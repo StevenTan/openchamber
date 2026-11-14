@@ -18,7 +18,7 @@ const header = (activityKey: SessionSidebarActivityKey, collapsed: boolean): Ses
   collapsed,
 });
 
-const child = (key: string): SessionSidebarRow => ({
+const child = (key: string): Extract<SessionSidebarRow, { kind: 'show-control' }> => ({
   kind: 'show-control',
   key,
   estimateSize: 20,
@@ -111,6 +111,34 @@ describe('findSessionSidebarDisclosure', () => {
     const previous = [header('chats', false), child('c1')];
     const next = [header('chats', false), child('c1'), child('c2')];
 
+    expect(findSessionSidebarDisclosure(previous, next)).toBeNull();
+  });
+
+  test('reveals and folds a Show more batch before its control', () => {
+    const control = (requestedCount: number): SessionSidebarRow => ({ ...child('project:show'), requestedCount });
+    const previous = [header('chats', false), sessionRow('s1'), control(7), header('work', false)];
+    const next = [header('chats', false), sessionRow('s1'), sessionRow('s2', true), child('s2-child'), control(14), header('work', false)];
+    const block = { previousHeaderIndex: 1, nextHeaderIndex: 1, blockStart: 2, blockEnd: 4 };
+
+    expect(findSessionSidebarDisclosure(previous, next)).toEqual({ ...block, opened: true });
+    expect(findSessionSidebarDisclosure(next, previous)).toEqual({ ...block, opened: false });
+    expect(sessionSidebarDisclosureBounds({ ...block, opened: true },
+      previous.map((_, i) => ({ start: i * 32, end: (i + 1) * 32 })),
+      next.map((_, i) => ({ start: i * 32, end: (i + 1) * 32 })),
+    )).toEqual({ from: 64, to: 128, shift: 0 });
+  });
+
+  test('does not animate arriving sessions when the requested page size stays the same', () => {
+    const control = child('project:show');
+    const previous = [header('chats', false), sessionRow('s1'), control];
+    const next = [header('chats', false), sessionRow('s1'), sessionRow('s2'), { ...control, currentCount: 8 }];
+    expect(findSessionSidebarDisclosure(previous, next)).toBeNull();
+  });
+
+  test('does not animate pagination mixed with a reorder', () => {
+    const control = child('project:show');
+    const previous = [header('chats', false), sessionRow('s1'), sessionRow('s2'), control];
+    const next = [header('chats', false), sessionRow('s2'), sessionRow('s1'), sessionRow('s3'), { ...control, requestedCount: 14 }];
     expect(findSessionSidebarDisclosure(previous, next)).toBeNull();
   });
 });

@@ -1315,15 +1315,16 @@ rest it is as quiet as the button was.
   the list back to that header and the sidebar would not scroll until focus
   left it; `moveHost` keeps the scroll position across a move that carries
   focus.
-- Opening and closing a zone, project, worktree, folder, multi-run or a
-  session's subsessions animates like a reasoning block in the chat (200ms
+- Opening and closing a zone, project, worktree, folder, multi-run, a
+  session's subsessions or its Show more / Show less batch animates like a
+  reasoning block in the chat (200ms
   ease-out, `sessionSidebarDisclosure.ts` finds the block and
   `lib/motion/rowDisclosure.ts` holds the timing and keyframes the file trees
   share; a session row with subsessions
   carries `expanded` for it). The rows are flat virtual rows, so no
   container changes height: `SessionSidebarRows` compares each new row list
-  with the one last drawn, and when exactly one header changed state with one
-  block of rows right under it, those rows are clipped above a moving boundary
+  with the one last drawn, and when exactly one control changed state with one
+  contiguous block of rows, those rows are clipped above a moving boundary
   and every row after them slides with it. A closed block is drawn as inert
   ghost rows at its old place until the motion ends; rows sliding in from past
   the virtual range stay mounted meanwhile. The block also fades: closing rows
@@ -1332,7 +1333,10 @@ rest it is as quiet as the button was.
   closing row stayed legible until the rows sliding up cut through it, which
   read as old content lingering over the new. An opening fade on a clock of
   its own (clear for the first 20%) left the first rows under the header
-  empty while the rows below already slid away. Collapse all, search, Show more and
+  empty while the rows below already slid away. A batch is identified by its
+  requested count changing, rather than its current count, which also changes
+  when sessions arrive. Its first new row starts the boundary; the controls and
+  following projects move with it. Collapse all, search and
   live list changes do not animate, nor does anything under reduced motion.
   The phone's list is drawn by the same renderer and animates the same way.
 - Shift selection and Ctrl/Cmd+A consume the model's logical row order. API
