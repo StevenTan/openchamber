@@ -105,6 +105,14 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     isAvailable: (ctx) => !ctx.isVSCode,
   },
   {
+    id: 'appearance.custom-css',
+    page: 'appearance',
+    titleKey: 'settings.customCss.label',
+    descriptionKey: 'settings.customCss.info',
+    keywords: ['css', 'stylesheet', 'custom', 'style', 'custom.css'],
+    isAvailable: (ctx) => !ctx.isVSCode,
+  },
+  {
     id: 'appearance.dock-badge',
     page: 'general',
     titleKey: 'settings.openchamber.visual.field.dockBadge',

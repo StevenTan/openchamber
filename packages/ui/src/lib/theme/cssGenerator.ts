@@ -167,10 +167,10 @@ const sidebarBaseRgb = hexToRgb(theme.colors.surface.muted);
 
     const existing = document.getElementById('opencode-theme-variables');
     if (existing) {
-      existing.remove();
+      existing.replaceWith(style);
+    } else {
+      document.head.appendChild(style);
     }
-
-    document.head.appendChild(style);
 
     document.documentElement.setAttribute('data-theme', theme.metadata.variant);
 

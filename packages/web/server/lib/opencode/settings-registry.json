@@ -867,6 +867,14 @@
         "web"
       ]
     },
+    "customCssEnabled": {
+      "scope": "device",
+      "surfaces": [
+        "web",
+        "desktop",
+        "mobile"
+      ]
+    },
     "mobileKeyboardMode": {
       "scope": "device",
       "surfaces": [

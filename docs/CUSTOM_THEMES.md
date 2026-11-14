@@ -1,5 +1,7 @@
 # Custom themes
 
+For layout, sizing and animation overrides, see [Custom CSS](CUSTOM_CSS.md).
+
 Create a theme by copying the JSON example below or a built-in palette from
 [`packages/ui/src/lib/theme/themes/`](../packages/ui/src/lib/theme/themes/).
 Give your copy a unique `metadata.id` and a name, then edit its colors.

@@ -1,5 +1,23 @@
 # Theme definitions and rendering
 
+The custom distribution's code baseline is 0.8125rem (13px at a 16px root),
+authored in `lib/typography.ts` and mirrored by the design-system CSS fallback.
+Interface and chat percentages remain independent multipliers. Saved settings,
+editor and terminal pixel sizes, VS Code typography and mobile size overrides
+keep their existing ownership.
+
+`useCustomCss.ts` owns the trusted server stylesheet, read through `runtimeFetch`
+from `/api/config/custom-css`. `ThemeSystemProvider` mounts it on web, desktop,
+hosted mobile and Capacitor; VS Code skips it. `customCssEnabled` is a persisted
+device setting, and `?custom-css=off` bypasses loading for recovery. The hook
+reloads on control-stream file changes and reconnection, aborts superseded reads,
+and clears immediately before a runtime switch, on disable and on unmount.
+Each read checks its abort signal after parsing, rejecting old replies even
+across A→B→A switches or transports that finish an aborted request. Read failures
+retain only the same runtime's last successful stylesheet; successful empty
+responses clear it. Theme variable updates replace their style element in place
+so the custom stylesheet stays after it. See `docs/CUSTOM_CSS.md` for authoring.
+
 `definition.ts` parses authored JSON into the complete runtime `Theme`. Built-ins and custom-file responses use this same boundary. Embedded windows receive an already resolved theme. The server checks required authored roles and file limits; the UI validates all supported overrides before rendering. An invalid sibling is skipped, while an invalid response shape leaves the previous custom library intact. Theme values are written into a `<style>` element, so the boundary also guards CSS: a colour must be a hex value, a keyword or a colour function (`rgb()`, `hsl()`, `oklch()`, `color-mix()` and kin), and fonts and transitions may not contain `; { } < > \` or load anything (`url()`, `image-set()`, `@import`). A theme that fails is skipped like any other invalid sibling.
 
 Keep authored definitions separate from runtime colors. Optional values are meaningful defaults, not missing rendering data. `compactTheme` removes semantic defaults; the maintainer script checks resolved-color equality before replacing JSON files. Existing custom files are read without rewriting them.

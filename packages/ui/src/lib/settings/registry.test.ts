@@ -24,6 +24,19 @@ import { renderSettingsRegistrySnapshot, SETTINGS_REGISTRY_SNAPSHOT_PATHS } from
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', '..');
 
 describe('settings registry', () => {
+  test('custom CSS is a device preference persisted locally and excluded from server autosave', () => {
+    const initial = useUIStore.getState().customCssEnabled;
+    const options = useUIStore.persist.getOptions();
+    try {
+      useUIStore.getState().setCustomCssEnabled(false);
+      expect(SETTINGS_REGISTRY.customCssEnabled.scope).toBe('device');
+      expect(SETTINGS_REGISTRY.customCssEnabled.surfaces).toEqual(['web', 'desktop', 'mobile']);
+      expect(readAutoSaveSnapshot()).not.toHaveProperty('customCssEnabled');
+      expect(options.partialize?.(useUIStore.getState())).toMatchObject({ customCssEnabled: false });
+    } finally {
+      useUIStore.setState({ customCssEnabled: initial });
+    }
+  });
   test('round-trips custom selection approval text and clearing it without resetting omitted preferences', async () => {
     const options = useUIStore.persist.getOptions();
     const original = useUIStore.getState();

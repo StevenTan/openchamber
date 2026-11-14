@@ -44,6 +44,7 @@ import { registerWorkflowRoutes } from '../workflows/routes.js';
 import { registerRoutingPromptRewrite, registerRoutingRoutes } from '../routing/routes.js';
 import { registerConfigEntityRoutes } from './config-entity-routes.js';
 import { createThemeFolderWatch } from './theme-watch.js';
+import { registerCustomCss } from './custom-css.js';
 import { registerSettingsUtilityRoutes } from './core-routes.js';
 import { registerProjectIconRoutes } from './project-icon-routes.js';
 import { registerProviderLogoRoutes } from './provider-logo-routes.js';
@@ -129,6 +130,7 @@ export const createFeatureRoutesRuntime = (dependencies) => {
   });
 
   let themeFolderWatch = null;
+  let customCssWatch = null;
   let stopGuestPackageWatch = () => {};
   let quotaProviders = null;
   const getQuotaProviders = async () => {
@@ -778,6 +780,11 @@ export const createFeatureRoutesRuntime = (dependencies) => {
         }
       }
     };
+    customCssWatch?.stop();
+    customCssWatch = registerCustomCss({
+      app, fsPromises, path, dataDir: openchamberDataDir,
+      onChange: () => announceChange('openchamber:custom-css-changed'),
+    });
     // Theme files edited by hand or by an agent reach every client without a reload.
     themeFolderWatch?.stop();
     themeFolderWatch = customThemesDir
@@ -1028,6 +1035,8 @@ export const createFeatureRoutesRuntime = (dependencies) => {
     stopFolderWatches: () => {
       themeFolderWatch?.stop();
       themeFolderWatch = null;
+      customCssWatch?.stop();
+      customCssWatch = null;
       stopGuestPackageWatch();
       stopGuestPackageWatch = () => {};
     },

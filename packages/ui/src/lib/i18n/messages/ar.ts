@@ -1,3 +1,4 @@
+import { customCssI18n } from './custom-css.i18n';
 import { settingsDict } from './ar.settings';
 import { linearIssuePickerI18n } from './linear-issue-picker.i18n';
 import { referencePickerI18n } from './reference-picker.i18n';
@@ -3926,6 +3927,7 @@ export const dict = {
   ...usageStatsI18n.ar,
   ...webSearchI18n.ar,
   ...sessionWarmingI18n.ar,
+  ...customCssI18n["ar"],
   ...compactionSettingsI18n.ar,
   ...heapSnapshotI18n.ar,
   ...consoleBudgetsI18n.ar,

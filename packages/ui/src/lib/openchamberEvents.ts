@@ -175,6 +175,7 @@ type GuestServiceEvent = { type: 'guest-service-event'; guestId: string; topic: 
  * rewritten. Carries nothing; listeners re-read the custom themes.
  */
 type ThemesChangedEvent = { type: 'themes-changed' };
+type CustomCssChangedEvent = { type: 'custom-css-changed' };
 
 /**
  * A usage limit stopped a session and the server moved on: the provider to
@@ -336,6 +337,7 @@ type OpenChamberEvent =
   | GuestMarksChangedEvent
   | GuestServiceEvent
   | ThemesChangedEvent
+  | CustomCssChangedEvent
   | LimitFailoverEvent
   | ProjectContextChangedEvent
   | SessionFoldersChangedEvent
@@ -700,6 +702,11 @@ const dispatchFromEnvelope = (envelope: { type: string; properties: unknown }) =
 
   if (envelope.type === 'openchamber:themes-changed') {
     for (const listener of listeners) listener({ type: 'themes-changed' });
+    return;
+  }
+
+  if (envelope.type === 'openchamber:custom-css-changed') {
+    for (const listener of listeners) listener({ type: 'custom-css-changed' });
     return;
   }
 

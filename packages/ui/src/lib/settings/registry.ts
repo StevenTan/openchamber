@@ -674,6 +674,7 @@ export const SETTINGS_REGISTRY = {
 
   // ── Device fields: never written to the server; an old settings.json that
   // still carries one is read once as a seed for the local store. ──
+  customCssEnabled: field({ scope: 'device', surfaces: ['web', 'desktop', 'mobile'], parse: parseBoolean, ui: uiStore('customCssEnabled', (v) => useUIStore.getState().setCustomCssEnabled(v), { autoSave: false }) }),
   mobileKeyboardMode: field({
     scope: 'device',
     surfaces: ['mobile'],

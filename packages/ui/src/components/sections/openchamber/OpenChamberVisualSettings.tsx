@@ -192,6 +192,8 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
     const weekStartPreference = useUIStore(state => state.weekStartPreference);
     const setWeekStartPreference = useUIStore(state => state.setWeekStartPreference);
     const alwaysShowScrollbars = useUIStore(state => state.alwaysShowScrollbars === true);
+    const customCssEnabled = useUIStore(state => state.customCssEnabled);
+    const setCustomCssEnabled = useUIStore(state => state.setCustomCssEnabled);
     const setAlwaysShowScrollbars = useUIStore(state => state.setAlwaysShowScrollbars);
     const showWindowControlsPosition = usesFramelessElectronChrome();
     const desktopWindowControlsPosition = useUIStore((state) => state.desktopWindowControlsPosition);
@@ -376,7 +378,19 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                     then what is set once per device. Sections stay direct children of
                     the page, so the layout drops the divider above whichever renders first. */}
                 {hasThemeSettings && (
-                    <ThemeAppearancePicker />
+                    <>
+                        <ThemeAppearancePicker />
+                        <SettingsSection>
+                            <SettingsCheckboxRow
+                                checked={customCssEnabled}
+                                onChange={setCustomCssEnabled}
+                                label={t('settings.customCss.label')}
+                                ariaLabel={t('settings.customCss.label')}
+                                info={t('settings.customCss.info')}
+                                settingsItem="appearance.custom-css"
+                            />
+                        </SettingsSection>
+                    </>
                 )}
 
                 {/* --- Density & type --- */}

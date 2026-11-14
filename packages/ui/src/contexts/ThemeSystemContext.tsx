@@ -10,6 +10,7 @@ import type { Theme, ThemeMode } from '@/types/theme';
 import { isDesktopLocalOriginActive, isDesktopShell as detectDesktopShell, isVSCodeRuntime } from '@/lib/desktop';
 import { setDesktopWindowTheme } from '@/lib/desktopNative';
 import { CSSVariableGenerator } from '@/lib/theme/cssGenerator';
+import { useCustomCss } from '@/lib/theme/useCustomCss';
 import { type SettingsSyncedDetail, updateDesktopSettings } from '@/lib/persistence';
 import {
   themes,
@@ -114,6 +115,7 @@ interface ThemeSystemProviderProps {
 }
 
 export function ThemeSystemProvider({ children, defaultThemeId }: ThemeSystemProviderProps) {
+  useCustomCss();
   const cssGenerator = useMemo(() => new CSSVariableGenerator(), []);
   const [preferences, setPreferences] = useState<ThemePreferences>(() => buildInitialPreferences(defaultThemeId));
   const [systemPrefersDark, setSystemPrefersDark] = useState<boolean>(() => getInitialSystemPreference());
