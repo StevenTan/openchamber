@@ -114,7 +114,7 @@ function ContextMenuSubTrigger({ className, children, ...props }: React.Componen
 function ContextMenuSubContent({ className, children, style, ...props }: React.ComponentProps<typeof BaseContextMenu.Popup>) {
   return (
     <BaseContextMenu.Portal>
-      <BaseContextMenu.Positioner className="app-region-no-drag z-50">
+      <BaseContextMenu.Positioner className="app-region-no-drag z-50" sideOffset={10}>
         <BaseContextMenu.Popup
           data-slot="dropdown-menu-sub-content"
           style={{

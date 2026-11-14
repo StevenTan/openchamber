@@ -44,7 +44,7 @@ export const contextSessionMenuSlots: SessionMenuSlots = {
   ),
   SubContent: ({ className, children, ...props }: React.ComponentProps<typeof ContextMenu.Popup>) => (
     <ContextMenu.Portal>
-      <ContextMenu.Positioner className="app-region-no-drag z-50">
+      <ContextMenu.Positioner className="app-region-no-drag z-50" sideOffset={10}>
         <ContextMenu.Popup
           data-slot="dropdown-menu-sub-content"
           style={{

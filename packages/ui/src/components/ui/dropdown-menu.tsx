@@ -386,7 +386,7 @@ function DropdownMenuSubContent({
 
   return (
     <BaseMenu.Portal className="contents" container={portalContext?.portalContainer || undefined}>
-      <BaseMenu.Positioner className="z-50">
+      <BaseMenu.Positioner className="z-50" sideOffset={10}>
         <BaseMenu.Popup
           ref={setPopup}
           data-slot="dropdown-menu-sub-content"
