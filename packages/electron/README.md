@@ -2,6 +2,9 @@
 
 Electron desktop runtime for OpenChamber on macOS, Windows, and Linux.
 
+This custom distribution's desktop update check always reports no update.
+The app and its bundled OpenCode CLI are upgraded by replacing the desktop package.
+
 This package owns the native shell: windows, menus, deep links, native notifications, auto-updates, host switching, SSH connections, tunnel helpers, and packaged desktop builds. The web UI and OpenChamber server logic still live in `packages/web` and shared React UI lives in `packages/ui`.
 
 ## How It Runs

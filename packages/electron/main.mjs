@@ -87,7 +87,7 @@ import { requestRemoteHostUpdate } from './remote-host-update.mjs';
 import { assertUpdaterCapability, readLinuxPackageType } from './updater-capability.mjs';
 import { relaunchAfterExit } from './linux-relaunch.mjs';
 import { installLinuxPackage } from './linux-package-install.mjs';
-import { checkForDesktopUpdate, downloadPendingDesktopUpdate, markDesktopUpdateDownloaded } from './updater-check.mjs';
+import { downloadPendingDesktopUpdate, markDesktopUpdateDownloaded } from './updater-check.mjs';
 import { resolveUpdaterChannel } from './updater-channel.mjs';
 import { convertShortcutComboToAccelerator, MINI_CHAT_GLOBAL_SHORTCUT_SETTING_KEY, normalizeStoredShortcutCombo, selectMiniChatGlobalShortcutAction } from './mini-chat-global-shortcut.mjs';
 import {
@@ -145,8 +145,6 @@ import { parsePairingDeepLink } from './pairing-deep-link.mjs';
 import { attachRendererRecovery, takeSafeStart } from './renderer-recovery.mjs';
 import { createLoadFailureWarningFilter } from './load-failure-warnings.mjs';
 import { mintOutsideFileGrant } from '@openchamber/web/server/lib/fs/routes.js';
-import { fetchUpdateNotes } from '@openchamber/web/server/lib/changelog/update-notes.js';
-import { compareVersions } from '@openchamber/web/server/lib/version-order.js';
 import { applyConnectAttemptTimeout } from '@openchamber/web/server/lib/network-defaults.js';
 import { isNetworkAccessBlocked } from '@openchamber/web/server/lib/enterprise-mode.js';
 import { assignInjectedEnv } from '@openchamber/web/server/lib/injected-env.js';
@@ -334,14 +332,12 @@ const state = {
   // path may end the process: the update sequence owns the exit.
   updateInstallPending: false,
   pendingUpdate: null,
-  // The channel and source ('mirror' or 'github') the updater's feed was last
-  // pointed at (applyUpdaterChannel), and the update check in flight, if any.
+  // The channel and source ('mirror' or 'github') last configured by applyUpdaterChannel.
   updaterChannel: null,
   updaterSource: null,
   // When the Stable mirror last failed a check or a download; checks read
   // GitHub for a while after (pickUpdaterSource).
   updaterMirrorFailedAt: null,
-  updateCheck: null,
   updateDownloadPromise: null,
   updateDownloadVersion: null,
   unreachableHosts: new Set(),
@@ -3851,8 +3847,6 @@ const installDownloadedUpdate = () => new Promise((resolve, reject) => {
   });
 });
 
-const parseRelevantChangelogNotes = (fromVersion, toVersion) => fetchUpdateNotes(fromVersion, toVersion, compareVersions);
-
 const buildInstalledAppsCachePath = () => path.join(path.dirname(settingsFilePath()), INSTALLED_APPS_CACHE_FILE);
 
 // The renderer asks again while a first scan is still running (it retries an
@@ -5142,67 +5136,14 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
       return { channel };
     }
 
-    case 'desktop_check_for_updates': {
-      assertUpdaterCapability({ packaged: app.isPackaged });
-      // electron-updater answers a check that is already running, for the
-      // feed it started on. A channel switched meanwhile waits for that check
-      // to end, then checks its own feed.
-      if (state.updateCheck && readUpdateChannel() !== state.updaterChannel) {
-        await state.updateCheck.catch(() => null);
-      }
-      const channel = readUpdateChannel();
-      applyUpdaterChannel(channel);
-      // The source this check started on. A check running beside it can fall
-      // back first and move the shared state to GitHub; this one still owes
-      // its caller the same fallback.
-      const startedOn = state.updaterSource;
-      const currentVersion = APP_VERSION;
-      const runCheck = () => checkForDesktopUpdate({
-        autoUpdater,
-        currentVersion,
-        pendingUpdate: state.pendingUpdate,
-        missingFeedIsError: state.updaterSource === 'mirror',
-      });
-      // The whole check, the GitHub retry included, is what a channel switch
-      // waits for: a switch that ran between the two would have its feed
-      // replaced by the retry.
-      const check = (async () => {
-        try {
-          return await runCheck();
-        } catch (error) {
-          if (startedOn !== 'mirror') throw error;
-          // The mirror failed: GitHub answers this check and the next ones for a while.
-          log.warn('[electron] update mirror failed, checking GitHub', error instanceof Error ? error.message : String(error));
-          state.updaterMirrorFailedAt = Date.now();
-          applyUpdaterChannel(channel, 'github');
-          return runCheck();
-        }
-      })();
-      state.updateCheck = check;
-      let result;
-      try {
-        result = await check;
-      } finally {
-        if (state.updateCheck === check) state.updateCheck = null;
-      }
-      const { available, updateInfo, nextVersion, pendingUpdate } = result;
-      // Assign before the changelog fetch: a download can finish while the
-      // notes load and mark this record as downloaded. Assigning after that
-      // await would replace it with the pre-await copy and drop the payload.
-      state.pendingUpdate = pendingUpdate;
-      const body =
-        (typeof updateInfo?.releaseNotes === 'string' && updateInfo.releaseNotes.trim() ? updateInfo.releaseNotes : null) ||
-        await parseRelevantChangelogNotes(currentVersion, nextVersion);
+    case 'desktop_check_for_updates':
       return {
-        available,
-        currentVersion,
-        version: available ? nextVersion : null,
-        body: body || null,
-        date:
-          (typeof updateInfo?.releaseDate === 'string' && updateInfo.releaseDate) ||
-          null,
+        available: false,
+        currentVersion: APP_VERSION,
+        version: null,
+        body: null,
+        date: null,
       };
-    }
 
     case 'desktop_download_and_install_update':
       assertUpdaterCapability({ packaged: app.isPackaged });
