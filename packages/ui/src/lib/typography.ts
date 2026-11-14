@@ -1,6 +1,6 @@
 export const SEMANTIC_TYPOGRAPHY = {
   markdown: '0.875rem',
-  code: '0.75rem',
+  code: '0.8125rem',
   uiHeader: '0.875rem',
   uiLabel: '0.84375rem',
   meta: '0.78125rem',

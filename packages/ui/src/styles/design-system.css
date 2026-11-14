@@ -42,7 +42,7 @@
 
     /* Semantic typography defaults (must match SEMANTIC_TYPOGRAPHY) */
     --text-markdown: 0.875rem;
-    --text-code: 0.75rem;
+    --text-code: 0.8125rem;
     --text-ui-header: 0.875rem;
     /* Sidebar section headers (projects, zones): a clear step above rows. */
     --text-ui-section: 0.9375rem;
