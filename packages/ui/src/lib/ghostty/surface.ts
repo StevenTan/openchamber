@@ -1927,7 +1927,7 @@ export class GhosttyTerminalSurface {
     const alternateScreen = this.core.isAlternateScreen();
     if (!reportMouse && !alternateScreen) {
       const state = this.readScrollbarState();
-      const atEdge = state !== null && state.total > state.len
+      const atEdge = state !== null
         && (event.deltaY < 0 ? state.offset === 0 : state.offset >= state.total - state.len);
       const pixels = event.deltaY * (event.deltaMode === 1 ? this.metrics.height : event.deltaMode === 2 ? this.rows * this.metrics.height : 1);
       const feedback = new TerminalScrollEdgeEvent(pixels, atEdge, this.onWheel);

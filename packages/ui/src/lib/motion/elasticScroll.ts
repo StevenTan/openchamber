@@ -102,10 +102,11 @@ export function bindElasticScroll(doc: Document, nativeScroll?: NativeScrollAPI)
     let retargeted = false;
     for (const entry of event.composedPath()) {
       if (!(entry instanceof HTMLElement) || entry === doc.documentElement || entry === doc.body) continue;
-      if (entry.scrollHeight <= entry.clientHeight + 1) continue;
       if (!/^(auto|scroll)$/.test(view.getComputedStyle(entry).overflowY)) continue;
       target = entry;
-      break;
+      // Prefer an ancestor with vertical travel; otherwise pull the outer
+      // scrollport, rather than a short horizontal scroller inside it.
+      if (entry.scrollHeight > entry.clientHeight + 1) break;
     }
     // The pulled viewport leaves a gap under the pointer. Keep that gesture
     // with its viewport instead of alternating between it and the parent.

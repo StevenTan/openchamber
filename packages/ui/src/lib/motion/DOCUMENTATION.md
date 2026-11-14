@@ -36,6 +36,10 @@ during that check cannot install a late listener.
 Normal scrolling uses native scroll offsets and events,
 with vertical wheel travel scaled by 0.8 (drag and inertial input alike). Only
 outward input at a vertical edge pulls the scrollport.
+Content that fits its scrollport can pull at either edge too. Wheel routing
+prefers the nearest ancestor with vertical travel; when none has travel, it
+pulls the outer scrollport so a short horizontal code/table scroller does not
+capture the document's vertical gesture.
 On a trusted macOS Electron page, `nativeScroll` supplies AppKit contact and
 momentum phases. `NativeOverscrollAxis` holds the resisted displacement while
 contact is active and samples Motion's spring only after release or cancellation.

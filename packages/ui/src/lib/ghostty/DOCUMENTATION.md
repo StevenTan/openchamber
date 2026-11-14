@@ -22,7 +22,8 @@ Touch-owned viewports have no menu and no paste shortcut, so `TerminalView` puts
 
 The surface emits cancelable `openchamber:terminal-scroll-edge` events for
 ordinary scrollback, with pixel deltas and an `atEdge` flag before row
-quantization. The document's motion binding owns visual feedback and can consume
+quantization. A terminal with no scrollback is at both edges. The document's
+motion binding owns visual feedback and can consume
 an outward edge pull or the reversal that unwinds a held pull. Unconsumed input
 continues through the terminal's normal row scrolling.
 Mouse-reporting and alternate-screen applications keep
