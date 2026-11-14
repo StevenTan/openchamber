@@ -16,8 +16,11 @@ apply the state immediately. No hidden live tool views are retained.
 Activity steps are separate virtual rows. Animating their live height on every
 frame would repeatedly change list measurements and scroll anchoring. Snapshots
 retain the outgoing picture without mounting a second transcript or keeping
-closed tools active. `styles/disclosure-motion.css` names only turn rows; the
-root does not crossfade and the overlay does not capture pointer input.
+closed tools active. `styles/disclosure-motion.css` names turn rows and the
+answer siblings after folded work. When thinking and the answer share one
+message, that row's top stays put; capturing the answer separately makes its
+position glide instead of crossfading its two positions inside the row.
+The root does not crossfade and the overlay does not capture pointer input.
 
 Snapshots belong only to the clicked transcript viewport. The transition overlay
 is clipped to that viewport and the composer's top edge: top-layer snapshots
