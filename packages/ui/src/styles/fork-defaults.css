@@ -86,7 +86,7 @@
 }
 
 [data-chat-column] .markdown-content:not(.markdown-tool, .markdown-reasoning) :is(strong, b, [data-streamdown="strong"]) {
-  font-weight: 630;
+  font-weight: 600;
 }
 
 /* Prose rhythm and content cards. Compact tool output keeps its own layout. */

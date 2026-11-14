@@ -3,12 +3,8 @@ import { defaultRangeExtractor, measureElement, useVirtualizer, type VirtualItem
 import type { SessionSidebarRow, SessionSidebarRowModel } from './sessionSidebarRowModel';
 import { SessionTreeGuides } from './sessions/SessionTreeGuides';
 import { SESSION_TREE_BASE_PADDING_PX } from './sessions/sessionTreeGeometry';
-import { findSessionSidebarDisclosure, sessionSidebarDisclosureBounds } from './sessionSidebarDisclosure';
 import {
-  boundaryClipKeyframes,
-  boundaryFadeInKeyframes,
   ROW_DISCLOSURE_EASING,
-  ROW_DISCLOSURE_FADE_OUT,
   ROW_DISCLOSURE_MS,
 } from '@/lib/motion/rowDisclosure';
 import {
@@ -25,26 +21,28 @@ import {
   sessionSidebarRowVirtualKey,
 } from './sessionSidebarVirtualization';
 
-/** A row a header just hid, drawn where it was while it folds away. */
-type GhostRow = { row: SessionSidebarRow; nextRow: SessionSidebarRow | undefined; start: number; end: number };
+/** A removed occurrence stays visible while it fades out. */
+type GhostRow = { row: SessionSidebarRow; nextRow: SessionSidebarRow | undefined; start: number; end: number; opacity: number };
 
-/**
- * One header opening or closing: the rows under it are clipped above a
- * boundary moving `from` → `to`, and every row from `followingIndex` on slides
- * the same distance.
- */
-type DisclosureMotion = {
+type RowMotion = {
   id: number;
+  positions: ReadonlyMap<string, { start: number; opacity: number }>;
   revealKeys: ReadonlySet<string>;
   ghosts: readonly GhostRow[];
-  followingIndex: number;
-  from: number;
-  to: number;
-  /**
-   * Rows that slide down from on screen to past the virtual range: they stay
-   * mounted until the motion ends, so the bottom of the list does not blank.
-   */
+  /** Previously mounted rows stay mounted until their move finishes. */
   slidingIndexes: readonly number[];
+};
+
+type RowPosition = { start: number; opacity: number };
+type RowAnimation = { animation: Animation; from: RowPosition; to: RowPosition; fadeEnd: number };
+
+/** The native animation keeps its progress after React removes its row. */
+const animatedRowPosition = ({ animation, from, to, fadeEnd }: RowAnimation): RowPosition => {
+  const progress = animation.effect?.getComputedTiming().progress ?? 1;
+  return {
+    start: from.start + (to.start - from.start) * progress,
+    opacity: from.opacity + (to.opacity - from.opacity) * Math.min(progress / fadeEnd, 1),
+  };
 };
 
 const prefersReducedMotion = (): boolean =>
@@ -89,6 +87,7 @@ export function SessionSidebarRows({
   projectDivider = true,
 }: Props): React.ReactNode {
   const rows = model.rows;
+  const heldRow = heldRowRef?.current;
   const getScrollElement = React.useCallback(() => scrollElement, [scrollElement]);
   const measuredHeightByKeyRef = React.useRef(new Map<string, number>());
   const measuredGapBySpacingRef = React.useRef(new Map<string, number>());
@@ -124,7 +123,8 @@ export function SessionSidebarRows({
     return row ? sessionSidebarRowVirtualKey(row, rows[index + 1]) : index;
   }, [rows]);
   const motionIdRef = React.useRef(0);
-  const [motion, setMotion] = React.useState<DisclosureMotion | null>(null);
+  const [motion, setMotion] = React.useState<RowMotion | null>(null);
+  const rowAnimationsRef = React.useRef(new Map<string, RowAnimation>());
   const slidingIndexes = motion?.slidingIndexes;
   const rangeExtractor = React.useCallback((range: Parameters<typeof defaultRangeExtractor>[0]) => {
     const indexes = defaultRangeExtractor(range);
@@ -166,46 +166,9 @@ export function SessionSidebarRows({
   const containerRef = React.useRef<HTMLDivElement>(null);
   const lastLayoutRef = React.useRef<{
     model: SessionSidebarRowModel;
-    measurements: readonly VirtualItem[];
     items: readonly VirtualItem[];
+    scrollTop: number;
   } | null>(null);
-
-  // A header the user opened or closed: plan the motion from where the rows
-  // were to where they are now. Runs before paint, and the state it sets
-  // renders before paint too, so the first frame drawn is the motion's start.
-  React.useLayoutEffect(() => {
-    const last = lastLayoutRef.current;
-    if (!last || last.model.rows === rows || !scrollElement || prefersReducedMotion() || heldRowRef?.current) return;
-    const disclosure = findSessionSidebarDisclosure(last.model.rows, rows);
-    if (!disclosure) return;
-    const before = last.measurements;
-    const after = virtualizer.measurementsCache;
-    const bounds = sessionSidebarDisclosureBounds(disclosure, before, after);
-    if (!bounds) return;
-    const { from, to, shift } = bounds;
-    const followingIndex = disclosure.opened ? disclosure.blockEnd : disclosure.nextHeaderIndex + 1;
-
-    const top = scrollElement.scrollTop - scrollElement.clientHeight;
-    const bottom = scrollElement.scrollTop + scrollElement.clientHeight * 2;
-    const revealKeys = new Set<string>();
-    const ghosts: GhostRow[] = [];
-    const slidingIndexes: number[] = [];
-    if (disclosure.opened) {
-      for (let index = disclosure.blockStart; index < disclosure.blockEnd; index += 1) revealKeys.add(rows[index].key);
-      for (let index = followingIndex; index < after.length && after[index].start + from - to < bottom; index += 1) {
-        slidingIndexes.push(index);
-      }
-    } else {
-      // Only the hidden rows near the viewport need drawing as they fold.
-      for (let index = disclosure.blockStart; index < disclosure.blockEnd; index += 1) {
-        const measured = before[index];
-        if (!measured || measured.end + shift < top || measured.start + shift > bottom) continue;
-        ghosts.push({ row: last.model.rows[index], nextRow: last.model.rows[index + 1], start: measured.start + shift, end: measured.end + shift });
-      }
-    }
-    motionIdRef.current += 1;
-    setMotion({ id: motionIdRef.current, revealKeys, ghosts, followingIndex, from, to, slidingIndexes });
-  }, [rows, scrollElement, virtualizer, heldRowRef]);
 
   // Rows that changed above what the user sees, with nothing the user did to
   // the list (see `isSessionSidebarUserChange`): sessions arriving, leaving or
@@ -240,36 +203,93 @@ export function SessionSidebarRows({
     if (nextLine !== null && Math.abs(nextLine - inset - scrollElement.scrollTop) > 0.5) virtualizer.scrollToOffset(Math.max(nextLine - inset, 0));
   }, [model, scrollElement, virtualizer, renderedScrollTop, getStickyHeaderHeight, heldRowRef]);
 
+  // Every membership or order change uses the same keyed transition.
+  // Resolve the scroll anchor first, then animate the mounted occurrences from
+  // their previous viewport positions to the new virtual layout.
+  React.useLayoutEffect(() => {
+    const last = lastLayoutRef.current;
+    const container = containerRef.current;
+    if (!last || last.model.rows === rows || !scrollElement || !container) return;
+    if (last.model.rows.length === rows.length && rows.every((row, index) => row.key === last.model.rows[index].key)) return;
+    if (prefersReducedMotion() || scrollElement.clientHeight === 0 || container.closest('[inert]')
+      || heldRow || last.model.search || model.search) {
+      setMotion(null);
+      return;
+    }
+
+    const after = virtualizer.measurementsCache;
+    const positions = new Map<string, { start: number; opacity: number }>();
+    const revealKeys = new Set<string>();
+    const ghosts = new Map<string, GhostRow>();
+    const slidingIndexes: number[] = [];
+    const scrollShift = scrollElement.scrollTop - last.scrollTop;
+    const anchorShift = scrollElement.scrollTop - renderedScrollTop;
+    // An interrupted transition starts from the picture currently on screen.
+    const position = (key: string, source: RowPosition) => {
+      const active = rowAnimationsRef.current.get(key);
+      if (!active) return { ...source, start: source.start + scrollShift };
+      const current = animatedRowPosition(active);
+      return { ...current, start: current.start + anchorShift };
+    };
+    // Presence includes rows still exiting, so returning keys keep their
+    // presentation instead of starting a second entrance.
+    const previousRows = new Map<string, GhostRow>();
+    for (const item of last.items) {
+      const row = last.model.rows[item.index];
+      previousRows.set(row.key, { row, nextRow: last.model.rows[item.index + 1], start: item.start, end: item.end, opacity: 1 });
+    }
+    for (const ghost of motion?.ghosts ?? []) previousRows.set(ghost.row.key, ghost);
+    let moved = false;
+    for (const item of previousRows.values()) {
+      const { row } = item;
+      const nextIndex = model.rowIndexByKey.get(row.key);
+      const previous = position(row.key, item);
+      if (nextIndex !== undefined) {
+        positions.set(row.key, previous);
+        slidingIndexes.push(nextIndex);
+        const next = after[nextIndex];
+        if (next && (Math.abs(previous.start - next.start) > 0.5 || previous.opacity < 1)) moved = true;
+      } else {
+        ghosts.set(row.key, { ...item, ...previous, end: previous.start + item.end - item.start });
+      }
+    }
+    for (const item of virtualizer.getVirtualItems()) {
+      const row = rows[item.index];
+      if (!last.model.rowIndexByKey.has(row.key) && !previousRows.has(row.key)) revealKeys.add(row.key);
+    }
+    if (!moved && !revealKeys.size && !ghosts.size) return;
+    motionIdRef.current += 1;
+    setMotion({ id: motionIdRef.current, positions, revealKeys, ghosts: [...ghosts.values()], slidingIndexes });
+  }, [model, rows, scrollElement, virtualizer, renderedScrollTop, heldRow, motion]);
+
   // Recorded after the effects above read it, on every commit, so it always
   // holds the layout the user last saw.
   React.useLayoutEffect(() => {
-    lastLayoutRef.current = { model, measurements: virtualizer.measurementsCache, items: virtualItems };
+    lastLayoutRef.current = { model, items: virtualItems, scrollTop: scrollElement?.scrollTop ?? 0 };
   });
 
   React.useLayoutEffect(() => {
     const container = containerRef.current;
     if (!motion || !container) return;
     const timing: KeyframeAnimationOptions = { duration: ROW_DISCLOSURE_MS, easing: ROW_DISCLOSURE_EASING };
-    const distance = motion.from - motion.to;
     const animations: Animation[] = [];
+    const rowAnimations = rowAnimationsRef.current;
+    const ghosts = new Map(motion.ghosts.map((ghost) => [ghost.row.key, ghost]));
     for (const element of container.children) {
       if (!(element instanceof HTMLElement)) continue;
       const key = element.dataset.sidebarRowKey ?? '';
       const start = Number(element.dataset.sidebarVirtualStart);
-      if (element.dataset.sidebarGhost === 'true') {
-        // Held shut after the end: the ghost unmounts a render later, and
-        // unclipped for that frame it would flash over the rows below.
-        animations.push(element.animate(boundaryClipKeyframes(start, element.offsetHeight, motion.from, motion.to), { ...timing, fill: 'forwards' }));
-        animations.push(element.animate(ROW_DISCLOSURE_FADE_OUT, { ...timing, fill: 'forwards' }));
-      } else if (motion.revealKeys.has(key)) {
-        animations.push(element.animate(boundaryClipKeyframes(start, element.offsetHeight, motion.from, motion.to), timing));
-        animations.push(element.animate(boundaryFadeInKeyframes(start, element.offsetHeight, motion.from, motion.to), timing));
-      } else if (Number(element.dataset.index) >= motion.followingIndex && distance !== 0) {
-        animations.push(element.animate([
-          { transform: `translateY(${start + distance}px)` },
-          { transform: `translateY(${start}px)` },
-        ], timing));
-      }
+      const ghost = ghosts.get(key);
+      const from = ghost ? { start, opacity: ghost.opacity }
+        : motion.revealKeys.has(key) ? { start: start - 6, opacity: 0 } : motion.positions.get(key);
+      const to = { start, opacity: ghost ? 0 : 1 };
+      if (!from || (Math.abs(from.start - to.start) <= 0.5 && from.opacity === to.opacity)) continue;
+      const frame = (position: RowPosition): Keyframe => ({ transform: `translateY(${position.start}px)`, opacity: position.opacity });
+      const fadeEnd = ghost ? 0.6 : 1;
+      const frames = ghost ? [frame(from), { ...frame(to), offset: fadeEnd }, frame(to)] : [frame(from), frame(to)];
+      const animation = element.animate(frames, { ...timing, fill: ghost ? 'forwards' : 'none' });
+      animations.push(animation);
+      rowAnimations.set(key, { animation, from, to, fadeEnd });
     }
     let cancelled = false;
     void Promise.all(animations.map((animation) => animation.finished)).then(() => {
@@ -278,6 +298,7 @@ export function SessionSidebarRows({
     return () => {
       cancelled = true;
       for (const animation of animations) animation.cancel();
+      rowAnimations.clear();
     };
   }, [motion]);
 
@@ -306,8 +327,8 @@ export function SessionSidebarRows({
 
   const ghostsEnd = motion?.ghosts.reduce((end, ghost) => Math.max(end, ghost.end), 0) ?? 0;
   return <div ref={containerRef} data-sidebar-virtual-ready="true" style={{ height: Math.max(totalSize, ghostsEnd), position: 'relative' }}>
-    {motion?.ghosts.map((ghost) => <div
-      key={ghost.row.key}
+    {motion?.ghosts.filter((ghost) => !model.rowIndexByKey.has(ghost.row.key)).map((ghost) => <div
+      key={`ghost:${ghost.row.key}`}
       aria-hidden="true"
       inert
       className={`[&_[data-session-row-box]]:my-px ${sectionWrapperClass(ghost.row, ghost.nextRow, projectDivider)}`}
@@ -320,6 +341,7 @@ export function SessionSidebarRows({
         left: 0,
         width: '100%',
         pointerEvents: 'none',
+        opacity: ghost.opacity,
         transform: `translateY(${ghost.start}px)`,
       }}
     >

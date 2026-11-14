@@ -1,9 +1,8 @@
 # Session Sidebar
 
-Disclosure boundaries use the last measured row's end when no row follows the
-block. The final Projects section therefore reveals and hides its full height,
-just like sections followed by another header. Ghost rows and scroll anchoring
-stay owned by `SessionSidebarRows`.
+`SessionSidebarRows` owns keyed transitions, exiting rows and scroll anchoring
+for every list change. The row model supplies identities and final positions;
+the animation follows those changes independently of the action that caused them.
 
 Sidebar code is organized by the business object it owns. Shared contracts are
 kept at this root in `types.ts` and `utils.tsx`.
@@ -1315,30 +1314,20 @@ rest it is as quiet as the button was.
   the list back to that header and the sidebar would not scroll until focus
   left it; `moveHost` keeps the scroll position across a move that carries
   focus.
-- Opening and closing a zone, project, worktree, folder, multi-run, a
-  session's subsessions or its Show more / Show less batch animates like a
-  reasoning block in the chat (200ms
-  ease-out, `sessionSidebarDisclosure.ts` finds the block and
-  `lib/motion/rowDisclosure.ts` holds the timing and keyframes the file trees
-  share; a session row with subsessions
-  carries `expanded` for it). The rows are flat virtual rows, so no
-  container changes height: `SessionSidebarRows` compares each new row list
-  with the one last drawn, and when exactly one control changed state with one
-  contiguous block of rows, those rows are clipped above a moving boundary
-  and every row after them slides with it. A closed block is drawn as inert
-  ghost rows at its old place until the motion ends; rows sliding in from past
-  the virtual range stay mounted meanwhile. The block also fades: closing rows
-  are gone by 60% of the motion, and an opening row comes up as the boundary
-  uncovers it, solid once half of it shows. Clipped at full strength, a
-  closing row stayed legible until the rows sliding up cut through it, which
-  read as old content lingering over the new. An opening fade on a clock of
-  its own (clear for the first 20%) left the first rows under the header
-  empty while the rows below already slid away. A batch is identified by its
-  requested count changing, rather than its current count, which also changes
-  when sessions arrive. Its first new row starts the boundary; the controls and
-  following projects move with it. Collapse all, search and
-  live list changes do not animate, nor does anything under reduced motion.
-  The phone's list is drawn by the same renderer and animates the same way.
+- Every change to row membership or order uses one keyed transition in
+  `SessionSidebarRows`: opening and closing sections, Show more / Show less,
+  session creation, archiving, completion and reordering all reach it through
+  the resulting row model. Mounted rows glide from their previous viewport
+  positions, new occurrences fade in, and removed occurrences remain as inert
+  fading ghosts for 200ms. Only transform and opacity animate; virtual row
+  heights and the authoritative model settle immediately. Previously mounted
+  surviving rows stay in the virtual range until the transition ends.
+  Overlapping changes start from the current animated positions and opacity,
+  including a row removed during its entrance. Scroll anchoring runs first,
+  preserving the visible row for background changes and the clicked header
+  for disclosures. Metadata-only updates, scrolling, search, hidden lists,
+  held drag rows and reduced motion start no transition. The phone uses the
+  same renderer.
 - Shift selection and Ctrl/Cmd+A consume the model's logical row order. API
   session IDs are deduplicated only at the action boundary, after hidden
   descendants have been included. Selection is cleared on runtime switch and
