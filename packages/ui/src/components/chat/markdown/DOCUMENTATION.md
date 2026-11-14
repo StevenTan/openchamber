@@ -69,6 +69,20 @@ The tool row is the one place that already turns terminal bytes into text (`rend
 
 OpenCode drops the output when the shell is removed and records "output is no longer available". The block keeps what it had read, and after a reload shows the status alone.
 
+# Table controls
+
+## Ownership
+
+`MarkdownTable` owns table actions and the horizontal scroller; `index.css` places the action strip over the header at its inline end, with a translucent theme surface and background blur. Buttons share that glass surface; the wrap toggle marks its enabled state with the foreground icon color, while resting actions use muted icons. Hover, keyboard focus and open menus use a faint theme tint.
+
+Table headers are transparent. Tables have no outer frame or column borders; body rows use faint foreground-tinted separators, with the header divider kept distinct.
+
+## Decisions
+
+### Why an overlapping grid and not controls inside a header cell
+
+The actions share a grid cell with the scroller, so they stay visible during horizontal scrolling without adding a toolbar row. Both contribute their intrinsic width: even a short single-column table has room for the controls, and its table fills that width.
+
 # SVG fences in document previews
 
 ## Ownership

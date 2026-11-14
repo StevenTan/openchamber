@@ -246,13 +246,10 @@
   }
 
   & [data-streamdown="table-wrapper"] > :is(div:has(> table), .overlay-scrollbar-wrapper) {
-    border-color: #e2e7ef;
-    border-radius: 12px;
     background: #fff;
   }
   & [data-streamdown="table"] { font-size: 1em; line-height: 1.8; }
-  & [data-streamdown="table-header"] { background: #f7f9fc; }
-  & :is([data-streamdown="table-row"], [data-streamdown="table-cell"], [data-streamdown="table-header-cell"]) {
+  & [data-streamdown="table-header"] [data-streamdown="table-row"] {
     border-color: #e2e7ef;
   }
   & [data-streamdown="table-header-cell"] { font-weight: 500; color: #171b22; }
