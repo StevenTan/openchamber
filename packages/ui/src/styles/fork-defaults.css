@@ -85,6 +85,10 @@
   font-weight: 500;
 }
 
+[data-chat-column] .markdown-content:not(.markdown-tool, .markdown-reasoning) :is(strong, b, [data-streamdown="strong"]) {
+  font-weight: 630;
+}
+
 /* Prose rhythm and content cards. Compact tool output keeps its own layout. */
 :root.light [data-chat-column] .markdown-content:not(.markdown-tool, .markdown-reasoning):not([data-user-message-collapsed] *) {
   --markdown-paragraph-spacing: 7px;
@@ -97,6 +101,11 @@
     --oc-block-margin-start: 7px;
     --oc-block-margin-end: 7px;
     margin-block: 7px;
+  }
+  & p {
+    --oc-block-margin-start: 16px;
+    --oc-block-margin-end: 16px;
+    margin-block: 16px;
   }
   & li + li { margin-block-start: 7px; }
   & li > :is(ul, ol) {

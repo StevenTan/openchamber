@@ -10,7 +10,9 @@ This fork defaults to the built-in `pure-white-light` palette in light mode,
 including One Light syntax colors. Existing theme choices keep their IDs.
 `styles/fork-defaults.css` owns the bundled layout, prose, selection and floating
 surface styles. Fenced code uses its code-size token and uniform 450 token weight;
-prose and the default interface weight are 500. Interface weight remains an
+prose and the default interface weight are 500. Chat prose emphasis uses 630;
+light-mode paragraphs use 16px spacing while lists keep their compact rhythm.
+Interface weight remains an
 Appearance setting rather than a stylesheet override. The external
 `custom.css` is loaded afterward for personal overrides.
 
