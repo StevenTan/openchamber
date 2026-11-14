@@ -18,6 +18,7 @@ import { collectLocalFileDiagnostics, collectSshBufferDiagnostics } from '@openc
 import { replaceFileWithRetry } from './windows-file-replace.mjs';
 import { persistMainWindowState } from './window-state.mjs';
 import { attachWindowEvents, isNativeWindowVisible } from './window-events.mjs';
+import { attachMacScrollEvents } from './macos-scroll-events.mjs';
 import { createTrayController } from './tray.mjs';
 import { buildDockMenuTemplate, buildUnreadJumpList, isJumpListSessionId } from './dock-menu.mjs';
 import { createSessionLinkGate } from './session-link-gate.mjs';
@@ -2698,6 +2699,10 @@ const createBrowserWindow = ({ label, restoreGeometry, url, runtimeConfig = {}, 
     state.focusedWindowIds.delete(browserWindow.id);
   });
   attachWindowEvents(browserWindow, emitToWindow);
+  browserWindow.__ocNativeScrollReady = attachMacScrollEvents(browserWindow, {
+    canSend: isLocalSender,
+    onError: (error) => log.error('[electron] native scroll events unavailable', error),
+  });
 
   // Traffic lights disappear during dock-restore animation when using
   // titleBarStyle:'hidden' + custom trafficLightPosition. macOS caches a
@@ -5919,6 +5924,14 @@ ipcMain.handle('openchamber:invoke', async (event, command, args) => {
   const browserWindow = BrowserWindow.fromWebContents(event.sender);
   const result = await handleInvoke(browserWindow, command, args);
   return !local && command === 'desktop_hosts_get' ? redactHostsConfigForRemote(result) : result;
+});
+
+ipcMain.handle('openchamber:native-scroll-ready', async (event) => {
+  if (event.senderFrame !== event.sender.mainFrame || !isLocalSender(event.sender)) {
+    throw new Error('Native scroll is available only to the local main frame');
+  }
+  const window = BrowserWindow.fromWebContents(event.sender);
+  return await (window?.__ocNativeScrollReady ?? false);
 });
 
 // Sync, because preload must know before the page's scripts restore their

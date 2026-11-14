@@ -20,6 +20,14 @@ On Linux, terminal selection changes publish to PRIMARY through the local Electr
 
 Touch-owned viewports have no menu and no paste shortcut, so `TerminalView` puts a Paste button next to Copy in the tab toolbar on those hosts only and calls `TerminalController.pasteClipboard`. It takes the same path as the menu's Paste, bracketed-paste encoding included, and its failure toast names no shortcut. Long-press stays text selection: the surface owns touch, so the system never sees a long-press it could answer with its own Paste menu. Clipboard text comes from `readClipboardText` (`lib/clipboard.ts`), which starts the read inside the click. iOS WebKit then shows its own Paste bubble and answers once the user taps it; dismissing the bubble rejects the read. Android WebView refuses web clipboard reads with no prompt, so the Android app reads through its `ClipboardText` plugin (`packages/mobile/README.md`).
 
+The surface emits cancelable `openchamber:terminal-scroll-edge` events for
+ordinary scrollback, with pixel deltas and an `atEdge` flag before row
+quantization. The document's motion binding owns visual feedback and can consume
+an outward edge pull or the reversal that unwinds a held pull. Unconsumed input
+continues through the terminal's normal row scrolling.
+Mouse-reporting and alternate-screen applications keep
+their existing wheel input and emit no boundary event.
+
 ## Invariants
 
 - On Android the hidden textarea rests at one space with the caret after it; elsewhere it rests empty. Every deletion a soft keyboard makes there fires an `input` event of type `deleteContentBackward`, and `onInput` sends exactly one Backspace for it through the key encoder (with a release for Kitty report-all programs) and puts the space back. Every keydown first returns the caret to after the space, because Gboard's space-bar swipe moves it without an event. Typed and composed text reaches the PTY without the space. Deletion is handled on `input` only, never on `beforeinput`. Other platforms leave deletion edits alone, as before.

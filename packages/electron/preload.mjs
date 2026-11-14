@@ -235,6 +235,16 @@ const desktopBridge = {
 
 if (isLocalPage) {
   desktopBridge.pickThemeFile = () => ipcRenderer.invoke('openchamber:invoke', 'desktop_pick_theme_file', {});
+  if (process.platform === 'darwin' && process.isMainFrame) {
+    desktopBridge.nativeScroll = {
+      ready: () => ipcRenderer.invoke('openchamber:native-scroll-ready'),
+      subscribe: (handler) => {
+        const listener = (_event, data) => handler(data);
+        ipcRenderer.on('openchamber:native-scroll', listener);
+        return () => ipcRenderer.removeListener('openchamber:native-scroll', listener);
+      },
+    };
+  }
   // PRIMARY is not reachable from the web Clipboard API; expose it only to the
   // local Linux page. Remote pages never receive this bridge.
   if (process.platform === 'linux') {
