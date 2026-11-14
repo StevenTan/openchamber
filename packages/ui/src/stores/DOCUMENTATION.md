@@ -5,7 +5,7 @@
 `packages/ui/src/stores` contains app-level Zustand stores for persistent UI state, runtime state, and feature caches.
 
 Typography defaults and reset actions share constants in `useUIStore`: interface
-115%, chat 95%, spacing 110%, editor 16px and terminal 15px. Persisted preferences
+115%, chat 95%, spacing 110%, editor 15px and terminal 15px. Persisted preferences
 override these initial values; the semantic font-size bases remain independent.
 
 Not all state in the UI belongs here.

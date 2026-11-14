@@ -1555,7 +1555,7 @@ const openFileTab = (state: UIStore, directory: string, filePath: string, previe
 
 /** What the selection menu's thumb-up says when the user set no text of their own. */
 export const DEFAULT_SELECTION_APPROVAL_TEXT = 'Sounds good';
-export const DEFAULT_EDITOR_FONT_SIZE = 16;
+export const DEFAULT_EDITOR_FONT_SIZE = 15;
 export const DEFAULT_TERMINAL_FONT_SIZE = 15;
 export const DEFAULT_INTERFACE_SCALE = 115;
 export const DEFAULT_CHAT_SCALE = 95;

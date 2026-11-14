@@ -19,17 +19,17 @@ const hydrate = async (version: number, editorFontSize: number) => {
 };
 
 describe('editor font size default', () => {
-  test('is 16px', () => {
-    expect(DEFAULT_EDITOR_FONT_SIZE).toBe(16);
-    expect(useUIStore.getInitialState().editorFontSize).toBe(16);
+  test('is 15px', () => {
+    expect(DEFAULT_EDITOR_FONT_SIZE).toBe(15);
+    expect(useUIStore.getInitialState().editorFontSize).toBe(15);
   });
 
   test('moves the legacy default to the configured editor default', async () => {
-    expect(await hydrate(27, 13)).toBe(16);
+    expect(await hydrate(27, 13)).toBe(15);
   });
 
   test('keeps a size the user set', async () => {
-    expect(await hydrate(27, 15)).toBe(15);
+    expect(await hydrate(27, 16)).toBe(16);
   });
 
   test('runs once: a 13px chosen after the migration stays', async () => {

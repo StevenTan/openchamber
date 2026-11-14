@@ -22,7 +22,7 @@ URLs before stylesheet inlining. Their font options
 have no CDN source, so enterprise mode can use them offline. Other downloadable
 faces retain their existing loader and policy. Font licenses ship in
 `web/public/fonts`. Defaults and reset actions share the UI store's scale
-constants: interface 115%, chat 95%, spacing 110%, editor 16px and terminal 15px.
+constants: interface 115%, chat 95%, spacing 110%, editor 15px and terminal 15px.
 The semantic typography bases stay unchanged; stored choices remain overrides.
 
 `useCustomCss.ts` owns the trusted server stylesheet, read through `runtimeFetch`
