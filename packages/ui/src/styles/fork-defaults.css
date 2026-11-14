@@ -258,7 +258,7 @@
   & [data-streamdown="table-header-cell"] { font-weight: 500; color: #171b22; }
   & tbody [data-streamdown="table-row"] {
     transition: background-color 120ms ease;
-    &:hover { background: #f2f6ff; }
+    &:hover { background: var(--interactive-hover); }
   }
   & img { border-radius: 12px; }
 
