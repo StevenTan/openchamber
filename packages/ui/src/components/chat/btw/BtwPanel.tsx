@@ -1,3 +1,4 @@
+import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
 import React from 'react';
 import { AnimatePresence } from 'motion/react';
 import { ComposerFloatingPanel } from '../composer/ui/ComposerFloatingPanel';
@@ -272,7 +273,7 @@ const BtwFrame: React.FC<{
                             ) : (
                                 <Icon name="chat-ai-3" className="size-3.5 shrink-0" />
                             )}
-                            <Icon name={collapsed ? 'arrow-up-s' : 'arrow-down-s'} className="size-4 shrink-0" />
+                            <DisclosureChevron expanded={!collapsed} closedDirection="up" className="size-4 shrink-0" />
                         </button>
                     </TooltipTrigger>
                     <TooltipContent side="top" sideOffset={6}>{titleClickLabel}</TooltipContent>

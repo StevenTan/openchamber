@@ -1,3 +1,4 @@
+import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
 import React from 'react';
 import { ModelSelector } from '@/components/sections/agents/ModelSelector';
 import { AgentSelector } from '@/components/sections/commands/AgentSelector';
@@ -6,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Icon } from '@/components/icon/Icon';
 import { cn } from '@/lib/utils';
 import {
   SETTINGS_CUSTOM_TRIGGER_CLASS,
@@ -128,7 +128,7 @@ const CategoryRow: React.FC<{
           aria-expanded={expanded}
           className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-1.5 text-start hover:bg-interactive-hover/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <Icon name={expanded ? 'arrow-down-s' : 'arrow-right-s'} className="size-4 flex-shrink-0 text-muted-foreground" />
+          <DisclosureChevron expanded={expanded} className="size-4 flex-shrink-0 text-muted-foreground" />
           <span className="typography-ui-label font-medium text-foreground truncate">{category.name || category.id}</span>
           <span className="typography-meta text-muted-foreground truncate">{summary}</span>
         </button>

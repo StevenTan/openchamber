@@ -1475,7 +1475,7 @@ export const McpPage: React.FC = () => {
                     <Icon name="arrow-right-s" className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                   )}
                 </CollapsibleTrigger>
-                <CollapsibleContent className="pt-2">
+                <CollapsibleContent><div className="pt-2">
                   <div className="space-y-4">
                     <div className="flex flex-col gap-2 @xl:flex-row @xl:items-center @xl:gap-8">
                       <div className="flex min-w-0 flex-row items-center gap-1 @xl:w-56 shrink-0">
@@ -1664,7 +1664,7 @@ export const McpPage: React.FC = () => {
                     )}
 
                   </div>
-                </CollapsibleContent>
+                </div></CollapsibleContent>
               </Collapsible>
         </SettingsSection>
 

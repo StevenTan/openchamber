@@ -3,7 +3,7 @@ import { defaultRangeExtractor, measureElement, useVirtualizer, type VirtualItem
 import type { SessionSidebarRow, SessionSidebarRowModel } from './sessionSidebarRowModel';
 import { SessionTreeGuides } from './sessions/SessionTreeGuides';
 import { SESSION_TREE_BASE_PADDING_PX } from './sessions/sessionTreeGeometry';
-import { findSessionSidebarDisclosure } from './sessionSidebarDisclosure';
+import { findSessionSidebarDisclosure, sessionSidebarDisclosureBounds } from './sessionSidebarDisclosure';
 import {
   boundaryClipKeyframes,
   boundaryFadeInKeyframes,
@@ -180,16 +180,10 @@ export function SessionSidebarRows({
     if (!disclosure) return;
     const before = last.measurements;
     const after = virtualizer.measurementsCache;
-    const headerBefore = before[disclosure.previousHeaderIndex];
-    const headerAfter = after[disclosure.nextHeaderIndex];
-    if (!headerBefore || !headerAfter) return;
-    // Rows above the header normally stay put; carry any shift over anyway.
-    const shift = headerAfter.start - headerBefore.start;
-    const followingBefore = disclosure.opened ? before[disclosure.previousHeaderIndex + 1] : before[disclosure.blockEnd];
+    const bounds = sessionSidebarDisclosureBounds(disclosure, before, after);
+    if (!bounds) return;
+    const { from, to, shift } = bounds;
     const followingIndex = disclosure.opened ? disclosure.blockEnd : disclosure.nextHeaderIndex + 1;
-    const followingAfter = after[followingIndex];
-    const from = (followingBefore?.start ?? headerBefore.end) + shift;
-    const to = followingAfter?.start ?? headerAfter.end;
 
     const top = scrollElement.scrollTop - scrollElement.clientHeight;
     const bottom = scrollElement.scrollTop + scrollElement.clientHeight * 2;

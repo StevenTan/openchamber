@@ -1,5 +1,10 @@
 # Session Sidebar
 
+Disclosure boundaries use the last measured row's end when no row follows the
+block. The final Projects section therefore reveals and hides its full height,
+just like sections followed by another header. Ghost rows and scroll anchoring
+stay owned by `SessionSidebarRows`.
+
 Sidebar code is organized by the business object it owns. Shared contracts are
 kept at this root in `types.ts` and `utils.tsx`.
 

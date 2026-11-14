@@ -40,6 +40,25 @@ type SessionSidebarDisclosure = {
   blockEnd: number;
 };
 
+/** The list tail is the boundary when the disclosed block has no following row. */
+export const sessionSidebarDisclosureBounds = (
+  disclosure: SessionSidebarDisclosure,
+  before: readonly { start: number; end: number }[],
+  after: readonly { start: number; end: number }[],
+): { from: number; to: number; shift: number } | null => {
+  const headerBefore = before[disclosure.previousHeaderIndex];
+  const headerAfter = after[disclosure.nextHeaderIndex];
+  if (!headerBefore || !headerAfter) return null;
+  const shift = headerAfter.start - headerBefore.start;
+  const followingBefore = before[disclosure.opened ? disclosure.previousHeaderIndex + 1 : disclosure.blockEnd];
+  const followingAfter = after[disclosure.opened ? disclosure.blockEnd : disclosure.nextHeaderIndex + 1];
+  return {
+    from: (followingBefore?.start ?? before[before.length - 1].end) + shift,
+    to: followingAfter?.start ?? after[after.length - 1].end,
+    shift,
+  };
+};
+
 /**
  * The one header the user just opened or closed between two row lists, with
  * the rows that appeared or went under it. Null when no header changed, when

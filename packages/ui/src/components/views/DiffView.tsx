@@ -1,3 +1,4 @@
+import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
 import React from 'react';
 
 import { useUIStore, type PendingDiffScope } from '@/stores/useUIStore';
@@ -907,7 +908,7 @@ const NestedRepositoryChanges = React.memo<NestedRepositoryChangesProps>(({
                                     className="flex w-full items-center gap-2 px-3 py-1 text-start text-foreground/80 transition-colors hover:text-foreground"
                                     title={nestedFile.path}
                                 >
-                                    <Icon name={isOpen ? 'arrow-down-s' : 'arrow-right-s'} className="size-4 shrink-0 text-muted-foreground" />
+                                    <DisclosureChevron expanded={isOpen} className="size-4 shrink-0 text-muted-foreground" />
                                     <span
                                         className="typography-micro font-semibold w-4 shrink-0 text-center uppercase"
                                         style={{ color: descriptor.color }}

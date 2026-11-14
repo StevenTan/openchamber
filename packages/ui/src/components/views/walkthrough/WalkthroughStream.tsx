@@ -1,3 +1,4 @@
+import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/icon/Icon';
 import { FileTypeIcon } from '@/components/icons/FileTypeIcon';
@@ -367,7 +368,7 @@ export const WalkthroughStream = memo(function WalkthroughStream({
             onClick={() => setUncoveredOpen((open) => !open)}
             aria-expanded={uncoveredOpen}
           >
-            <Icon name={uncoveredOpen ? 'arrow-down-s' : 'arrow-right-s'} className="size-4 shrink-0" />
+            <DisclosureChevron expanded={uncoveredOpen} className="size-4 shrink-0" />
             <span className="typography-ui-label text-muted-foreground">
               {t('walkthrough.uncovered.title', { count: view.uncoveredHunks.length })}
             </span>

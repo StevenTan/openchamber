@@ -53,6 +53,7 @@ export const setupMcpDirectoryHarness = () => {
     const dom = new Window();
     const globals = {
       window: dom,
+      getComputedStyle: dom.getComputedStyle.bind(dom),
       document: dom.document,
       Event: dom.Event,
       PointerEvent: dom.PointerEvent,

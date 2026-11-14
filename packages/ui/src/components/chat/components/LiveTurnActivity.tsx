@@ -1,3 +1,4 @@
+import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
 import React from 'react';
 import { Icon } from '@/components/icon/Icon';
 import { Button } from '@/components/ui/button';
@@ -20,6 +21,7 @@ import { dispatchRowExpand } from '../lib/scroll/timelineScrollIntent';
 import { renderedPage } from '@/lib/opencode/tools';
 import type { ShownPart } from '../lib/turns/liveActivity';
 import { DiffCount } from '@/components/ui/diff-count';
+import { animateActivityDisclosure } from '@/lib/motion/activityDisclosure';
 
 const NO_MESSAGES: ChatMessageEntry[] = [];
 
@@ -94,7 +96,7 @@ export function TurnFold({ turn, hasLaterAssistant, expanded, finalMessageId, on
         <>
             <Icon name="stack" className="size-3.5 shrink-0 text-[var(--tools-icon)]" />
             <span className="shrink-0 font-semibold text-[var(--tools-title)]">{t('chat.liveActivity.title')}</span>
-            <Icon name={expanded ? 'arrow-down-s' : 'arrow-right-s'} className="size-3 shrink-0" />
+            <DisclosureChevron expanded={expanded} className="size-3 shrink-0" />
             {fileLabel ? (
                 <span className="flex min-w-0 items-center gap-1 typography-meta @min-[560px]:shrink-0">
                     <span className="truncate">{fileLabel}</span>
@@ -112,7 +114,7 @@ export function TurnFold({ turn, hasLaterAssistant, expanded, finalMessageId, on
     // The fold opens below its header, which stays where the reader clicked it.
     const handleToggle = React.useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
         if (!expanded) dispatchRowExpand(event.currentTarget);
-        onToggle();
+        animateActivityDisclosure(event.currentTarget, onToggle);
     }, [expanded, onToggle]);
     const headerClass = 'w-full justify-start normal-case !ps-px !pe-2 text-[var(--tools-description)] hover:!bg-transparent active:!bg-transparent';
     const contentId = foldContentId(turn.turnId);

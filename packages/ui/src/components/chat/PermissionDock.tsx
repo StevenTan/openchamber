@@ -1,3 +1,4 @@
+import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
 import React from 'react';
 import { AnimatePresence } from 'motion/react';
 import { ComposerFloatingPanel } from './composer/ui/ComposerFloatingPanel';
@@ -111,7 +112,7 @@ const PermissionDockRequest: React.FC<{
                     className="flex min-w-0 flex-1 items-center gap-2 text-start text-muted-foreground transition-colors hover:text-foreground"
                 >
                     <Icon name="question" className="size-3.5 shrink-0 text-[var(--status-warning)]" />
-                    <Icon name={collapsed ? 'arrow-up-s' : 'arrow-down-s'} className="size-4 shrink-0" />
+                    <DisclosureChevron expanded={!collapsed} closedDirection="up" className="size-4 shrink-0" />
                     <span className="typography-ui-label min-w-0 truncate text-foreground">{title}</span>
                     {isFromSubagent ? (
                         <span className="typography-micro shrink-0 rounded bg-foreground/5 px-1.5 py-0.5 text-muted-foreground">

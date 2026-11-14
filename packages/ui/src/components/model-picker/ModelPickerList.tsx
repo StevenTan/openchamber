@@ -1,3 +1,4 @@
+import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
 import React from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -1121,7 +1122,7 @@ export const ModelPickerList: React.FC<ModelPickerListProps> = ({
   // so a closed one still reads as closed at rest.
   const renderChevron = (collapsed: boolean) => (
     <span className={cn('ms-auto flex size-4 flex-shrink-0 items-center justify-center text-muted-foreground', !collapsed && 'opacity-0 group-hover/header:opacity-100 group-focus-visible/header:opacity-100')}>
-      <Icon name={collapsed ? 'arrow-right-s' : 'arrow-down-s'} className="size-4" />
+      <DisclosureChevron expanded={!collapsed} className="size-4" />
     </span>
   );
 

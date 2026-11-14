@@ -1,3 +1,4 @@
+import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
 import React from 'react';
 import { toast } from '@/components/ui';
 import { Button } from '@/components/ui/button';
@@ -108,7 +109,7 @@ function PromptCaption({ prompt, expanded, onToggle }: { prompt: string; expande
           className="inline-flex shrink-0 items-center gap-0.5 rounded px-1 typography-meta text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {expanded ? t('multirun.overview.prompt.collapse') : t('multirun.overview.prompt.expand')}
-          <Icon name={expanded ? 'arrow-up-s' : 'arrow-down-s'} className="size-3.5" />
+          <DisclosureChevron expanded={expanded} closedDirection="down" className="size-3.5" />
         </button>
       ) : null}
     </div>

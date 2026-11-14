@@ -1,3 +1,4 @@
+import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -340,8 +341,8 @@ export const AgentPermissionsEditor: React.FC<AgentPermissionsEditorProps> = ({
             className={cn('flex min-w-0 items-center gap-1.5 text-start', !supportsPatterns && 'cursor-default')}
             aria-expanded={supportsPatterns ? isExpanded : undefined}
           >
-            <Icon
-              name={isExpanded && supportsPatterns ? 'arrow-down-s' : 'arrow-right-s'}
+            <DisclosureChevron
+              expanded={isExpanded && supportsPatterns}
               className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground', !supportsPatterns && 'opacity-0')}
             />
             <span className={SETTINGS_FIELD_LABEL_CLASS}>{label}</span>

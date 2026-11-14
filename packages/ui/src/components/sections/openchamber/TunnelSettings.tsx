@@ -1440,7 +1440,7 @@ export const TunnelSettings: React.FC = () => {
                           </Button>
                         </div>
 
-                        <CollapsibleContent className="pt-1.5">
+                        <CollapsibleContent><div className="pt-1.5">
                           <div className="space-y-1 px-3 pb-2">
                             <p className="typography-meta text-muted-foreground">{t('settings.openchamber.tunnel.field.hostnameLabel')} <code>{preset.hostname}</code></p>
                             <Input
@@ -1486,7 +1486,7 @@ export const TunnelSettings: React.FC = () => {
                               </Button>
                             </div>
                           </div>
-                        </CollapsibleContent>
+                        </div></CollapsibleContent>
                       </Collapsible>
                     </div>
                   );

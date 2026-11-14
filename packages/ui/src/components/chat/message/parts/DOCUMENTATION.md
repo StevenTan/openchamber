@@ -1,5 +1,12 @@
 # Chat Message Parts: Rendering Architecture
 
+Explicit Activity clicks animate virtual-row snapshots through
+`lib/motion/activityDisclosure.ts`; the live row projection still changes once.
+The snapshot keeps closing content visible without retaining hidden tools or
+animating the list's measurements. Reduced motion and unsupported browsers
+apply disclosure immediately. Expandable tool headers share `DisclosureChevron`
+and the measured-height Base UI panel transition.
+
 This folder contains renderers for chat message parts (text, tools, reasoning, placeholders) and shared tool presentation helpers.
 
 Use this doc when you ask an agent to change tool/header/description behavior.

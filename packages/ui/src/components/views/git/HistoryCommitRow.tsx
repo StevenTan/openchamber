@@ -1,3 +1,4 @@
+import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -613,8 +614,8 @@ export const HistoryCommitRow = React.memo(({
                         {t('gitView.history.binary')}
                       </span>
                     )}
-                    <Icon
-                      name={openDiffPaths.has(file.path) ? 'arrow-down-s' : 'arrow-right-s'}
+                    <DisclosureChevron
+                      expanded={openDiffPaths.has(file.path)}
                       className="size-3 shrink-0 text-muted-foreground"
                     />
                   </button>

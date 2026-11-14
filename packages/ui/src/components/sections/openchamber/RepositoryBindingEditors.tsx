@@ -1,3 +1,4 @@
+import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
 import React from 'react';
 import {
   gitRemoteHost,
@@ -47,7 +48,6 @@ import {
   SettingsStackedField,
 } from '../shared/SettingsSection';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Icon } from '@/components/icon/Icon';
 import { IdentityDropdown } from '@/components/views/git/GitHeader';
 import { useGitOperationRecovery } from '@/components/views/git/useGitOperationRecovery';
 import { GitOperationStatus } from '@/components/views/git/GitOperationStatus';
@@ -352,7 +352,7 @@ export const AuxiliaryBindingSettings: React.FC<SourceControlBindingSettingsProp
     <Collapsible open={open} onOpenChange={setOpen} className={cn('min-w-0', className)}>
       <CollapsibleTrigger className="w-auto justify-start gap-1.5">
         <SettingsGroupTitle>{t('gitView.hydration.title')}</SettingsGroupTitle>
-        <Icon name={open ? 'arrow-up-s' : 'arrow-down-s'} className="h-4 w-4 text-muted-foreground" />
+        <DisclosureChevron expanded={open} closedDirection="down" className="h-4 w-4 text-muted-foreground" />
       </CollapsibleTrigger>
       <CollapsibleContent>
     <SettingsControlGroup

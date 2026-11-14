@@ -1,3 +1,4 @@
+import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
 import React from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Icon } from '@/components/icon/Icon';
@@ -272,7 +273,7 @@ export const BackgroundShellsStrip: React.FC<BackgroundShellsStripProps> = React
                   ? t('chat.backgroundShells.count', { count })
                   : t('chat.backgroundWork.count', { count })}
               </span>
-              <Icon name={expanded ? 'arrow-up-s' : 'arrow-down-s'} className="size-4 shrink-0" aria-hidden="true" />
+              <DisclosureChevron expanded={expanded} closedDirection="down" className="size-4 shrink-0" aria-hidden="true" />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="top" sideOffset={6}>{t(expanded ? 'contextTooltips.chat.shellsHide' : 'contextTooltips.chat.shellsShow')}</TooltipContent>

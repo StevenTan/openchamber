@@ -1,3 +1,4 @@
+import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
 
 import React from 'react';
 import { useMobileAppActions } from '@/apps/mobileAppContext';
@@ -2154,8 +2155,8 @@ const ToolPartContent: React.FC<ToolPartProps & { header?: ToolRowHeader; subage
                                     )} style={iconStyle}>
                                         {getToolIcon(rowTool, presentation)}
                                     </span>
-                                    <Icon
-                                        name={isExpanded ? 'arrow-down-s' : 'arrow-right-s'}
+                                    <DisclosureChevron
+                                        expanded={isExpanded}
                                         className={cn(
                                             'absolute inset-0 h-3.5 w-3.5 transition-opacity',
                                             isExpanded ? 'opacity-100' : 'opacity-0 group-hover/tool:opacity-100',

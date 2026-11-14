@@ -1,3 +1,6 @@
+import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
+import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
+import { Collapsible as BaseCollapsible } from '@base-ui/react/collapsible';
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Icon } from '@/components/icon/Icon';
@@ -5,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useUIStore } from '@/stores/useUIStore';
 import type { IconName } from '@/components/icon/icons';
 import { WorkStatusTouchContext } from './touchContext';
+import { useHeightMorph } from '@/lib/motion/useSizeMorph';
 
 /**
  * Row/section vocabulary for the work-status panel.
@@ -82,9 +86,7 @@ export const WorkStatusSection: React.FC<{
 };
 
 /**
- * Section whose body folds away. The chevron swaps on expand exactly as the
- * transcript's tool blocks do, so the two collapsibles read as the same
- * control rather than two conventions in one window.
+ * Section whose body and persistent chevron animate together.
  *
  * Expanded state lives in the persisted UI store, not in component state: the
  * panel unmounts whenever the context panel opens, and local state would
@@ -115,13 +117,18 @@ export const WorkStatusCollapsibleSection: React.FC<{
   const setExpandedInStore = useUIStore((state) => state.setWorkStatusSectionExpanded);
   const touch = React.useContext(WorkStatusTouchContext);
   const expanded = stored ?? defaultExpanded;
+  const previewId = React.useId();
+  const previewRef = React.useRef<HTMLDivElement>(null);
+  useHeightMorph(previewRef);
   return (
-    <section data-work-status-section={id} className={SECTION_CLASS}>
+    <Collapsible
+      render={<section data-work-status-section={id} className={SECTION_CLASS} />}
+      open={expanded}
+      onOpenChange={(open) => setExpandedInStore(id, open)}
+    >
       <div data-work-status-heading className={cn('flex items-center gap-1', touch ? 'mb-1.5 min-h-9 ps-2.5' : 'mb-0.5', actionLayout === 'inline' && !touch && 'h-6')}>
-        <button
-          type="button"
-          aria-expanded={expanded}
-          onClick={() => setExpandedInStore(id, !expanded)}
+        <BaseCollapsible.Trigger
+          {...(collapsedContent ? { 'aria-controls': previewId } : {})}
           className={cn(
             // The rows' icon-to-label gap, so every label starts at one x.
             'group/section flex min-w-0 flex-1 items-center gap-2 rounded-md text-start',
@@ -156,10 +163,10 @@ export const WorkStatusCollapsibleSection: React.FC<{
                   ) : null)}
                 </span>
               ) : null}
-              <Icon
-                name={expanded ? 'arrow-down-s' : 'arrow-right-s'}
+              <DisclosureChevron
+                expanded={expanded}
                 className={cn(
-                  'absolute inset-0 size-[13px] text-muted-foreground transition-opacity rtl:-scale-x-100',
+                  'absolute inset-0 size-[13px] text-muted-foreground transition-opacity',
                   !(iconNode || icon) || expanded ? 'opacity-100' : 'opacity-0 group-hover/section:opacity-100 group-focus-visible/section:opacity-100',
                 )}
               />
@@ -172,19 +179,25 @@ export const WorkStatusCollapsibleSection: React.FC<{
           ) : null}
           {/* The phone has no hover: its chevron stays at the heading's end. */}
           {touch ? (
-            <Icon
-              name={expanded ? 'arrow-down-s' : 'arrow-right-s'}
-              className="me-2.5 size-3.5 shrink-0 text-muted-foreground rtl:-scale-x-100"
+            <DisclosureChevron
+              expanded={expanded}
+              className="me-2.5 size-3.5 shrink-0 text-muted-foreground"
             />
           ) : null}
-        </button>
+        </BaseCollapsible.Trigger>
         {actionLayout === 'inline' ? action : null}
       </div>
       {actionLayout === 'below' ? action : null}
-      {touch ? (
-        expanded ? <TouchCard>{children}</TouchCard> : collapsedContent ? <TouchCard>{collapsedContent}</TouchCard> : null
-      ) : (expanded ? children : collapsedContent)}
-    </section>
+      {collapsedContent ? (
+        <div id={previewId} ref={previewRef}>
+          {touch ? <TouchCard>{expanded ? children : collapsedContent}</TouchCard> : expanded ? children : collapsedContent}
+        </div>
+      ) : (
+        <CollapsibleContent>
+          {touch ? <TouchCard>{children}</TouchCard> : children}
+        </CollapsibleContent>
+      )}
+    </Collapsible>
   );
 };
 

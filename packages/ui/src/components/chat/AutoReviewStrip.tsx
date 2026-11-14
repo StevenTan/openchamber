@@ -1,3 +1,4 @@
+import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
 import React, { memo } from 'react';
 
 import { Icon } from '@/components/icon/Icon';
@@ -139,7 +140,7 @@ export const AutoReviewStrip = memo(() => {
                 className="min-w-0 flex-1 shrink justify-start gap-2 px-0 font-normal normal-case hover:!bg-transparent has-[>svg]:px-0"
               >
                 {label}
-                <Icon name={unfolded ? 'arrow-up-s' : 'arrow-down-s'} className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <DisclosureChevron expanded={unfolded} closedDirection="down" className="size-4 shrink-0 text-muted-foreground" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="top" sideOffset={6}>{t(unfolded ? 'contextTooltips.chat.disputeHide' : 'contextTooltips.chat.disputeShow')}</TooltipContent>

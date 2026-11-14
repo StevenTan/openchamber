@@ -1,5 +1,13 @@
 # Shared UI primitives
 
+`DisclosureChevron` keeps one glyph mounted and rotates it for expanded state.
+Its closed direction is right, up or down; right-facing disclosures mirror in
+RTL. It respects reduced motion. Collapsible panels
+transition their measured height and opacity for 200 ms; Base UI owns their
+closing lifetime and restores automatic height when opening settles.
+Vertical padding belongs to an inner content wrapper, so the panel itself can
+reach zero height before unmounting.
+
 ## Ownership
 
 This folder owns runtime-independent controls and their Base UI integration, including dropdown focus and dismissal. Feature-specific model filtering belongs to `components/model-picker`.

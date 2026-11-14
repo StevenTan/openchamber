@@ -1,3 +1,4 @@
+import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
 import React, { memo } from 'react';
 
 import { Icon } from '@/components/icon/Icon';
@@ -101,7 +102,7 @@ export const PullRequestWatchStrip = memo(({ sessionId }: { sessionId: string | 
               <span className="min-w-0 flex-1 truncate text-start">
                 {t(changeRequestCopy('chat.prWatch.count', countTerm), { count: watches.length })}
               </span>
-              <Icon name={expanded ? 'arrow-up-s' : 'arrow-down-s'} className="size-4 shrink-0" aria-hidden="true" />
+              <DisclosureChevron expanded={expanded} closedDirection="down" className="size-4 shrink-0" />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="top" sideOffset={6}>{t(expanded ? 'contextTooltips.chat.prWatchesHide' : 'contextTooltips.chat.prWatchesShow')}</TooltipContent>

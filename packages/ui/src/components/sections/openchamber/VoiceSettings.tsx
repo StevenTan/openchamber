@@ -1,3 +1,4 @@
+import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useConfigStore } from '@/stores/useConfigStore';
 import { useDeviceInfo } from '@/lib/device';
@@ -575,12 +576,12 @@ const LocalTtsModelStatus = ({ models, requestingId, request }: ReturnType<typeo
                                 ({available.length})
                             </span>
                         </div>
-                        <Icon
-                            name={availableOpen ? 'arrow-down-s' : 'arrow-right-s'}
+                        <DisclosureChevron
+                            expanded={availableOpen}
                             className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-foreground"
                         />
                     </CollapsibleTrigger>
-                    <CollapsibleContent className="pt-1">
+                    <CollapsibleContent><div className="pt-1">
                         <input
                             type="text"
                             value={filter}
@@ -604,7 +605,7 @@ const LocalTtsModelStatus = ({ models, requestingId, request }: ReturnType<typeo
                                 />
                             ))
                         )}
-                    </CollapsibleContent>
+                    </div></CollapsibleContent>
                 </Collapsible>
             ) : null}
         </div>

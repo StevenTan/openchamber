@@ -31,6 +31,8 @@ test('a status frame keeps subscriptions and storage alive while project changes
     localStorage: dom.localStorage, getComputedStyle: dom.getComputedStyle.bind(dom), Event: dom.Event, MessageEvent: dom.MessageEvent,
     Element: dom.Element, HTMLElement: dom.HTMLElement, Node: dom.Node, DocumentFragment: dom.DocumentFragment,
     MutationObserver: dom.MutationObserver,
+    requestAnimationFrame: dom.requestAnimationFrame.bind(dom),
+    cancelAnimationFrame: dom.cancelAnimationFrame.bind(dom),
     IS_REACT_ACT_ENVIRONMENT: true })) {
     originals.set(key, Object.getOwnPropertyDescriptor(globalThis, key));
     Object.defineProperty(globalThis, key, { configurable: true, writable: true, value });

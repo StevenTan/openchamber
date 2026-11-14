@@ -1,3 +1,4 @@
+import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
 import React from 'react';
 import { Icon } from '@/components/icon/Icon';
 import { Spinner } from '@/components/ui/spinner';
@@ -79,8 +80,8 @@ export const SessionSidebarActivityHeader: React.FC<{
         {label ?? (isBuiltinActivityKey(activityKey) ? t(ACTIVITY_TITLE_KEY[activityKey]) : '')}
       </span>
       {preview ? <PreviewMark /> : null}
-      <Icon
-        name={collapsed ? 'arrow-right-s' : 'arrow-down-s'}
+      <DisclosureChevron
+        expanded={!collapsed}
         className={cn(
           'h-3.5 w-3.5 text-muted-foreground',
           collapsed || alwaysShowActions ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100',
@@ -126,8 +127,8 @@ export const SessionSidebarCaption: React.FC<{
         {label ?? t('sessions.sidebar.activity.projectsTitle')}
       </span>
       {preview ? <PreviewMark /> : null}
-      <Icon
-        name={collapsed ? 'arrow-right-s' : 'arrow-down-s'}
+      <DisclosureChevron
+        expanded={!collapsed}
         className={cn(
           'h-3.5 w-3.5 text-muted-foreground',
           collapsed || alwaysShowActions ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100',

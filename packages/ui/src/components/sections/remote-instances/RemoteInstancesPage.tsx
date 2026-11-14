@@ -1,3 +1,4 @@
+import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
 import { rankByQuery } from '@/lib/search/fuzzySearch';
 import React from 'react';
 import QRCode from 'qrcode';
@@ -2371,7 +2372,7 @@ export const RemoteInstancesPage: React.FC = () => {
       <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
         <CollapsibleTrigger className="mt-6 w-auto justify-start gap-1.5">
           <span className={SETTINGS_SECTION_TITLE_CLASS}>{t('settings.remoteInstances.page.section.advanced')}</span>
-          <Icon name={advancedOpen ? 'arrow-up-s' : 'arrow-down-s'} className="h-4 w-4 text-muted-foreground" />
+          <DisclosureChevron expanded={advancedOpen} closedDirection="down" className="h-4 w-4 text-muted-foreground" />
         </CollapsibleTrigger>
         <CollapsibleContent>
           <p className="px-2 pb-2 typography-micro text-muted-foreground">{t('settings.remoteInstances.page.section.advancedHint')}</p>
@@ -2789,7 +2790,7 @@ export const RemoteInstancesPage: React.FC = () => {
                     </Button>
                   </div>
                 </div>
-                <CollapsibleContent className="pt-2">
+                <CollapsibleContent><div className="pt-2">
                   <div className="space-y-0 pb-2">
                     <div className="flex flex-col gap-1.5 py-1.5 md:flex-row md:items-center md:gap-8">
                       <div className="w-56 shrink-0">
@@ -2964,7 +2965,7 @@ export const RemoteInstancesPage: React.FC = () => {
                       ) : null}
                     </div>
                   </div>
-                </CollapsibleContent>
+                </div></CollapsibleContent>
               </Collapsible>
             );
           })}

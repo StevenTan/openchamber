@@ -1,3 +1,4 @@
+import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
 /**
  * The create dialog of an isolated space (journey step 1): its name, where it
  * runs, what code it starts from, its network, and model access given up front. Opened from the
@@ -326,7 +327,7 @@ export const NewSpaceDialog: React.FC<NewSpaceDialogProps> = ({ open, onOpenChan
         <div className="ps-6">
           <button type="button" className="inline-flex items-center typography-meta text-muted-foreground hover:text-foreground hover:underline" onClick={() => setShowFiles((value) => !value)}>
             {showFiles ? t('spaces.create.start.hideFiles') : t('spaces.create.start.showFiles')}
-            <Icon name={showFiles ? 'arrow-down-s' : 'arrow-right-s'} className="ms-0.5 h-3.5 w-3.5" />
+            <DisclosureChevron expanded={showFiles} className="ms-0.5 h-3.5 w-3.5" />
           </button>
           {showFiles ? (
             // Paths from the user's own repository: text to show, left to right in every language.

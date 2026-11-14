@@ -1,5 +1,5 @@
 import React from 'react';
-import { Icon } from '@/components/icon/Icon';
+import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
 import { useI18n, type I18nKey } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { FILE_TREE_BASE_PADDING_PX, FILE_TREE_INDENT_PX, type FileTreeGitStatus } from './fileTreeRow';
@@ -25,10 +25,7 @@ export const FileTreeIndentGuides: React.FC<{ depth: number }> = ({ depth }) => 
 );
 
 export const FileTreeChevron: React.FC<{ expanded: boolean }> = ({ expanded }) => (
-  <Icon
-    name="arrow-right-s"
-    className={cn('size-3.5 flex-shrink-0 text-muted-foreground transition-transform', expanded && 'rotate-90 rtl:-rotate-90')}
-  />
+  <DisclosureChevron expanded={expanded} className="size-3.5 flex-shrink-0 text-muted-foreground" />
 );
 
 export const FileTreeStatusLetter: React.FC<{ code: string; color: string; label: string }> = ({ code, color, label }) => (

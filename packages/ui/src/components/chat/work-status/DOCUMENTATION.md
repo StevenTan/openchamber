@@ -986,3 +986,12 @@ animation frame.
 
 - Test/build/dev-server status and LSP diagnostics — a separate track. Note
   that `state.lsp` already exists in the sync state.
+
+## Disclosure motion
+
+Collapsible sections use the shared measured-height panel and persistent
+chevron, including Turn stats and Resources. Their state stays in the UI store.
+The panel clips its own animated contents, and below-title actions stay outside
+it. Sections with a folded task preview swap their one live body through the shared
+height morph, so the preview and full list never occupy two rows during a
+transition. Reduced motion applies the state immediately.

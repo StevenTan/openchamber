@@ -1,3 +1,4 @@
+import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
 /**
  * What gets Docker going on this computer, under its place in Settings and in the create dialog:
  * the one action OpenChamber can take (install with Homebrew, start Colima, open Docker Desktop),
@@ -216,7 +217,7 @@ export const DockerSetupNotice: React.FC<DockerSetupNoticeProps> = ({ place, onR
             <>
               <button type="button" className="typography-meta text-muted-foreground hover:text-foreground hover:underline" onClick={() => setShowOutput((value) => !value)}>
                 {t('spaces.setup.action.details')}
-                <Icon name={showOutput ? 'arrow-down-s' : 'arrow-right-s'} className="ms-0.5 inline h-3.5 w-3.5" />
+                <DisclosureChevron expanded={showOutput} className="ms-0.5 inline h-3.5 w-3.5" />
               </button>
               {/* The command's own output, as it printed it: text to show. */}
               {showOutput ? <ScrollableOverlay as="pre" dir="ltr" outerClassName="max-h-40 max-w-md rounded bg-muted/50" className="typography-code whitespace-pre-wrap break-words px-2 py-1 text-xs text-muted-foreground" disableHorizontal>{job.failure.output}</ScrollableOverlay> : null}

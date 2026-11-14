@@ -1,3 +1,4 @@
+import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
 import { DirectoryActionIndicator } from '../sessions/DirectoryActionIndicator';
 import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
@@ -74,7 +75,7 @@ const ProjectHeaderIdentity: React.FC<ProjectHeaderIdentityProps> = ({
             'h-3.5 w-3.5 items-center justify-center text-muted-foreground',
             alwaysShowActions ? 'inline-flex' : 'absolute inset-0 inline-flex opacity-0 group-hover/project:opacity-100 group-has-[:focus-visible]/project:opacity-100',
           )}>
-            <Icon name={isCollapsed ? 'arrow-right-s' : 'arrow-down-s'} className="h-3.5 w-3.5" />
+            <DisclosureChevron expanded={!isCollapsed} className="h-3.5 w-3.5" />
           </span>
         ) : null}
         {projectIconImage ? (
@@ -112,8 +113,8 @@ const ProjectHeaderIdentity: React.FC<ProjectHeaderIdentityProps> = ({
           sessions set it apart from them. */}
       <span className={cn('truncate font-medium text-foreground typography-ui-label', labelClassName)}>{projectLabel}</span>
       {hasCollapseControl && keepIconWithCollapse ? (
-        <Icon
-          name={isCollapsed ? 'arrow-right-s' : 'arrow-down-s'}
+        <DisclosureChevron
+          expanded={!isCollapsed}
           className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground"
         />
       ) : null}

@@ -1,3 +1,4 @@
+import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
 import React, { memo } from 'react';
 import {
     DndContext,
@@ -285,7 +286,7 @@ export const QueuedMessagesStrip = memo(({ target, composerAgentName, onEditMess
                             <span className="min-w-0 flex-1 truncate text-start">
                                 {t('chat.queuedMessage.title')} {queuedMessages.length}
                             </span>
-                            <Icon name={expanded ? 'arrow-up-s' : 'arrow-down-s'} className="size-4 shrink-0" aria-hidden="true" />
+                            <DisclosureChevron expanded={expanded} closedDirection="down" className="size-4 shrink-0" />
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent side="top" sideOffset={6}>{t(expanded ? 'contextTooltips.chat.queueHide' : 'contextTooltips.chat.queueShow')}</TooltipContent>

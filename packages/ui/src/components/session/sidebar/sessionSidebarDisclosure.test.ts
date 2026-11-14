@@ -1,6 +1,14 @@
 import { describe, expect, test } from 'bun:test';
 import type { SessionSidebarActivityKey, SessionSidebarRow } from './sessionSidebarRowModel';
-import { findSessionSidebarDisclosure } from './sessionSidebarDisclosure';
+import { findSessionSidebarDisclosure, sessionSidebarDisclosureBounds } from './sessionSidebarDisclosure';
+
+test('the final section opens toward the list tail and closes back to its caption', () => {
+  const closed = [{ start: 0, end: 28 }];
+  const opened = [...closed, { start: 28, end: 60 }, { start: 60, end: 92 }];
+  const disclosure = { opened: true, previousHeaderIndex: 0, nextHeaderIndex: 0, blockStart: 1, blockEnd: 3 };
+  expect(sessionSidebarDisclosureBounds(disclosure, closed, opened)).toEqual({ from: 28, to: 92, shift: 0 });
+  expect(sessionSidebarDisclosureBounds({ ...disclosure, opened: false }, opened, closed)).toEqual({ from: 92, to: 28, shift: 0 });
+});
 
 const header = (activityKey: SessionSidebarActivityKey, collapsed: boolean): SessionSidebarRow => ({
   kind: 'activity-header',

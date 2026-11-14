@@ -1,3 +1,4 @@
+import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
 import React from 'react';
 import type { Part } from '@/lib/opencode/model';
 import { Icon } from '@/components/icon/Icon';
@@ -151,7 +152,7 @@ export const RevertedMessagesStrip: React.FC<RevertedMessagesStripProps> = React
                             <span className="min-w-0 truncate text-start">
                                 {t('chat.revertPopover.staged', { count: items.length })}
                             </span>
-                            <Icon name={expanded ? 'arrow-up-s' : 'arrow-down-s'} className="size-4 shrink-0" aria-hidden="true" />
+                            <DisclosureChevron expanded={expanded} closedDirection="down" className="size-4 shrink-0" />
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent side="top" sideOffset={6}>{t(expanded ? 'contextTooltips.chat.revertedHide' : 'contextTooltips.chat.revertedShow')}</TooltipContent>

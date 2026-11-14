@@ -1,3 +1,4 @@
+import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
 import React from 'react';
 
 import { toast } from '@/components/ui';
@@ -45,7 +46,7 @@ export const PlanTodos: React.FC<{ projectRef: ProjectRef; planId: string }> = (
         aria-expanded={open}
         className="flex items-center gap-1 typography-meta text-muted-foreground hover:text-foreground focus-visible:outline-none"
       >
-        <Icon name={open ? 'arrow-down-s' : 'arrow-right-s'} className={cn('size-3.5', !open && 'rtl:rotate-180')} />
+        <DisclosureChevron expanded={open} className="size-3.5" />
         <span>{t('planView.todos.title')}</span>
         <span className="tabular-nums">{`${done}/${linked.length}`}</span>
       </button>

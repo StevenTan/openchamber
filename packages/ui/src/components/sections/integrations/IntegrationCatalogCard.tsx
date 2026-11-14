@@ -88,9 +88,9 @@ export const IntegrationCatalogCard: React.FC<IntegrationCatalogCardProps> = ({
       </CollapsibleTrigger>
       {/* The header's own padding plus pt-3 keeps the body clear of the
           header's hover fill. */}
-      <CollapsibleContent className="px-4 pb-4 pt-3">
+      <CollapsibleContent><div className="px-4 pb-4 pt-3">
         {children}
-      </CollapsibleContent>
+      </div></CollapsibleContent>
     </div>
   </Collapsible>
 );
