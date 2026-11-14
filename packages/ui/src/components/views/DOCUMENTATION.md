@@ -628,6 +628,18 @@ as nothing hovers; rows name their group only in the lists that mix groups.
 Deleting a session stays on the desktop, whose confirmation dialog the mobile
 shell does not mount.
 
+## Terminal fonts
+
+`TerminalView` derives the font family from `useFontPreferences`, using the same
+stacks and installed-font resolver as `useAppFontEffects`. The viewport applies
+family and size changes to its existing surface without restarting the shell.
+
+### Why preferences and not computed page CSS
+
+The view can render before the app's font effect writes the CSS variables.
+Reading those variables during render caches the previous family on startup;
+subscribing to the selected and custom font names keeps the terminal current.
+
 ## Terminal tabs whose shell exits
 
 When the process of a terminal tab exits (`exit`, Ctrl-D, a project action that

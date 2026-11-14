@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Window } from 'happy-dom';
+import { CODE_FONT_OPTION_MAP, DEFAULT_MONO_FONT, customFontStack, type MonoFontOption } from '@/lib/fontOptions';
 
 import type { TerminalHandlers } from '@/lib/api/types';
 import { useTerminalStore } from '@/stores/useTerminalStore';
@@ -41,6 +42,8 @@ const runtimeApis = {
 const i18n = { t: (key: string) => key };
 let deviceInfo = { isMobile: false, isTablet: false, hasTouchOnlyPointer: false };
 const pasteClipboardCalls: string[] = [];
+type TerminalFontPreferences = { monoFont: MonoFontOption; customMonoFont: string };
+let fontPreferences: TerminalFontPreferences;
 
 // The two fields the view reads: a selected session, or an open draft and what it waits for.
 type SessionUiState = {
@@ -105,7 +108,7 @@ mock.module('@/contexts/useThemeSystem', () => ({
     },
   }),
 }));
-mock.module('@/hooks/useFontPreferences', () => ({ useFontPreferences: () => ({ monoFont: 'geist-mono' }) }));
+mock.module('@/hooks/useFontPreferences', () => ({ useFontPreferences: () => fontPreferences }));
 mock.module('@/lib/device', () => ({
   useDeviceInfo: () => deviceInfo,
   // Dialogs ask whether to lay out as a tablet; these tests run on a phone or a desktop.
@@ -115,7 +118,7 @@ mock.module('@/stores/useUIStore', () => ({ useUIStore: useUiStoreMock }));
 mock.module('@/stores/useInlineCommentDraftStore', () => ({ useInlineCommentDraftStore: () => ({ addDraft: () => undefined }) }));
 mock.module('@/components/terminal/TerminalViewport', () => ({
   TerminalViewport: React.forwardRef(function TerminalViewportMock(
-    { sessionKey, chunks, isVisible, onResize }: { sessionKey: string; chunks: unknown[]; isVisible: boolean; onResize: (cols: number, rows: number) => void },
+    { sessionKey, chunks, isVisible, onResize, fontFamily, fontSize }: { sessionKey: string; chunks: unknown[]; isVisible: boolean; onResize: (cols: number, rows: number) => void; fontFamily: string; fontSize: number },
     ref: React.ForwardedRef<{ focus: () => void; fit: () => void; getSelection: () => null; pasteClipboard: () => Promise<void> }>,
   ) {
     React.useImperativeHandle(ref, () => ({
@@ -135,6 +138,8 @@ mock.module('@/components/terminal/TerminalViewport', () => ({
       'data-session-key': sessionKey,
       'data-visible': String(isVisible),
       'data-chunk-count': String(chunks.length),
+      'data-font-family': fontFamily,
+      'data-font-size': String(fontSize),
     });
   }),
 }));
@@ -205,6 +210,8 @@ describe('TerminalView project action tab indicator', () => {
     connectCalls.length = 0;
     closeCalls.length = 0;
     uiState.terminalCloseOnExit = true;
+    uiState.terminalFontSize = 14;
+    fontPreferences = { monoFont: 'geist-mono', customMonoFont: '' };
     ensureDirectoryCalls.length = 0;
     connectBehavior = () => ({ close: () => undefined });
     deviceInfo = { isMobile: false, isTablet: false, hasTouchOnlyPointer: false };
@@ -259,6 +266,30 @@ describe('TerminalView project action tab indicator', () => {
     sessionUiState.newSessionDraft = null;
     resetSpaceCreationRequests();
     useSpacesStore.getState().resetForRuntimeSwitch();
+  });
+
+  test('opens with the selected font even before the page font CSS is applied', async () => {
+    document.documentElement.style.setProperty('--font-family-mono', CODE_FONT_OPTION_MAP[DEFAULT_MONO_FONT].stack);
+    await act(async () => root.render(React.createElement(TerminalView, { visible: true })));
+
+    expect(host.querySelector('[data-terminal-viewport]')?.getAttribute('data-font-family')).toBe(CODE_FONT_OPTION_MAP['geist-mono'].stack);
+  });
+
+  test('applies installed font preferences on first mount and updates the same viewport', async () => {
+    fontPreferences.monoFont = 'custom';
+    fontPreferences.customMonoFont = 'CourierPrime Nerd Font';
+    const render = () => act(async () => root.render(React.createElement(TerminalView, { visible: true })));
+    await render();
+    const viewport = host.querySelector('[data-terminal-viewport]');
+    const fallback = CODE_FONT_OPTION_MAP[DEFAULT_MONO_FONT].stack;
+    expect(viewport?.getAttribute('data-font-family')).toBe(customFontStack('CourierPrime Nerd Font', fallback));
+
+    fontPreferences.customMonoFont = 'Menlo';
+    uiState.terminalFontSize = 18;
+    await render();
+    expect(host.querySelector('[data-terminal-viewport]')).toBe(viewport);
+    expect(viewport?.getAttribute('data-font-family')).toBe(customFontStack('Menlo', fallback));
+    expect(viewport?.getAttribute('data-font-size')).toBe('18');
   });
 
   test('a draft waiting for a new space opens no shell until the space runs, then opens it in the space', async () => {
