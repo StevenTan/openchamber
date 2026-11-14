@@ -1,0 +1,118 @@
+{
+  "metadata": {
+    "id": "pure-white-light",
+    "name": "纯白 · Pure White",
+    "variant": "light",
+    "description": "White canvas with quiet neutral surfaces and minimal separators.",
+    "version": "1.0.0",
+    "tags": ["light", "white", "minimal"]
+  },
+  "colors": {
+    "primary": {
+      "base": "#35353e",
+      "foreground": "#ffffff",
+      "hover": "#292932",
+      "active": "#202028",
+      "muted": "#35353e14"
+    },
+    "surface": {
+      "background": "#ffffff",
+      "foreground": "#373740",
+      "muted": "#ffffff",
+      "mutedForeground": "#70707a",
+      "elevated": "#f7f7f8",
+      "elevatedForeground": "#373740",
+      "subtle": "#fafafa",
+      "overlay": "#20202824"
+    },
+    "interactive": {
+      "border": "#00000008",
+      "borderHover": "#00000018",
+      "borderFocus": "#5267a180",
+      "selection": "#efeff1",
+      "selectionForeground": "#373740",
+      "hover": "#00000006",
+      "active": "#0000000e",
+      "focus": "#5267a110",
+      "focusRing": "#5267a155",
+      "cursor": "#373740"
+    },
+    "status": {
+      "error": "#b93838",
+      "warning": "#916515",
+      "success": "#277d40",
+      "info": "#3d609e"
+    },
+    "syntax": {
+      "base": {
+        "background": "#fafafa",
+        "foreground": "#383a42",
+        "comment": "#a0a1a7",
+        "keyword": "#a626a4",
+        "string": "#50a14f",
+        "number": "#986801",
+        "function": "#4078f2",
+        "variable": "#e45649",
+        "type": "#c18401",
+        "operator": "#383a42"
+      },
+      "tokens": {
+        "variableProperty": "#e45649",
+        "punctuation": "#383a42",
+        "className": "#c18401",
+        "stringEscape": "#0184bc",
+        "parameter": "#383a42",
+        "stringInterpolation": "#ca1243",
+        "stringRegex": "#0184bc",
+        "typePrimitive": "#a626a4",
+        "boolean": "#986801",
+        "tag": "#e45649",
+        "tagAttribute": "#986801",
+        "functionBuiltin": "#0184bc",
+        "regex": "#0184bc",
+        "url": "#e45649",
+        "variableGlobal": "#e45649"
+      },
+      "highlights": {
+        "diffAdded": "#3bba54",
+        "diffAddedBackground": "#edf8ef",
+        "diffRemoved": "#e45649",
+        "diffRemovedBackground": "#fff0ef",
+        "diffModified": "#367d89",
+        "diffModifiedBackground": "#edf6f8",
+        "lineNumber": "#9d9d9f",
+        "lineNumberActive": "#383a42"
+      }
+    },
+    "chat": {
+      "background": "#ffffff",
+      "userMessageBackground": "#f3f3f4",
+      "divider": "#00000000"
+    },
+    "markdown": {
+      "link": "#3d5699",
+      "linkHover": "#293f80",
+      "inlineCode": "#484853",
+      "inlineCodeBackground": "#f0f0f2",
+      "blockquote": "#73737d",
+      "blockquoteBorder": "#e9e9ed",
+      "listMarker": "#62626e",
+      "bold": "#303038",
+      "italic": "#373740",
+      "strikethrough": "#73737d",
+      "hr": "#f0f0f2"
+    },
+    "tools": {
+      "border": "#00000000",
+      "icon": "#73737d",
+      "title": "#373740",
+      "description": "#73737d",
+      "edit": {
+        "addedBackground": "#edf8ef",
+        "removedBackground": "#fff0ef",
+        "modifiedBackground": "#edf6f8",
+        "lineNumber": "#8a8a94"
+      }
+    }
+  }
+}

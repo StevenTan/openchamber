@@ -6,6 +6,25 @@ Interface and chat percentages remain independent multipliers. Saved settings,
 editor and terminal pixel sizes, VS Code typography and mobile size overrides
 keep their existing ownership.
 
+This fork defaults to the built-in `pure-white-light` palette in light mode,
+including One Light syntax colors. Existing theme choices keep their IDs.
+`styles/fork-defaults.css` owns the bundled layout, prose, selection and floating
+surface styles. Fenced code uses its code-size token and uniform 450 token weight;
+prose and the default interface weight are 500. Interface weight remains an
+Appearance setting rather than a stylesheet override. The external
+`custom.css` is loaded afterward for personal overrides.
+
+The default faces are OPPO Sans 4.0 for the interface and Fira Code for code.
+OPPO Sans and Fira Code variable fonts are bundled in `assets/fonts`,
+declared by `styles/bundled-fonts.css`. The font effect
+imports that sheet directly so the production CSS pipeline resolves its asset
+URLs before stylesheet inlining. Their font options
+have no CDN source, so enterprise mode can use them offline. Other downloadable
+faces retain their existing loader and policy. Font licenses ship in
+`web/public/fonts`. Defaults and reset actions share the UI store's scale
+constants: interface 115%, chat 95%, spacing 110%, editor 16px and terminal 15px.
+The semantic typography bases stay unchanged; stored choices remain overrides.
+
 `useCustomCss.ts` owns the trusted server stylesheet, read through `runtimeFetch`
 from `/api/config/custom-css`. `ThemeSystemProvider` mounts it on web, desktop,
 hosted mobile and Capacitor; VS Code skips it. `customCssEnabled` is a persisted

@@ -60,6 +60,7 @@ import mono_dark_Raw from './mono-dark.json';
 import mono_light_Raw from './mono-light.json';
 import vitesse_dark_dark_Raw from './vitesse-dark-dark.json';
 import vitesse_light_light_Raw from './vitesse-light-light.json';
+import pure_white_light_Raw from './pure-white-light.json';
 
 export const presetThemes: Theme[] = [
   fields_of_the_shire_dark_Raw,
@@ -120,4 +121,5 @@ export const presetThemes: Theme[] = [
   mono_light_Raw,
   vitesse_dark_dark_Raw,
   vitesse_light_light_Raw,
+  pure_white_light_Raw,
 ].map((theme) => withPrColors(requireTheme(theme)));

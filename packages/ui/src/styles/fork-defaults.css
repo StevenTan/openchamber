@@ -1,0 +1,314 @@
+/* Appearance defaults for this fork; custom.css can override them. */
+[data-chat-column="main"] .oc-composer-surface {
+  border-radius: 24px !important;
+}
+
+/* Keep wider conversation gutters inside the main column. */
+@media (min-width: 1024px) {
+  [data-chat-column="main"] :is(.chat-column, .chat-message-column, .chat-input-column) {
+    padding-inline: clamp(1.5rem, 7%, 6rem) !important;
+  }
+}
+
+:root.light :is(
+  [data-slot="dropdown-menu-content"],
+  [data-slot="dropdown-menu-sub-content"],
+  .oc-glass-popover,
+  .oc-panel-edge[data-edge-floating]
+) {
+  background: #fafafa !important;
+  border-color: #e6e6e9 !important;
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.08),
+    0 4px 10px rgb(0 0 0 / 0.08),
+    0 16px 40px -8px rgb(0 0 0 / 0.18),
+    inset 0 1px 0 rgb(255 255 255 / 0.9) !important;
+}
+
+:root.light .oc-glass-popover:is([data-slot="dropdown-menu-content"], [data-slot="dropdown-menu-sub-content"]) {
+  background: #fff !important;
+  box-shadow: 0 8px 16px rgb(15 23 42 / 8.5%), 0 2px 6px rgb(15 23 42 / 5%) !important;
+}
+
+:root.light :is([data-slot="dropdown-menu-content"], [data-slot="dropdown-menu-sub-content"]) :is(
+  [data-slot="dropdown-menu-item"],
+  [data-slot="dropdown-menu-sub-trigger"],
+  [role^="menuitem"]
+):is(:hover, [data-highlighted]) {
+  background: #f6f6f8 !important;
+}
+
+[data-user-message-bubble] {
+  border: 0 !important;
+  padding-block: 8px !important;
+  padding-inline: 14px !important;
+}
+
+:root.light [data-user-message-bubble]::selection,
+:root.light [data-user-message-bubble] ::selection {
+  background: #dbeafe !important;
+  color: #203451 !important;
+}
+
+/* Icons whose expanded state already changes their rotation. */
+@media (prefers-reduced-motion: no-preference) {
+  svg:has(> use:is(
+    [href="#oc-arrow-right-s"],
+    [href="#oc-arrow-down-s"],
+    [href="#oc-arrow-up-s"]
+  )) {
+    transition: transform 180ms ease, rotate 180ms ease !important;
+  }
+}
+
+/* Fenced code uses the code size and a uniform 450 weight. */
+.markdown-content [data-streamdown="code-block"] {
+  background-color: var(--syntax-background) !important;
+}
+
+.markdown-content [data-streamdown="code-block"] [data-streamdown="code-block-body"],
+.markdown-content [data-streamdown="code-block"] [data-streamdown="code-block-body"] :is(pre, code) {
+  font-size: var(--text-code) !important;
+}
+
+.markdown-content [data-streamdown="code-block-body"] code,
+.markdown-content [data-streamdown="code-block-body"] code * {
+  font-weight: 450 !important;
+}
+
+.markdown-content code[data-streamdown="inline-code"] {
+  font-weight: 500 !important;
+}
+
+/* Prose weight is independent of interface emphasis controls. */
+.markdown-content {
+  font-weight: 500;
+}
+
+/* Prose rhythm and content cards. Compact tool output keeps its own layout. */
+:root.light [data-chat-column] .markdown-content:not(.markdown-tool, .markdown-reasoning):not([data-user-message-collapsed] *) {
+  --markdown-paragraph-spacing: 7px;
+  color: #20242c;
+  line-height: 2;
+  letter-spacing: 0.005em;
+
+  & :is(p, li, td):not(blockquote *) { color: #20242c; }
+  & :is(p, ul, ol) {
+    --oc-block-margin-start: 7px;
+    --oc-block-margin-end: 7px;
+    margin-block: 7px;
+  }
+  & li + li { margin-block-start: 7px; }
+  & li > :is(ul, ol) {
+    margin-block: 5px 0;
+    padding-inline-start: 1.5em;
+  }
+  & li > p { margin-block: 0; }
+  & li::marker { color: #607089; }
+
+  & :is(h1, h2, h3, h4, h5, h6) {
+    --oc-block-margin-start: 14px;
+    --oc-block-margin-end: 12px;
+    margin-block: 14px 12px;
+    color: #111827;
+    font-weight: 500;
+    line-height: 1.38;
+    letter-spacing: 0.01em;
+  }
+  & h1 { font-size: 1.82em; border-bottom: 1px solid #e2e6ee; padding-block-end: 6px; }
+  & h2 { font-size: 1.42em; color: #171b22; position: relative; padding-inline-start: 12px; }
+  & h2::before {
+    content: "";
+    position: absolute;
+    inset-inline-start: 0;
+    top: 50%;
+    width: 3px;
+    height: 0.8em;
+    border-radius: 999px;
+    background: #0084e8;
+    transform: translateY(-50%);
+  }
+  & h3 { font-size: 1.22em; color: #171b22; }
+  & h4 { font-size: 1.12em; color: #252b36; }
+  & h5 { font-size: 1.06em; }
+  & h6 { font-size: 1em; }
+
+  & code[data-streamdown="inline-code"]:not([data-openchamber-file-link="true"]) {
+    margin-inline: 0.08em;
+    border: 1px solid rgb(203 213 225 / 48%);
+    border-radius: 6px;
+    background: rgb(241 245 249 / 28%) !important;
+    padding: 0.06em 0.3em;
+    color: #334155 !important;
+    font-size: 0.9em;
+    letter-spacing: 0.01em;
+    box-shadow: none;
+    vertical-align: baseline;
+  }
+  & a:not([data-openchamber-agent-mention], [data-skill-name], [data-openchamber-file-link]) {
+    color: #409eff;
+    font-weight: 500;
+    text-decoration: none;
+    transition: color 120ms ease;
+    &:hover { color: #66b1ff; }
+  }
+  & blockquote {
+    --oc-block-margin-start: 4px;
+    --oc-block-margin-end: 4px;
+    margin-block: 4px;
+    padding-block: 2px;
+    padding-inline: 14px 0;
+    border-inline-start-width: 3px;
+    border-radius: 0;
+    background: transparent;
+    line-height: 1.8;
+    & > :first-child { margin-block-start: 0; }
+    & > :last-child { margin-block-end: 0; }
+    &:not([data-oc-alert]) { border-inline-start-color: #c7ccd3; color: #4b5563; }
+  }
+  & hr {
+    --oc-block-margin-start: 18px;
+    --oc-block-margin-end: 18px;
+    margin-block: 18px;
+    height: 1.5px;
+    border: 0;
+    background: #c9cdd3;
+  }
+  & input[type="checkbox"] {
+    appearance: none;
+    position: relative;
+    width: 18px;
+    height: 18px;
+    margin-inline: 3px 8px;
+    vertical-align: -3px;
+    border: 1.5px solid #c8d1de;
+    border-radius: 5px;
+    background: #fff;
+    opacity: 1;
+    &:checked { border-color: #0084e8; background: #0084e8; }
+    &:checked::after {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 5px;
+      width: 5px;
+      height: 10px;
+      border: solid white;
+      border-width: 0 2px 2px 0;
+      transform: rotate(42deg);
+    }
+  }
+
+  & [data-streamdown="code-block"] {
+    --oc-block-margin-start: 12px;
+    --oc-block-margin-end: 16px;
+    margin-block: 12px 16px;
+    border-color: #e2e7ef;
+    border-radius: 12px;
+    background: #fff !important;
+    box-shadow: none;
+    transition: border-color 140ms ease, box-shadow 140ms ease;
+    &:is(:hover, :focus-within) {
+      border-color: #b8d0ff;
+      box-shadow: 0 5px 10px rgb(74 111 185 / 4.5%);
+    }
+    & > div:has(> [data-streamdown="code-block-actions"]) { height: 36px; }
+    & [data-streamdown="code-block-actions"] {
+      opacity: 0;
+      transition: opacity 120ms ease;
+    }
+    &:is(:hover, :focus-within) [data-streamdown="code-block-actions"] { opacity: 1; }
+  }
+  & [data-streamdown="code-block-header"] {
+    min-height: 36px;
+    padding-block: 0;
+    padding-inline-start: 25px;
+    border-bottom: 0;
+    color: #4b5565;
+    font-size: var(--text-code);
+    line-height: 1;
+    font-weight: 500;
+  }
+  & [data-streamdown="code-block-body"] {
+    line-height: 1.95;
+    & pre { padding: 4px 14px 6px !important; line-height: inherit; }
+    & code { line-height: inherit; }
+    & code:has(> .before\:content-\[counter\(line\)\]) {
+      padding-inline-start: 34px;
+      background-image: none;
+    }
+    & code > .before\:content-\[counter\(line\)\]::before {
+      width: 24px;
+      margin-inline-start: -34px;
+      padding-inline-end: 10px;
+      color: #7b8491;
+    }
+  }
+
+  & [data-streamdown="table-wrapper"] > :is(div:has(> table), .overlay-scrollbar-wrapper) {
+    border-color: #e2e7ef;
+    border-radius: 12px;
+    background: #fff;
+  }
+  & [data-streamdown="table"] { font-size: 1em; line-height: 1.8; }
+  & [data-streamdown="table-header"] { background: #f7f9fc; }
+  & :is([data-streamdown="table-row"], [data-streamdown="table-cell"], [data-streamdown="table-header-cell"]) {
+    border-color: #e2e7ef;
+  }
+  & [data-streamdown="table-header-cell"] { font-weight: 500; color: #171b22; }
+  & tbody [data-streamdown="table-row"] {
+    transition: background-color 120ms ease;
+    &:hover { background: #f2f6ff; }
+  }
+  & img { border-radius: 12px; }
+
+  @media (hover: none) {
+    & [data-streamdown="code-block-actions"] { opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    & :is(a, [data-streamdown="code-block"], [data-streamdown="code-block-actions"], [data-streamdown="table-row"]) {
+      transition: none;
+    }
+  }
+}
+
+/* Chat selection also covers recap and metadata outside Markdown. */
+:root.light [data-chat-column]::selection,
+:root.light [data-chat-column] ::selection {
+  background: rgb(120 144 178 / 22%);
+  color: #0f172a;
+}
+
+/* Desktop selection toolbars are portaled outside the chat column. */
+:root.light .fixed > .oc-glass-popover.oc-glass-floating.rounded-full {
+  background: #fff !important;
+  border: 1px solid rgb(0 0 0 / 6%) !important;
+  border-radius: 0.75rem;
+  padding: 6px 8px;
+  min-height: 42px;
+  color: #10213a;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: 0 8px 16px rgb(15 23 42 / 8.5%), 0 2px 6px rgb(15 23 42 / 5%) !important;
+  transition-duration: 180ms;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+
+  & button {
+    height: 30px;
+    padding-block: 0;
+    border-radius: 0.5625rem;
+    color: #0f223d;
+    transition: background-color 120ms ease, color 120ms ease;
+    &:is(:hover, [aria-pressed="true"]):not(:disabled) {
+      background: #f6f6f8;
+      color: var(--foreground);
+    }
+    &:focus-visible { outline: 2px solid rgb(0 132 232 / 25%); outline-offset: 2px; }
+    &:disabled { color: #718099; }
+  }
+  & > div.w-px { height: 24px; margin-inline: 7px; background: #e7ebf1; }
+
+  @media (prefers-reduced-motion: reduce) {
+    &, & button { transition: none; }
+  }
+}

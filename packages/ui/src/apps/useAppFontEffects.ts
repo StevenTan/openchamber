@@ -3,6 +3,7 @@ import { useFontPreferences } from '@/hooks/useFontPreferences';
 import { CODE_FONT_OPTION_MAP, CUSTOM_FONT_ID, DEFAULT_MONO_FONT, DEFAULT_UI_FONT, UI_FONT_OPTION_MAP, UI_FONT_WEIGHT_VALUES, customFontStack } from '@/lib/fontOptions';
 import { loadMonoFont, loadUiFont } from '@/lib/fontLoader';
 import { useUIStore } from '@/stores/useUIStore';
+import '@/styles/bundled-fonts.css';
 
 export function useAppFontEffects() {
   const { uiFont, monoFont, customUiFont, customMonoFont } = useFontPreferences();

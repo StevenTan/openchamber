@@ -4,6 +4,7 @@
 @import "./styles/typography.css";
 @import "./styles/mobile.css";
 @import "./styles/disclosure-motion.css";
+@import "./styles/fork-defaults.css";
 /* KaTeX styles are loaded eagerly through `styles/katex-css` (a JS import) at
    every app entry point. Keeping them eager avoids a late stylesheet injection
    on the first markdown render, whose style recalc briefly lost the layered
@@ -2293,7 +2294,7 @@ diffs-container {
   overflow: hidden;
   --foreground: var(--surface-elevated-foreground);
   color: var(--foreground);
-  background: var(--surface-elevated);
+  background: var(--syntax-background);
   border-radius: 1rem;
 }
 

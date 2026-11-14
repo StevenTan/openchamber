@@ -355,7 +355,7 @@ describe('settings registry', () => {
 
     applySettingsToStores({ sessionRetentionOnlyArchived: true, sessionRetentionAction: 'archive' });
     expect(useUIStore.getState().sessionRetentionAction).toBe('delete');
-    applySettingsToStores({ fontSize: 100 });
+    applySettingsToStores({ terminalShell: 'zsh' });
     expect(useUIStore.getState().sessionRetentionOnlyArchived).toBe(true);
     applySettingsToStores({ sessionRetentionOnlyArchived: false, sessionRetentionAction: 'archive' });
     expect(useUIStore.getState().sessionRetentionOnlyArchived).toBe(false);

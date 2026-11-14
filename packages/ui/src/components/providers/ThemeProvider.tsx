@@ -1,6 +1,6 @@
 import React from 'react';
 import { isTerminalEventTarget } from '@/lib/terminalFocus';
-import { DEFAULT_EDITOR_FONT_SIZE, useUIStore } from '@/stores/useUIStore';
+import { DEFAULT_EDITOR_FONT_SIZE, DEFAULT_TERMINAL_FONT_SIZE, DEFAULT_INTERFACE_SCALE, useUIStore } from '@/stores/useUIStore';
 
 interface ThemeProviderProps {
   children: React.ReactNode;
@@ -31,9 +31,9 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       const isEditor = active?.closest('.cm-editor, .oc-file-preview') != null
         && active?.closest('[data-chat-input="true"]') == null;
       if (action === 'zoom-reset') {
-        if (isTerminal) state.setTerminalFontSize(14);
+        if (isTerminal) state.setTerminalFontSize(DEFAULT_TERMINAL_FONT_SIZE);
         else if (isEditor) state.setEditorFontSize(DEFAULT_EDITOR_FONT_SIZE);
-        else state.setFontSize(100);
+        else state.setFontSize(DEFAULT_INTERFACE_SCALE);
       } else if (isTerminal) {
         state.setTerminalFontSize(state.terminalFontSize + (action === 'zoom-in' ? 1 : -1));
       } else if (isEditor) {

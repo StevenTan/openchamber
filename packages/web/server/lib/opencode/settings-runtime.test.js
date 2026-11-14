@@ -247,11 +247,11 @@ describe('settings runtime', () => {
     }
   });
 
-  it('uses OpenChamber themes when a new install has no theme preferences', async () => {
+  it('uses Pure White for light mode when a new install has no theme preferences', async () => {
     const { runtime, cleanup } = await createRuntime();
     try {
       await expect(runtime.readSettingsFromDiskMigrated()).resolves.toMatchObject({
-        lightThemeId: 'openchamber-light',
+        lightThemeId: 'pure-white-light',
         darkThemeId: 'openchamber-dark',
       });
     } finally {

@@ -6,6 +6,10 @@ Create a theme by copying the JSON example below or a built-in palette from
 [`packages/ui/src/lib/theme/themes/`](../packages/ui/src/lib/theme/themes/).
 Give your copy a unique `metadata.id` and a name, then edit its colors.
 
+This fork includes Pure White as its default light theme, with One Light syntax
+colors. Its source is `packages/ui/src/lib/theme/themes/pure-white-light.json`;
+existing theme preferences and the default dark theme stay in effect.
+
 ## Import a VS Code theme
 
 Open **Settings → Appearance → Import VS Code theme** to search Open VSX.
@@ -29,7 +33,7 @@ For individual files with those references, export the active theme with
 
 Delete a custom theme using the trash icon beside it in the theme dropdown.
 This includes valid themes you added directly to the server's `themes` folder.
-Deleting a selected theme restores the standard OpenChamber theme for that mode.
+Deleting a selected theme restores the default theme for that mode.
 Built-in themes cannot be deleted. Delete and reimport a theme to update it.
 
 ## Create your own theme

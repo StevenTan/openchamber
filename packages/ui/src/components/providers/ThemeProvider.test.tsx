@@ -35,7 +35,7 @@ test('zoom works without App menu listeners and routes by focused content', asyn
     expect(useUIStore.getState().terminalFontSize).toBe(15);
     expect(useUIStore.getState().fontSize).toBe(120);
     await act(async () => zoom('zoom-reset'));
-    expect(useUIStore.getState().terminalFontSize).toBe(14);
+    expect(useUIStore.getState().terminalFontSize).toBe(15);
 
     const editor = document.createElement('div');
     editor.className = 'cm-editor';
@@ -57,8 +57,8 @@ test('zoom works without App menu listeners and routes by focused content', asyn
 
     browser.blur();
     await act(async () => zoom('zoom-reset'));
-    expect(useUIStore.getState().fontSize).toBe(100);
-    expect(document.documentElement.style.fontSize).toBe('');
+    expect(useUIStore.getState().fontSize).toBe(115);
+    expect(document.documentElement.style.fontSize).toBe('115%');
     const composer = document.createElement('div');
     composer.dataset.chatInput = 'true';
     composer.className = 'cm-editor';
@@ -67,12 +67,12 @@ test('zoom works without App menu listeners and routes by focused content', asyn
     container.append(composer);
     composerInput.focus();
     await act(async () => zoom('zoom-in'));
-    expect(useUIStore.getState().fontSize).toBe(110);
+    expect(useUIStore.getState().fontSize).toBe(125);
     expect(useUIStore.getState().editorFontSize).toBe(12);
     await act(async () => zoom('zoom-reset'));
     await act(async () => root.unmount());
     zoom('zoom-in');
-    expect(useUIStore.getState().fontSize).toBe(100);
+    expect(useUIStore.getState().fontSize).toBe(115);
   } finally {
     await act(async () => root.unmount());
     for (const [name, descriptor] of originals) {

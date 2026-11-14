@@ -1,4 +1,4 @@
-export type UiFontOption = 'inter' | 'fixel' | 'geist-sans' | 'atkinson-hyperlegible' | 'source-sans-3' | 'roboto' | 'noto-sans' | 'dm-sans' | 'manrope' | 'system' | 'custom';
+export type UiFontOption = 'inter' | 'fixel' | 'geist-sans' | 'atkinson-hyperlegible' | 'source-sans-3' | 'roboto' | 'noto-sans' | 'dm-sans' | 'manrope' | 'system' | 'custom' | 'oppo-sans';
 
 export type MonoFontOption = 'jetbrains-mono' | 'fira-code' | 'geist-mono' | 'commit-mono' | 'source-code-pro' | 'cascadia-code' | 'roboto-mono' | 'iosevka' | 'system-mono' | 'custom';
 
@@ -34,7 +34,7 @@ export type UiFontWeight = typeof UI_FONT_WEIGHT_OPTIONS[number];
 
 /** CSS weight of regular interface text; `font-medium` and up stay as they are. */
 export const UI_FONT_WEIGHT_VALUES = { regular: 400, balanced: 450, strong: 500 } as const satisfies Record<UiFontWeight, number>;
-export const DEFAULT_UI_FONT_WEIGHT: UiFontWeight = 'regular';
+export const DEFAULT_UI_FONT_WEIGHT: UiFontWeight = 'strong';
 
 interface FontOptionDefinition<T extends string> {
     id: T;
@@ -122,6 +122,12 @@ export const UI_FONT_OPTIONS: FontOptionDefinition<UiFontOption>[] = [
         label: 'System',
         description: 'Native operating system interface font.',
         stack: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif'
+    },
+    {
+        id: 'oppo-sans',
+        label: 'OPPO Sans',
+        description: 'Bundled variable font for Chinese and Latin interface text.',
+        stack: '"OPPO Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
     }
 ];
 
@@ -137,8 +143,7 @@ export const CODE_FONT_OPTIONS: FontOptionDefinition<MonoFontOption>[] = [
         id: 'fira-code',
         label: 'Fira Code',
         description: 'Readable coding font with ligature support.',
-        stack: '"Fira Code", "SFMono-Regular", "Menlo", monospace',
-        source: { family: 'Fira Code', packageName: '@fontsource-variable/fira-code', filePrefix: 'fira-code', weightRange: [300, 700] }
+        stack: '"Fira Code", "SFMono-Regular", "Menlo", monospace'
     },
     {
         id: 'geist-mono',
@@ -196,8 +201,8 @@ const buildFontMap = <T extends string>(options: FontOptionDefinition<T>[]) =>
 export const UI_FONT_OPTION_MAP = buildFontMap(UI_FONT_OPTIONS);
 export const CODE_FONT_OPTION_MAP = buildFontMap(CODE_FONT_OPTIONS);
 
-export const DEFAULT_UI_FONT: UiFontOption = 'system';
-export const DEFAULT_MONO_FONT: MonoFontOption = 'system-mono';
+export const DEFAULT_UI_FONT: UiFontOption = 'oppo-sans';
+export const DEFAULT_MONO_FONT: MonoFontOption = 'fira-code';
 
 /** The option that uses a font installed on this device, named by the user. */
 export const CUSTOM_FONT_ID = 'custom';
@@ -209,8 +214,8 @@ export const isMonoFontOption = (value: unknown): value is MonoFontOption =>
     value === CUSTOM_FONT_ID || (typeof value === 'string' && value in CODE_FONT_OPTION_MAP);
 
 /**
- * A stack that tries each family named in `list`, then `fallback` (the system
- * font), so a name that is not installed still renders and a mixed-script list
+ * A stack that tries each family named in `list`, then `fallback`, so a name
+ * that is not installed still renders and a mixed-script list
  * (a Latin primary with a CJK fallback) works. `list` is comma-separated;
  * empty entries are dropped and quotes or characters that could end the CSS
  * value are stripped from each family.

@@ -1555,7 +1555,11 @@ const openFileTab = (state: UIStore, directory: string, filePath: string, previe
 
 /** What the selection menu's thumb-up says when the user set no text of their own. */
 export const DEFAULT_SELECTION_APPROVAL_TEXT = 'Sounds good';
-export const DEFAULT_EDITOR_FONT_SIZE = 12;
+export const DEFAULT_EDITOR_FONT_SIZE = 16;
+export const DEFAULT_TERMINAL_FONT_SIZE = 15;
+export const DEFAULT_INTERFACE_SCALE = 115;
+export const DEFAULT_CHAT_SCALE = 95;
+export const DEFAULT_SPACING_SCALE = 110;
 /** The Files tree beside the editor: narrow enough that the code beside it does not wrap. */
 export const DEFAULT_CONTEXT_EDITOR_TREE_WIDTH = 208;
 
@@ -1666,10 +1670,10 @@ export const useUIStore = create<UIStore>()(
         worktreeArchiveOnDoneEnabled: false,
         autoDeleteLastRunAt: null,
         messageLimit: 200,
-        fontSize: 100,
-        chatFontSize: 100,
+        fontSize: DEFAULT_INTERFACE_SCALE,
+        chatFontSize: DEFAULT_CHAT_SCALE,
         globalDraftStarters: null,
-        terminalFontSize: 14,
+        terminalFontSize: DEFAULT_TERMINAL_FONT_SIZE,
         terminalShell: 'auto',
         terminalLoginShells: [],
         terminalCloseOnExit: true,
@@ -1679,7 +1683,7 @@ export const useUIStore = create<UIStore>()(
         customUiFont: '',
         customMonoFont: '',
         uiFontWeight: DEFAULT_UI_FONT_WEIGHT,
-        padding: 100,
+        padding: DEFAULT_SPACING_SCALE,
         cornerRadius: 18,
         inputBarOffset: 0,
         mobileKeyboardMode: getStoredMobileKeyboardMode(),
@@ -2958,7 +2962,7 @@ export const useUIStore = create<UIStore>()(
             return;
           }
 
-          root.style.fontSize = `${scale * 100}%`;
+          root.style.fontSize = `${fontSize}%`;
 
           // The variables remain authored in rem and inherit the root scale.
           for (const [key] of entries) root.style.removeProperty(getTypographyVariable(key));
@@ -3652,9 +3656,8 @@ export const useUIStore = create<UIStore>()(
             state.workStatusSectionOrder = sanitizeWorkStatusSectionOrder(state.workStatusSectionOrder, false);
           }
 
-          // v27 -> v28: the Editor font size default went from 13 to 12. The
-          // local copy holds 13 for everyone who never changed it; a 13 the
-          // user chose is restored from the synced settings after hydration.
+          // v27 -> v28: rebase the legacy editor default onto the current one.
+          // Synced user choices are restored after local hydration.
           if (version < 28 && state.editorFontSize === 13) {
             state.editorFontSize = DEFAULT_EDITOR_FONT_SIZE;
           }
