@@ -70,7 +70,7 @@ createRoot(rootElement).render(
   <StrictMode>
     <I18nProvider>
       <ThemeSystemProvider>
-        <ThemeProvider>
+        <ThemeProvider zoom={runtimeAPIs.zoom}>
           <SessionAuthGate>
             <App apis={runtimeAPIs} />
           </SessionAuthGate>

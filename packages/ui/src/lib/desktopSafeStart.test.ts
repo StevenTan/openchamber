@@ -46,12 +46,12 @@ describe('forgetLayoutForSafeStart', () => {
   });
 
   test('keeps settings that are not layout', () => {
-    useUIStore.setState({ fontSize: 117 });
+    useUIStore.setState({ interfaceFontSizePx: 17 });
     useUIStore.getState().openContextFile('/repo', '/repo/a.ts');
 
     forgetLayoutForSafeStart();
 
-    expect(useUIStore.getState().fontSize).toBe(117);
+    expect(useUIStore.getState().interfaceFontSizePx).toBe(17);
   });
 
   test('saves the forgotten layout, so the next launch starts without it too', async () => {

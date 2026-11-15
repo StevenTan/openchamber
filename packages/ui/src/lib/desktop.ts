@@ -179,6 +179,12 @@ export const invokeDesktop = async <T = unknown>(command: string, args?: Record<
   return bridge.invoke(command, args ?? {}) as Promise<T>;
 };
 
+export const createDesktopZoomAPI = (): RuntimeAPIs['zoom'] => {
+  const invoke = getDesktopBridge()?.invoke;
+  if (!isElectronShell() || !invoke) return undefined;
+  return { set: async (percent) => { z.literal(true).parse(await invoke('desktop_set_zoom', { percent })); } };
+};
+
 /** Removes the session's delivered native notifications from Notification Center (macOS only). */
 export const clearDesktopSessionNotifications = (sessionId: string): void => {
   if (getElectronPlatform() !== 'darwin' || !canUseElectronDesktopIPC()) return;

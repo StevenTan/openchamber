@@ -7,6 +7,8 @@ transition their measured height and opacity; Base UI owns their
 closing lifetime and restores automatic height when opening settles.
 Vertical padding belongs to an inner content wrapper, so the panel itself can
 reach zero height before unmounting.
+The root exposes `data-slot="collapsible"` with Base UI's open and closed state
+attributes, so a containing viewport can recognise manual expansion before layout changes.
 
 ## Ownership
 

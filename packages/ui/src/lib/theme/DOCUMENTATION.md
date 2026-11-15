@@ -3,6 +3,16 @@
 `styles/fork-defaults.css` owns bundled appearance overrides. The external
 `custom.css` loads afterward. Typography tokens live in `lib/typography.ts`;
 default preferences and reset actions share constants in `stores/useUIStore`.
+The root rem stays at the stylesheet value. Interface preferences set text
+tokens in pixels; chat and code have independent pixel tokens. Font effects
+publish `--font-chat`, which follows `--font-sans` unless a chat family is chosen.
+Native page zoom scales text, spacing, icons and embedded editors together.
+
+### Why typography sizes use CSS pixels
+
+Font preferences control reading size independently of layout dimensions.
+Keeping rem stable preserves spacing and icon geometry; Chromium page zoom
+provides the separate whole-window scale, including canvas-based terminals.
 Desktop scroll containers contain scroll chaining while allowing Chromium's
 native boundary effect. The root remains clipped and permits that effect;
 `overscroll-behavior: none` on the root suppresses it in descendant viewports.

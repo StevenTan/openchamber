@@ -64,14 +64,38 @@ export function onFrameScroll(container: HTMLElement, listener: (direction: Fram
 // header up and out of view.
 const ROW_EXPAND_EVENT = 'openchamber:row-expand';
 
+export const isInStuckTurnHeader = (element: Element | null): boolean => {
+    const header = element?.closest<HTMLElement>('[data-turn-sticky-header]');
+    const chat = header?.closest<HTMLElement>('[data-scrollbar="chat"]');
+    if (!header || !chat) return false;
+    return Math.abs(header.getBoundingClientRect().top - chat.getBoundingClientRect().top) < 1;
+};
+
 export function dispatchRowExpand(row: HTMLElement | null): void {
     row?.dispatchEvent(new CustomEvent(ROW_EXPAND_EVENT, { bubbles: true }));
 }
 
-/** Listens for rows the reader opens inside `container`. */
+/** Listens before native and shared disclosures open, and for explicit row expansions. */
 export function onRowExpand(container: HTMLElement, listener: () => void): () => void {
+    const handleClick = (event: MouseEvent) => {
+        if (event.button !== 0 || !(event.target instanceof Element) || isInStuckTurnHeader(event.target)) return;
+        const summary = event.target.closest('summary');
+        if (summary?.parentElement?.tagName === 'DETAILS') {
+            const control = event.target.closest('a, button, input, select, textarea');
+            if (!summary.parentElement.hasAttribute('open') && !(control && summary.contains(control))) listener();
+            return;
+        }
+        const trigger = event.target.closest('button[aria-expanded="false"]');
+        if (!trigger || trigger.matches(':disabled, [aria-disabled="true"], [aria-haspopup]')) return;
+        const root = trigger.closest('[data-slot="collapsible"]');
+        if (root?.hasAttribute('data-closed') && !root.hasAttribute('data-disabled')) listener();
+    };
+    container.addEventListener('click', handleClick, true);
     container.addEventListener(ROW_EXPAND_EVENT, listener);
-    return () => container.removeEventListener(ROW_EXPAND_EVENT, listener);
+    return () => {
+        container.removeEventListener('click', handleClick, true);
+        container.removeEventListener(ROW_EXPAND_EVENT, listener);
+    };
 }
 
 // Something about to move the viewport itself (a quote reveal stepping

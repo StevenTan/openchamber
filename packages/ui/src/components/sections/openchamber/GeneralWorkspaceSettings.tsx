@@ -1,6 +1,8 @@
 import React from 'react';
 
 import { NumberInput } from '@/components/ui/number-input';
+import { Button } from '@/components/ui/button';
+import { Icon } from '@/components/icon/Icon';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
@@ -20,6 +22,7 @@ import {
   SETTINGS_NUMBER_UNIT_CLASS,
   SETTINGS_OPTION_STACK_CLASS,
   SETTINGS_SELECT_ROW_TRIGGER_CLASS,
+  SETTINGS_ICON_BUTTON_CLASS,
 } from '@/components/sections/shared/SettingsSection';
 import { LIVE_BROWSER_TABS_MAX, LIVE_BROWSER_TABS_MIN } from '@/lib/browser/liveTabs';
 import { useRuntimeAPIs } from '@/hooks/useRuntimeAPIs';
@@ -34,7 +37,7 @@ import { subscribeRuntimeEndpointChanged } from '@/lib/runtime-switch';
 import { formatShortcutForDisplay } from '@/lib/shortcuts';
 import { isTerminalShell } from '@/lib/terminalShell';
 import { useConfigStore } from '@/stores/useConfigStore';
-import { useUIStore } from '@/stores/useUIStore';
+import { DEFAULT_TERMINAL_FONT_SIZE, useUIStore } from '@/stores/useUIStore';
 import { MobileWorkspaceTabsSettings } from './MobileWorkspaceTabsSettings';
 
 const MESSAGE_STREAM_TRANSPORT_OPTIONS: Array<{ id: 'auto' | 'ws' | 'sse'; labelKey: I18nKey; descriptionKey: I18nKey }> = [
@@ -183,7 +186,7 @@ const FilesAndEditorSection: React.FC = () => {
   );
 };
 
-/** The built-in terminal: which shell, login mode, quick keys. Not in VS Code. */
+/** The built-in terminal: shell, login mode, quick keys and text size. Not in VS Code. */
 const TerminalSection: React.FC = () => {
   const { t } = useI18n();
   const { isMobile } = useDeviceInfo();
@@ -196,6 +199,8 @@ const TerminalSection: React.FC = () => {
   const setShowTerminalQuickKeysOnDesktop = useUIStore((state) => state.setShowTerminalQuickKeysOnDesktop);
   const terminalCloseOnExit = useUIStore((state) => state.terminalCloseOnExit);
   const setTerminalCloseOnExit = useUIStore((state) => state.setTerminalCloseOnExit);
+  const terminalFontSize = useUIStore((state) => state.terminalFontSize);
+  const setTerminalFontSize = useUIStore((state) => state.setTerminalFontSize);
   const [availableTerminalShells, setAvailableTerminalShells] = React.useState<TerminalShellOption[]>([]);
   const [terminalShellRuntimeEpoch, setTerminalShellRuntimeEpoch] = React.useState(0);
 
@@ -289,6 +294,35 @@ const TerminalSection: React.FC = () => {
           />
         ) : null}
       </div>
+      <SettingsFieldRow
+        label={t('settings.openchamber.visual.field.terminalFontSize')}
+        settingsItem="appearance.terminal-font-size"
+      >
+        <div className={SETTINGS_NUMBER_STEPPER_ROW_CLASS}>
+          <NumberInput
+            value={terminalFontSize}
+            onValueChange={setTerminalFontSize}
+            min={9}
+            max={52}
+            step={1}
+            className="typography-ui-label w-[5ch]"
+            aria-label={t('settings.openchamber.visual.field.terminalFontSize')}
+          />
+          <span className={SETTINGS_NUMBER_UNIT_CLASS}>px</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className={SETTINGS_ICON_BUTTON_CLASS}
+            disabled={terminalFontSize === DEFAULT_TERMINAL_FONT_SIZE}
+            onClick={() => setTerminalFontSize(DEFAULT_TERMINAL_FONT_SIZE)}
+            aria-label={t('settings.openchamber.visual.actions.resetTerminalFontSizeAria')}
+            title={t('settings.common.actions.reset')}
+          >
+            <Icon name="restart" className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </SettingsFieldRow>
     </SettingsSection>
   );
 };

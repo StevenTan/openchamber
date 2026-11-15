@@ -6,7 +6,7 @@ import { useUIStore } from '@/stores/useUIStore';
 import '@/styles/bundled-fonts.css';
 
 export function useAppFontEffects() {
-  const { uiFont, monoFont, customUiFont, customMonoFont } = useFontPreferences();
+  const { uiFont, monoFont, customUiFont, customMonoFont, chatFont, customChatFont } = useFontPreferences();
   const uiFontWeight = useUIStore((state) => state.uiFontWeight);
 
   // A layout effect, like ThemeProvider's size write: a page drawn in the
@@ -25,18 +25,23 @@ export function useAppFontEffects() {
     const monoStack = monoFont === CUSTOM_FONT_ID
       ? customFontStack(customMonoFont, defaultMonoStack)
       : CODE_FONT_OPTION_MAP[monoFont]?.stack ?? defaultMonoStack;
+    const chatStack = chatFont === 'interface' ? uiStack : chatFont === CUSTOM_FONT_ID
+      ? customFontStack(customChatFont, uiStack)
+      : UI_FONT_OPTION_MAP[chatFont].stack;
     void loadUiFont(uiFont);
     void loadMonoFont(monoFont);
+    if (chatFont !== 'interface') void loadUiFont(chatFont);
 
     root.style.setProperty('--font-sans', uiStack);
     root.style.setProperty('--font-heading', uiStack);
     root.style.setProperty('--font-family-sans', uiStack);
     root.style.setProperty('--font-mono', monoStack);
+    root.style.setProperty('--font-chat', chatStack);
     root.style.setProperty('--font-family-mono', monoStack);
     root.style.setProperty('--ui-regular-font-weight', String(UI_FONT_WEIGHT_VALUES[uiFontWeight] ?? 400));
 
     if (document.body) {
       document.body.style.fontFamily = uiStack;
     }
-  }, [uiFont, monoFont, customUiFont, customMonoFont, uiFontWeight]);
+  }, [uiFont, monoFont, customUiFont, customMonoFont, uiFontWeight, chatFont, customChatFont]);
 }

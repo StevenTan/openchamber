@@ -112,7 +112,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useI18n } from '@/lib/i18n';
 import { useDraftHeading } from './useDraftHeading';
 import { isVSCodeRuntime } from '@/lib/desktop';
-import { SEMANTIC_TYPOGRAPHY, VSCODE_TYPOGRAPHY, getScaledTypographyStyle } from '@/lib/typography';
+import { getChatTypographyStyle } from '@/lib/typography';
 import { eventMatchesShortcut, getEffectiveShortcutCombo } from '@/lib/shortcuts';
 import { ChatSearchBar } from './search/ChatSearchBar';
 import { WorkStatusPanel } from './work-status/WorkStatusPanel';
@@ -978,15 +978,9 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     const stickyUserHeader = useUIStore((state) => state.stickyUserHeader);
     const promptNavigatorEnabled = useUIStore((state) => state.promptNavigatorEnabled);
     const allowPromptingSubagentSessions = useUIStore((state) => state.allowPromptingSubagentSessions);
-    const chatFontSize = useUIStore((state) => state.chatFontSize);
-    // The chat's own text size, on top of the interface size: the semantic
-    // text variables are redefined for this column only (as FilesView does
-    // for its preview), so the sidebar keeps the interface size.
+    const chatFontSize = useUIStore((state) => state.chatFontSizePx);
     // SAFETY: CSS custom properties are valid inline styles; React's type lists only standard ones.
-    const chatTypographyStyle = React.useMemo(() => getScaledTypographyStyle(
-        chatFontSize,
-        isVSCodeRuntime() ? VSCODE_TYPOGRAPHY : SEMANTIC_TYPOGRAPHY,
-    ) as React.CSSProperties | undefined, [chatFontSize]);
+    const chatTypographyStyle = React.useMemo(() => getChatTypographyStyle(chatFontSize) as React.CSSProperties, [chatFontSize]);
     // The timeline dialog of the main chat is app state (a global shortcut
     // opens it); a pinned column keeps its own.
     const globalTimelineDialogOpen = useUIStore((s) => s.isTimelineDialogOpen);

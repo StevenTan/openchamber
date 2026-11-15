@@ -655,6 +655,20 @@
     "uiFontWeight": {
       "scope": "profile"
     },
+    "interfaceFontSizePx": {
+      "scope": "profile",
+      "perSurface": true
+    },
+    "chatFontSizePx": {
+      "scope": "profile",
+      "perSurface": true
+    },
+    "chatFont": {
+      "scope": "profile"
+    },
+    "customChatFont": {
+      "scope": "profile"
+    },
     "padding": {
       "scope": "profile",
       "perSurface": true
@@ -1037,6 +1051,10 @@
       "local": true
     },
     "agentMemoryViewedAt": {
+      "scope": "device",
+      "local": true
+    },
+    "appZoom": {
       "scope": "device",
       "local": true
     },

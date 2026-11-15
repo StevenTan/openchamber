@@ -25,3 +25,42 @@
   animation-timing-function: ease-out;
   mix-blend-mode: normal;
 }
+
+[data-disclosure-overflow][data-open]:not([data-starting-style]) {
+  overflow: visible;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  details::details-content {
+    interpolate-size: allow-keywords;
+    block-size: 0;
+    overflow: clip;
+    opacity: 0;
+    transition:
+      block-size 200ms ease-out,
+      opacity 200ms ease-out,
+      content-visibility 200ms allow-discrete;
+  }
+
+  details[open]::details-content {
+    block-size: auto;
+    opacity: 1;
+    overflow: visible;
+    transition:
+      block-size 200ms ease-out,
+      opacity 200ms ease-out,
+      content-visibility 200ms allow-discrete,
+      overflow 200ms step-end allow-discrete;
+  }
+
+  [data-disclosure-overflow][data-open]:not([data-starting-style]) {
+    transition:
+      height 200ms ease-out,
+      opacity 200ms ease-out,
+      overflow 200ms step-end allow-discrete;
+  }
+
+  .markdown-content [data-oc-disclosure-icon] {
+    transition: transform 200ms ease-out;
+  }
+}

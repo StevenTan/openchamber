@@ -70,6 +70,8 @@ import { tooltipsWorkspaceI18n } from './tooltips-workspace.i18n';
 import { tooltipsPanelI18n } from './tooltips-panel.i18n';
 import { tooltipsChatI18n } from './tooltips-chat.i18n';
 
+import { typographyI18n } from './typography.i18n';
+
 export const dict = {
   'quota.family.zen': 'Zen Modelleri',
   'quota.value.requests': 'İstekler: {count}',
@@ -149,6 +151,7 @@ export const dict = {
   ...webSearchI18n.tr,
   ...sessionWarmingI18n.tr,
   ...customCssI18n["tr"],
+  ...typographyI18n["tr"],
   ...compactionSettingsI18n.tr,
   ...heapSnapshotI18n.tr,
   ...consoleBudgetsI18n.tr,

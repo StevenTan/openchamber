@@ -17,7 +17,8 @@ Object.assign(globalThis, { window: browser, document: browser.document, navigat
   Element: browser.Element, Node: browser.Node, Text: browser.Text, SVGElement: browser.SVGElement,
   customElements: browser.customElements, MutationObserver: browser.MutationObserver, DOMParser: browser.DOMParser, CustomEvent: browser.CustomEvent,
   ResizeObserver: browser.ResizeObserver, IntersectionObserver: browser.IntersectionObserver,
-  requestAnimationFrame: browser.requestAnimationFrame, cancelAnimationFrame: browser.cancelAnimationFrame });
+  requestAnimationFrame: browser.requestAnimationFrame, cancelAnimationFrame: browser.cancelAnimationFrame,
+  getComputedStyle: browser.getComputedStyle.bind(browser) });
 Object.defineProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT', { configurable: true, value: true });
 const { UiBlock } = await import('./UiBlock');
 const { onTabStep } = await import('../lib/scroll/timelineScrollIntent');
@@ -126,10 +127,25 @@ test('a block that cannot be drawn says why and folds its source', async () => {
   await draw('root = Stack([question])\nquestion = Choice("approach", ["A"])\nConfirm = Button("Go")', async () => {});
   expect(host.textContent).toContain('Defined but never used: Confirm');
   const source = host.querySelector('pre');
-  expect(source?.hidden).toBe(true);
+  expect(source?.closest('[hidden]')).not.toBeNull();
   const toggle = [...host.querySelectorAll('button')].find((button) => button.textContent === 'Source');
   await act(async () => toggle?.click());
-  expect(source?.hidden).toBe(false);
+  expect(source?.closest('[hidden]')).toBeNull();
+});
+
+test('a fold keeps its field elements mounted while hidden', async () => {
+  await draw('root = Stack([section])\nsection = Details("Options", [name])\nname = Input("name", "Name")', async () => {});
+  const toggle = host.querySelector<HTMLButtonElement>('button[aria-controls]')!;
+  const panel = document.getElementById(toggle.getAttribute('aria-controls')!)!;
+  const field = panel.querySelector('input')!;
+  expect(panel.hidden).toBe(true);
+  await act(async () => toggle.click());
+  expect(panel.hidden).toBe(false);
+  await act(async () => toggle.click());
+  expect(panel.hidden).toBe(true);
+  expect(panel.querySelector('input')).toBe(field);
+  await act(async () => toggle.click());
+  expect(panel.querySelector('input')).toBe(field);
 });
 
 const tabbedForm = 'root = Stack([tabs])\ntabs = Tabs([Tab("Editor", [Choice("editor", ["Zed"])]), Tab("Why", [Input("why", "Why?")])])';

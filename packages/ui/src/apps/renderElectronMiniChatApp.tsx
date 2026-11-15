@@ -24,7 +24,7 @@ export function renderElectronMiniChatApp(apis: RuntimeAPIs) {
     <StrictMode>
       <I18nProvider>
         <ThemeSystemProvider>
-          <ThemeProvider>
+          <ThemeProvider zoom={apis.zoom}>
             <SessionAuthGate>
               <ElectronMiniChatApp apis={apis} />
             </SessionAuthGate>

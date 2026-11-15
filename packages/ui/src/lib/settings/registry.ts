@@ -18,7 +18,7 @@
  *   only ever lived in the local store are in `LOCAL_DEVICE_KEYS`.
  */
 import type { ProjectEntry, TerminalShell } from '@/lib/api/types';
-import type { DesktopWindowControlsPosition, DesktopWindowControlsStyle } from '@/lib/desktop';
+import { isVSCodeRuntime, type DesktopWindowControlsPosition, type DesktopWindowControlsStyle } from '@/lib/desktop';
 import { getDirectoryShowHidden, setDirectoryShowHidden } from '@/lib/directoryShowHidden';
 import type { DraftStarterRef } from '@/lib/draftStarters';
 import { sanitizeStarterRefs } from '@/lib/draftStarters';
@@ -38,6 +38,7 @@ import { useUIStore, type FileEditorKeymap, type LargeTextPasteBehavior } from '
 import { isSessionGoalMaxAutoTurns } from '@/lib/sessionGoalTurnLimit';
 import { hiddenSidebarSectionsSchema, sidebarPinListsSchema, sidebarSectionsSchema } from '@/lib/sidebarSections';
 import { z } from 'zod';
+import { legacyChatFontPixels, legacyInterfaceFontPixels, SEMANTIC_TYPOGRAPHY, VSCODE_TYPOGRAPHY } from '@/lib/typography';
 import {
   fromSchema,
   mapParser,
@@ -563,8 +564,8 @@ export const SETTINGS_REGISTRY = {
   draftStartersScheduleTaskAdded: field({ scope: 'profile', parse: parseBoolean }),
 
   // ── Typography (profile; sizes per surface) ──
-  fontSize: field({ scope: 'profile', perSurface: true, parse: parseFiniteNumber, ui: uiStore('fontSize', (v) => useUIStore.getState().setFontSize(v)) }),
-  chatFontSize: field({ scope: 'profile', perSurface: true, parse: parseFiniteNumber, ui: uiStore('chatFontSize', (v) => useUIStore.getState().setChatFontSize(v)) }),
+  fontSize: field({ scope: 'profile', perSurface: true, parse: parseFiniteNumber }),
+  chatFontSize: field({ scope: 'profile', perSurface: true, parse: parseFiniteNumber }),
   terminalFontSize: field({ scope: 'profile', perSurface: true, parse: parseFiniteNumber, ui: uiStore('terminalFontSize', (v) => useUIStore.getState().setTerminalFontSize(v)) }),
   editorFontSize: field({ scope: 'profile', perSurface: true, parse: parseFiniteNumber, ui: uiStore('editorFontSize', (v) => useUIStore.getState().setEditorFontSize(v)) }),
   uiFont: field({ scope: 'profile', parse: parseUiFont, ui: uiStore('uiFont', (v) => useUIStore.getState().setUiFont(v)) }),
@@ -572,6 +573,10 @@ export const SETTINGS_REGISTRY = {
   customUiFont: field({ scope: 'profile', parse: parseTextUpTo(100), ui: uiStore('customUiFont', (v) => useUIStore.getState().setCustomUiFont(v)) }),
   customMonoFont: field({ scope: 'profile', parse: parseTextUpTo(100), ui: uiStore('customMonoFont', (v) => useUIStore.getState().setCustomMonoFont(v)) }),
   uiFontWeight: field({ scope: 'profile', parse: parseOneOf(UI_FONT_WEIGHT_OPTIONS), ui: uiStore('uiFontWeight', (v) => useUIStore.getState().setUiFontWeight(v)) }),
+  interfaceFontSizePx: field({ scope: 'profile', perSurface: true, parse: parseFiniteNumber, ui: uiStore('interfaceFontSizePx', (v) => useUIStore.getState().setInterfaceFontSizePx(v)) }),
+  chatFontSizePx: field({ scope: 'profile', perSurface: true, parse: parseFiniteNumber, ui: uiStore('chatFontSizePx', (v) => useUIStore.getState().setChatFontSizePx(v)) }),
+  chatFont: field<UiFontOption | 'interface'>({ scope: 'profile', parse: parseGuarded((value): value is UiFontOption | 'interface' => value === 'interface' || isUiFontOption(value)), ui: uiStore('chatFont', (v) => useUIStore.getState().setChatFont(v)) }),
+  customChatFont: field({ scope: 'profile', parse: parseTextUpTo(100), ui: uiStore('customChatFont', (v) => useUIStore.getState().setCustomChatFont(v)) }),
   padding: field({ scope: 'profile', perSurface: true, parse: parseFiniteNumber, ui: uiStore('padding', (v) => useUIStore.getState().setPadding(v)) }),
   cornerRadius: field({ scope: 'profile', perSurface: true, parse: parseFiniteNumber, ui: uiStore('cornerRadius', (v) => useUIStore.getState().setCornerRadius(v)) }),
   shortcutOverrides: field({
@@ -745,6 +750,7 @@ export const LOCAL_DEVICE_KEYS = [
   'dockBadgeEnabled',
   'alwaysShowScrollbars',
   'agentMemoryViewedAt',
+  'appZoom',
 ] as const;
 
 /**
@@ -815,10 +821,21 @@ const isSameValue = (left: SettingsValue, right: SettingsValue): boolean => {
  * store already holds the value is not written again.
  */
 export const applySettingsToStores = (snapshot: DesktopSettings): void => {
+  const typography = { ...snapshot };
+  const base = isVSCodeRuntime() ? VSCODE_TYPOGRAPHY : SEMANTIC_TYPOGRAPHY;
+  const current = useUIStore.getState();
+  const currentInterfacePercent = current.interfaceFontSizePx / legacyInterfaceFontPixels(100, base) * 100;
+  if (snapshot.interfaceFontSizePx === undefined && snapshot.fontSize !== undefined) {
+    typography.interfaceFontSizePx = legacyInterfaceFontPixels(snapshot.fontSize, base);
+  }
+  if (snapshot.chatFontSizePx === undefined && (snapshot.fontSize !== undefined || snapshot.chatFontSize !== undefined)) {
+    const chatPercent = snapshot.chatFontSize ?? current.chatFontSizePx / legacyChatFontPixels(currentInterfacePercent, 100, base) * 100;
+    typography.chatFontSizePx = legacyChatFontPixels(snapshot.fontSize ?? currentInterfacePercent, chatPercent, base);
+  }
   for (const key of SETTINGS_KEYS) {
     const spec = specOf(key);
     if (!spec.ui) continue;
-    const value = snapshot[key];
+    const value = typography[key];
     if (value === undefined) continue;
     if (isSameValue(spec.ui.read(), value)) continue;
     spec.ui.write(value, snapshot);

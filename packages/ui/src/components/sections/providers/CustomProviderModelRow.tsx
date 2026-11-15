@@ -13,6 +13,8 @@ import { useI18n } from '@/lib/i18n';
 import { formatGoalTokens } from '@/lib/sessionGoalMetadata';
 import { cn } from '@/lib/utils';
 import type { ModelFieldErrors, ModelRow } from './custom-provider-form';
+import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
+import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
 
 const MODEL_CAPABILITIES = ['text', 'image', 'audio', 'video', 'pdf'] as const;
 
@@ -72,7 +74,7 @@ export const CustomProviderModelRow: React.FC<Props> = ({
   );
 
   return (
-    <div className="border-b border-edge last:border-b-0">
+    <Collapsible open={expanded} className="border-b border-edge last:border-b-0">
       <div className="flex items-center gap-1 py-1">
         <button
           type="button"
@@ -81,11 +83,7 @@ export const CustomProviderModelRow: React.FC<Props> = ({
           aria-controls={editorId}
           className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-1.5 text-start hover:bg-[var(--interactive-hover)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--interactive-focus-ring)]"
         >
-          <Icon
-            name="arrow-right-s"
-            className={cn('size-4 shrink-0 text-muted-foreground transition-transform', expanded && 'rotate-90 rtl:-rotate-90')}
-            aria-hidden
-          />
+          <DisclosureChevron expanded={expanded} className="size-4 shrink-0 text-muted-foreground" />
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="flex min-w-0 items-baseline gap-2">
               <span className={cn('truncate', SETTINGS_FIELD_LABEL_CLASS, !name && !id && 'text-muted-foreground')}>{title}</span>
@@ -110,7 +108,7 @@ export const CustomProviderModelRow: React.FC<Props> = ({
         ) : null}
       </div>
 
-      {expanded ? (
+      <CollapsibleContent>
         <div id={editorId} className="space-y-3 pb-4 ps-7 pe-1 pt-1">
           <div className="grid grid-cols-1 gap-2 @xl:grid-cols-2">
             <div>
@@ -225,7 +223,7 @@ export const CustomProviderModelRow: React.FC<Props> = ({
             </p>
           ) : null}
         </div>
-      ) : null}
-    </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 };

@@ -2,6 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/lib/i18n';
 import { ScrollableOverlay } from '@/components/ui/ScrollableOverlay';
+import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 
 /** A JSON body pretty-printed; anything else as the provider sent it. */
 const formatResponseBody = (body: string): string => {
@@ -23,7 +24,7 @@ export const ErrorResponseDetails: React.FC<{ body: string; className?: string }
   const [open, setOpen] = React.useState(false);
 
   return (
-    <div className={className}>
+    <Collapsible open={open} className={className}>
       <Button
         variant="link"
         size="xs"
@@ -33,11 +34,13 @@ export const ErrorResponseDetails: React.FC<{ body: string; className?: string }
       >
         {open ? t('chat.errorDetails.hide') : t('chat.errorDetails.show')}
       </Button>
-      {open ? (
-        <ScrollableOverlay as="pre" outerClassName="mt-1 max-h-60 rounded-md bg-muted/30" className="px-2 py-1 typography-meta font-mono text-muted-foreground whitespace-pre-wrap break-all" disableHorizontal>
-          {formatResponseBody(body)}
-        </ScrollableOverlay>
-      ) : null}
-    </div>
+      <CollapsibleContent>
+        <div className="pt-1">
+          <ScrollableOverlay as="pre" outerClassName="max-h-60 rounded-md bg-muted/30" className="px-2 py-1 typography-meta font-mono text-muted-foreground whitespace-pre-wrap break-all" disableHorizontal>
+            {formatResponseBody(body)}
+          </ScrollableOverlay>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 };

@@ -12,7 +12,8 @@ Object.assign(globalThis, { window: browser, document: browser.document, Event: 
   Element: browser.Element, Node: browser.Node, Text: browser.Text, SVGElement: browser.SVGElement,
   customElements: browser.customElements, MutationObserver: browser.MutationObserver, DOMParser: browser.DOMParser,
   ResizeObserver: browser.ResizeObserver, IntersectionObserver: browser.IntersectionObserver,
-  requestAnimationFrame: () => 0, cancelAnimationFrame: () => {} });
+  requestAnimationFrame: () => 0, cancelAnimationFrame: () => {},
+  getComputedStyle: browser.getComputedStyle.bind(browser) });
 Object.defineProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT', { configurable: true, value: true });
 
 type Answer = (name: string, text: string) => Promise<void>;

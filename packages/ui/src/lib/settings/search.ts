@@ -174,14 +174,14 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     id: 'appearance.interface-font-size',
     page: 'appearance',
     titleKey: 'settings.openchamber.visual.field.interfaceFontSize',
-    keywords: ['font', 'text size', 'ui scale'],
+    keywords: ['font', 'text size', 'px', 'interface'],
     isAvailable: (ctx) => !ctx.isMobile,
   },
   {
     id: 'appearance.chat-font-size',
     page: 'appearance',
-    titleKey: 'settings.openchamber.visual.field.chatFontSize',
-    keywords: ['chat', 'font', 'text size', 'messages'],
+    titleKey: 'settings.typography.chatFont',
+    keywords: ['chat', 'font', 'text size', 'messages', 'px'],
     isAvailable: (ctx) => !ctx.isMobile,
   },
   {
@@ -194,9 +194,10 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
   },
   {
     id: 'appearance.terminal-font-size',
-    page: 'appearance',
+    page: 'general',
     titleKey: 'settings.openchamber.visual.field.terminalFontSize',
     keywords: ['terminal', 'font', 'text size'],
+    isAvailable: (ctx) => !ctx.isVSCode,
   },
   {
     id: 'appearance.terminal-shell',
@@ -217,8 +218,15 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
   {
     id: 'appearance.editor-font-size',
     page: 'appearance',
-    titleKey: 'settings.openchamber.visual.field.editorFontSize',
-    keywords: ['editor', 'font', 'text size', 'code'],
+    titleKey: 'settings.typography.codeFontSize',
+    keywords: ['editor', 'font', 'text size', 'code', 'px'],
+  },
+  {
+    id: 'appearance.interface-zoom',
+    page: 'appearance',
+    titleKey: 'settings.typography.zoom',
+    keywords: ['zoom', 'scale', 'window', 'interface'],
+    isAvailable: (ctx) => ctx.isDesktop && !ctx.isMobile,
   },
   {
     id: 'appearance.spacing-density',

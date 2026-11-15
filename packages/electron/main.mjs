@@ -2901,9 +2901,7 @@ const createBrowserWindow = ({ label, restoreGeometry, url, runtimeConfig = {}, 
     log.warn(`[guests] refused an extension frame navigating to ${host || 'an invalid URL'}`);
   });
 
-  // The app scales itself (View > Zoom changes the interface scale), so
-  // Chromium's page zoom from pinch or Ctrl+wheel stays off.
-  browserWindow.webContents.setZoomMode('disabled');
+  browserWindow.webContents.setZoomMode('isolated');
   attachRendererRecovery(browserWindow, { log, label: 'window' });
   attachDevWindowTape(app, browserWindow);
 
@@ -5403,6 +5401,12 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
         visible: isNativeWindowVisible(browserWindow),
       };
 
+    case 'desktop_set_zoom': {
+      const percent = z.number().min(50).max(200).parse(args.percent);
+      browserWindow.webContents.setZoomFactor(percent / 100);
+      return true;
+    }
+
     case 'desktop_set_locale': {
       if (typeof args.locale === 'string') {
         setContextMenuLocale(args.locale);
@@ -5902,6 +5906,7 @@ const COMMANDS_SAFE_FOR_REMOTE = new Set([
   'desktop_close_current_window',
   'desktop_get_current_window_state',
   'desktop_get_app_version',
+  'desktop_set_zoom',
   'desktop_get_lan_address',
   'desktop_capture_page_rect',
   'desktop_tray_update',
@@ -5911,6 +5916,9 @@ const COMMANDS_SAFE_FOR_REMOTE = new Set([
 ]);
 
 ipcMain.handle('openchamber:invoke', async (event, command, args) => {
+  if (command === 'desktop_set_zoom' && event.senderFrame !== event.sender.mainFrame) {
+    throw new Error('Window zoom is available only to the main frame');
+  }
   if (!isLocalSender(event.sender) && !COMMANDS_SAFE_FOR_REMOTE.has(command)) {
     log.warn(`[ipc] rejected ${command} from non-local origin: ${event.sender?.getURL?.() || '(unknown)'}`);
     throw new Error('IPC not available for this origin');

@@ -5,7 +5,10 @@
 `packages/ui/src/stores` contains app-level Zustand stores for persistent UI state, runtime state, and feature caches.
 
 Typography defaults and reset actions share constants in `useUIStore`.
-Persisted preferences override those defaults; typography tokens remain independent.
+Interface and chat sizes are independent CSS pixels. Code uses `editorFontSize`
+for chat code and file editors; the terminal retains its own pixel size.
+`appZoom` is device-local and affects the native window without changing these
+preferences. Persisted percentage font values are converted to pixels on read.
 
 Not all state in the UI belongs here.
 

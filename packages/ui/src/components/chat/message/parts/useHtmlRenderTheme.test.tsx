@@ -19,6 +19,7 @@ const { useAppFontEffects } = await import('@/apps/useAppFontEffects');
 const { ThemeSystemProvider } = await import('@/contexts/ThemeSystemContext');
 const { useUIStore } = await import('@/stores/useUIStore');
 const { useHtmlRenderTheme } = await import('./useHtmlRenderTheme');
+const { ThemeProvider } = await import('@/components/providers/ThemeProvider');
 
 afterAll(async () => {
     for (const [key, descriptor] of previousGlobals) {
@@ -28,17 +29,9 @@ afterAll(async () => {
     await win.happyDOM.close();
 });
 
-// The app's root writes, as the app makes them: the interface size in a
-// parent's layout effect from the store (ThemeProvider; px here, since the
-// test DOM does not resolve the app's percentage), the fonts through the
-// app's own hook.
 function AppRoot({ children }: { children: React.ReactNode }) {
-    const fontSize = useUIStore((state) => state.fontSize);
-    React.useLayoutEffect(() => {
-        document.documentElement.style.fontSize = `${(16 * fontSize) / 100}px`;
-    }, [fontSize]);
     useAppFontEffects();
-    return children;
+    return <ThemeProvider>{children}</ThemeProvider>;
 }
 
 let theme: HtmlRenderTheme | null = null;
@@ -52,7 +45,7 @@ describe('a drawn page follows the interface settings', () => {
     let root: Root;
 
     beforeEach(async () => {
-        useUIStore.setState({ fontSize: 100, chatFontSize: 100, uiFont: 'custom', customUiFont: 'Inter' });
+        useUIStore.setState({ interfaceFontSizePx: 15.5, chatFontSizePx: 14, chatFont: 'interface', uiFont: 'custom', customUiFont: 'Inter' });
         root = createRoot(document.createElement('div'));
         await act(async () => root.render(<ThemeSystemProvider><AppRoot><Page /></AppRoot></ThemeSystemProvider>));
     });
@@ -62,32 +55,43 @@ describe('a drawn page follows the interface settings', () => {
         document.documentElement.classList.remove('mobile-pointer');
     });
 
-    test('takes the new interface size', async () => {
+    test('interface text size leaves the page rem and chat body size independent', async () => {
         expect(pageVariable('--oc-rem')).toBe('16px');
-        await act(async () => useUIStore.setState({ fontSize: 130 }));
-        expect(pageVariable('--oc-rem')).toBe('20.8px');
-        expect(pageVariable('--oc-text')).toBe(`${0.875 * 20.8}px`);
+        await act(async () => useUIStore.setState({ interfaceFontSizePx: 19 }));
+        expect(pageVariable('--oc-rem')).toBe('16px');
+        expect(pageVariable('--oc-text')).toBe('14px');
     });
 
     test('takes the chat font size in its text and leaves the app rem alone', async () => {
         expect(pageVariable('--oc-text')).toBe(`${0.875 * 16}px`);
-        await act(async () => useUIStore.setState({ chatFontSize: 130 }));
-        expect(pageVariable('--oc-text')).toBe(`${0.875 * 16 * 1.3}px`);
+        await act(async () => useUIStore.setState({ chatFontSizePx: 18 }));
+        expect(pageVariable('--oc-text')).toBe('18px');
         expect(pageVariable('--oc-rem')).toBe('16px');
-        await act(async () => useUIStore.setState({ chatFontSize: 100 }));
+        await act(async () => useUIStore.setState({ chatFontSizePx: 14 }));
         expect(pageVariable('--oc-text')).toBe(`${0.875 * 16}px`);
         expect(pageVariable('--oc-rem')).toBe('16px');
     });
 
     test('keeps the phone text size, which the chat setting does not reach', async () => {
         document.documentElement.classList.add('mobile-pointer');
-        await act(async () => useUIStore.setState({ chatFontSize: 130 }));
-        expect(pageVariable('--oc-text')).toBe(`${0.875 * 16}px`);
+        const style = document.createElement('style');
+        style.textContent = ':root.mobile-pointer{--text-markdown:1rem!important}';
+        document.head.append(style);
+        await act(async () => useUIStore.setState({ chatFontSizePx: 18 }));
+        expect(pageVariable('--oc-text')).toBe('16px');
+        style.remove();
     });
 
     test('takes the new interface font', async () => {
         expect(pageVariable('--font-sans')).toContain('"Inter"');
         await act(async () => useUIStore.setState({ customUiFont: 'Georgia' }));
+        expect(pageVariable('--font-sans')).toContain('"Georgia"');
+    });
+
+    test('uses an independent chat font for drawn pages', async () => {
+        await act(async () => useUIStore.setState({ chatFont: 'custom', customChatFont: 'Georgia' }));
+        expect(pageVariable('--font-sans')).toContain('"Georgia"');
+        await act(async () => useUIStore.setState({ customUiFont: 'Verdana' }));
         expect(pageVariable('--font-sans')).toContain('"Georgia"');
     });
 });
