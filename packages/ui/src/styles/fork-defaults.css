@@ -17,13 +17,6 @@
   border-radius: 24px !important;
 }
 
-/* Keep wider conversation gutters inside the main column. */
-@media (min-width: 1024px) {
-  [data-chat-column="main"] :is(.chat-column, .chat-message-column, .chat-input-column) {
-    padding-inline: clamp(1.5rem, 7%, 6rem) !important;
-  }
-}
-
 :root.light :is(
   [data-slot="dropdown-menu-content"],
   [data-slot="dropdown-menu-sub-content"],

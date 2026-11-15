@@ -8,6 +8,10 @@ stylesheet root size. Interface preferences set text
 tokens in pixels; chat and code have independent pixel tokens. Font effects
 publish `--font-chat`, which follows `--font-sans` unless a chat family is chosen.
 Native page zoom scales text, spacing, icons and embedded editors together.
+Conversation messages, cards and the composer share a centered column capped
+at 768px, or 1024px with wide layout enabled, including 16px of padding on each
+side. The content box is 736px in normal layout and 992px in wide layout when
+space permits. These widths are independent of the root font size.
 
 ### Why typography sizes use CSS pixels
 

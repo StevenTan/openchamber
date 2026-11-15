@@ -85,66 +85,22 @@
     text-decoration: underline;
   }
 
-  .chat-column {
-    width: min(100%, 48rem);
-    margin-inline: auto;
-    padding-inline: calc(clamp(0.75rem, 2.5vw, 1rem) * var(--padding-scale, 1));
-  }
-
-  .wide-chat-layout .chat-column {
-    width: min(100%, 64rem);
-  }
-
-  .chat-input-column {
-    width: min(100%, 48rem);
-    margin-inline: auto;
-    padding-inline: calc(clamp(0.75rem, 2.5vw, 1rem) * var(--padding-scale, 1));
-  }
-
-  .wide-chat-layout .chat-input-column {
-    width: min(100%, 64rem);
-  }
-
+  .chat-column,
+  .chat-input-column,
   .chat-message-column {
-    width: min(100%, 48rem);
     margin-inline: auto;
-    padding-inline: calc(clamp(0.75rem, 2.5vw, 1rem) * var(--padding-scale, 1));
-  }
-
-  /* Wide layout: the transcript uses the whole chat width; the composer and
-     the rows docked above it (.chat-input-column, .chat-column cards) keep a
-     readable column. */
-  .wide-chat-layout .chat-message-column {
-    width: 100%;
+    padding-inline: 16px;
   }
 
   /* The prompt navigator's end edge is the message column's, so its
      indicator stands in the column's side padding; a chat narrower than the
-     column, or the wide layout, keeps the 12px inset. */
+     column keeps the 12px inset. */
   .oc-prompt-navigator {
-    inset-inline-end: max(0.75rem, calc((100% - 48rem) / 2));
+    inset-inline-end: max(12px, calc((100% - 768px) / 2));
   }
 
   .wide-chat-layout .oc-prompt-navigator {
-    inset-inline-end: 0.75rem;
-  }
-
-  /* On a wide window the side padding follows the chat's own width (a
-     percentage padding resolves against the parent's width), so a chat
-     squeezed beside an expanded context panel takes 1rem instead of the
-     1.5rem a full-width chat gets. */
-  @media (min-width: 1024px) {
-    .chat-column {
-      padding-inline: calc(clamp(1rem, 3%, 1.5rem) * var(--padding-scale, 1));
-    }
-
-    .chat-input-column {
-      padding-inline: calc(clamp(1rem, 3%, 1.5rem) * var(--padding-scale, 1));
-    }
-
-    .chat-message-column {
-      padding-inline: calc(clamp(1rem, 3%, 1.5rem) * var(--padding-scale, 1));
-    }
+    inset-inline-end: max(12px, calc((100% - 1024px) / 2));
   }
 
   /* Enhanced focus indicators for small interactive elements */
@@ -238,19 +194,15 @@
   }
 }
 
-/* Chat message column width — intentionally UNLAYERED so it always wins the
-   cascade. The same rule inside `@layer components` above is correct in steady
-   state, but a layered rule can be momentarily out-ranked during a heavy style
-   recalc (e.g. a large session's virtualized list re-laying-out when the
-   background history prepend lands, or a late-loaded CSS chunk re-establishing
-   layer order). That dropped the clamp for a frame and flashed message text to
-   full width. An unlayered duplicate of just the width keeps it robust. */
+/* Conversation cards, messages and the composer share a centered column. */
+.chat-column,
+.chat-input-column,
 .chat-message-column {
-  width: min(100%, 48rem);
+  width: min(100%, 768px);
 }
 
-.wide-chat-layout .chat-message-column {
-  width: 100%;
+.wide-chat-layout :is(.chat-column, .chat-input-column, .chat-message-column) {
+  width: min(100%, 1024px);
 }
 
 /* A message reached through a message link shows a selection tint behind its
