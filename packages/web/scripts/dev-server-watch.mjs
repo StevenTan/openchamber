@@ -64,8 +64,9 @@ export function runDevServerWatch(options = {}) {
   const { command, args, spawnOptions } = createDevServerWatchCommand(options);
   const compiler = runner(process.execPath, [compilerPath, '--project', 'tsconfig.agent-command.build.json', '--watch', '--preserveWatchOutput'], spawnOptions);
   const searchCompiler = runner(command, ['build', './server/lib/agent-search/src/plugin.ts', '--outfile', './server/lib/agent-search/dist/plugin.js', '--target', 'node', '--format', 'esm', '--watch'], spawnOptions);
+  const questionCompiler = runner(process.execPath, [compilerPath, '--project', 'tsconfig.agent-question.build.json', '--watch', '--preserveWatchOutput'], spawnOptions);
   const child = runner(command, args, spawnOptions);
-  const watchers = [compiler, searchCompiler, child];
+  const watchers = [compiler, searchCompiler, questionCompiler, child];
   let exitSignal = null;
   const stop = (signal) => {
     exitSignal = signal;
@@ -82,7 +83,7 @@ export function runDevServerWatch(options = {}) {
       if (exitSignal) process.kill(process.pid, exitSignal);
     });
 
-  for (const builder of [compiler, searchCompiler]) {
+  for (const builder of [compiler, searchCompiler, questionCompiler]) {
     builder.on('error', (error) => {
       console.error('[dev:web:server] Failed to start tool compiler:', error);
       process.exitCode = 1;
@@ -98,12 +99,14 @@ export function runDevServerWatch(options = {}) {
   child.on('error', (error) => {
     compiler.kill();
     searchCompiler.kill();
+    questionCompiler.kill();
     console.error('[dev:web:server] Failed to start server watcher:', error);
     process.exitCode = 1;
   });
   child.on('exit', (code, signal) => {
     compiler.kill();
     searchCompiler.kill();
+    questionCompiler.kill();
     if (signal) {
       exitSignal = signal;
       return;

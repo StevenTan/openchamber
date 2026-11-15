@@ -66,6 +66,7 @@ import { markDefiniteTransportFailure } from "@/lib/relay/transport-error"
 import { isRelayModeActive } from "@/lib/relay/runtime-tunnel"
 import { getErrorStatus, isAmbiguousSendFailure } from "./send-failure-classification"
 import { isFormRequestNotFoundError } from "./form-request-error"
+import { isAsyncQuestion } from "./async-questions"
 import { ConnectionLostError } from "./connection-lost-error"
 import { getStaleRunningToolMessageID } from "./materialization"
 import { promoteRestoredSessionOrdering } from "./session-ordering"
@@ -82,6 +83,7 @@ import { applyForkInheritance } from "@/lib/sessionForkInheritance"
 import { getSessionGoal } from "@/lib/sessionGoalMetadata"
 import { fetchGoalObjectiveContent, writeGoalObjectiveFile } from "@/lib/goalObjectiveFiles"
 import { isVSCodeRuntime } from "@/lib/desktop"
+import { runtimeFetch } from "@/lib/runtime-fetch"
 
 const MESSAGE_REFETCH_LIMIT = 100
 const SEND_CONFIRMATION_REFETCH_LIMIT = 30
@@ -2848,6 +2850,43 @@ export async function cancelForm(sessionId: string, formId: string): Promise<voi
   }
 }
 
+export async function resolveAsyncQuestions(forms: FormRequest[], answers?: Record<string, FormAnswer>): Promise<void> {
+  const sessionId = forms[0].sessionID
+  const isCurrentRuntime = captureRuntimeInstance()
+  const runtimeKey = getRuntimeKey()
+  const assertRuntimeCurrent = () => {
+    if (!isCurrentRuntime()) throw new Error("Question reply was cancelled because the runtime changed.")
+  }
+  await waitForConnectionOrThrow()
+  assertRuntimeCurrent()
+  const { record, directory } = await resolveBlockingRequestTarget(sessionId, getRequestReplyDirectory("form", sessionId, forms[0].id))
+  if (!directory) throw new Error("The reply was not sent because its session directory could not be resolved.")
+  const settleSelection = answers ? await applyFormSelection(record, sessionId, directory, runtimeKey) : () => {}
+  assertRuntimeCurrent()
+  const response = await runtimeFetch('/api/openchamber/async-question/resolve', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, directory,
+    body: JSON.stringify({ sessionID: sessionId, replies: forms.map(form => answers
+      ? { questionID: form.id, status: 'answered', answer: answers[form.id] }
+      : { questionID: form.id, status: 'cancelled' }) }),
+  })
+  if (response.status !== 204) {
+    if ((response.status === 404 || response.status === 409) && isCurrentRuntime()) {
+      const pending = await opencodeClient.listPendingForms({ directories: [directory] })
+      assertRuntimeCurrent()
+      const remaining = new Set(pending.filter(form => form.sessionID === sessionId).map(form => form.id))
+      for (const form of forms) if (!remaining.has(form.id)) removeFormRequestFromChildStores(sessionId, form.id)
+    }
+    throw new Error(`Question group reply failed (${response.status}).`)
+  }
+  if (!isCurrentRuntime()) return
+  settleSelection()
+  for (const form of forms) {
+    removeFormRequestFromChildStores(sessionId, form.id)
+    if (answers) noteLocalFormReplied(form.id)
+    else noteLocalFormCancelled(form.id)
+  }
+}
+
 /** The model and agent a recovered answer's new turn runs with. */
 type RecoveredAnswerSelection = {
   providerID: string
@@ -2955,6 +2994,7 @@ export async function dismissOpenFormsForSession(sessionId: string): Promise<boo
       const requests = formsBySession[scopedId]
       if (!requests) continue
       for (const request of requests) {
+        if (isAsyncQuestion(request)) continue
         toDismiss.push({ store, sessionId: scopedId, form: request })
       }
     }

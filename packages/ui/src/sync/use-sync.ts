@@ -20,6 +20,7 @@ import {
 import { stripSessionDiffSnapshots } from "./sanitize"
 import { getSessionMaterializationStatus } from "./materialization"
 import { captureRuntimeInstance, getRuntimeKey } from "@/lib/runtime-switch"
+import { isAsyncQuestion } from "./async-questions"
 
 const sessionReadDirectorySources: SessionReadDirectorySources = {
   knownDirectory: (sessionID) => {
@@ -84,7 +85,7 @@ export function useSync() {
         includePermissions: false,
       })
       if (getRuntimeKey() !== runtimeKey) return false
-      return (targetStore.getState().form[sessionID]?.length ?? 0) > 0
+      return targetStore.getState().form[sessionID]?.some(form => !isAsyncQuestion(form)) ?? false
     },
     [childStores, directory, runtimeKey],
   )

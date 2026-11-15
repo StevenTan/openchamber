@@ -30,6 +30,10 @@ const bySession = () => useGlobalBlockingRequestsStore.getState().bySession;
 beforeEach(() => resetGlobalBlockingRequests());
 
 describe('global blocking requests index', () => {
+  test('keeps asynchronous question forms out of the blocking index', () => {
+    applyGlobalBlockingRequestEvents('/repo', [{ type: 'form.created', properties: { form: { ...form('frm_ocq1', 's1'), metadata: { kind: 'openchamber-async-question', order: 1 }, fields: [{ key: 'q0', type: 'string' }] } } }]);
+    expect(bySession().size).toBe(0);
+  });
   test('keeps a waiting page beside the session\'s forms until the server says it stopped waiting', () => {
     const noDirectory = () => null;
     applyGlobalBlockingRequestEvents('/far', [formCreated(form('q1', 's1'))]);

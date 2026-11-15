@@ -4,6 +4,7 @@ import { normalizeProjectPath } from '@/lib/projectResolution';
 import type { FormRequest, PermissionRequest } from '@/lib/opencode/model';
 import type { HostSessionStatusSnapshot } from '@/lib/opencode/session-status';
 import { isSpaceDirectory } from '@/lib/spaces/space-route';
+import { isAsyncQuestion } from './async-questions';
 
 // Cross-directory index of permission requests and forms still waiting for an
 // answer. Directory stores remain the source for open directories; this index
@@ -190,6 +191,7 @@ export const applyGlobalBlockingRequestEvents = (rawDirectory: string, payloads:
       }
       case 'form.created': {
         const { form } = payload.properties;
+        if (isAsyncQuestion(form)) break;
         if (form.sessionID && form.id) reducer.ask(directory, form.sessionID, { kind: 'form', request: toBlockingForm(form) });
         continue;
       }

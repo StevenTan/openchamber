@@ -138,6 +138,7 @@ export function readSessionNotice(message: Message): SessionNotice | undefined {
   const description = message.description?.trim()
   if (!description) return undefined
   const metadata = message.metadata ?? {}
+  if (metadata.source === "openchamber-async-question") return undefined
   if (readContextPart({ type: "text", metadata: message.metadata })) return undefined
   if (readSubagentRun(message) || readDispatchedSessionResult(message) || readWorkflowReport(message)) return undefined
   if (readShellCompletion(message) || readShellCancellation(message) || isSubagentCancellationNote(message)) return undefined

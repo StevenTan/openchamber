@@ -132,7 +132,7 @@ export default {
       });
       editor.add({
         name: "codex-research",
-        description: `Execute web search, page browsing, image search, PDF screenshots, literature search, finance, weather, sports and time queries. References are scoped to the current session. ${browsingGuidelines}`,
+        description: `Execute web search, page browsing, image search, PDF screenshots, finance, weather, sports and time queries. References are scoped to the current session. ${browsingGuidelines}`,
         options: { codemode: false, permission: "websearch" },
         input: {
           type: "object", additionalProperties: false,

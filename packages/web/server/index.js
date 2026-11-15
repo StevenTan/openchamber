@@ -186,6 +186,7 @@ import { createRelayService, relayBlockedByEnterprise } from './lib/relay/servic
 import { createRelayHostLock } from './lib/relay/host-lock.js';
 import { createRelayKeyStore } from './lib/relay/key-store.js';
 import { createAgentToolRuntime } from './lib/agent-tool/runtime.js';
+import { createQuestionRuntime, questionStoreDirectory } from './lib/agent-question/dist/runtime.js';
 import { createBrowserControlBroker } from './lib/browser-control/broker.js';
 import { createBrowserControlRouter } from './lib/browser-control/provider.js';
 import { createDevServerScanner } from './lib/dev-servers/routes.js';
@@ -396,6 +397,7 @@ const deleteImportedTheme = (...args) => themeRuntime.deleteImportedTheme(...arg
 
 let notificationTemplateRuntime = null;
 let agentToolRuntime = null;
+let questionRuntime = null;
 let limitFailoverRuntime = null;
 let managedConfigRuntime = null;
 let stopEnterprisePolicyWatch = () => {};
@@ -1408,6 +1410,7 @@ const dispatchResultsRuntime = createDispatchResultsRuntime({
   isSessionArchived: (sessionID) => openChamberSessionService.sessionArchive.isArchived(sessionID),
 });
 dispatchResultsRuntime.start();
+
 
 // An agent waiting on its pull request: followed through the tracked-items
 // service (attached when the routes create it), woken with one message.
@@ -2488,6 +2491,7 @@ const gracefulShutdownRuntime = createGracefulShutdownRuntime({
   messageQueueRuntime,
   mergeFollowRuntime,
   dispatchResultsRuntime,
+  closeAsyncQuestions: () => questionRuntime?.stop(),
   workflowRuntime,
   messageSearchRuntime,
   sessionRuntime,
@@ -2551,6 +2555,13 @@ async function main(options = {}) {
       ? process.env.OPENCHAMBER_HOST.trim()
       : '127.0.0.1');
   const instanceDir = await prepareInstanceDir({ fsPromises, path, dataDir: OPENCHAMBER_DATA_DIR });
+  questionRuntime = createQuestionRuntime({
+    dataDir: questionStoreDirectory(OPENCHAMBER_DATA_DIR, process.env.OPENCHAMBER_RUNTIME || 'web', effectiveBindHost, port),
+    client: () => openCodeSessionClient(),
+    globalEventHub: globalMessageStreamHub,
+    isSessionArchived: (sessionID) => openChamberSessionService.sessionArchive.isArchived(sessionID),
+    isEnabled: () => !isExternalOpenCode && !ENV_SKIP_OPENCODE_START,
+  });
   agentToolRuntime = createAgentToolRuntime({
     crypto,
     fsPromises,
@@ -2562,6 +2573,7 @@ async function main(options = {}) {
     resolveSessionDirectory: (sessionID) => openChamberControlService.resolveSessionDirectory(sessionID),
     getCommandEnvironment: () => overlayEnvironment({ ...process.env, PATH: buildAugmentedPath() }, environmentRuntime.forOpenCode()),
     hasPendingInput: async (sessionID, signal) => (await openCodeSessionClient().session.inbox.list({ sessionID }, { signal })).length > 0,
+    questionRuntime,
     getActivePort: () => {
       const address = server?.address?.();
       return typeof address === 'object' && address ? address.port : null;
@@ -3020,6 +3032,7 @@ async function main(options = {}) {
   // An archived chat of a deleted space is read and deleted, never run or changed.
   app.use(spaceArchive.guard);
   app.use((req, res, next) => (spacesHost ? spacesHost.middleware(req, res, next) : next()));
+  agentToolRuntime.registerQuestionFormRoutes(app, express);
   // First of all upgrade handlers: a socket addressed to a space by its directory carries a path
   // a host handler would take too, and the space's handler marks it as the space's before they run.
   server.prependListener('upgrade', (...args) => { spacesHost?.upgradeHandler(...args); });
@@ -3344,6 +3357,7 @@ async function main(options = {}) {
   terminalRuntime = startupPipelineResult.terminalRuntime;
   dictationRuntime = startupPipelineResult.dictationRuntime;
   messageStreamRuntime = startupPipelineResult.messageStreamRuntime;
+  questionRuntime.start();
 
   try {
     await scheduledTasksRuntime.start();

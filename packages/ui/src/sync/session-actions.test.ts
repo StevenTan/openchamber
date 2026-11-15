@@ -48,6 +48,9 @@ const openchamberRouteRequests: Array<{ path: string; body: Record<string, unkno
 // Lets a test switch runtime while the archive/unarchive request is in flight.
 let beforeArchiveRouteResolve: ((path: string) => void) | null = null
 type MockRouteResponse = { status: number; body: unknown }
+let asyncQuestionResponse: MockRouteResponse = { status: 204, body: null }
+let pendingAsyncForms: FormRequest[] = []
+let pendingAsyncError: Error | null = null
 let archiveBatchResponse: MockRouteResponse = {
   status: 404,
   body: { error: 'not found' },
@@ -170,6 +173,11 @@ mock.module("@/lib/opencode/client", () => ({
       })
       if (permissionReplyError) throw permissionReplyError
       return true
+    }),
+    listPendingForms: mock(async (options: { directories: string[] }) => {
+      replyCalls.push({ method: "form.list", params: options })
+      if (pendingAsyncError) throw pendingAsyncError
+      return pendingAsyncForms
     }),
     replyToForm: mock(async (
       sessionId: string,
@@ -440,6 +448,7 @@ mock.module("@/lib/runtime-fetch", () => ({
     const payload = JSON.parse(String(init?.body ?? "{}"))
     openchamberRouteRequests.push({ path, body: payload })
     beforeArchiveRouteResolve?.(path)
+    if (path === '/api/openchamber/async-question/resolve') return new Response(null, { status: asyncQuestionResponse.status })
     if (path.startsWith("/api/goals/objective/")) {
       const sessionId = path.slice("/api/goals/objective/".length)
       if (typeof payload.content === "string") goalObjectives.set(sessionId, payload.content)
@@ -4338,11 +4347,68 @@ function buildPermission(id: string, sessionId: string): PermissionRequest {
   }
 }
 
+describe("resolveAsyncQuestions", () => {
+  const first = { ...buildForm("async-first", "session-a"), metadata: { kind: "openchamber-async-question", order: 1 } }
+  const second = { ...buildForm("async-second", "session-a"), metadata: { kind: "openchamber-async-question", order: 2 } }
+  beforeEach(() => {
+    openchamberRouteRequests.length = 0
+    replyCalls.length = 0
+    asyncQuestionResponse = { status: 204, body: null }
+    pendingAsyncForms = []
+    pendingAsyncError = null
+    beforeArchiveRouteResolve = null
+  })
+  afterEach(() => { beforeArchiveRouteResolve = null })
+
+  async function setup() {
+    const store = createStore({}, { session: [{ id: "session-a", time: { created: 1 } } as Session], form: { "session-a": [first, second] } })
+    const actions = await import("./session-actions")
+    actions.setActionRefs(createChildStores([["/test/project", store]]), () => "/test/project")
+    return { store, actions }
+  }
+  test("sends one request with both answers and clears only submitted requests", async () => {
+    const { store, actions } = await setup()
+    const later = { ...first, id: 'async-later' }
+    beforeArchiveRouteResolve = () => store.setState({ form: { "session-a": [first, second, later] } })
+    await actions.resolveAsyncQuestions([first, second], { "async-first": { q0: 'Blue' }, "async-second": { q0: 'Green' } })
+    expect(openchamberRouteRequests).toEqual([{ path: '/api/openchamber/async-question/resolve', body: { sessionID: 'session-a', replies: [
+      { questionID: 'async-first', status: 'answered', answer: { q0: 'Blue' } },
+      { questionID: 'async-second', status: 'answered', answer: { q0: 'Green' } },
+    ] } }])
+    expect(store.getState().form['session-a']).toEqual([later])
+    expect(replyCalls.filter(call => call.method === 'form.reply')).toEqual([])
+  })
+  test("a stale member preserves the other pending question", async () => {
+    const { store, actions } = await setup()
+    asyncQuestionResponse = { status: 404, body: null }
+    pendingAsyncForms = [second]
+    await expect(actions.resolveAsyncQuestions([first, second])).rejects.toThrow('Question group reply failed')
+    expect(store.getState().form['session-a']).toEqual([second])
+  })
+  test("failed reconciliation keeps every question available for retry", async () => {
+    const { store, actions } = await setup()
+    asyncQuestionResponse = { status: 409, body: null }
+    pendingAsyncError = new Error('Pending form read failed')
+    await expect(actions.resolveAsyncQuestions([first, second])).rejects.toThrow('Pending form read failed')
+    expect(store.getState().form['session-a']).toEqual([first, second])
+  })
+});
+
 describe("dismissOpenFormsForSession", () => {
   beforeEach(() => {
     replyCalls.length = 0
     formReplyError = null
     formCancelError = null
+  })
+
+  test("sending a message preserves pending asynchronous questions", async () => {
+    const question = { ...buildForm("async-1", "session-a"), metadata: { kind: "openchamber-async-question", order: 1 } }
+    const store = createStore({}, { session: [{ id: "session-a", time: { created: 1 } } as Session], form: { "session-a": [question] } })
+    const { setActionRefs, dismissOpenFormsForSession } = await import("./session-actions")
+    setActionRefs(createChildStores([["/test/project", store]]), () => "/test/project")
+    expect(await dismissOpenFormsForSession("session-a")).toBe(false)
+    expect(store.getState().form["session-a"]).toEqual([question])
+    expect(replyCalls).toEqual([])
   })
 
   test("returns false and rejects nothing when no forms are pending", async () => {

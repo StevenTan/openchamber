@@ -19,6 +19,7 @@ import { useOpenChildSession } from './useOpenChildSession';
 import { formatCost } from './subagentCost';
 import { computeRollup } from './useSubagentCostRollup';
 import type { State } from '@/sync/types';
+import { isAsyncQuestion } from '@/sync/async-questions';
 import { ScrollableOverlay } from '@/components/ui/ScrollableOverlay';
 
 type Props = {
@@ -119,7 +120,7 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
   const panelSpaceId = spaceIdOfDirectory(panelDirectory);
   const rows = children.map((child) => {
     const blocked = (permissions[child.id]?.length ?? 0) > 0;
-    const asked = (forms[child.id]?.length ?? 0) > 0;
+    const asked = forms[child.id]?.some(form => !isAsyncQuestion(form)) ?? false;
     const status = statuses[child.id]?.type;
     const observed = observedById.get(child.id);
     const busy = status === 'busy' || status === 'retry' || (!status && observed === 'busy');

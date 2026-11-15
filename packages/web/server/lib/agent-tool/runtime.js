@@ -994,6 +994,7 @@ export const createAgentToolRuntime = (dependencies) => {
     resolveSessionDirectory,
     getCommandEnvironment,
     hasPendingInput,
+    questionRuntime,
   } = dependencies;
   // The plugin embeds this server's tool declarations, so it lives in this
   // server's own directory (see ../opencode/instance-dir.js).
@@ -1142,6 +1143,11 @@ export const createAgentToolRuntime = (dependencies) => {
 
   const registerRoutes = (app, express) => {
     commandToolRuntime.registerRoutes(app, express, { authorize, trackInflight });
+    app.post('/api/openchamber/async-question', express.json({ limit: '1mb' }), async (req, res) => {
+      if (!authorize(req)) return res.status(401).json({ error: 'Unauthorized' });
+      try { return res.json(await questionRuntime.ask(req.body)); }
+      catch (error) { return res.status(error.status ?? (error.name === 'ZodError' ? 400 : 500)).json({ error: error.message }); }
+    });
     app.post('/api/openchamber/agent-tool', express.json({ limit: '1mb' }), async (req, res) => {
       if (!authorize(req)) return res.status(401).json({ error: 'Unauthorized' });
       const controller = new AbortController();
@@ -1169,16 +1175,34 @@ export const createAgentToolRuntime = (dependencies) => {
 
   const commandToolRuntime = createCommandToolRuntime({ instanceDir, resolveSessionDirectory, getEnvironment: getCommandEnvironment, hasPendingInput });
 
+  const registerQuestionFormRoutes = (app, express) => {
+    app.post('/api/openchamber/async-question/resolve', express.json({ limit: '1mb' }), async (req, res) => {
+      try { await questionRuntime.resolveBatch(req.body); return res.status(204).end(); }
+      catch (error) { return res.status(error.status ?? (error.name === 'ZodError' ? 400 : 500)).json({ error: error.message }); }
+    });
+    const resolveQuestion = (cancel) => async (req, res, next) => {
+      try {
+        const handled = await questionRuntime.resolve(req.params.sessionID, req.params.formID, cancel ? { status: 'cancelled' } : { status: 'answered', answer: req.body?.answer });
+        if (!handled) return next();
+        return res.status(204).end();
+      } catch (error) { return res.status(error.status ?? (error.name === 'ZodError' ? 400 : 500)).json({ error: error.message }); }
+    };
+    app.post('/api/session/:sessionID/form/:formID/reply', express.json({ limit: '1mb' }), resolveQuestion(false));
+    app.delete('/api/session/:sessionID/form/:formID', resolveQuestion(true));
+  };
+
   return {
     pluginDirectory,
     materializePlugin,
     createChildEnv,
     authorizeRequest: authorize,
     registerRoutes,
+    registerQuestionFormRoutes,
     execute,
     abortSession,
     materializeCommandPlugin: commandToolRuntime.materializePlugin,
     materializeSearchPlugin: () => materializeSearchPlugin(instanceDir),
+    materializeQuestionPlugin: () => questionRuntime.materializePlugin(instanceDir),
     closeCommands: commandToolRuntime.close,
     releaseCommandSession: commandToolRuntime.releaseSession,
   };

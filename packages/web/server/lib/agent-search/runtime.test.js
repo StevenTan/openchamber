@@ -145,15 +145,16 @@ it('uses the current assistant model and sends only recent visible conversation 
 });
 
 it('forwards search controls and specialized commands without including them in commands metadata', async () => {
+  expect(tools.get('codex-research').input.properties).not.toHaveProperty('literature_search_query');
   expect(tools.get('codex-research').input.properties.sports.items.required).not.toContain('tool');
   await tools.get('codex-research').execute({
     image_query: [{ q: 'otter', domains: ['example.com'] }], screenshot: [{ ref_id: 'https://example.com/a.pdf', pageno: 0 }],
     finance: [{ ticker: 'MSFT', type: 'equity', market: 'USA' }], weather: [{ location: 'Beijing' }],
-    sports: [{ fn: 'standings', league: 'nba' }], time: [{ utc_offset: '+08:00' }], literature_search_query: [{ q: 'attention' }],
+    sports: [{ fn: 'standings', league: 'nba' }], time: [{ utc_offset: '+08:00' }],
     mode: 'indexed', max_output_tokens: 2500, search_context_size: 'high',
     user_location: { country: 'CN', timezone: 'Asia/Shanghai' }, allowed_domains: ['example.com'], blocked_domains: ['blocked.example'],
   }, invocation());
-  expect(Object.keys(requests[0].commands)).toEqual(['response_length', 'literature_search_query', 'image_query', 'screenshot', 'finance', 'weather', 'sports', 'time']);
+  expect(Object.keys(requests[0].commands)).toEqual(['response_length', 'image_query', 'screenshot', 'finance', 'weather', 'sports', 'time']);
   expect(requests[0].commands.sports).toEqual([{ tool: 'sports', fn: 'standings', league: 'nba' }]);
   expect(requests[0]).toMatchObject({ max_output_tokens: 2500, settings: {
     external_web_access: 'indexed', search_context_size: 'high',

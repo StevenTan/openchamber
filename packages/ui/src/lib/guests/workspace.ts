@@ -9,6 +9,7 @@ import { getAllSyncSessionMap, getDirectoryState, getSyncChildStores } from '@/s
 import { getLinkedIssues, isLinkedChange } from '@/lib/linkedIssues';
 import { isSessionInWork } from '@/lib/sessionWorkMetadata';
 import { isSessionUnread } from '@/sync/session-unread';
+import { isAsyncQuestion } from '@/sync/async-questions';
 import { currentLiveTool, useSessionLiveWorkStore } from '@/sync/session-live-work';
 import { findSessionModelKey, limitsForAnsweringModel } from '@/lib/routing/contextWindowLimits';
 import { normalizePath } from '@/lib/pathNormalization';
@@ -98,9 +99,7 @@ const projectSession = (session: Session, projectId: string, guestId: string, wo
     else if (status?.type === 'retry') activity = 'retrying';
     else if (status?.type === 'idle' || (!statusInvalidated && (child?.sessionStatusReady || observed))) activity = 'idle';
     if (child?.permission[session.id]?.length) activity = 'waiting-permission';
-    // v2 replaced the v1 question tool with typed forms; both are "the agent
-    // is waiting for the user to answer", so the public activity value stays.
-    else if (child?.form[session.id]?.length) activity = 'waiting-question';
+    else if (child?.form[session.id]?.some(form => !isAsyncQuestion(form))) activity = 'waiting-question';
   }
   return {
     id: session.id, title: session.title || session.id, projectId, directory,

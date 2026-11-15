@@ -10,7 +10,7 @@ import type { RecoveredQuestion } from '@/sync/recoverable-questions';
 import { noteLocalFormCancelled } from '@/sync/recoverable-questions';
 import { readWebSearchConsent } from '@/lib/opencode/websearch';
 import { useUIStore } from '@/stores/useUIStore';
-import { useChatSessionSelection } from './chatColumnSession';
+import { useChatSessionSelection, useChatTranscriptDirectory } from './chatColumnSession';
 import { useSessions } from '@/sync/sync-context';
 import * as sessionActions from '@/sync/session-actions';
 import { agentUnavailableFrom, connectionLostMessage, isFormRequestNotFoundError } from '@/sync/form-request-error';
@@ -21,6 +21,7 @@ import { serializeFormAnswerAsMarkdown, serializeFormAsJson, serializeFormAsMark
 import { dropFormDraft, formDraftScope, loadFormDraft, saveFormDraft } from './formDrafts';
 import { FormFieldControl } from './FormFieldControl';
 import { WebSearchConsentCard } from './WebSearchConsent';
+import { retainAsyncQuestionValues, splitAsyncQuestionAnswers } from './asyncQuestionForms';
 import {
     type FormValues,
     buildFormAnswer,
@@ -34,6 +35,7 @@ interface FormCardProps {
     form: FormRequest;
     /** Set when this card re-asks a question whose turn died before it was answered. */
     recovered?: RecoveredQuestion;
+    asyncForms?: FormRequest[];
 }
 
 /**
@@ -45,16 +47,17 @@ interface FormCardProps {
  * renders every visible field at once and submits one answer. Fields gated by
  * a `when` clause appear and disappear as their controlling field changes.
  */
-export const FormCard: React.FC<FormCardProps> = ({ form, recovered }) => {
+export const FormCard: React.FC<FormCardProps> = ({ form, recovered, asyncForms }) => {
     const webSearchConsent = readWebSearchConsent(form);
     if (webSearchConsent) return <WebSearchConsentCard form={form} consent={webSearchConsent} />;
-    return <GenericFormCard form={form} recovered={recovered} />;
+    return <GenericFormCard form={form} recovered={recovered} asyncForms={asyncForms} />;
 };
 
-const GenericFormCard: React.FC<FormCardProps> = ({ form, recovered }) => {
+const GenericFormCard: React.FC<FormCardProps> = ({ form, recovered, asyncForms }) => {
     const { t } = useI18n();
     const isMobile = useUIStore((state) => state.isMobile);
     const { sessionId: currentSessionId, directory: currentSessionDirectory } = useChatSessionSelection();
+    const transcriptDirectory = useChatTranscriptDirectory();
     const sessions = useSessions(currentSessionDirectory ?? undefined);
 
     const isFromSubagent = React.useMemo(() => {
@@ -67,26 +70,23 @@ const GenericFormCard: React.FC<FormCardProps> = ({ form, recovered }) => {
     const fieldsSignature = fields.map((field) => `${field.key}:${field.type}`).join('|');
     const recoveryDirectory = recovered?.directory;
     const draftScope = React.useMemo(
-        () => (recoveryDirectory !== undefined ? formDraftScope(form, recoveryDirectory) : null),
-        [form, recoveryDirectory],
+        () => (recoveryDirectory !== undefined || asyncForms ? formDraftScope(form, recoveryDirectory ?? transcriptDirectory ?? undefined) : null),
+        [asyncForms, transcriptDirectory, form, recoveryDirectory],
     );
     const [restored] = React.useState(() => {
         const draft = draftScope ? loadFormDraft(draftScope) : null;
-        return draft?.fieldsSignature === fieldsSignature ? draft : null;
+        return asyncForms || draft?.fieldsSignature === fieldsSignature ? draft : null;
     });
     // The card shows every field at once, so an external link is on screen
     // from the start and its acknowledgement travels with the reply.
-    const [values, setValues] = React.useState<FormValues>(() => restored?.values ?? initialFormValues(fields, { acknowledgeExternal: true }));
+    const [values, setValues] = React.useState<FormValues>(() => asyncForms ? retainAsyncQuestionValues(fields, restored?.values ?? {}) : restored?.values ?? initialFormValues(fields, { acknowledgeExternal: true }));
     const [isResponding, setIsResponding] = React.useState(false);
     const respondingRef = React.useRef(false);
     const [hasResponded, setHasResponded] = React.useState(false);
     const [showErrors, setShowErrors] = React.useState(false);
 
-    // The store hands the card a fresh form object whenever the pending list
-    // is rebuilt (an event for another form, a bootstrap reconcile), so the
-    // fields array changes identity without changing content. Resetting on
-    // identity threw away half-filled answers; only a different form, or a
-    // form whose fields actually changed, starts over.
+    // Pending snapshots can replace form objects without changing their fields.
+    // Async request keys are immutable, so a growing group retains those answers.
     const mountedIdentityRef = React.useRef<string | null>(null);
     React.useEffect(() => {
         const identity = `${form.id}\u0000${fieldsSignature}`;
@@ -95,7 +95,7 @@ const GenericFormCard: React.FC<FormCardProps> = ({ form, recovered }) => {
         mountedIdentityRef.current = identity;
         // The first run needs no reset: the initial state already holds this
         // scope's restored draft.
-        if (!first) setValues(initialFormValues(fields, { acknowledgeExternal: true }));
+        if (!first) setValues(previous => asyncForms ? retainAsyncQuestionValues(fields, previous) : initialFormValues(fields, { acknowledgeExternal: true }));
         setHasResponded(false);
         setShowErrors(false);
         // oxlint-disable-next-line react-hooks/exhaustive-deps
@@ -127,13 +127,16 @@ const GenericFormCard: React.FC<FormCardProps> = ({ form, recovered }) => {
             if (recovered) {
                 await sessionActions.sendRecoveredFormAnswer(recovered, serializeFormAnswerAsMarkdown(form, answer));
                 if (draftScope) dropFormDraft(draftScope);
+            } else if (asyncForms) {
+                await sessionActions.resolveAsyncQuestions(asyncForms, splitAsyncQuestionAnswers(asyncForms, answer));
+                if (draftScope) dropFormDraft(draftScope);
             } else {
                 await sessionActions.replyToForm(form.sessionID, form.id, answer);
             }
-            setHasResponded(true);
+            if (!asyncForms) setHasResponded(true);
         } catch (error) {
             // The store removes not-found requests, so no card remains to retry.
-            if (!recovered && isFormRequestNotFoundError(error)) {
+            if (!recovered && !asyncForms && isFormRequestNotFoundError(error)) {
                 setHasResponded(true);
                 return;
             }
@@ -152,7 +155,7 @@ const GenericFormCard: React.FC<FormCardProps> = ({ form, recovered }) => {
             respondingRef.current = false;
             setIsResponding(false);
         }
-    }, [canSubmit, draftScope, fields, form, recovered, t, values]);
+    }, [asyncForms, canSubmit, draftScope, fields, form, recovered, t, values]);
 
     const handleCancel = React.useCallback(async () => {
         if (respondingRef.current) return;
@@ -162,12 +165,15 @@ const GenericFormCard: React.FC<FormCardProps> = ({ form, recovered }) => {
             if (recovered) {
                 noteLocalFormCancelled(recovered.form.id);
                 if (draftScope) dropFormDraft(draftScope);
+            } else if (asyncForms) {
+                await sessionActions.resolveAsyncQuestions(asyncForms);
+                if (draftScope) dropFormDraft(draftScope);
             } else {
                 await sessionActions.cancelForm(form.sessionID, form.id);
             }
-            setHasResponded(true);
+            if (!asyncForms) setHasResponded(true);
         } catch (error) {
-            if (isFormRequestNotFoundError(error)) {
+            if (!asyncForms && isFormRequestNotFoundError(error)) {
                 setHasResponded(true);
                 return;
             }
@@ -181,7 +187,7 @@ const GenericFormCard: React.FC<FormCardProps> = ({ form, recovered }) => {
             respondingRef.current = false;
             setIsResponding(false);
         }
-    }, [draftScope, form.id, form.sessionID, recovered, t]);
+    }, [asyncForms, draftScope, form.id, form.sessionID, recovered, t]);
 
     const handleKeyDown = React.useCallback(
         (event: React.KeyboardEvent<HTMLTextAreaElement>) => {

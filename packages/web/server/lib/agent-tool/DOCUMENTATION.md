@@ -395,6 +395,10 @@ error state.
 
 ## Runtime parity
 
+The managed `openchamber-question-tool` exposes `request_user_input_async` through
+the same authenticated callback channel. Its durable form and answer lifecycle is
+owned by `../agent-question/`; ordinary form replies use the existing form routes.
+
 The separate `openchamber-command-tool` plugin exposes `exec_command` and
 `write_stdin` for managed OpenCode and shares this runtime's authenticated
 callback channel. Its command ownership, waiting and PTY contracts are in

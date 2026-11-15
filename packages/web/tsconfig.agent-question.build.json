@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.agent-command.json",
+  "compilerOptions": {
+    "allowJs": false,
+    "noEmit": false,
+    "noCheck": true,
+    "rootDir": "server/lib/agent-question/src",
+    "outDir": "server/lib/agent-question/dist"
+  },
+  "include": ["server/lib/agent-question/src/**/*.ts"]
+}

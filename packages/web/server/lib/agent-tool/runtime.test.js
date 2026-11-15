@@ -37,6 +37,40 @@ const createRuntime = async (overrides = {}) => {
 
 const pluginDirectoryFor = (dataDir) => path.join(dataDir, 'agent-tool', 'openchamber-agent-tool');
 
+describe('asynchronous question routes', () => {
+  it('authenticates callbacks and settles forms only behind API authentication', async () => {
+    const questionRuntime = {
+      ask: vi.fn(async () => ({ question_id: 'frm_ocq1', status: 'pending' })),
+      resolve: vi.fn(async (_session, formID) => formID.startsWith('frm_ocq')),
+      resolveBatch: vi.fn(async () => ({ sessionID: 'ses_1', questionIDs: ['frm_ocq1'] })),
+    };
+    const { runtime } = await createRuntime({ questionRuntime });
+    const env = runtime.createChildEnv();
+    const app = express();
+    runtime.registerRoutes(app, express);
+    app.use('/api', (req, res, next) => req.headers['x-fixture-auth'] === 'yes' ? next() : res.status(401).end());
+    runtime.registerQuestionFormRoutes(app, express);
+    app.post('/api/session/:sessionID/form/:formID/reply', (_req, res) => res.status(202).end());
+
+    await request(app).post('/api/openchamber/async-question').send({}).expect(401);
+    await request(app).post('/api/openchamber/async-question').set('Authorization', `Bearer ${env.OPENCHAMBER_AGENT_TOOL_TOKEN}`).send({ sessionID: 'ses_1', callID: 'call_1', input: {} }).expect(200);
+    expect(questionRuntime.ask).toHaveBeenCalledTimes(1);
+    await request(app).post('/api/session/ses_1/form/frm_ocq1/reply').send({ answer: { q0: 'Blue' } }).expect(401);
+    await request(app).delete('/api/session/ses_1/form/frm_ocq1').expect(401);
+    await request(app).post('/api/openchamber/async-question/resolve').send({}).expect(401);
+    expect(questionRuntime.resolveBatch).not.toHaveBeenCalled();
+    expect(questionRuntime.resolve).not.toHaveBeenCalled();
+    await request(app).post('/api/session/ses_1/form/frm_ocq1/reply').set('x-fixture-auth', 'yes').send({ answer: { q0: 'Blue' } }).expect(204);
+    expect(questionRuntime.resolve).toHaveBeenLastCalledWith('ses_1', 'frm_ocq1', { status: 'answered', answer: { q0: 'Blue' } });
+    await request(app).post('/api/session/ses_1/form/native/reply').set('x-fixture-auth', 'yes').send({ answer: {} }).expect(202);
+    await request(app).delete('/api/session/ses_1/form/frm_ocq1').set('x-fixture-auth', 'yes').expect(204);
+    expect(questionRuntime.resolve).toHaveBeenLastCalledWith('ses_1', 'frm_ocq1', { status: 'cancelled' });
+    const group = { sessionID: 'ses_1', replies: [{ questionID: 'frm_ocq1', status: 'answered', answer: { q0: 'Blue' } }] };
+    await request(app).post('/api/openchamber/async-question/resolve').set('x-fixture-auth', 'yes').send(group).expect(204);
+    expect(questionRuntime.resolveBatch).toHaveBeenCalledWith(group);
+  });
+});
+
 /** What a managed OpenCode child start does: write the plugin, mint a token. */
 const prepareManagedEnv = async (runtime, options) => {
   const pluginDirectory = await runtime.materializePlugin(options);

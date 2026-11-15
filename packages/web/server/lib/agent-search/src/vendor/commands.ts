@@ -29,7 +29,6 @@ const operations = <T extends z.ZodType>(schema: T) => z.array(schema).min(1).op
 
 // Command fields mirror codex-rs/codex-api/src/search.rs.
 export const additionalCommands = z.object({
-  literature_search_query: operations(searchQuery),
   image_query: operations(searchQuery),
   screenshot: operations(z.object({ ref_id: reference, pageno: z.number().int().nonnegative() }).strict()),
   finance: operations(z.object({ ticker: reference, type: z.enum(["equity", "fund", "crypto", "index"]), market: z.string().optional() }).strict()),

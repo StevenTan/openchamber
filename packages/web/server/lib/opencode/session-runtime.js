@@ -166,6 +166,7 @@ export const createSessionRuntime = ({
     if (payload.type === 'form.created') {
       const form = properties.form && typeof properties.form === 'object' ? properties.form : null;
       if (!form) return;
+      if (form.metadata?.kind === 'openchamber-async-question') return;
       const sessionId = readRequestId(form.sessionID) || readRequestId(properties.sessionID);
       const requestId = readRequestId(form.id);
       if (!sessionId || !requestId) return;

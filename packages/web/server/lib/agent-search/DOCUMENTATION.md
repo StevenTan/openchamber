@@ -21,7 +21,7 @@ are excluded. Context stops at the invoking assistant message.
 
 With `native` selected, agents receive `codex-search` and `codex-research` as direct
 tools. Research supports batched search, page opening, page text lookup,
-numbered link traversal, image and literature search, PDF screenshots, finance,
+numbered link traversal, image search, PDF screenshots, finance,
 weather, sports and time. Availability of specialized queries depends on the
 configured backend and model. Backend references use `openchamber_<sessionID>` and
 remain isolated across OpenCode sessions. Results retain reference IDs for tool

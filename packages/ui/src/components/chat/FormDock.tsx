@@ -15,7 +15,7 @@ import type { FormRequest } from '@/lib/opencode/model';
 import type { RecoveredQuestion } from '@/sync/recoverable-questions';
 import { readWebSearchConsent } from '@/lib/opencode/websearch';
 import { useUIStore } from '@/stores/useUIStore';
-import { useScopedBlockingForms, useRecoveredQuestions, useSessions } from '@/sync/sync-context';
+import { useScopedForms, useRecoveredQuestions, useSessions } from '@/sync/sync-context';
 import { useRequestReveal } from '@/sync/request-reveal';
 import { useChatSessionSelection } from './chatColumnSession';
 import * as sessionActions from '@/sync/session-actions';
@@ -28,6 +28,7 @@ import { serializeFormAnswerAsMarkdown, serializeFormAsJson, serializeFormAsMark
 import { formDraftScope, loadFormDraft, saveFormDraft, dropFormDraft } from './formDrafts';
 import { noteLocalFormCancelled } from '@/sync/recoverable-questions';
 import { ScrollableOverlay } from '@/components/ui/ScrollableOverlay';
+import { groupAsyncQuestionForms, retainAsyncQuestionValues, splitAsyncQuestionAnswers } from './asyncQuestionForms';
 import {
     type FormValues,
     buildFormAnswer,
@@ -65,11 +66,12 @@ interface FormDockProps {
 }
 
 const FormDockView: React.FC<FormDockProps> = ({ sessionId, directory, hidden }) => {
-    const forms = useScopedBlockingForms(sessionId, directory);
+    const forms = useScopedForms(sessionId, directory);
     // The session's own forms come first; a location-scoped form (an MCP
     // elicitation, owned by no session) follows and shows in every session
     // of the directory that raised it.
-    const form = forms[0];
+    const presented = React.useMemo(() => groupAsyncQuestionForms(forms), [forms]);
+    const { form, asyncForms } = presented[0] ?? {};
     const webSearchConsent = form ? readWebSearchConsent(form) : null;
     // A question whose ask died with its turn waits behind the live requests;
     // answering it starts a new turn instead of replying to a form.
@@ -82,7 +84,7 @@ const FormDockView: React.FC<FormDockProps> = ({ sessionId, directory, hidden })
             {hidden ? null : form ? (
                 webSearchConsent
                     ? <WebSearchConsentDock key={form.id} form={form} consent={webSearchConsent} />
-                    : <FormDockPanel key={form.id} form={form} forms={forms} directory={directory} />
+                    : <FormDockPanel key={JSON.stringify(formDraftScope(form, directory))} form={form} forms={forms} directory={directory} asyncForms={asyncForms} />
             ) : recoveredFirst ? (
                 <FormDockPanel
                     key={recoveredFirst.form.id}
@@ -109,7 +111,8 @@ const FormDockPanel: React.FC<{
     directory?: string;
     /** Set when this card re-asks a question whose turn died before it was answered. */
     recovered?: RecoveredQuestion;
-}> = ({ form, forms, directory, recovered }) => {
+    asyncForms?: FormRequest[];
+}> = ({ form, forms, directory, recovered, asyncForms }) => {
     const { t } = useI18n();
     const isMobile = useUIStore((state) => state.isMobile);
     // The sessions of the chat this dock belongs to, which may be a chat of
@@ -124,15 +127,15 @@ const FormDockPanel: React.FC<{
     const draftScope = React.useMemo(() => formDraftScope(form, recovered?.directory ?? directory), [directory, form, recovered?.directory]);
     const [restored] = React.useState(() => {
         const draft = loadFormDraft(draftScope);
-        return draft?.fieldsSignature === fieldsSignature ? draft : null;
+        return asyncForms || draft?.fieldsSignature === fieldsSignature ? draft : null;
     });
-    const [values, setValues] = React.useState<FormValues>(() => restored?.values ?? initialFormValues(fields));
+    const [values, setValues] = React.useState<FormValues>(() => asyncForms ? retainAsyncQuestionValues(fields, restored?.values ?? {}) : restored?.values ?? initialFormValues(fields));
     const [step, setStep] = React.useState(restored?.step ?? 0);
     const [collapsed, setCollapsed] = React.useState(false);
     const [isResponding, setIsResponding] = React.useState(false);
     const respondingRef = React.useRef(false);
     const [showErrors, setShowErrors] = React.useState(false);
-    const waiting = forms.length - 1;
+    const waiting = forms.length - (asyncForms?.length ?? 1);
     // "Open session" on a question's toast expands the dock, including for a
     // question queued behind the one shown.
     const formIds = React.useMemo(() => forms.map((item) => item.id), [forms]);
@@ -142,8 +145,8 @@ const FormDockPanel: React.FC<{
     React.useEffect(() => {
         if (appliedSignatureRef.current === fieldsSignature) return;
         appliedSignatureRef.current = fieldsSignature;
-        setValues(initialFormValues(fields));
-        setStep(0);
+        setValues(previous => asyncForms ? retainAsyncQuestionValues(fields, previous) : initialFormValues(fields));
+        setStep(previous => asyncForms ? Math.min(previous, fields.length - 1) : 0);
         setShowErrors(false);
         // oxlint-disable-next-line react-hooks/exhaustive-deps
     }, [fieldsSignature]);
@@ -214,12 +217,14 @@ const FormDockPanel: React.FC<{
             const answer = buildFormAnswer(fields, values);
             if (recovered) {
                 await sessionActions.sendRecoveredFormAnswer(recovered, serializeFormAnswerAsMarkdown(form, answer));
+            } else if (asyncForms) {
+                await sessionActions.resolveAsyncQuestions(asyncForms, splitAsyncQuestionAnswers(asyncForms, answer));
             } else {
                 await sessionActions.replyToForm(form.sessionID, form.id, answer);
             }
             dropFormDraft(draftScope);
         } catch (error) {
-            if (!recovered && isFormRequestNotFoundError(error)) {
+            if (!recovered && !asyncForms && isFormRequestNotFoundError(error)) {
                 dropFormDraft(draftScope);
                 return;
             }
@@ -241,7 +246,7 @@ const FormDockPanel: React.FC<{
             respondingRef.current = false;
             setIsResponding(false);
         }
-    }, [canSubmit, draftScope, fields, form, missing, recovered, shown, t, values]);
+    }, [asyncForms, canSubmit, draftScope, fields, form, missing, recovered, shown, t, values]);
 
     const handleDismiss = React.useCallback(async () => {
         if (respondingRef.current) return;
@@ -250,12 +255,14 @@ const FormDockPanel: React.FC<{
         try {
             if (recovered) {
                 noteLocalFormCancelled(recovered.form.id);
+            } else if (asyncForms) {
+                await sessionActions.resolveAsyncQuestions(asyncForms);
             } else {
                 await sessionActions.cancelForm(form.sessionID, form.id);
             }
             dropFormDraft(draftScope);
         } catch (error) {
-            if (!recovered && isFormRequestNotFoundError(error)) {
+            if (!recovered && !asyncForms && isFormRequestNotFoundError(error)) {
                 dropFormDraft(draftScope);
                 return;
             }
@@ -269,7 +276,7 @@ const FormDockPanel: React.FC<{
             respondingRef.current = false;
             setIsResponding(false);
         }
-    }, [draftScope, form.id, form.sessionID, recovered, t]);
+    }, [asyncForms, draftScope, form.id, form.sessionID, recovered, t]);
 
     const goNext = React.useCallback(() => {
         setStep(Math.min(currentStep + 1, lastStep));

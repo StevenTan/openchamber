@@ -15,12 +15,13 @@ import { Spinner } from '@/components/ui/spinner';
 import { PauseClock } from '@/components/ui/pause-clock';
 import { useBtwStore } from '@/stores/useBtwStore';
 import { useSync } from '@/sync/use-sync';
+import { isAsyncQuestion } from '@/sync/async-questions';
 import {
     useSessionMessageRecords,
     useSessionRenderable,
     useSessionStatus,
     useScopedBlockingPermissions,
-    useScopedBlockingForms,
+    useScopedForms,
     useRecoveredQuestions,
 } from '@/sync/sync-context';
 import { useStreamingStore } from '@/sync/streaming';
@@ -32,6 +33,8 @@ import { useMobileAutocompleteMaxHeight } from '../useMobileAutocompleteMaxHeigh
 import ChatMessage from '../ChatMessage';
 import { PermissionCard } from '../PermissionCard';
 import { FormCard } from '../FormCard';
+import { groupAsyncQuestionForms } from '../asyncQuestionForms';
+import { formDraftScope } from '../formDrafts';
 import { SessionErrorNotice } from '../SessionErrorNotice';
 import { ScrollableOverlay } from '@/components/ui/ScrollableOverlay';
 
@@ -130,7 +133,7 @@ type BtwSessionData = {
     streamingMessageId: string | null;
     activeStreamingPhase: 'streaming' | 'cooldown' | 'completed' | null;
     sessionPermissions: ReturnType<typeof useScopedBlockingPermissions>;
-    sessionForms: ReturnType<typeof useScopedBlockingForms>;
+    sessionForms: ReturnType<typeof useScopedForms>;
     sessionRecoveredQuestions: ReturnType<typeof useRecoveredQuestions>;
     isEmpty: boolean;
 };
@@ -164,7 +167,7 @@ const useBtwSessionData = (
         ),
     );
     const sessionPermissions = useScopedBlockingPermissions(sessionId, directory);
-    const sessionForms = useScopedBlockingForms(sessionId, directory);
+    const sessionForms = useScopedForms(sessionId, directory);
     const sessionRecoveredQuestions = useRecoveredQuestions(sessionId, directory);
 
     const tailRecords = React.useMemo(
@@ -173,7 +176,7 @@ const useBtwSessionData = (
     );
 
     const sessionIsWorking = React.useMemo(() => {
-        if (sessionPermissions.length > 0 || sessionForms.length > 0) {
+        if (sessionPermissions.length > 0 || sessionForms.some(form => !isAsyncQuestion(form))) {
             return false;
         }
         const statusType = status.type ?? 'idle';
@@ -183,7 +186,7 @@ const useBtwSessionData = (
         // Plumbing roles trail the assistant message, so the working state
         // follows the last conversation message, not the last record.
         return isIncompleteAssistantTurn(getLastConversationRecord(tailRecords)?.info);
-    }, [sessionPermissions.length, sessionForms.length, status.type, tailRecords]);
+    }, [sessionPermissions.length, sessionForms, status.type, tailRecords]);
 
     return {
         messageRecords: tailRecords,
@@ -487,8 +490,8 @@ const BtwMessages: React.FC<{
                 ))}
                 {data.sessionForms.length > 0 || data.sessionPermissions.length > 0 || data.sessionRecoveredQuestions.length > 0 ? (
                     <div>
-                        {data.sessionForms.map((form) => (
-                            <FormCard key={form.id} form={form} />
+                        {groupAsyncQuestionForms(data.sessionForms).map(({ form, asyncForms }) => (
+                            <FormCard key={JSON.stringify(formDraftScope(form, sessionRef.directory))} form={form} asyncForms={asyncForms} />
                         ))}
                         {data.sessionRecoveredQuestions.map((question) => (
                             <FormCard key={question.form.id} form={question.form} recovered={question} />

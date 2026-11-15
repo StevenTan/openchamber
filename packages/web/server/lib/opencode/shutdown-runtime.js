@@ -53,6 +53,7 @@ export const createGracefulShutdownRuntime = (dependencies) => {
     getSpacesHost = () => null,
     stopFolderWatches = () => {},
     closeAgentCommands = () => {},
+    closeAsyncQuestions = () => {},
   } = dependencies;
 
   let shutdownPromise = null;
@@ -115,6 +116,7 @@ export const createGracefulShutdownRuntime = (dependencies) => {
       () => mergeFollowRuntime?.stop?.(),
       () => messageQueueRuntime?.stop?.(),
       () => dispatchResultsRuntime?.stop?.(),
+      closeAsyncQuestions,
       () => workflowRuntime?.shutdown(),
       () => messageSearchRuntime?.stop?.(),
       () => scheduledTasksRuntime?.stop?.(),

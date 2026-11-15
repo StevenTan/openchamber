@@ -7,6 +7,10 @@ to the shared UI domain model. Sync owns transcript membership and store writes.
 
 ## Invariants
 
+- `async-question.ts` classifies answered `openchamber-async-question` synthetic
+  messages for visible question/answer rows. These responses open a transcript
+  turn while cancellation signals remain model-only.
+
 - `getSessionMessage` reads only the requested session. Pins, message references
   and linked-message existence checks must retain this strict behavior.
 - `getToolContentMessage` is reserved for `completeToolContent`, which checks

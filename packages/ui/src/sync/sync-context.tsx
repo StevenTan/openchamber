@@ -60,6 +60,7 @@ import {
 import { shouldConsumeBulkArchiveEcho } from "./bulk-archive-echo"
 import { applyForkedSession, noteForkedSessionPatched } from "./forked-session"
 import { LOCATION_SCOPED_FORM_SESSION_ID } from "./location-scoped-forms"
+import { isAsyncQuestion, orderAsyncQuestions } from "./async-questions"
 import { useUIStore } from "@/stores/useUIStore"
 import { useBtwStore } from "@/stores/useBtwStore"
 import { selectNewChildSessions } from "./child-session-discovery"
@@ -4082,7 +4083,7 @@ export function useSessionBlockingRequests(
       for (const sessionID of sessionIDs) {
         const pending = indexed.get(sessionID)
         hasPermission ||= Boolean(permissions[sessionID]?.length)
-        hasForm ||= Boolean(forms[sessionID]?.length)
+        hasForm ||= Boolean(forms[sessionID]?.some(form => !isAsyncQuestion(form)))
           || Boolean(pending?.pages.length)
           || (!formsAuthoritative && Boolean(pending?.forms.length))
       }
@@ -4179,10 +4180,16 @@ export const collectComposerForms = (
   sessionID: string | null,
   empty: FormRequest[],
 ): FormRequest[] => {
-  const own = collectScopedBlockingRequests(sessions, formsBySession, sessionID, empty)
+  const own = orderAsyncQuestions(collectScopedBlockingRequests(sessions, formsBySession, sessionID, empty))
   const locationScoped = sessionID ? formsBySession[LOCATION_SCOPED_FORM_SESSION_ID] : undefined
   if (!locationScoped || locationScoped.length === 0) return own
   return own === empty ? locationScoped : [...own, ...locationScoped]
+}
+
+export const collectBlockingComposerForms: typeof collectComposerForms = (sessions, formsBySession, sessionID, empty) => {
+  const forms = collectComposerForms(sessions, formsBySession, sessionID, empty)
+  const blocking = forms.filter(form => !isAsyncQuestion(form))
+  return blocking.length === 0 ? empty : blocking
 }
 
 type ScopedBlockingRequestCache<T extends { id: string }> = {
@@ -4242,6 +4249,10 @@ export function useScopedBlockingPermissions(sessionID: string | null, directory
 }
 
 export function useScopedBlockingForms(sessionID: string | null, directory?: string): FormRequest[] {
+  return useScopedBlockingRequests(sessionID, directory, selectFormRequestsBySession, EMPTY_FORM_REQUESTS, collectBlockingComposerForms)
+}
+
+export function useScopedForms(sessionID: string | null, directory?: string): FormRequest[] {
   return useScopedBlockingRequests(sessionID, directory, selectFormRequestsBySession, EMPTY_FORM_REQUESTS, collectComposerForms)
 }
 

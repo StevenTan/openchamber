@@ -2,6 +2,18 @@
 
 ## Scope
 
+Forms with metadata kind `openchamber-async-question` stay in directory form state
+and appear through `useScopedForms`. `useScopedBlockingForms` and the global
+blocking-request index exclude them. Sending a message preserves these forms;
+their answers are delivered by the server's `agent-question` runtime.
+
+The composer and BTW form surfaces present asynchronous requests for one owning
+session as a single form. `resolveAsyncQuestions` submits all its replies through
+one authenticated server request, then clears only those request IDs. Questions
+that arrive during submission stay pending. A rejected group refreshes missing
+request membership from an authoritative directory form list without dropping
+the remaining questions or their drafts.
+
 Managed restart notifications use `opencode-restart-resuming` only when every interrupted chat has an automatic continuation scheduled. `opencode-restart-interrupted` keeps manual guidance, including after a turn's recovery budget is spent. Both show the same persistent toast; the server owns eligibility and the client chooses the matching localized description.
 
 This document covers the current client-side session/data architecture in `packages/ui/src/sync` and the rules for updating stores safely.

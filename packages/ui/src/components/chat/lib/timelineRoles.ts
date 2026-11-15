@@ -2,6 +2,7 @@ import type { Message } from '@/lib/opencode/model';
 import { readDispatchedSessionResult } from '@/lib/opencode/dispatched-session';
 import { readWorkflowReport } from '@/lib/workflows/report';
 import { readSubagentRun } from '@/lib/opencode/subagent-run';
+import { readAsyncQuestionAnswer } from '@/lib/opencode/async-question';
 
 /** Roles `TimelineNotice` owns; the rest belong to `ChatMessage` or nothing. */
 const NOTICE_ROLES = new Set<Message['role']>(['compaction', 'shell']);
@@ -49,7 +50,8 @@ export const isSkippedTimelineRole = (role: Message['role']): boolean => SKIPPED
 export const isBackgroundReportEntry = (message: Message): boolean =>
     readSubagentRun(message) !== undefined
     || readDispatchedSessionResult(message) !== undefined
-    || readWorkflowReport(message) !== undefined;
+    || readWorkflowReport(message) !== undefined
+    || readAsyncQuestionAnswer(message) !== undefined;
 
 /**
  * A notice row that opens a turn the way a prompt does: a background report,

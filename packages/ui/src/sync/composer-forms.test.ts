@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import type { FormRequest, Session } from "@/lib/opencode/model"
 
-import { collectComposerForms } from "./sync-context"
+import { collectComposerForms, collectBlockingComposerForms } from "./sync-context"
 import { LOCATION_SCOPED_FORM_SESSION_ID } from "./location-scoped-forms"
 
 // SAFETY: subtree scoping reads only `id` and `parentID`; the other session fields are never touched here.
@@ -36,5 +36,19 @@ describe("composer forms", () => {
 
   test("the shared empty list survives when neither kind is pending", () => {
     expect(collectComposerForms(sessions, { [LOCATION_SCOPED_FORM_SESSION_ID]: [] }, "ses_root", empty)).toBe(empty)
+  })
+
+  test("async questions stay visible without blocking session activity", () => {
+    const asyncQuestion = { ...form("form_async", "ses_root"), metadata: { kind: "openchamber-async-question", order: 1 } }
+    const pending = { ses_root: [asyncQuestion, own] }
+    expect(collectComposerForms(sessions, pending, "ses_root", empty)).toEqual([asyncQuestion, own])
+    expect(collectBlockingComposerForms(sessions, pending, "ses_root", empty)).toEqual([own])
+    expect(collectBlockingComposerForms(sessions, { ses_root: [asyncQuestion] }, "ses_root", empty)).toBe(empty)
+  })
+
+  test("async questions retain request order after an ID-sorted snapshot", () => {
+    const first = { ...form("form_z", "ses_root"), metadata: { kind: "openchamber-async-question", order: 1 } }
+    const second = { ...form("form_a", "ses_root"), metadata: { kind: "openchamber-async-question", order: 2 } }
+    expect(collectComposerForms(sessions, { ses_root: [second, first] }, "ses_root", empty)).toEqual([first, second])
   })
 })

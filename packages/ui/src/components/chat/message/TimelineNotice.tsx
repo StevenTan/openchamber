@@ -37,6 +37,8 @@ import { HoverTooltip } from '@/components/ui/row-tooltip';
 import { useI18n } from '@/lib/i18n';
 import type { Message, ToolPart as ToolPartType } from '@/lib/opencode/model';
 import { cn } from '@/lib/utils';
+import { readAsyncQuestionAnswer } from '@/lib/opencode/async-question';
+import { SimpleMarkdownRenderer } from '../MarkdownRenderer';
 
 /** The shared frame every notice row sits in, so they line up with messages. */
 const NoticeRow: React.FC<{ children: React.ReactNode; spacingClassName?: string }> = ({ children, spacingClassName = 'pb-2' }) => (
@@ -372,6 +374,19 @@ const SubagentNotice: React.FC<{ message: SyntheticMessage }> = ({ message }) =>
     const run = React.useMemo(() => readSubagentRun(message), [message]);
     const dispatched = React.useMemo(() => (run ? undefined : readDispatchedSessionResult(message)), [message, run]);
     const workflow = React.useMemo(() => (run || dispatched ? undefined : readWorkflowReport(message)), [dispatched, message, run]);
+    const answer = React.useMemo(() => readAsyncQuestionAnswer(message), [message]);
+    if (answer) return (
+        <NoticeRow>
+            <div className="flex flex-col gap-3 text-size-chat">
+                {answer.answers.map((item, index) => (
+                    <div key={`${message.id}:${index}`} className="flex flex-col gap-1">
+                        <div className="text-muted-foreground">{item.question}</div>
+                        <SimpleMarkdownRenderer content={item.answer} variant="assistant" />
+                    </div>
+                ))}
+            </div>
+        </NoticeRow>
+    );
     if (run) return <SubagentRunNotice message={message} run={run} />;
     if (dispatched) return <DispatchedSessionNotice message={message} result={dispatched} />;
     return workflow ? <WorkflowReportNotice message={message} report={workflow} /> : null;

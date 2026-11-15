@@ -12,6 +12,13 @@ describe('session runtime', () => {
     runtimes.length = 0;
   });
 
+  it('excludes asynchronous questions from the host blocking-request snapshot', () => {
+    const runtime = createSessionRuntime({ writeSseEvent() {}, getNotificationClients: () => new Set(), broadcastEvent() {} });
+    runtimes.push(runtime);
+    runtime.processOpenCodeSsePayload({ type: 'form.created', properties: { form: { id: 'frm_ocq1', sessionID: 'session-1', title: 'Pick one', metadata: { kind: 'openchamber-async-question' }, fields: [] } } });
+    expect(runtime.getPendingBlockingRequestsSnapshot()).toEqual({});
+  });
+
   it('keeps pending permission requests and forms until they are answered', () => {
     const runtime = createSessionRuntime({
       writeSseEvent() {},
