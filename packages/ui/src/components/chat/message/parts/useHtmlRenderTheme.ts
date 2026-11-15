@@ -19,15 +19,11 @@ const usesPhoneTextSizes = () => (
 const readRootMetrics = (chatFontSize: number): HtmlRenderMetrics => {
     const style = getComputedStyle(document.documentElement);
     const rem = Number.parseFloat(style.fontSize) || 16;
-    // The chat's body text size, which the styles set in rem (0.875, and
-    // 1 on phones), times the chat's own scale. The scale is read from the
-    // setting: a full-screen page sits outside the chat column.
-    const chatScale = usesPhoneTextSizes() ? 1 : chatFontSize / 100;
-    const text = (Number.parseFloat(style.getPropertyValue('--text-markdown')) || 0.875) * rem * chatScale;
+    const text = usesPhoneTextSizes() ? rem : chatFontSize;
     return {
         rem,
         text,
-        sans: style.getPropertyValue('--font-sans').trim() || DEFAULT_SANS,
+        sans: style.getPropertyValue('--font-chat').trim() || style.getPropertyValue('--font-sans').trim() || DEFAULT_SANS,
         mono: style.getPropertyValue('--font-mono').trim() || DEFAULT_MONO,
     };
 };
@@ -39,9 +35,9 @@ const sameMetrics = (a: HtmlRenderMetrics, b: HtmlRenderMetrics) => (
 /** The app theme as the page's variables, following theme, interface and chat size and font switches live. */
 export function useHtmlRenderTheme(): HtmlRenderTheme {
     const { currentTheme } = useThemeSystem();
-    const interfaceSize = useUIStore((state) => state.fontSize);
-    const chatFontSize = useUIStore((state) => state.chatFontSize);
-    const { uiFont, monoFont, customUiFont, customMonoFont } = useFontPreferences();
+    const interfaceSize = useUIStore((state) => state.interfaceFontSizePx);
+    const chatFontSize = useUIStore((state) => state.chatFontSizePx);
+    const { uiFont, monoFont, customUiFont, customMonoFont, chatFont, customChatFont } = useFontPreferences();
     const [metrics, setMetrics] = React.useState(() => readRootMetrics(chatFontSize));
     // The interface size and fonts reach the root in layout effects
     // (ThemeProvider, useAppFontEffects) that run after this component
@@ -50,6 +46,6 @@ export function useHtmlRenderTheme(): HtmlRenderTheme {
     React.useEffect(() => {
         const next = readRootMetrics(chatFontSize);
         setMetrics((current) => (sameMetrics(current, next) ? current : next));
-    }, [interfaceSize, chatFontSize, uiFont, monoFont, customUiFont, customMonoFont]);
+    }, [interfaceSize, chatFontSize, uiFont, monoFont, customUiFont, customMonoFont, chatFont, customChatFont]);
     return React.useMemo(() => htmlRenderTheme(currentTheme, metrics), [currentTheme, metrics]);
 }

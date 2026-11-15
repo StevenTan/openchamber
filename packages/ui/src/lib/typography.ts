@@ -3,6 +3,7 @@ export const SEMANTIC_TYPOGRAPHY = {
   code: '0.8125rem',
   uiHeader: '0.875rem',
   uiLabel: '0.84375rem',
+  uiSection: '0.9375rem',
   meta: '0.78125rem',
   micro: '0.75rem',
   /** Settings page / detail-pane title — larger than section headers */
@@ -15,6 +16,7 @@ export const VSCODE_TYPOGRAPHY = {
   code: '0.8125rem',
   uiHeader: '0.8438rem',
   uiLabel: '0.7813rem',
+  uiSection: '0.9375rem',
   meta: '0.7813rem',
   micro: '0.75rem',
   settingsPageTitle: '1rem',
@@ -22,25 +24,44 @@ export const VSCODE_TYPOGRAPHY = {
 
 export type SemanticTypographyKey = keyof typeof SEMANTIC_TYPOGRAPHY;
 
-export function getTypographyVariable(key: SemanticTypographyKey): string {
+function getTypographyVariable(key: SemanticTypographyKey): string {
   return `--text-${key.replace(/([A-Z])/g, '-$1').toLowerCase()}`;
 }
 
-/**
- * Inline style that scales the semantic text sizes of one area (the chat) by
- * `percent`, on top of the interface size the rem unit already carries.
- * Undefined at 100%, so the area inherits the root sizes unchanged.
- */
-export function getScaledTypographyStyle(
+export const DEFAULT_INTERFACE_FONT_SIZE = 15.5;
+export const DEFAULT_CHAT_FONT_SIZE = 15.5;
+export const DEFAULT_APP_ZOOM = 100;
+
+export function getInterfaceTypographyStyle(
+  pixels: number,
+  base: Record<SemanticTypographyKey, string> = SEMANTIC_TYPOGRAPHY,
+): Record<string, string> {
+  const scale = pixels / (Number.parseFloat(base.uiLabel) * 16);
+  const entries = Object.entries(base) as Array<[SemanticTypographyKey, string]>;
+  const utilities = { xs: 12, sm: 14, base: 16, lg: 18, xl: 20, '2xl': 24, '3xl': 30, '4xl': 36, '5xl': 48 };
+  return Object.fromEntries([
+    ...entries.map(([key, size]) => [getTypographyVariable(key), `${Number.parseFloat(size) * 16 * scale}px`]),
+    ...Object.entries(utilities).map(([key, size]) => [`--text-${key}`, `${size * scale}px`]),
+  ]);
+}
+
+export const getChatTypographyStyle = (pixels: number) => ({
+  '--text-markdown': `${pixels}px`,
+});
+
+/** Root typography tokens are authored in rem and set in px by preferences. */
+export const typographyPixels = (value: string, rem: number): number =>
+  Number.parseFloat(value) * (value.trim().endsWith('rem') ? rem : 1);
+
+export const legacyInterfaceFontPixels = (
   percent: number,
   base: Record<SemanticTypographyKey, string> = SEMANTIC_TYPOGRAPHY,
-): Record<string, string> | undefined {
-  if (percent === 100) return undefined;
-  const scale = percent / 100;
-  // SAFETY: base is typed by SemanticTypographyKey, so its own keys are those keys.
-  const entries = Object.entries(base) as Array<[SemanticTypographyKey, string]>;
-  return Object.fromEntries(entries.map(([key, size]) => [getTypographyVariable(key), `calc(${size} * ${scale})`]));
-}
+): number => Number.parseFloat(base.uiLabel) * 16 * percent / 100;
+export const legacyChatFontPixels = (
+  interfacePercent: number,
+  chatPercent: number,
+  base: Record<SemanticTypographyKey, string> = SEMANTIC_TYPOGRAPHY,
+): number => Number.parseFloat(base.markdown) * 16 * interfacePercent / 100 * chatPercent / 100;
 
 export const typography = {
 

@@ -499,8 +499,10 @@ The server (`packages/web/server/lib/fs/ripgrep.js`) looks for ripgrep in this o
   commands in `main.mjs`.
 - Mini Chat loads from the resolved local UI origin in HMR development, not the
   API server origin. Bundled mode keeps `openchamber-ui://` assets. Native zoom
-  targets the focused window directly; composer focus adjusts interface scale,
-  while terminal and file-editor focus adjust their own font sizes.
+  shortcuts adjust the focused app window's Chromium page zoom, including its
+  terminal and file editor. The browser guest keeps its own webpage zoom.
+  Each WebContents uses isolated zoom; the device-local setting ranges from
+  50% to 200% and resets to 100%.
 - New Mini Chat windows default to the managed Chats target. Explicit project/worktree drafts retain their target, existing managed chat sessions reopen in their own directory, and the compact header omits project/branch metadata for Chats. Opening a managed draft back in the main window preserves that target.
 - Multiple native windows.
 - Native notifications. On macOS, viewing a session (the UI's

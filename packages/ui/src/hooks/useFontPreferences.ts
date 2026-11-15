@@ -14,6 +14,8 @@ interface FontPreferences {
     monoFont: MonoFontOption;
     customUiFont: string;
     customMonoFont: string;
+    chatFont: UiFontOption | 'interface';
+    customChatFont: string;
 }
 
 /**
@@ -27,6 +29,8 @@ export const useFontPreferences = (): FontPreferences => {
     const monoFont = useUIStore(state => state.monoFont);
     const customUiFont = useUIStore(state => state.customUiFont);
     const customMonoFont = useUIStore(state => state.customMonoFont);
+    const chatFont = useUIStore(state => state.chatFont);
+    const customChatFont = useUIStore(state => state.customChatFont);
     const enterpriseMode = useEnterpriseMode();
 
     return {
@@ -34,5 +38,7 @@ export const useFontPreferences = (): FontPreferences => {
         monoFont: enterpriseMode && CODE_FONT_OPTION_MAP[monoFont]?.source ? DEFAULT_MONO_FONT : monoFont,
         customUiFont,
         customMonoFont,
+        chatFont: chatFont !== 'interface' && enterpriseMode && UI_FONT_OPTION_MAP[chatFont]?.source ? DEFAULT_UI_FONT : chatFont,
+        customChatFont,
     };
 };

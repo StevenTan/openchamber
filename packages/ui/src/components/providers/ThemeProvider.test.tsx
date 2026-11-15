@@ -4,7 +4,7 @@ import { Window } from 'happy-dom';
 import { ThemeProvider } from './ThemeProvider';
 import { useUIStore } from '@/stores/useUIStore';
 
-test('zoom works without App menu listeners and routes by focused content', async () => {
+test('window zoom includes editor and terminal focus while preserving font preferences', async () => {
   const dom = new Window({ url: 'http://localhost' });
   const originals = new Map<string, PropertyDescriptor | undefined>();
   for (const [name, value] of Object.entries({
@@ -19,23 +19,29 @@ test('zoom works without App menu listeners and routes by focused content', asyn
   const container = document.createElement('div');
   document.body.append(container);
   const root = createRoot(container);
-  useUIStore.setState({ fontSize: 100, terminalFontSize: 14, editorFontSize: 13 });
+  const originalState = useUIStore.getState();
+  const applied: number[] = [];
+  const nativeZoom = { set: async (percent: number) => { applied.push(percent); } };
+  useUIStore.setState({ appZoom: 100, interfaceFontSizePx: 15.5, chatFontSizePx: 17, terminalFontSize: 14, editorFontSize: 13 });
   const zoom = (action: string) => window.dispatchEvent(new CustomEvent('openchamber:zoom', { detail: action }));
   try {
-    await act(async () => root.render(<ThemeProvider><input aria-label="composer" /></ThemeProvider>));
+    await act(async () => root.render(<ThemeProvider zoom={nativeZoom}><input aria-label="composer" /></ThemeProvider>));
     await act(async () => { zoom('zoom-in'); zoom('zoom-in'); });
-    expect(useUIStore.getState().fontSize).toBe(120);
-    expect(document.documentElement.style.fontSize).toBe('120%');
+    expect(useUIStore.getState().appZoom).toBe(120);
+    expect(applied.at(-1)).toBe(120);
+    expect(document.documentElement.style.fontSize).toBe('');
+    expect(document.documentElement.style.getPropertyValue('--text-ui-label')).toBe('15.5px');
 
     const terminal = document.createElement('input');
     terminal.dataset.terminalOwner = 'test-terminal';
     container.append(terminal);
     terminal.focus();
     await act(async () => zoom('zoom-in'));
-    expect(useUIStore.getState().terminalFontSize).toBe(15);
-    expect(useUIStore.getState().fontSize).toBe(120);
+    expect(useUIStore.getState().terminalFontSize).toBe(14);
+    expect(useUIStore.getState().appZoom).toBe(130);
     await act(async () => zoom('zoom-reset'));
-    expect(useUIStore.getState().terminalFontSize).toBe(15);
+    expect(useUIStore.getState().terminalFontSize).toBe(14);
+    expect(useUIStore.getState().appZoom).toBe(100);
 
     const editor = document.createElement('div');
     editor.className = 'cm-editor';
@@ -44,8 +50,8 @@ test('zoom works without App menu listeners and routes by focused content', asyn
     container.append(editor);
     editorInput.focus();
     await act(async () => zoom('zoom-out'));
-    expect(useUIStore.getState().editorFontSize).toBe(12);
-    expect(useUIStore.getState().fontSize).toBe(120);
+    expect(useUIStore.getState().editorFontSize).toBe(13);
+    expect(useUIStore.getState().appZoom).toBe(90);
 
     const browser = document.createElement('webview');
     browser.tabIndex = 0;
@@ -53,12 +59,12 @@ test('zoom works without App menu listeners and routes by focused content', asyn
     browser.focus();
     expect(document.activeElement).toBe(browser);
     await act(async () => zoom('zoom-in'));
-    expect(useUIStore.getState().fontSize).toBe(120);
+    expect(useUIStore.getState().appZoom).toBe(90);
 
     browser.blur();
     await act(async () => zoom('zoom-reset'));
-    expect(useUIStore.getState().fontSize).toBe(115);
-    expect(document.documentElement.style.fontSize).toBe('115%');
+    expect(useUIStore.getState().appZoom).toBe(100);
+    expect(document.documentElement.style.fontSize).toBe('');
     const composer = document.createElement('div');
     composer.dataset.chatInput = 'true';
     composer.className = 'cm-editor';
@@ -67,14 +73,16 @@ test('zoom works without App menu listeners and routes by focused content', asyn
     container.append(composer);
     composerInput.focus();
     await act(async () => zoom('zoom-in'));
-    expect(useUIStore.getState().fontSize).toBe(125);
-    expect(useUIStore.getState().editorFontSize).toBe(12);
+    expect(useUIStore.getState().appZoom).toBe(110);
+    expect(useUIStore.getState().editorFontSize).toBe(13);
+    expect(useUIStore.getState().chatFontSizePx).toBe(17);
     await act(async () => zoom('zoom-reset'));
     await act(async () => root.unmount());
     zoom('zoom-in');
-    expect(useUIStore.getState().fontSize).toBe(115);
+    expect(useUIStore.getState().appZoom).toBe(100);
   } finally {
     await act(async () => root.unmount());
+    useUIStore.setState(originalState, true);
     for (const [name, descriptor] of originals) {
       if (descriptor) Object.defineProperty(globalThis, name, descriptor);
       else Reflect.deleteProperty(globalThis, name);

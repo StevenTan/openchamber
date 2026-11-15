@@ -588,18 +588,16 @@ export const createSettingsHelpers = (dependencies) => {
     }
 
 
-    if (typeof candidate.uiFont === 'string' && candidate.uiFont.length > 0) {
-      result.uiFont = candidate.uiFont;
-    }
-    if (typeof candidate.monoFont === 'string' && candidate.monoFont.length > 0) {
-      result.monoFont = candidate.monoFont;
+    for (const key of ['uiFont', 'monoFont', 'chatFont']) {
+      if (typeof candidate[key] === 'string' && candidate[key].length > 0) {
+        result[key] = candidate[key];
+      }
     }
     // Family names for the "custom" font choice; empty clears them.
-    if (typeof candidate.customUiFont === 'string') {
-      result.customUiFont = candidate.customUiFont.slice(0, 100);
-    }
-    if (typeof candidate.customMonoFont === 'string') {
-      result.customMonoFont = candidate.customMonoFont.slice(0, 100);
+    for (const key of ['customUiFont', 'customMonoFont', 'customChatFont']) {
+      if (typeof candidate[key] === 'string') {
+        result[key] = candidate[key].slice(0, 100);
+      }
     }
     if (UI_FONT_WEIGHT_VALUES.has(candidate.uiFontWeight)) {
       result.uiFontWeight = candidate.uiFontWeight;
@@ -1080,6 +1078,12 @@ export const createSettingsHelpers = (dependencies) => {
     }
     if (Number.isFinite(candidate.chatFontSize)) {
       result.chatFontSize = Math.max(50, Math.min(200, Math.round(candidate.chatFontSize)));
+    }
+    if (Number.isFinite(candidate.interfaceFontSizePx)) {
+      result.interfaceFontSizePx = Math.max(6, Math.min(32, candidate.interfaceFontSizePx));
+    }
+    if (Number.isFinite(candidate.chatFontSizePx)) {
+      result.chatFontSizePx = Math.max(3, Math.min(64, candidate.chatFontSizePx));
     }
     if (typeof candidate.terminalFontSize === 'number' && Number.isFinite(candidate.terminalFontSize)) {
       result.terminalFontSize = Math.max(9, Math.min(52, Math.round(candidate.terminalFontSize)));

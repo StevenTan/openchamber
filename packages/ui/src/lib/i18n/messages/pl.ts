@@ -1,4 +1,5 @@
 import { customCssI18n } from './custom-css.i18n';
+import { typographyI18n } from './typography.i18n';
 import type { I18nKey } from './en';
 import { settingsDict } from './pl.settings';
 import { linearIssuePickerI18n } from './linear-issue-picker.i18n';
@@ -211,6 +212,7 @@ export const dict: Record<I18nKey, string> = {
   ...webSearchI18n.pl,
   ...sessionWarmingI18n.pl,
   ...customCssI18n["pl"],
+  ...typographyI18n["pl"],
   ...compactionSettingsI18n.pl,
   ...heapSnapshotI18n.pl,
   ...consoleBudgetsI18n.pl,

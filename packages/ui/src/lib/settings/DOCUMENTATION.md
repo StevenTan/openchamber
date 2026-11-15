@@ -6,6 +6,10 @@
 
 ## Modules
 
+Typography sizes use `interfaceFontSizePx`, `chatFontSizePx` and `editorFontSize`.
+Legacy percentage fields are read for compatibility; explicit pixel fields take
+precedence. `appZoom` belongs to `LOCAL_DEVICE_KEYS` and is never profile-synced.
+
 - `registry.ts` — the settings registry. One `SETTINGS_REGISTRY` table plus two key lists (`LOCAL_DEVICE_KEYS`, `DESKTOP_SHELL_KEYS`) and the derived helpers other modules use: `DesktopSettings` (the document type), `parseSettingsDocument`, `applySettingsToStores`, `AUTO_SAVE_KEYS` / `readAutoSaveSnapshot`, `MIRRORED_KEYS`, `buildSettingsRegistrySnapshot`.
 - `parsers.ts` — value-level boundary parsers (zod schemas wrapped as `SettingsParser<T>`). `undefined` means "reject", never "default".
 - `registry-snapshot.ts` — renders the plain-JSON snapshot for the two consumers that cannot import the UI's TypeScript: the OpenChamber server (`packages/web/server/lib/opencode/settings-registry.json`) and the VS Code extension host (`packages/vscode/src/settings-registry.json`). Regenerate with `bun run settings-registry:generate`; `registry.test.ts` fails when a checked-in copy is stale.

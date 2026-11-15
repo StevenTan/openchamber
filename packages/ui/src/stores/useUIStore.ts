@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { devtools, persist } from 'zustand/middleware';
 import type { SidebarSection } from '@/constants/sidebar';
 import { createDeferredSafeJSONStorage } from './utils/safeStorage';
-import { SEMANTIC_TYPOGRAPHY, getTypographyVariable, type SemanticTypographyKey } from '@/lib/typography';
+import { DEFAULT_APP_ZOOM, DEFAULT_CHAT_FONT_SIZE, DEFAULT_INTERFACE_FONT_SIZE, VSCODE_TYPOGRAPHY, SEMANTIC_TYPOGRAPHY, getInterfaceTypographyStyle, legacyChatFontPixels, legacyInterfaceFontPixels } from '@/lib/typography';
 import type { ShortcutCombo } from '@/lib/shortcuts';
 import type { DraftStarterRef } from '@/lib/draftStarters';
 import type { CustomProviderIcon } from '@/lib/customProviderIcons';
@@ -1059,9 +1059,12 @@ interface UIStore {
   worktreeArchiveOnDoneEnabled: boolean;
   autoDeleteLastRunAt: number | null;
   messageLimit: number;
-  fontSize: number;
-  /** Chat text size in percent of the interface size, so the chat can grow without the sidebar. */
-  chatFontSize: number;
+  interfaceFontSizePx: number;
+  /** Chat body size in CSS pixels, independent of interface typography. */
+  chatFontSizePx: number;
+  appZoom: number;
+  chatFont: UiFontOption | 'interface';
+  customChatFont: string;
   // Global draft welcome starters; null = unset (use the default built-in set).
   globalDraftStarters: DraftStarterRef[] | null;
   draftStartersVisible: boolean;
@@ -1392,8 +1395,11 @@ interface UIStore {
   setSessionRetentionIncludeInWork: (value: boolean) => void;
   setAutoDeleteLastRunAt: (timestamp: number | null) => void;
   setMessageLimit: (value: number) => void;
-  setFontSize: (size: number) => void;
-  setChatFontSize: (size: number) => void;
+  setInterfaceFontSizePx: (size: number) => void;
+  setChatFontSizePx: (size: number) => void;
+  setAppZoom: (percent: number) => void;
+  setChatFont: (font: UiFontOption | 'interface') => void;
+  setCustomChatFont: (family: string) => void;
   setGlobalDraftStarters: (refs: DraftStarterRef[]) => void;
   setDraftStartersVisible: (value: boolean) => void;
   setTerminalFontSize: (size: number) => void;
@@ -1557,8 +1563,6 @@ const openFileTab = (state: UIStore, directory: string, filePath: string, previe
 export const DEFAULT_SELECTION_APPROVAL_TEXT = 'Sounds good';
 export const DEFAULT_EDITOR_FONT_SIZE = 15;
 export const DEFAULT_TERMINAL_FONT_SIZE = 15;
-export const DEFAULT_INTERFACE_SCALE = 115;
-export const DEFAULT_CHAT_SCALE = 95;
 export const DEFAULT_SPACING_SCALE = 110;
 /** The Files tree beside the editor: narrow enough that the code beside it does not wrap. */
 export const DEFAULT_CONTEXT_EDITOR_TREE_WIDTH = 208;
@@ -1670,8 +1674,11 @@ export const useUIStore = create<UIStore>()(
         worktreeArchiveOnDoneEnabled: false,
         autoDeleteLastRunAt: null,
         messageLimit: 200,
-        fontSize: DEFAULT_INTERFACE_SCALE,
-        chatFontSize: DEFAULT_CHAT_SCALE,
+        interfaceFontSizePx: DEFAULT_INTERFACE_FONT_SIZE,
+        chatFontSizePx: DEFAULT_CHAT_FONT_SIZE,
+        appZoom: DEFAULT_APP_ZOOM,
+        chatFont: 'interface',
+        customChatFont: '',
         globalDraftStarters: null,
         terminalFontSize: DEFAULT_TERMINAL_FONT_SIZE,
         terminalShell: 'auto',
@@ -2869,16 +2876,19 @@ export const useUIStore = create<UIStore>()(
           set({ messageLimit: clamped });
         },
 
-        setFontSize: (size) => {
-          // Clamp between 50% and 200%
-          const clampedSize = Math.max(50, Math.min(200, size));
-          set({ fontSize: clampedSize });
+        setInterfaceFontSizePx: (size) => {
+          set({ interfaceFontSizePx: Math.max(6, Math.min(32, size)) });
           get().applyTypography();
         },
 
-        setChatFontSize: (size) => {
-          set({ chatFontSize: Math.max(50, Math.min(200, Math.round(size))) });
+        setChatFontSizePx: (size) => {
+          set({ chatFontSizePx: Math.max(3, Math.min(64, size)) });
+          get().applyTypography();
         },
+
+        setAppZoom: (percent) => set({ appZoom: Math.max(50, Math.min(200, Math.round(percent))) }),
+        setChatFont: (chatFont) => set({ chatFont }),
+        setCustomChatFont: (family) => set({ customChatFont: family.slice(0, 100) }),
 
         setGlobalDraftStarters: (refs) => {
           set({ globalDraftStarters: refs });
@@ -2944,28 +2954,15 @@ export const useUIStore = create<UIStore>()(
         },
 
         applyTypography: () => {
-          const { fontSize } = get();
+          const { interfaceFontSizePx, chatFontSizePx, editorFontSize } = get();
           const root = document.documentElement;
-
-          // 100 = default (1.0x), 50 = half size (0.5x), 200 = double (2.0x)
-          const scale = fontSize / 100;
-
-          const entries = Object.entries(SEMANTIC_TYPOGRAPHY) as Array<[SemanticTypographyKey, string]>;
-
-          // Scale the root rem unit so regular utility classes, icons, spacing,
-          // and semantic typography all respond to the same interface setting.
-          if (scale === 1) {
-            root.style.removeProperty('font-size');
-            for (const [key] of entries) {
-              root.style.removeProperty(getTypographyVariable(key));
-            }
-            return;
+          root.style.removeProperty('font-size');
+          for (const [key, value] of Object.entries(getInterfaceTypographyStyle(interfaceFontSizePx, isVSCodeRuntime() ? VSCODE_TYPOGRAPHY : SEMANTIC_TYPOGRAPHY))) {
+            root.style.setProperty(key, value);
           }
-
-          root.style.fontSize = `${fontSize}%`;
-
-          // The variables remain authored in rem and inherit the root scale.
-          for (const [key] of entries) root.style.removeProperty(getTypographyVariable(key));
+          root.style.setProperty('--text-markdown', `${chatFontSizePx}px`);
+          root.style.setProperty('--text-code', `${editorFontSize}px`);
+          document.body.style.fontSize = `${interfaceFontSizePx}px`;
         },
 
         applyPadding: () => {
@@ -3636,12 +3633,27 @@ export const useUIStore = create<UIStore>()(
       {
         name: 'ui-store',
         storage: createDeferredSafeJSONStorage(),
-        version: 29,
+        version: 30,
         migrate: (persistedState, version) => {
           if (!persistedState || typeof persistedState !== 'object') {
             return persistedState;
           }
           const state = persistedState as Record<string, unknown>;
+
+          if (version < 30) {
+            const base = isVSCodeRuntime() ? VSCODE_TYPOGRAPHY : SEMANTIC_TYPOGRAPHY;
+            const number = z.number().optional().catch(undefined);
+            const fontSize = number.parse(state.fontSize);
+            const chatFontSize = number.parse(state.chatFontSize);
+            if (fontSize !== undefined) {
+              state.interfaceFontSizePx = legacyInterfaceFontPixels(fontSize, base);
+            }
+            if (fontSize !== undefined || chatFontSize !== undefined) {
+              state.chatFontSizePx = legacyChatFontPixels(fontSize ?? 115, chatFontSize ?? 95, base);
+            }
+            delete state.fontSize;
+            delete state.chatFontSize;
+          }
 
           // v22 -> v23: table cell wrap is on by default. The local copy only
           // ever held the old default; a choice the user made is restored from
@@ -3989,8 +4001,11 @@ export const useUIStore = create<UIStore>()(
           worktreeArchiveOnDoneEnabled: state.worktreeArchiveOnDoneEnabled,
           autoDeleteLastRunAt: state.autoDeleteLastRunAt,
           messageLimit: state.messageLimit,
-          fontSize: state.fontSize,
-          chatFontSize: state.chatFontSize,
+          interfaceFontSizePx: state.interfaceFontSizePx,
+          chatFontSizePx: state.chatFontSizePx,
+          appZoom: state.appZoom,
+          chatFont: state.chatFont,
+          customChatFont: state.customChatFont,
           globalDraftStarters: state.globalDraftStarters,
           terminalFontSize: state.terminalFontSize,
           terminalShell: state.terminalShell,

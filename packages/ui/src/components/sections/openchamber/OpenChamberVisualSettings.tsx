@@ -1,7 +1,8 @@
 import React from 'react';
 import { ThemeAppearancePicker } from './ThemeAppearancePicker';
+import { TypographySettings } from './TypographySettings';
 
-import { DEFAULT_EDITOR_FONT_SIZE, DEFAULT_TERMINAL_FONT_SIZE, DEFAULT_INTERFACE_SCALE, DEFAULT_CHAT_SCALE, DEFAULT_SPACING_SCALE, useUIStore } from '@/stores/useUIStore';
+import { DEFAULT_SPACING_SCALE, useUIStore } from '@/stores/useUIStore';
 import { useSessionDisplayStore } from '@/stores/useSessionDisplayStore';
 import { Button } from '@/components/ui/button';
 import { NumberInput } from '@/components/ui/number-input';
@@ -25,10 +26,7 @@ import {
 import { useDeviceInfo } from '@/lib/device';
 import { usePwaDetection } from '@/hooks/usePwaDetection';
 import { loadDesktopSettings, updateDesktopSettings } from '@/lib/persistence';
-import { CODE_FONT_OPTIONS, CUSTOM_FONT_ID, DEFAULT_MONO_FONT, DEFAULT_UI_FONT, UI_FONT_OPTIONS, UI_FONT_WEIGHT_OPTIONS, type MonoFontOption, type UiFontOption, type UiFontWeight } from '@/lib/fontOptions';
 import { useI18n } from '@/lib/i18n';
-import { useEnterpriseMode } from '@/stores/useEnterprisePolicyStore';
-import { useFontPreferences } from '@/hooks/useFontPreferences';
 import { normalizeMobileKeyboardMode, supportsMobileKeyboardResizeContent, type MobileKeyboardMode } from '@/lib/mobileKeyboardMode';
 import {
     SettingsSection,
@@ -45,7 +43,6 @@ import {
     SETTINGS_NUMBER_INPUT_CLASS,
     SETTINGS_FIELDS_STACK_CLASS,
     SETTINGS_OPTION_STACK_CLASS,
-    SETTINGS_HELPER_CLASS,
 } from '@/components/sections/shared/SettingsSection';
 
 interface Option<T extends string> {
@@ -130,13 +127,7 @@ const WEEK_START_OPTIONS: Option<'auto' | 'monday' | 'sunday'>[] = [
     },
 ];
 
-type VisibleSetting = 'theme' | 'windowControlsPosition' | 'pwaInstallName' | 'pwaOrientation' | 'mobileKeyboardMode' | 'timeFormat' | 'weekStart' | 'fontSize' | 'terminalFontSize' | 'editorFontSize' | 'spacing' | 'scrollbars' | 'inputBarOffset' | 'animatedActivityIndicators';
-
-const UI_FONT_WEIGHT_LABEL_KEYS = {
-    regular: 'settings.openchamber.visual.option.uiFontWeight.regular',
-    balanced: 'settings.openchamber.visual.option.uiFontWeight.balanced',
-    strong: 'settings.openchamber.visual.option.uiFontWeight.strong',
-} as const satisfies Record<UiFontWeight, string>;
+type VisibleSetting = 'theme' | 'windowControlsPosition' | 'pwaInstallName' | 'pwaOrientation' | 'mobileKeyboardMode' | 'timeFormat' | 'weekStart' | 'fontSize' | 'editorFontSize' | 'spacing' | 'scrollbars' | 'inputBarOffset' | 'animatedActivityIndicators';
 
 const WINDOW_CONTROLS_POSITION_OPTIONS: Array<{ id: DesktopWindowControlsPosition; labelKey: string }> = [
     { id: 'left', labelKey: 'settings.openchamber.desktopNetwork.option.windowControlsLeft' },
@@ -161,26 +152,6 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
     const animatedActivityIndicators = useSessionDisplayStore((s) => s.animatedActivityIndicators);
     const setAnimatedActivityIndicators = useSessionDisplayStore((s) => s.setAnimatedActivityIndicators);
 
-    const fontSize = useUIStore(state => state.fontSize);
-    const setFontSize = useUIStore(state => state.setFontSize);
-    const chatFontSize = useUIStore(state => state.chatFontSize);
-    const setChatFontSize = useUIStore(state => state.setChatFontSize);
-    const terminalFontSize = useUIStore(state => state.terminalFontSize);
-    const setTerminalFontSize = useUIStore(state => state.setTerminalFontSize);
-    const editorFontSize = useUIStore(state => state.editorFontSize);
-    const setEditorFontSize = useUIStore(state => state.setEditorFontSize);
-    // The fonts in effect: enterprise mode shows the system font where the
-    // stored choice would load from a CDN (useFontPreferences).
-    const { uiFont, monoFont } = useFontPreferences();
-    const setUiFont = useUIStore(state => state.setUiFont);
-    const setMonoFont = useUIStore(state => state.setMonoFont);
-    const customUiFont = useUIStore(state => state.customUiFont);
-    const customMonoFont = useUIStore(state => state.customMonoFont);
-    const setCustomUiFont = useUIStore(state => state.setCustomUiFont);
-    const setCustomMonoFont = useUIStore(state => state.setCustomMonoFont);
-    const uiFontWeight = useUIStore(state => state.uiFontWeight);
-    const setUiFontWeight = useUIStore(state => state.setUiFontWeight);
-    const webFontsBlocked = useEnterpriseMode();
     const padding = useUIStore(state => state.padding);
     const setPadding = useUIStore(state => state.setPadding);
     const inputBarOffset = useUIStore(state => state.inputBarOffset);
@@ -240,7 +211,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
     const hasThemeSettings = shouldShow('theme') && !isVSCode;
     const showWindowControlsPositionSetting = shouldShow('windowControlsPosition') && showWindowControlsPosition;
     const hasLocalizationSettings = shouldShow('theme') || shouldShow('timeFormat') || shouldShow('weekStart');
-    const hasLayoutSettings = shouldShow('fontSize') || shouldShow('terminalFontSize') || shouldShow('editorFontSize') || shouldShow('spacing') || (shouldShow('scrollbars') && !hasThemeSettings) || (shouldShow('inputBarOffset') && isMobile);
+    const hasLayoutSettings = shouldShow('fontSize') || shouldShow('editorFontSize') || shouldShow('spacing') || (shouldShow('scrollbars') && !hasThemeSettings) || (shouldShow('inputBarOffset') && isMobile);
     const showPwaInstallNameSetting = shouldShow('pwaInstallName') && isWebRuntime() && browserTab && !isDesktopShell() && !isVSCode;
     const showPwaOrientationSetting = shouldShow('pwaOrientation') && isWebRuntime() && !isDesktopShell() && !isVSCode;
     const showMobileKeyboardModeSetting = shouldShow('mobileKeyboardMode') && isWebRuntime() && !isDesktopShell() && !isVSCode && supportsMobileKeyboardResizeContent();
@@ -396,246 +367,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                 {/* --- Density & type --- */}
                 {hasLayoutSettings && (
                     <SettingsSection title={t('settings.openchamber.visual.section.densityAndType')} contentClassName={SETTINGS_FIELDS_STACK_CLASS}>
-                        {(shouldShow('fontSize') && !isMobile) || shouldShow('terminalFontSize') ? (
-                            <SettingsTwoColumn>
-                                {shouldShow('fontSize') && !isMobile && (
-                                    <SettingsStackedField
-                                        label={t('settings.openchamber.visual.field.interfaceFont')}
-                                        description={uiFont === CUSTOM_FONT_ID ? t('settings.openchamber.visual.field.customFontHint') : undefined}
-                                        descriptionPlacement="after"
-                                        settingsItem="appearance.interface-font-size"
-                                        controlClassName="w-full flex-wrap"
-                                    >
-                                        <Select value={uiFont} onValueChange={(value) => setUiFont(value as UiFontOption)}>
-                                            <SelectTrigger aria-label={t('settings.openchamber.visual.field.selectInterfaceFontAria')} className={SETTINGS_SELECT_TRIGGER_CLASS}>
-                                                <SelectValue>{uiFont === CUSTOM_FONT_ID ? t('settings.openchamber.visual.field.customFont') : UI_FONT_OPTIONS.find((option) => option.id === uiFont)?.label}</SelectValue>
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {UI_FONT_OPTIONS.map((option) => (
-                                                    <SelectItem key={option.id} value={option.id} disabled={webFontsBlocked && Boolean(option.source)}>
-                                                        <span style={{ fontFamily: option.stack }}>{option.label}</span>
-                                                    </SelectItem>
-                                                ))}
-                                                <SelectItem value={CUSTOM_FONT_ID}>{t('settings.openchamber.visual.field.customFont')}</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                        <Button size="sm"
-                                            type="button"
-                                            variant="ghost"
-                                            onClick={() => setUiFont(DEFAULT_UI_FONT)}
-                                            disabled={uiFont === DEFAULT_UI_FONT}
-                                            className={SETTINGS_ICON_BUTTON_CLASS}
-                                            aria-label={t('settings.openchamber.visual.actions.resetInterfaceFontAria')}
-                                            title={t('settings.common.actions.reset')}
-                                        >
-                                            <Icon name="restart" className="h-3.5 w-3.5" />
-                                        </Button>
-                                        {uiFont === CUSTOM_FONT_ID ? (
-                                            <Input
-                                                value={customUiFont}
-                                                onChange={(event) => setCustomUiFont(event.target.value)}
-                                                placeholder={t('settings.openchamber.visual.field.customFontPlaceholder')}
-                                                aria-label={t('settings.openchamber.visual.field.customFontAria')}
-                                                spellCheck={false}
-                                                autoComplete="off"
-                                                className="h-8 basis-full rounded-md px-3"
-                                            />
-                                        ) : null}
-                                    </SettingsStackedField>
-                                )}
-                                {shouldShow('terminalFontSize') && (
-                                    <SettingsStackedField
-                                        label={t('settings.openchamber.visual.field.codeFont')}
-                                        description={monoFont === CUSTOM_FONT_ID ? t('settings.openchamber.visual.field.customFontHint') : undefined}
-                                        descriptionPlacement="after"
-                                        controlClassName="w-full flex-wrap"
-                                    >
-                                        <Select value={monoFont} onValueChange={(value) => setMonoFont(value as MonoFontOption)}>
-                                            <SelectTrigger aria-label={t('settings.openchamber.visual.field.selectCodeFontAria')} className={SETTINGS_SELECT_TRIGGER_CLASS}>
-                                                <SelectValue>{monoFont === CUSTOM_FONT_ID ? t('settings.openchamber.visual.field.customFont') : CODE_FONT_OPTIONS.find((option) => option.id === monoFont)?.label}</SelectValue>
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {CODE_FONT_OPTIONS.map((option) => (
-                                                    <SelectItem key={option.id} value={option.id} disabled={webFontsBlocked && Boolean(option.source)}>
-                                                        <span style={{ fontFamily: option.stack }}>{option.label}</span>
-                                                    </SelectItem>
-                                                ))}
-                                                <SelectItem value={CUSTOM_FONT_ID}>{t('settings.openchamber.visual.field.customFont')}</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                        <Button size="sm"
-                                            type="button"
-                                            variant="ghost"
-                                            onClick={() => setMonoFont(DEFAULT_MONO_FONT)}
-                                            disabled={monoFont === DEFAULT_MONO_FONT}
-                                            className={SETTINGS_ICON_BUTTON_CLASS}
-                                            aria-label={t('settings.openchamber.visual.actions.resetCodeFontAria')}
-                                            title={t('settings.common.actions.reset')}
-                                        >
-                                            <Icon name="restart" className="h-3.5 w-3.5" />
-                                        </Button>
-                                        {monoFont === CUSTOM_FONT_ID ? (
-                                            <Input
-                                                value={customMonoFont}
-                                                onChange={(event) => setCustomMonoFont(event.target.value)}
-                                                placeholder={t('settings.openchamber.visual.field.customFontPlaceholder')}
-                                                aria-label={t('settings.openchamber.visual.field.customFontAria')}
-                                                spellCheck={false}
-                                                autoComplete="off"
-                                                className="h-8 basis-full rounded-md px-3"
-                                            />
-                                        ) : null}
-                                    </SettingsStackedField>
-                                )}
-                            </SettingsTwoColumn>
-                        ) : null}
-                        {webFontsBlocked && ((shouldShow('fontSize') && !isMobile) || shouldShow('terminalFontSize')) ? (
-                            <p className={SETTINGS_HELPER_CLASS}>{t('settings.openchamber.visual.field.webFontsEnterprise')}</p>
-                        ) : null}
-
-                        {(shouldShow('fontSize') && !isMobile) || shouldShow('terminalFontSize') || shouldShow('editorFontSize') ? (
-                            <SettingsTwoColumn>
-                                {shouldShow('fontSize') && !isMobile && (
-                                    <SettingsStackedField
-                                        label={t('settings.openchamber.visual.field.interfaceFontSize')}
-                                        controlClassName="w-full"
-                                    >
-                                        <div className={SETTINGS_NUMBER_STEPPER_ROW_CLASS}>
-                                            <NumberInput
-                                                value={fontSize}
-                                                onValueChange={setFontSize}
-                                                min={50}
-                                                max={200}
-                                                step={5}
-                                                className={SETTINGS_NUMBER_INPUT_CLASS}
-                                                aria-label={t('settings.openchamber.visual.field.fontSizePercentageAria')}
-                                            />
-                                            <span className={SETTINGS_NUMBER_UNIT_CLASS}>%</span>
-                                            <Button size="sm"
-                                                type="button"
-                                                variant="ghost"
-                                                onClick={() => setFontSize(DEFAULT_INTERFACE_SCALE)}
-                                                disabled={fontSize === DEFAULT_INTERFACE_SCALE}
-                                                className={SETTINGS_ICON_BUTTON_CLASS}
-                                                aria-label={t('settings.openchamber.visual.actions.resetFontSizeAria')}
-                                                title={t('settings.common.actions.reset')}
-                                            >
-                                                <Icon name="restart" className="h-3.5 w-3.5" />
-                                            </Button>
-                                        </div>
-                                    </SettingsStackedField>
-                                )}
-                                {shouldShow('fontSize') && !isMobile && (
-                                    <SettingsStackedField
-                                        label={t('settings.openchamber.visual.field.chatFontSize')}
-                                        settingsItem="appearance.chat-font-size"
-                                        controlClassName="w-full"
-                                    >
-                                        <div className={SETTINGS_NUMBER_STEPPER_ROW_CLASS}>
-                                            <NumberInput
-                                                value={chatFontSize}
-                                                onValueChange={setChatFontSize}
-                                                min={50}
-                                                max={200}
-                                                step={5}
-                                                className={SETTINGS_NUMBER_INPUT_CLASS}
-                                                aria-label={t('settings.openchamber.visual.field.chatFontSizePercentageAria')}
-                                            />
-                                            <span className={SETTINGS_NUMBER_UNIT_CLASS}>%</span>
-                                            <Button size="sm"
-                                                type="button"
-                                                variant="ghost"
-                                                onClick={() => setChatFontSize(DEFAULT_CHAT_SCALE)}
-                                                disabled={chatFontSize === DEFAULT_CHAT_SCALE}
-                                                className={SETTINGS_ICON_BUTTON_CLASS}
-                                                aria-label={t('settings.openchamber.visual.actions.resetChatFontSizeAria')}
-                                                title={t('settings.common.actions.reset')}
-                                            >
-                                                <Icon name="restart" className="h-3.5 w-3.5" />
-                                            </Button>
-                                        </div>
-                                    </SettingsStackedField>
-                                )}
-                                {shouldShow('fontSize') && !isMobile && (
-                                    <SettingsStackedField
-                                        label={t('settings.openchamber.visual.field.interfaceFontWeight')}
-                                        info={t('settings.openchamber.visual.field.interfaceFontWeightInfo')}
-                                        settingsItem="appearance.interface-font-weight"
-                                        controlClassName="w-full"
-                                    >
-                                        <SettingsChipGroup
-                                            value={uiFontWeight}
-                                            onChange={setUiFontWeight}
-                                            aria-label={t('settings.openchamber.visual.field.interfaceFontWeight')}
-                                            options={UI_FONT_WEIGHT_OPTIONS.map((weight) => ({
-                                                value: weight,
-                                                label: t(UI_FONT_WEIGHT_LABEL_KEYS[weight]),
-                                            }))}
-                                        />
-                                    </SettingsStackedField>
-                                )}
-                                {shouldShow('terminalFontSize') && (
-                                    <SettingsStackedField
-                                        label={t('settings.openchamber.visual.field.terminalFontSize')}
-                                        settingsItem="appearance.terminal-font-size"
-                                        controlClassName="w-full"
-                                    >
-                                        <div className={SETTINGS_NUMBER_STEPPER_ROW_CLASS}>
-                                            <NumberInput
-                                                value={terminalFontSize}
-                                                onValueChange={setTerminalFontSize}
-                                                min={9}
-                                                max={52}
-                                                step={1}
-                                                className={SETTINGS_NUMBER_INPUT_CLASS}
-                                            />
-                                            <span className={SETTINGS_NUMBER_UNIT_CLASS}>px</span>
-                                            <Button size="sm"
-                                                type="button"
-                                                variant="ghost"
-                                                onClick={() => setTerminalFontSize(DEFAULT_TERMINAL_FONT_SIZE)}
-                                                disabled={terminalFontSize === DEFAULT_TERMINAL_FONT_SIZE}
-                                                className={SETTINGS_ICON_BUTTON_CLASS}
-                                                aria-label={t('settings.openchamber.visual.actions.resetTerminalFontSizeAria')}
-                                                title={t('settings.common.actions.reset')}
-                                            >
-                                                <Icon name="restart" className="h-3.5 w-3.5" />
-                                            </Button>
-                                        </div>
-                                    </SettingsStackedField>
-                                )}
-                                {shouldShow('editorFontSize') && (
-                                    <SettingsStackedField
-                                        label={t('settings.openchamber.visual.field.editorFontSize')}
-                                        settingsItem="appearance.editor-font-size"
-                                        controlClassName="w-full"
-                                    >
-                                        <div className={SETTINGS_NUMBER_STEPPER_ROW_CLASS}>
-                                            <NumberInput
-                                                value={editorFontSize}
-                                                onValueChange={setEditorFontSize}
-                                                min={9}
-                                                max={32}
-                                                step={1}
-                                                className={SETTINGS_NUMBER_INPUT_CLASS}
-                                            />
-                                            <span className={SETTINGS_NUMBER_UNIT_CLASS}>px</span>
-                                            <Button size="sm"
-                                                type="button"
-                                                variant="ghost"
-                                                onClick={() => setEditorFontSize(DEFAULT_EDITOR_FONT_SIZE)}
-                                                disabled={editorFontSize === DEFAULT_EDITOR_FONT_SIZE}
-                                                className={SETTINGS_ICON_BUTTON_CLASS}
-                                                aria-label={t('settings.openchamber.visual.actions.resetEditorFontSizeAria')}
-                                                title={t('settings.common.actions.reset')}
-                                            >
-                                                <Icon name="restart" className="h-3.5 w-3.5" />
-                                            </Button>
-                                        </div>
-                                    </SettingsStackedField>
-                                )}
-                            </SettingsTwoColumn>
-                        ) : null}
+                        <TypographySettings showInterface={shouldShow('fontSize') && !isMobile} showCode={shouldShow('editorFontSize')} />
 
                         {shouldShow('spacing') || (shouldShow('inputBarOffset') && isMobile) ? (
                             <SettingsTwoColumn>

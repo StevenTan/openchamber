@@ -5415,7 +5415,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                                         : isMobile
                                             ? 'pt-4 pb-2.5'
                                             : 'pt-4 pb-2',
-                                    inputMode === 'shell' ? 'font-mono' : 'typography-markdown md:typography-ui-label',
+                                    inputMode === 'shell' ? 'font-mono typography-code' : 'typography-markdown font-[family-name:var(--font-chat)]',
                                 )}
                             />
                         </div>
