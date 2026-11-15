@@ -23,6 +23,7 @@ const isLinux = process.platform === 'linux';
 // Linux StatusNotifier hosts often blank or drop oversized tray images; keep
 // the icon at a panel-typical size so AppImage trays stay visible.
 const LINUX_TRAY_ICON_PX = 22;
+const MAC_TRAY_GUID = '82177a19-0c65-4e9a-8b24-c0fbd99ecac8';
 
 // Text shown next to the icon — reserved for the two states where a precise
 // count is actionable: pending approvals and errors. Busy and unread are
@@ -36,8 +37,8 @@ const computeTitle = (counts) => {
 };
 
 // Which icon variant to show. Busy work animates a "breathing" fill; unread
-// (with nothing active) holds a static filled cube until the state clears;
-// otherwise the plain outline.
+// (with nothing active) holds an opaque rear panel until the state clears;
+// otherwise the rear panel stays translucent.
 const computeIconState = (counts) => {
   if (counts.busy > 0) return 'busy';
   if (counts.unseen > 0) return 'unseen';
@@ -78,9 +79,9 @@ const toTemplateImage = (p) => {
   return image;
 };
 
-// idleIconPath: plain outline (calm state). unseenIconPath: statically filled
-// (a finished session left unread). breathIconPaths: eased outline→fill frames
-// the busy state ping-pongs through.
+// idleIconPath: translucent rear panel (calm state). unseenIconPath: opaque rear
+// panel (a finished session left unread). breathIconPaths: eased rear-panel
+// opacity frames the busy state ping-pongs through.
 export const createTrayController = ({ idleIconPath, unseenIconPath, breathIconPaths, statusIconPaths, onAction }) => {
   let tray = null;
   let lastTitle = null;
@@ -143,7 +144,7 @@ export const createTrayController = ({ idleIconPath, unseenIconPath, breathIconP
 
   const ensureTray = () => {
     if (tray && !tray.isDestroyed?.()) return tray;
-    tray = new Tray(idleFrame);
+    tray = new Tray(idleFrame, isMac ? MAC_TRAY_GUID : undefined);
     tray.setIgnoreDoubleClickEvents(true);
     if (!isMac) {
       // Windows: left-click shows. Linux: left-click toggles show/hide so the

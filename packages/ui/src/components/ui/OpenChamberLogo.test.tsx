@@ -4,7 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nProvider } from '@/lib/i18n';
 import { OpenChamberLogo } from './OpenChamberLogo';
-import { OPEN_CHAMBER_LOGO_ART as ART } from './openChamberLogoArt';
+import { LOGO_PANEL_REST } from './openChamberLogoArt';
 
 const browser = new Window({ url: 'http://localhost/' });
 Object.assign(globalThis, {
@@ -22,11 +22,7 @@ const render = (element: React.ReactElement) => act(async () => {
 const advance = (ms: number) => act(async () => {
   jest.advanceTimersByTime(ms);
 });
-const tierOpacities = (logo = 0) => {
-  const svg = host.querySelectorAll('svg')[logo];
-  return ART.tiers.map((path) => Number(svg.querySelector(`path[d="${path}"]`)?.getAttribute('fill-opacity')));
-};
-const litPattern = (lit: number) => ART.tiers.map((_, index) => (index === lit ? ART.tierLit[index] : ART.tierRest[index]));
+const opacity = () => Number(host.querySelector('img')!.style.opacity);
 
 beforeEach(() => {
   jest.useFakeTimers();
@@ -41,33 +37,20 @@ afterEach(async () => {
   jest.useRealTimers();
 });
 
-test('a still logo shows its tiers at their resting opacity', async () => {
-  await render(<OpenChamberLogo />);
-  expect(tierOpacities()).toEqual([...ART.tierOpacity]);
-
+test('a still logo preserves its caller opacity', async () => {
+  await render(<OpenChamberLogo className="opacity-20" />);
+  expect(host.querySelector('img')?.style.opacity).toBe('');
+  expect(host.querySelector('img')?.className).toBe('opacity-20');
+  expect(host.querySelector('img')?.alt).toBeTruthy();
   await advance(3000);
-  expect(tierOpacities()).toEqual([...ART.tierOpacity]);
+  expect(host.querySelector('img')?.style.opacity).toBe('');
 });
 
-test('a loading logo lights one tier at a time, outer to core, once a second', async () => {
+test('a loading logo changes opacity on the shared one-second clock', async () => {
   await render(<OpenChamberLogo isAnimated />);
-  const first = tierOpacities().findIndex((opacity, index) => opacity !== ART.tierRest[index]);
-  expect(tierOpacities()).toEqual(litPattern(first));
-
-  for (let step = 1; step <= ART.tiers.length; step += 1) {
-    await advance(1000);
-    expect(tierOpacities()).toEqual(litPattern((first + step) % ART.tiers.length));
-  }
-});
-
-test('two logos on one page keep their own wall gradients', async () => {
-  await render(<><OpenChamberLogo /><OpenChamberLogo /></>);
-  const gradientIds = [...host.querySelectorAll('linearGradient')].map((gradient) => gradient.getAttribute('id'));
-  expect(new Set(gradientIds).size).toBe(gradientIds.length);
-  for (const svg of host.querySelectorAll('svg')) {
-    for (const path of svg.querySelectorAll('path[fill^="url(#"]')) {
-      const id = path.getAttribute('fill')?.slice(5, -1) ?? '';
-      expect(svg.querySelector(`linearGradient[id="${id}"]`)).not.toBeNull();
-    }
-  }
+  const first = opacity();
+  await advance(1000);
+  expect(opacity()).toBe(first === 1 ? LOGO_PANEL_REST : 1);
+  await advance(1000);
+  expect(opacity()).toBe(first);
 });
