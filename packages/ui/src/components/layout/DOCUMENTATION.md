@@ -18,16 +18,20 @@ setting turned off keep the plain session title (`Header.tsx`).
 - A long title fades out at its end (`.session-tab-title` in `index.css`)
   rather than ending in an ellipsis, which read as clutter next to the state
   mark.
-- The running or unread mark sits at the tab's end and takes room only while
-  shown. The project icon sits at the start; on hover or keyboard focus the
-  close button takes its slot, so the tab reserves no room for a control.
+- The project icon stays at the start. Running and unread marks follow the
+  title, before a reserved trailing close slot. The active tab's close control
+  stays visible; inactive controls appear on hover or keyboard focus. Renaming
+  hides the close control while keeping its slot's width.
+- Tab additions and closures use `TabMotion`: entering and exiting tabs fade
+  and scale, and neighbouring tabs spring into position. The draft participates
+  in the same lifetime. Drag transforms stay on an inner element; reordering
+  uses the drag controller's animation. Reduced motion applies changes directly.
 - The session menu opens on right-click only, without changing the active
   tab. It is the sidebar row's session menu (`SessionActionsMenuItems` in
   `components/session/sidebar/sessions/`, through
   `HeaderSessionActionsMenuItems.tsx`), with Close other tabs first, and acts
   on the clicked tab's session whether it is active or not. The title's "⋯"
-  menu, with tabs off, is the same menu for the current session. A per-tab
-  "⋯" button and controls visible at rest were removed and stay out. A new tab affordance follows the sidebar row patterns
+  menu, with tabs off, is the same menu for the current session. A new tab affordance follows the sidebar row patterns
   (`components/session/sidebar/DOCUMENTATION.md`): revealed on hover, menu on
   right-click.
 - A "+" right after the last tab, outside the scroller so it stays in view,

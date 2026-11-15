@@ -2,7 +2,7 @@
 
 ## Ownership
 
-This module owns shared disclosure transitions.
+This module owns shared disclosure transitions and the tab presence spring.
 Feature code owns state changes; virtualizers own row layout and measurements.
 
 ## Invariants
@@ -13,6 +13,11 @@ Feature code owns state changes; virtualizers own row layout and measurements.
   the viewport marker and clip.
 - Reduced motion applies disclosure state immediately.
   Unmount and interrupted transitions release their listeners and effects.
+- Tab reveals use layout coordinates from the scroll track, so presence and
+  drag transforms do not change the destination. Presence springs belong to
+  `TabMotion`; state and scroll ownership stay with the tab strips.
+- Tab scroll ranges and edge fades follow present slots. Retained exiting
+  slots do not extend the range used by automatic tab reveal.
 
 ## Decisions
 
