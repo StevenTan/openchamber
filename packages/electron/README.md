@@ -232,7 +232,7 @@ IPC results if its endpoint changes while the read is pending.
 | `scripts/rebuild-native.mjs` | Rebuilds native modules against the Electron runtime |
 | `scripts/package.mjs` | Runs `electron-builder`, with unsigned Windows builds when signing env is missing. With `OPENCHAMBER_DESKTOP_CHANNEL=canary` it passes the configuration from `scripts/canary-build-config.mjs`, which swaps in the Canary icons |
 | `scripts/windows-signpath.mjs` | Two-pass Windows build for SignPath signing, and the electron-builder sign hook it uses (see *Windows signing through SignPath*) |
-| `resources/` | Packaged web assets, icons, macOS entitlements, and the NSIS include for the Windows installer. Every file in `resources/icons` is written by `bun run brand:generate` (`scripts/brand`); do not edit them by hand. `resources/icons-canary` holds Canary's: its `AppIcon.icon` is hand-made, the rest is generated from it |
+| `resources/` | Packaged web assets, icons, macOS entitlements, and the NSIS include for the Windows installer. Brand assets in `resources/icons` and `resources/icons-canary` are written by `bun run brand:generate` (`scripts/brand`); the Canary bird layer is retained as source artwork |
 
 ## Development
 
@@ -410,6 +410,8 @@ Every path that hides a window instead of closing it goes through `hideWindow` (
 An exit requested during entry remains queued in Electron even after an explicit show. The hide helper keeps its exit listener until that exit completes so Hide can restore full screen. Early entry remains a known gap: Electron exposes no public entry-start event or transition-state getter, and `isFullScreen()` can still report false while entry is pending, allowing an immediate hide before entry completes.
 
 The macOS menu bar item is enabled by default and can be disabled in General settings. The setting applies after restart. While disabled, Desktop skips the native tray controller, tray-specific subscriptions, polling, and quota refresh. Dock badges remain independent: unread activity, session membership, and badge preferences still update the Dock through the shared IPC command. Turning off the Dock badge clears its count without enabling the menu bar item.
+
+The macOS tray GUID is stable across launches so the system restores the item's saved position. Holding Command while dragging the item changes that position.
 
 The Dock's context menu lists up to 10 unread sessions, newest completed turn
 first, from the same sidebar-visible set as its badge. A session opens through

@@ -38,7 +38,7 @@ export const AppStartupOverlay: React.FC<{ ready: boolean; animated?: boolean }>
       }}
       style={{ pointerEvents: ready ? 'none' : 'auto' }}
     >
-      <OpenChamberLogo width={120} height={120} isAnimated={animated} variant="splash" />
+      <OpenChamberLogo width={120} height={120} isAnimated={animated} />
       {/* Absolutely positioned below the (still perfectly centered) logo so
           the text never pushes it up. 50% + half the 120px logo + a gap. */}
       {slow ? (

@@ -144,7 +144,25 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
   <!-- Initial loading screen with the OpenChamber logo -->
   <div id="initial-loading">
     <svg class="logo" width="70" height="70" viewBox="-50 -50 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <!-- brand:flat-logo:start --><defs><linearGradient id="oc-logo-l" gradientUnits="userSpaceOnUse" x1="-42" y1="-20" x2="-2" y2="12"><stop offset="0" stop-color="currentColor" stop-opacity="0.025"/><stop offset="0.72" stop-color="currentColor" stop-opacity="0.143"/><stop offset="1" stop-color="currentColor" stop-opacity="0.198"/></linearGradient><linearGradient id="oc-logo-r" gradientUnits="userSpaceOnUse" x1="40" y1="3" x2="3" y2="-16"><stop offset="0" stop-color="currentColor" stop-opacity="0.071"/><stop offset="0.68" stop-color="currentColor" stop-opacity="0.174"/><stop offset="1" stop-color="currentColor" stop-opacity="0.223"/></linearGradient></defs><path d="M-41.568 -24 L-41.568 24 L0 0 Z" fill="url(#oc-logo-l)"/><path d="M41.568 -24 L0 0 L41.568 24 Z" fill="url(#oc-logo-r)"/><path d="M0 -48 L41.568 -24 L0 0 L-41.568 -24 Z" fill="currentColor" fill-opacity="0.08"/><path data-tier="0" data-rest="0.12" data-lit="0.55" d="M0 -43.2 L33.254 -24 L0 -4.8 L-33.254 -24 Z" fill="currentColor" fill-opacity="0.22"/><path data-tier="1" data-rest="0.15" data-lit="0.48" d="M0 -37.92 L24.109 -24 L0 -10.08 L-24.109 -24 Z" fill="currentColor" fill-opacity="0.27"/><path data-tier="2" data-rest="0.38" data-lit="0.85" d="M0 -32.64 L14.964 -24 L0 -15.36 L-14.964 -24 Z" fill="currentColor" fill-opacity="0.85"/><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"><path d="M0 -48 L-41.568 -24 L0 0 L41.568 -24 Z"/><path d="M-41.568 -24 L-41.568 24 L0 48 L41.568 24 L41.568 -24"/><path d="M0 0 L0 48"/></g><!-- brand:flat-logo:end -->
+      <!-- brand:flat-logo:start --><defs>
+    <linearGradient id="oc-logo-front" x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#2469ED" />
+      <stop offset="0.42" stop-color="#2F80ED" />
+      <stop offset="1" stop-color="#4B9EF0" />
+    </linearGradient>
+    <radialGradient id="oc-logo-frontLift" gradientUnits="userSpaceOnUse" cx="330" cy="430" r="470">
+      <stop offset="0" stop-color="#5794FA" stop-opacity="0.20" />
+      <stop offset="0.62" stop-color="#4788F0" stop-opacity="0.07" />
+      <stop offset="1" stop-color="#4788F0" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="oc-logo-rear" x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#A9C8FF" />
+      <stop offset="0.55" stop-color="#91B9F6" />
+      <stop offset="1" stop-color="#A5B8F2" />
+    </linearGradient>
+    <path id="oc-logo-rear-shape" d="M547 327 L731 274 C792 256 847 297 847 362 L847 682 C847 747 789 783 732 765 L547 710 L547 578 L691 626 C711 633 726 619 726 600 L726 445 C726 425 711 414 691 421 L547 469 Z" />
+    <path id="oc-logo-front-shape" d="M245 332 L531 219 C579 200 624 225 624 270 L624 745 C624 794 581 824 537 807 L246 696 C221 686 207 666 207 640 L207 389 C207 363 220 342 245 332 Z" />
+  </defs><g transform="translate(-75.285714 -73.142857) scale(0.142857142857)"><g data-brand-panel="rear" data-rest="0.72" data-lit="1"><use href="#oc-logo-rear-shape" fill="url(#oc-logo-rear)" fill-rule="evenodd"/></g><g data-brand-panel="front" data-rest="0.72" data-lit="1"><use href="#oc-logo-front-shape" fill="url(#oc-logo-front)"/><use href="#oc-logo-front-shape" fill="url(#oc-logo-frontLift)"/></g></g><!-- brand:flat-logo:end -->
     </svg>
     <!-- Status text stays empty while things are fine; populated only on error. -->
     <div class="status-text" id="loading-status"></div>
@@ -153,20 +171,18 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
   
   <div id="root"></div>
   <script>
-    // While the splash shows, the roof tiers light up one at a time, one step a
-    // second, like the app's own startup logo; a smooth CSS animation repainted
-    // the logo on every frame.
+    // Loading panels alternate once per second while the splash is visible.
     (function () {
       if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
       var step = 0;
       var timer = null;
       var tick = function () {
         var splash = document.getElementById('initial-loading');
-        var tiers = splash ? splash.querySelectorAll('[data-tier]') : [];
-        if (!tiers.length || splash.classList.contains('fade-out')) { clearInterval(timer); return; }
-        var lit = step % tiers.length;
-        tiers.forEach(function (tier, i) {
-          tier.setAttribute('fill-opacity', tier.getAttribute(i === lit ? 'data-lit' : 'data-rest'));
+        var panels = splash ? splash.querySelectorAll('[data-brand-panel]') : [];
+        if (!panels.length || splash.classList.contains('fade-out')) { clearInterval(timer); return; }
+        var lit = step % panels.length;
+        panels.forEach(function (panel, i) {
+          panel.setAttribute('opacity', panel.getAttribute(i === lit ? 'data-lit' : 'data-rest'));
         });
         step += 1;
       };

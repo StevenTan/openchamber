@@ -2,51 +2,43 @@
 
 ## Ownership
 
-`scripts/brand` owns every drawing of the OpenChamber logo. `geometry.mjs` describes the shapes; `raster.mjs` turns them into PNG, the pixel-exact small cube and `.ico` files; `generate.mjs` writes each file where its runtime reads it. `bun run brand:generate` rewrites all of them; `bun run brand:generate --check` fails when a generated text file was edited by hand.
+`scripts/brand/source.svg` owns the OpenChamber artwork: a blue front panel, a pale rear panel, and a light rounded tile. `geometry.mjs` derives the tiled app icon, transparent colour mark, and monochrome glyph from this source. `raster.mjs` handles rasterization, compositing, and ICO encoding; `generate.mjs` writes assets to their runtime locations.
 
-The logo has four drawings, each for a kind of place:
+Run `bun run brand:generate` after changing the artwork. `bun run brand:generate --check` verifies generated text assets. Canary shares the artwork and adds its retained bird layer in `packages/electron/resources/icons-canary/AppIcon.icon/Assets/canary-glyph.png`; `canary.mjs` also owns its small menu bar bird.
 
-| Drawing | Where it shows |
+| Drawing | Consumers |
 |---|---|
-| App icon, an Icon Composer document (`packages/electron/resources/icons/AppIcon.icon`) | macOS Dock and Finder, the iOS app. Its layers carry the six macOS appearances: Default, Dark, Clear and Tinted, light and dark |
-| Icon without a tile: the open shell with a dark grey inside, white edges, black outline | Windows, Linux, the VS Code Marketplace; on a black square for phone home screens, PWA and Android |
-| In-app logo: the open shell in one colour | Every splash, About, sign-in, empty states, README |
-| Glyph: cube outline and two roof rings, one colour | macOS menu bar, favicon, VS Code activity bar and title buttons, model picker sprite, Android notification and themed icon, iOS Control Center |
+| Tiled app icon | macOS, Windows, Linux, mobile launchers, PWA, touch icons, VS Code Marketplace |
+| Transparent colour mark | React UI, startup HTML, web favicon, documentation badges, iOS widgets |
+| Monochrome glyph | macOS menu bar, VS Code activity and title bars, model picker sprite, Android notification and themed launcher, iOS Control Center |
 
-OpenChamber Canary, the nightly build, has its own icons in `packages/electron/resources/icons-canary`, drawn by `canary.mjs`: the release cube on a blue tile with a yellow canary at its side. Its Icon Composer document `AppIcon.icon` is the master and is edited in Icon Composer; the Windows and Linux icon (the release icon without a tile, its cube flat in blue, with the rendered document's bird in front in a black outline), the `.ico` (blue pixel cubes below 32 px, each with a round pixel chick kept as text in `raster.mjs`), the menu bar templates (the glyph with the canary redrawn per pixel, kept as text in `canary.mjs`, standing over its lower right corner with a thin clear gap around it, in every state) and `Assets.car`/`icon.icns` come from it.
-
-The macOS menu bar animation lives in `packages/electron/tray.mjs`; this module only draws its frames. `OpenChamberLogo.tsx` renders the in-app logo from the generated `openChamberLogoArt.ts` and owns its loading animation.
+The Electron tray owns frame timing. `OpenChamberLogo.tsx` owns React loading opacity and uses the shared duration ticker; the VS Code startup page owns its panel animation.
 
 ## Invariants
 
-- Every logo file in the repository comes out of `generate.mjs`, except Canary's `AppIcon.icon`, the master its other files are generated from. A change to the logo is a change to `geometry.mjs` and a run of `bun run brand:generate`, never an edit of an output. One exception: the iOS widgets draw the in-app logo in SwiftUI (`CubeLogoView` in `packages/mobile/ios/App/OpenChamberWidget/WidgetShared.swift`), by hand from the same numbers. A change to the in-app logo updates it in the same change; `--check` does not cover it.
-- The four HTML documents that show before React (the web `index.html`, the Electron splash in `early-startup.mjs`, the VS Code loader in `webviewHtml.ts`, the headless server page in `static-routes-runtime.js`) and `OpenChamberLogo.tsx` draw the same in-app logo. The HTML documents carry it between `<!-- brand:flat-logo:start -->` and `<!-- brand:flat-logo:end -->`; the generator rewrites only that region.
-- The in-app logo is drawn in `currentColor` (or the splash stroke colour), never a fixed colour, so it follows every theme.
-- Text outputs are checked by `generate.test.mjs`; image bytes are not, because they depend on the libvips build.
-- On macOS with Xcode 26 the generator also compiles `Assets.car` and `icon.icns` with `actool`, renders `dev-icon.png` with Icon Composer's `ictool`, writes every Canary icon, and writes the Control Center SF Symbol with `swiftdraw`. Elsewhere those files stay as they are.
+- Shape and colour changes start in `source.svg`. Its panel paths use absolute `M`, `L`, and `C` coordinates; the glyph and SF Symbol transforms depend on alternating x/y coordinate pairs.
+- The source's `app-mark` transform controls the panel size inside the tile and is shared by portable app icons and native panel layers. Transparent marks and monochrome glyphs use the panel paths directly.
+- Generated assets are never edited individually. The release and Canary Icon Composer documents and their panel PNGs are generated together. The Canary bird and `symbol-template.svg` are source assets.
+- The four HTML startup surfaces carry the colour mark between `brand:flat-logo` markers. The generator changes only those regions. React embeds a generated SVG image so repeated logos have isolated gradient IDs.
+- Colour marks retain their blue gradients in every UI theme. Monochrome SVG glyphs inherit `currentColor` where their consumer supplies it; native template images encode panel contrast in alpha.
+- iOS widgets use the generated `BrandLogo` image asset. The app uses the desktop Icon Composer document, and Control Center uses the generated symbol in the widget asset catalog.
+- On macOS, generation requires full Xcode with Icon Composer. `actool` compiles both native `Assets.car` and `icon.icns`; the renderer inside Icon Composer exports the development Dock icon. Other platforms generate portable assets without compiling native macOS resources.
+- Text consistency and ICO directory structure are tested. Raster bytes depend on the installed SVG renderer and are verified through consumer builds and visual inspection.
 
 ## Decisions
 
-### Why one script and not exported files
+### Why derive variants from one SVG
 
-The logo used to live in about forty hand-exported files and six inline drawings that had to be kept in step by hand. A redesign touched all of them. With the shapes in code, the next change is one edit and one run, and a test catches a file edited on its own.
+The app icon, colour mark, and monochrome glyph need different backgrounds and colour handling, but share one silhouette. Extracting their paths from the source keeps small native assets and larger UI artwork consistent.
 
-### Why the app icon is layered and not one picture
+### Why use separate native panel layers
 
-macOS turns a single flat picture into a grey smudge in Clear and Tinted: it can only reduce it to its brightness. Separate layers (shell, three tiers) let the system draw each as its own glass. The tiers appear twice: white with baked opacity for the light Default, opaque and coloured for Dark, Clear and Tinted, so each tier keeps its own tone there. A layer hidden in an appearance keeps glass off in it, or its glass still shows.
+Icon Composer needs separate artwork and background layers to render system appearances. Its layer list runs from front to back. Native icon documents preserve the panel positions and use the source tile gradient as their background fill.
 
-### Why the small Windows sizes are pixel art and not scaled vector
+### Why render the development Dock icon with Icon Composer
 
-At 16 to 24 px the 30 degree edges fall between pixels and the cube blurs. `pixelCube` redraws it with 2:1 edges on whole pixels, no anti-aliasing, and a 1 px black outline for light taskbars. The `.ico` carries these for 16, 20 and 24 px and the vector rendering above that.
+The development icon uses the same native rendering as the release app, with a construction ribbon composited over it. The renderer is selected from the active Xcode installation's Icon Composer bundle; the developer tool named `ictool` serves the asset compiler interface.
 
-### Why the macOS dev icon is rendered by ictool and not drawn
+### Why keep the SF Symbol template
 
-The release Dock icon is glass rendered by the system. A flat drawing next to it looked like a different app. `ictool` renders the real document the way the Dock does, and the tape goes on top.
-
-### Why Canary's icon is a picture and not geometry
-
-Its bird and glass were drawn in Icon Composer, and the look that was approved is the one Icon Composer renders. Redrawing it as vector art would change it. The other Canary files are cut from that rendering, so a change to the document is one edit and one run, like the release icons.
-
-### Why Canary's Windows and Linux cube is drawn flat and not cut from the document
-
-The cube cut out of the rendered document carried its glass: a thin pale edge line under the black outline and glass on the top face, next to the release icon's thick white edges. On a taskbar the two apps looked like different families. `canary.mjs` draws the release icon without a tile in the Canary blues (`CANARY_NO_TILE`) and takes only the bird from the document, so the two icons differ in colour and bird alone.
+Control Center requires symbol metadata, guides, and weight groups. The template retains that format while generation supplies the same panel paths used by other monochrome consumers.

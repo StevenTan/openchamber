@@ -23,9 +23,7 @@ const outPath = resolve(repoRoot, "packages/ui/src/components/icon/sprite.ts")
 const customIconData = new Map([
   ...openInAppGlyphs,
   // The OpenChamber glyph from scripts/brand, scaled from its 32 grid to 24.
-  // Its brand stroke turns hairline at row size next to Remixicon's 2px
-  // lines, so the sprite draws it heavier.
-  ["openchamber", `<g transform="scale(0.75)">${glyphInner({ stroke: 2.1 })}</g>`],
+  ["openchamber", `<g transform="scale(0.75)">${glyphInner()}</g>`],
   // OpenCode's mark (packages/identity/mark.svg in the OpenCode repository):
   // a 4:5 frame with the lower half of its opening filled, drawn as a 2px line
   // to sit beside Remixicon's line glyphs.
