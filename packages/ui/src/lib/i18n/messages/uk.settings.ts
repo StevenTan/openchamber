@@ -1143,6 +1143,8 @@ export const settingsDict = {
   "settings.openchamber.desktopNetwork.field.macMenuBarAria": "Показувати OpenChamber у смузі меню macOS",
   "settings.openchamber.desktopNetwork.field.macMenuBar": "Показувати OpenChamber у смузі меню",
   "settings.openchamber.desktopNetwork.field.macMenuBarDescription": "Потребує перезапуску застосунку. Якщо вимкнено, OpenChamber не створює елемент смуги меню та не запускає пов’язані оновлення сесій, запитів на підтвердження й використання.",
+  'settings.openchamber.desktopNetwork.field.macMenuBarAnimation': 'Пульсація значка в рядку меню',
+  'settings.openchamber.desktopNetwork.field.macMenuBarAnimationDescription': 'Застосовується відразу. Індикатори непрочитаного залишаються доступними, коли анімацію вимкнено.',
   "settings.openchamber.desktopNetwork.field.minimizeToTrayAria": "Закривати OpenChamber у системний трей",
   "settings.openchamber.desktopNetwork.field.minimizeToTray": "Закривати в системний трей",
   "settings.openchamber.desktopNetwork.field.minimizeToTrayDescription": "Залишає OpenChamber запущеним у системному треї, коли головне вікно закрито. Під час згортання вікно залишається на панелі завдань.",

@@ -13,9 +13,11 @@ import {
   setDesktopLaunchAtLogin,
   setDesktopMiniChatGlobalShortcut,
   setDesktopMinimizeToTray,
+  getDesktopMacMenuBarAnimation,
+  setDesktopMacMenuBarAnimation,
 } from '@/lib/desktop';
 import { useI18n } from '@/lib/i18n';
-import { loadDesktopSettings, updateDesktopSettings } from '@/lib/persistence';
+import { loadDesktopSettings, updateDesktopSettings, reportSettingsSaveState } from '@/lib/persistence';
 import { formatShortcutForDisplay, getCustomizableShortcutActions, UNASSIGNED_SHORTCUT } from '@/lib/shortcuts';
 import {
   SettingsSection,
@@ -68,6 +70,8 @@ export const DesktopAppSettings: React.FC = () => {
   // they stay drafts until "Save + restart".
   const [savedMacMenuBarEnabled, setSavedMacMenuBarEnabled] = React.useState(true);
   const [draftMacMenuBarEnabled, setDraftMacMenuBarEnabled] = React.useState(true);
+  const [macMenuBarAnimationEnabled, setMacMenuBarAnimationEnabled] = React.useState(true);
+  const [isSavingMacMenuBarAnimation, setIsSavingMacMenuBarAnimation] = React.useState(false);
   const [savedLinuxNativeFrame, setSavedLinuxNativeFrame] = React.useState(false);
   const [draftLinuxNativeFrame, setDraftLinuxNativeFrame] = React.useState(false);
   const [keepAwakeSupported, setKeepAwakeSupported] = React.useState(false);
@@ -88,12 +92,17 @@ export const DesktopAppSettings: React.FC = () => {
         if (!data) {
           throw new Error(t('settings.openchamber.desktopNetwork.error.loadFailed'));
         }
+        const animation = isMacDesktop ? await getDesktopMacMenuBarAnimation() : null;
+        if (isMacDesktop && !animation?.supported) {
+          throw new Error(t('settings.openchamber.desktopNetwork.error.loadFailed'));
+        }
         if (cancelled) {
           return;
         }
         const macMenuBarEnabled = data.desktopMacMenuBarEnabled !== false;
         setSavedMacMenuBarEnabled(macMenuBarEnabled);
         setDraftMacMenuBarEnabled(macMenuBarEnabled);
+        if (animation) setMacMenuBarAnimationEnabled(animation.enabled);
         const linuxNativeFrame = data.desktopLinuxNativeFrame === true;
         setSavedLinuxNativeFrame(linuxNativeFrame);
         setDraftLinuxNativeFrame(linuxNativeFrame);
@@ -268,6 +277,21 @@ export const DesktopAppSettings: React.FC = () => {
     }
   }, [isSavingKeepAwake, keepAwakeEnabled, keepAwakeSupported, t]);
 
+  const handleMacMenuBarAnimationChange = React.useCallback(async (enabled: boolean) => {
+    setIsSavingMacMenuBarAnimation(true);
+    setAppError(null);
+    reportSettingsSaveState('saving');
+    const status = await setDesktopMacMenuBarAnimation(enabled);
+    if (status?.supported) {
+      setMacMenuBarAnimationEnabled(status.enabled);
+      reportSettingsSaveState('saved');
+    } else {
+      setAppError(t('settings.openchamber.desktopNetwork.error.saveFailed'));
+      reportSettingsSaveState('error');
+    }
+    setIsSavingMacMenuBarAnimation(false);
+  }, [t]);
+
   const handleSaveAndRestart = React.useCallback(async () => {
     setIsSaving(true);
     setAppError(null);
@@ -366,6 +390,19 @@ export const DesktopAppSettings: React.FC = () => {
             label={t('settings.openchamber.desktopNetwork.field.macMenuBar')}
             info={t('settings.openchamber.desktopNetwork.field.macMenuBarDescription')}
             ariaLabel={t('settings.openchamber.desktopNetwork.field.macMenuBarAria')}
+          />
+        ) : null}
+
+        {isMacDesktop ? (
+          <SettingsCheckboxRow
+            className="ps-6"
+            settingsItem="sessions.desktop-mac-menu-bar-animation"
+            checked={macMenuBarAnimationEnabled}
+            onChange={(checked) => { void handleMacMenuBarAnimationChange(checked); }}
+            disabled={isLoading || isSavingMacMenuBarAnimation || !draftMacMenuBarEnabled}
+            label={t('settings.openchamber.desktopNetwork.field.macMenuBarAnimation')}
+            info={t('settings.openchamber.desktopNetwork.field.macMenuBarAnimationDescription')}
+            ariaLabel={t('settings.openchamber.desktopNetwork.field.macMenuBarAnimation')}
           />
         ) : null}
 

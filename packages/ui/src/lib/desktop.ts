@@ -459,6 +459,29 @@ export const setDesktopKeepAwake = async (enabled: boolean): Promise<KeepAwakeSt
   }
 };
 
+const macMenuBarAnimationStatusSchema = z.object({ supported: z.boolean(), enabled: z.boolean() });
+type MacMenuBarAnimationStatus = z.infer<typeof macMenuBarAnimationStatusSchema>;
+
+const invokeMacMenuBarAnimation = async (
+  command: 'desktop_get_mac_menu_bar_animation' | 'desktop_set_mac_menu_bar_animation',
+  args: Record<string, boolean>,
+): Promise<MacMenuBarAnimationStatus | null> => {
+  if (!canUseElectronDesktopIPC() || !isDesktopLocalOriginActive()) return null;
+  try {
+    const result = macMenuBarAnimationStatusSchema.safeParse(await invokeDesktop(command, args));
+    return result.success ? result.data : null;
+  } catch (error) {
+    console.warn('Desktop menu bar animation command failed', command, error);
+    return null;
+  }
+};
+
+export const getDesktopMacMenuBarAnimation = (): Promise<MacMenuBarAnimationStatus | null> =>
+  invokeMacMenuBarAnimation('desktop_get_mac_menu_bar_animation', {});
+
+export const setDesktopMacMenuBarAnimation = (enabled: boolean): Promise<MacMenuBarAnimationStatus | null> =>
+  invokeMacMenuBarAnimation('desktop_set_mac_menu_bar_animation', { enabled });
+
 const normalizeOrigin = (raw: string): string | null => {
   const trimmed = raw.trim();
   if (!trimmed) return null;

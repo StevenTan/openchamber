@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { TRAY_BREATH_FRAMES } from '../../packages/electron/tray-animation.mjs';
 
 const SOURCE = readFileSync(new URL('./source.svg', import.meta.url), 'utf8').trim();
 const DEFS = SOURCE.match(/<defs>([\s\S]*?)<\/defs>/)[1];
@@ -60,7 +61,7 @@ export const glyphSvg = ({ size = 32, style = '', zoom = 1, ...options } = {}) =
 };
 
 export const glyphBreathOpacity = (frame) => ({
-  rearOpacity: Number((0.55 + 0.45 * (1 - Math.cos(Math.PI * frame / 15)) / 2).toFixed(3)),
+  rearOpacity: Number((0.55 + 0.45 * (1 - Math.cos(Math.PI * frame / TRAY_BREATH_FRAMES.at(-1))) / 2).toFixed(3)),
 });
 
 export const appIconLayerSvgs = () => ({

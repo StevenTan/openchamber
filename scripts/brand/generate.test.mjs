@@ -4,6 +4,7 @@ import { relative } from 'node:path';
 
 import { textOutputs } from './generate.mjs';
 import { encodeIco } from './raster.mjs';
+import { TRAY_BREATH_FRAMES } from '../../packages/electron/tray-animation.mjs';
 
 test('every generated text file matches scripts/brand', () => {
   const stale = [...textOutputs()]
@@ -22,4 +23,15 @@ test('an .ico directory points at each PNG with its size', () => {
   expect(ico.readUInt8(6 + 16)).toBe(0);
   const offset = ico.readUInt32LE(6 + 16 + 12);
   expect(ico.subarray(offset, offset + 3).toString()).toBe('bcd');
+});
+
+test('all native tray animation frames exist for both channels and display scales', () => {
+  for (const channel of ['icons', 'icons-canary']) {
+    for (const frame of TRAY_BREATH_FRAMES) {
+      for (const scale of ['', '@2x']) {
+        const name = `trayTemplate-breath-${String(frame).padStart(2, '0')}${scale}.png`;
+        expect(existsSync(new URL(`../../packages/electron/resources/${channel}/tray/${name}`, import.meta.url))).toBe(true);
+      }
+    }
+  }
 });

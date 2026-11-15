@@ -86,6 +86,12 @@
         "desktop"
       ]
     },
+    "desktopMacMenuBarAnimationEnabled": {
+      "scope": "instance",
+      "surfaces": [
+        "desktop"
+      ]
+    },
     "desktopLinuxNativeFrame": {
       "scope": "instance",
       "surfaces": [

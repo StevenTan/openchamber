@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import sharp from 'sharp';
 import { GLYPH_UNSEEN_OPACITY, MENU_BAR_GLYPH_ZOOM, appIconSvg, glyphBreathOpacity, glyphSvg } from './geometry.mjs';
 import { encodeIco, svgToPng } from './raster.mjs';
+import { TRAY_BREATH_FRAMES } from '../../packages/electron/tray-animation.mjs';
 
 const MENU_BAR_BIRDS = {
   36: [
@@ -98,7 +99,7 @@ export const canaryImageOutputs = async ({ iconsDir, releaseIconsDir }) => {
   const states = [
     ['idle', {}],
     ['unseen', { rearOpacity: GLYPH_UNSEEN_OPACITY }],
-    ...[0, 3, 6, 9, 12, 15].map((frame) => [`breath-${String(frame).padStart(2, '0')}`, glyphBreathOpacity(frame)]),
+    ...TRAY_BREATH_FRAMES.map((frame) => [`breath-${String(frame).padStart(2, '0')}`, glyphBreathOpacity(frame)]),
   ];
   for (const [name, options] of states) for (const size of [18, 36]) {
     images.set(join(iconsDir, 'tray', `trayTemplate-${name}${size === 36 ? '@2x' : ''}.png`), await menuBarTemplate(options, size));

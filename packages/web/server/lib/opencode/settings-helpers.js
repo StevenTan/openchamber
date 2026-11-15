@@ -446,6 +446,10 @@ export const createSettingsHelpers = (dependencies) => {
     if (typeof candidate.desktopMacMenuBarEnabled === 'boolean') {
       result.desktopMacMenuBarEnabled = candidate.desktopMacMenuBarEnabled;
     }
+    const macMenuBarAnimation = z.boolean().safeParse(candidate.desktopMacMenuBarAnimationEnabled);
+    if (macMenuBarAnimation.success) {
+      result.desktopMacMenuBarAnimationEnabled = macMenuBarAnimation.data;
+    }
     if (typeof candidate.desktopLinuxNativeFrame === 'boolean') {
       result.desktopLinuxNativeFrame = candidate.desktopLinuxNativeFrame;
     }

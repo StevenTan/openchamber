@@ -17,6 +17,7 @@
 
 import { Tray, Menu, nativeImage } from 'electron';
 import { buildTrayMenuTemplate, trayMenuKey } from './tray-menu.mjs';
+import { TRAY_BREATH_INTERVAL_MS } from './tray-animation.mjs';
 
 const isMac = process.platform === 'darwin';
 const isLinux = process.platform === 'linux';
@@ -39,8 +40,8 @@ const computeTitle = (counts) => {
 // Which icon variant to show. Busy work animates a "breathing" fill; unread
 // (with nothing active) holds an opaque rear panel until the state clears;
 // otherwise the rear panel stays translucent.
-const computeIconState = (counts) => {
-  if (counts.busy > 0) return 'busy';
+const computeIconState = (counts, animationEnabled) => {
+  if (animationEnabled && counts.busy > 0) return 'busy';
   if (counts.unseen > 0) return 'unseen';
   return 'idle';
 };
@@ -55,12 +56,6 @@ const computeTooltip = (counts, sessionCount) => {
   const suffix = bits.length ? ` · ${bits.join(', ')}` : ' · idle';
   return `OpenChamber — ${sessionCount} session${sessionCount === 1 ? '' : 's'}${suffix}`;
 };
-
-// Frame cadence for the "breathing" busy animation: five images a second.
-// A busy state can last hours, and every setImage costs the main process and
-// macOS's WindowServer; at thirteen a second (75 ms) the main process alone
-// used 2.5% of a core on an M-series Mac, against 0.2% for one a second.
-const ANIM_INTERVAL_MS = 200;
 
 const toTemplateImage = (p) => {
   let image = nativeImage.createFromPath(p);
@@ -82,7 +77,7 @@ const toTemplateImage = (p) => {
 // idleIconPath: translucent rear panel (calm state). unseenIconPath: opaque rear
 // panel (a finished session left unread). breathIconPaths: eased rear-panel
 // opacity frames the busy state ping-pongs through.
-export const createTrayController = ({ idleIconPath, unseenIconPath, breathIconPaths, statusIconPaths, onAction }) => {
+export const createTrayController = ({ idleIconPath, unseenIconPath, breathIconPaths, statusIconPaths, onAction, animationEnabled = true }) => {
   let tray = null;
   let lastTitle = null;
   let lastTooltip = null;
@@ -103,6 +98,7 @@ export const createTrayController = ({ idleIconPath, unseenIconPath, breathIconP
   let animTimer = null;
   let animIndex = 0;
   let animDir = 1;
+  let lastCounts = { busy: 0, unseen: 0 };
 
   const stopAnim = () => {
     if (animTimer) {
@@ -118,12 +114,12 @@ export const createTrayController = ({ idleIconPath, unseenIconPath, breathIconP
     animDir = 1;
     animTimer = setInterval(() => {
       if (!tray || tray.isDestroyed?.()) return;
-      tray.setImage(breathFrames[animIndex] || idleFrame);
+      tray.setImage(breathFrames[animIndex]);
       // Ping-pong for a seamless, infinite in-and-out breath.
       animIndex += animDir;
       if (animIndex >= breathFrames.length - 1) { animIndex = breathFrames.length - 1; animDir = -1; }
       else if (animIndex <= 0) { animIndex = 0; animDir = 1; }
-    }, ANIM_INTERVAL_MS);
+    }, TRAY_BREATH_INTERVAL_MS);
   };
 
   const applyIconState = (nextState) => {
@@ -174,6 +170,7 @@ export const createTrayController = ({ idleIconPath, unseenIconPath, breathIconP
       approvals: approvals.length,
       unseen: sessions.reduce((sum, s) => sum + (Number.isFinite(s.unseen) ? s.unseen : 0), 0),
     };
+    lastCounts = counts;
 
     const widget = ensureTray();
     const title = computeTitle(counts);
@@ -181,7 +178,7 @@ export const createTrayController = ({ idleIconPath, unseenIconPath, breathIconP
       widget.setTitle(title);
       lastTitle = title;
     }
-    applyIconState(computeIconState(counts));
+    applyIconState(computeIconState(counts, animationEnabled));
     const tooltip = computeTooltip(counts, sessions.length);
     if (tooltip !== lastTooltip) {
       widget.setToolTip(tooltip);
@@ -206,5 +203,10 @@ export const createTrayController = ({ idleIconPath, unseenIconPath, breathIconP
     iconState = null;
   };
 
-  return { update, destroy };
+  const setAnimationEnabled = (enabled) => {
+    animationEnabled = enabled;
+    applyIconState(computeIconState(lastCounts, animationEnabled));
+  };
+
+  return { update, destroy, setAnimationEnabled };
 };

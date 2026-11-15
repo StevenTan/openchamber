@@ -12,6 +12,7 @@ import {
 } from './geometry.mjs';
 import { canaryImageOutputs } from './canary.mjs';
 import { composeOnSquare, encodeIco, solidSquare, svgToPng } from './raster.mjs';
+import { TRAY_BREATH_FRAMES } from '../../packages/electron/tray-animation.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const at = (...parts) => join(repoRoot, ...parts);
@@ -112,7 +113,7 @@ const imageOutputs = async () => {
   };
   await tray('idle', {});
   await tray('unseen', { rearOpacity: GLYPH_UNSEEN_OPACITY });
-  for (const frame of [0, 3, 6, 9, 12, 15]) await tray(`breath-${String(frame).padStart(2, '0')}`, glyphBreathOpacity(frame));
+  for (const frame of TRAY_BREATH_FRAMES) await tray(`breath-${String(frame).padStart(2, '0')}`, glyphBreathOpacity(frame));
 
   for (const size of [16, 32, 64]) put(join(WEB_PUBLIC, size === 64 ? 'favicon.png' : `favicon-${size}.png`), await svgToPng(flatLogoSvg(), size));
   for (const size of [120, 152, 167, 180]) put(join(WEB_PUBLIC, `apple-touch-icon-${size}x${size}.png`), await svgToPng(icon, size));
@@ -152,6 +153,15 @@ const cleanLayers = (iconsDir, keep = []) => {
   if (existsSync(assetsDir)) for (const name of readdirSync(assetsDir)) if (!layers.has(name)) rmSync(join(assetsDir, name));
 };
 
+const cleanTrayFrames = (iconsDir) => {
+  const dir = join(iconsDir, 'tray');
+  const names = new Set(TRAY_BREATH_FRAMES.flatMap((frame) => ['', '@2x'].map((scale) =>
+    `trayTemplate-breath-${String(frame).padStart(2, '0')}${scale}.png`)));
+  for (const name of readdirSync(dir)) {
+    if (/^trayTemplate-breath-\d+(?:@2x)?\.png$/.test(name) && !names.has(name)) rmSync(join(dir, name));
+  }
+};
+
 const macDevDockIcon = async (ictool) => {
   const tmp = mkdtempSync(join(tmpdir(), 'openchamber-dev-icon-'));
   try {
@@ -166,6 +176,7 @@ const macDevDockIcon = async (ictool) => {
 const generate = async () => {
   cleanLayers(ELECTRON_ICONS);
   cleanLayers(CANARY_ICONS, ['canary-glyph.png']);
+  for (const dir of [ELECTRON_ICONS, CANARY_ICONS]) cleanTrayFrames(dir);
   for (const [path, text] of textOutputs()) writeFile(path, text);
   for (const [path, buffer] of await imageOutputs()) writeFile(path, buffer);
   for (const [path, buffer] of await canaryImageOutputs({ iconsDir: CANARY_ICONS, releaseIconsDir: ELECTRON_ICONS })) writeFile(path, buffer);

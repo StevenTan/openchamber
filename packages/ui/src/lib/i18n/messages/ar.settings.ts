@@ -1175,6 +1175,8 @@ export const settingsDict = {
   'settings.openchamber.desktopNetwork.field.macMenuBarAria': 'إظهار OpenChamber في شريط قوائم macOS',
   'settings.openchamber.desktopNetwork.field.macMenuBar': 'إظهار OpenChamber في شريط القوائم',
   'settings.openchamber.desktopNetwork.field.macMenuBarDescription': 'يتطلب إعادة تشغيل التطبيق. عند إيقافه، لا ينشئ OpenChamber عنصر شريط القوائم ولا يشغّل تحديثات الجلسات والموافقات والاستخدام الخاصة به.',
+  'settings.openchamber.desktopNetwork.field.macMenuBarAnimation': 'حركة النبض في شريط القوائم',
+  'settings.openchamber.desktopNetwork.field.macMenuBarAnimationDescription': 'تُطبق فورًا. تظل مؤشرات المحتوى غير المقروء متاحة عند إيقاف الحركة.',
   'settings.openchamber.desktopNetwork.field.minimizeToTrayAria': 'إغلاق OpenChamber إلى علبة النظام',
   'settings.openchamber.desktopNetwork.field.minimizeToTray': 'الإغلاق إلى علبة النظام',
   'settings.openchamber.desktopNetwork.field.minimizeToTrayDescription': 'يبقي OpenChamber قيد التشغيل في علبة النظام عند إغلاق النافذة الرئيسية. أما التصغير فيُبقي النافذة في شريط المهام.',

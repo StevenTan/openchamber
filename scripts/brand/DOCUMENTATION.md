@@ -12,7 +12,7 @@ Run `bun run brand:generate` after changing the artwork. `bun run brand:generate
 | Transparent colour mark | React UI, startup HTML, web favicon, documentation badges, iOS widgets |
 | Monochrome glyph | macOS menu bar, VS Code activity and title bars, model picker sprite, Android notification and themed launcher, iOS Control Center |
 
-The Electron tray owns frame timing. `OpenChamberLogo.tsx` owns React loading opacity and uses the shared duration ticker; the VS Code startup page owns its panel animation.
+The Electron tray owns frame timing. Its `tray-animation.mjs` frame sequence is shared by the native asset loader and both brand generators. `OpenChamberLogo.tsx` owns React loading opacity and uses the shared duration ticker; the VS Code startup page owns its panel animation.
 
 ## Invariants
 

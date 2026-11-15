@@ -1148,6 +1148,8 @@ export const settingsDict = {
   'settings.openchamber.desktopNetwork.field.macMenuBarAria': 'OpenChamber\'ı macOS menü çubuğunda göster',
   'settings.openchamber.desktopNetwork.field.macMenuBar': 'OpenChamber\'ı menü çubuğunda göster',
   'settings.openchamber.desktopNetwork.field.macMenuBarDescription': 'Uygulamanın yeniden başlatılmasını gerektirir. Kapalıyken OpenChamber, menü çubuğu öğesini oluşturmaz ve session, onay ile kullanım güncellemelerini çalıştırmaz.',
+  'settings.openchamber.desktopNetwork.field.macMenuBarAnimation': 'Menü çubuğu nefes animasyonu',
+  'settings.openchamber.desktopNetwork.field.macMenuBarAnimationDescription': 'Hemen uygulanır. Animasyon kapalıyken okunmamış içerik göstergeleri kullanılabilir kalır.',
   'settings.openchamber.desktopNetwork.field.minimizeToTrayAria': 'OpenChamber\'ı sistem tepsisine kapat',
   'settings.openchamber.desktopNetwork.field.minimizeToTray': 'Sistem tepsisine kapat',
   'settings.openchamber.desktopNetwork.field.minimizeToTrayDescription': 'Ana pencere kapatıldığında OpenChamber\'ı sistem tepsisinde çalışır halde tutar. Küçültüldüğünde pencere görev çubuğunda kalır.',

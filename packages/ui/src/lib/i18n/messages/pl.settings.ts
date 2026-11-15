@@ -855,6 +855,8 @@ export const settingsDict = {
   'settings.openchamber.desktopNetwork.field.macMenuBarAria': 'Pokazuj OpenChamber na pasku menu macOS',
   'settings.openchamber.desktopNetwork.field.macMenuBar': 'Pokazuj OpenChamber na pasku menu',
   'settings.openchamber.desktopNetwork.field.macMenuBarDescription': 'Wymaga ponownego uruchomienia aplikacji. Po wyłączeniu OpenChamber nie tworzy elementu paska menu ani nie uruchamia aktualizacji sesji, zatwierdzeń i użycia.',
+  'settings.openchamber.desktopNetwork.field.macMenuBarAnimation': 'Animacja pulsowania na pasku menu',
+  'settings.openchamber.desktopNetwork.field.macMenuBarAnimationDescription': 'Zmiana działa od razu. Wskaźniki nieprzeczytanych treści pozostają widoczne po wyłączeniu animacji.',
   'settings.openchamber.desktopNetwork.field.minimizeToTrayAria': 'Zamykaj OpenChamber do zasobnika systemowego',
   'settings.openchamber.desktopNetwork.field.minimizeToTray': 'Zamykaj do zasobnika systemowego',
   'settings.openchamber.desktopNetwork.field.minimizeToTrayDescription': 'Utrzymuje OpenChamber w zasobniku systemowym, gdy główne okno zostanie zamknięte. Minimalizacja pozostawia okno na pasku zadań.',

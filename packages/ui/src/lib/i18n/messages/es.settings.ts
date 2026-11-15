@@ -1143,6 +1143,8 @@ export const settingsDict = {
   "settings.openchamber.desktopNetwork.field.macMenuBarAria": "Mostrar OpenChamber en la barra de menús de macOS",
   "settings.openchamber.desktopNetwork.field.macMenuBar": "Mostrar OpenChamber en la barra de menús",
   "settings.openchamber.desktopNetwork.field.macMenuBarDescription": "Requiere reiniciar la aplicación. Al desactivarlo, OpenChamber no crea el elemento de la barra de menús ni ejecuta sus actualizaciones de sesiones, aprobaciones y uso.",
+  'settings.openchamber.desktopNetwork.field.macMenuBarAnimation': 'Animación de pulsación en la barra de menús',
+  'settings.openchamber.desktopNetwork.field.macMenuBarAnimationDescription': 'Se aplica de inmediato. Los indicadores de contenido sin leer se mantienen al desactivar la animación.',
   "settings.openchamber.desktopNetwork.field.minimizeToTrayAria": "Cerrar OpenChamber a la bandeja del sistema",
   "settings.openchamber.desktopNetwork.field.minimizeToTray": "Cerrar a la bandeja del sistema",
   "settings.openchamber.desktopNetwork.field.minimizeToTrayDescription": "Mantiene OpenChamber en ejecución en la bandeja del sistema cuando se cierra la ventana principal. Al minimizar, la ventana sigue en la barra de tareas.",

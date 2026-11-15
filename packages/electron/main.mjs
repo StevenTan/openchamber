@@ -19,6 +19,7 @@ import { replaceFileWithRetry } from './windows-file-replace.mjs';
 import { persistMainWindowState } from './window-state.mjs';
 import { attachWindowEvents, isNativeWindowVisible } from './window-events.mjs';
 import { createTrayController } from './tray.mjs';
+import { TRAY_BREATH_FRAMES } from './tray-animation.mjs';
 import { buildDockMenuTemplate, buildUnreadJumpList, isJumpListSessionId } from './dock-menu.mjs';
 import { createSessionLinkGate } from './session-link-gate.mjs';
 import { applyDevDockIdentity, applyDockBadge } from './dev-dock-identity.mjs';
@@ -4309,6 +4310,21 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
       return readDesktopMinimizeToTrayStatus();
     }
 
+    case 'desktop_get_mac_menu_bar_animation': {
+      const supported = process.platform === 'darwin';
+      return { supported, enabled: supported && readSettingsRoot().desktopMacMenuBarAnimationEnabled !== false };
+    }
+
+    case 'desktop_set_mac_menu_bar_animation': {
+      if (process.platform !== 'darwin') return { supported: false, enabled: false };
+      const { enabled } = z.object({ enabled: z.boolean() }).parse(args);
+      await mutateSettingsRoot((root) => {
+        root.desktopMacMenuBarAnimationEnabled = enabled;
+      });
+      state.trayController?.setAnimationEnabled(enabled);
+      return { supported: true, enabled };
+    }
+
     case 'desktop_get_keep_awake': {
       return readDesktopKeepAwakeStatus();
     }
@@ -6023,11 +6039,8 @@ ipcMain.handle('openchamber:file:grant-existing', async (event, filePath) => {
 // Tray clicks flow back through dispatchTrayAction → renderer (focus/respond) or
 // native handlers (show / hide / toggle / quit).
 
-// Icon assets: a calm outline (idle), a statically filled cube (a finished
-// session left unread), and an eased sequence the busy state breathes through.
-// Six frames of the original sixteen keep the breath at about two seconds
-// while the icon changes five times a second instead of thirteen.
-const TRAY_BREATH_FRAMES = [0, 3, 6, 9, 12, 15];
+// The rear panel is translucent while idle, opaque for unread activity, and
+// follows the shared breathing frame sequence while sessions are working.
 // The window the user is "on" for tray routing: the focused one, else the last
 // focused that is still alive.
 const resolveTraySurface = () => {
@@ -6089,6 +6102,7 @@ const setupTray = () => {
     state.trayController = createTrayController({
       ...assets,
       onAction: (action) => { void dispatchTrayAction(action); },
+      animationEnabled: readSettingsRoot().desktopMacMenuBarAnimationEnabled !== false,
     });
     // Seed an empty snapshot so the icon appears immediately; the renderer
     // pushes the real state once the sync stores are mounted.

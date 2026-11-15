@@ -1176,6 +1176,8 @@ export const settingsDict = {
   'settings.openchamber.desktopNetwork.field.macMenuBarAria': 'macOS のメニューバーに OpenChamber を表示',
   'settings.openchamber.desktopNetwork.field.macMenuBar': 'メニューバーに OpenChamber を表示',
   'settings.openchamber.desktopNetwork.field.macMenuBarDescription': 'アプリの再起動が必要です。オフにすると、OpenChamber はメニューバー項目を作成せず、セッション、承認、使用量の更新も実行しません。',
+  'settings.openchamber.desktopNetwork.field.macMenuBarAnimation': 'メニューバーの呼吸アニメーション',
+  'settings.openchamber.desktopNetwork.field.macMenuBarAnimationDescription': 'すぐに反映されます。アニメーションをオフにしても未読表示は残ります。',
   'settings.openchamber.desktopNetwork.field.minimizeToTrayAria': 'OpenChamber をシステムトレイへ閉じる',
   'settings.openchamber.desktopNetwork.field.minimizeToTray': 'システムトレイへ閉じる',
   'settings.openchamber.desktopNetwork.field.minimizeToTrayDescription': 'メインウィンドウを閉じたときも、OpenChamber をシステムトレイで実行し続けます。最小化した場合はタスクバーに残ります。',

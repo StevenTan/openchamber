@@ -1175,6 +1175,8 @@ export const settingsDict = {
   'settings.openchamber.desktopNetwork.field.macMenuBarAria': 'Show OpenChamber in the macOS menu bar',
   'settings.openchamber.desktopNetwork.field.macMenuBar': 'Show OpenChamber in the menu bar',
   'settings.openchamber.desktopNetwork.field.macMenuBarDescription': 'Requires an app restart. When off, OpenChamber does not create the menu bar item or run its session, approval, and usage updates.',
+  'settings.openchamber.desktopNetwork.field.macMenuBarAnimation': 'Menu bar breathing animation',
+  'settings.openchamber.desktopNetwork.field.macMenuBarAnimationDescription': 'Applies immediately. Unread indicators remain available when animation is off.',
   'settings.openchamber.desktopNetwork.field.minimizeToTrayAria': 'Close OpenChamber to the system tray',
   'settings.openchamber.desktopNetwork.field.minimizeToTray': 'Close to the system tray',
   'settings.openchamber.desktopNetwork.field.minimizeToTrayDescription': 'Keeps OpenChamber running in the system tray when the main window is closed. Minimizing still leaves the window in the taskbar.',

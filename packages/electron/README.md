@@ -413,6 +413,8 @@ The macOS menu bar item is enabled by default and can be disabled in General set
 
 The macOS tray GUID is stable across launches so the system restores the item's saved position. Holding Command while dragging the item changes that position.
 
+The menu bar breathing animation is enabled by default and can be toggled in General settings. Changes apply immediately and persist as `desktopMacMenuBarAnimationEnabled`; disabling animation keeps unread indicators available. `tray-animation.mjs` defines the shared frame sequence and timing used by the native controller and brand generator. The breathing cycle lasts two seconds at 10 image updates per second; idle and disabled animation have no recurring image updates.
+
 The Dock's context menu lists up to 10 unread sessions, newest completed turn
 first, from the same sidebar-visible set as its badge. A session opens through
 the tray's session action route. Mark all as read reaches the renderer even

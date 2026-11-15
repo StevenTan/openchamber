@@ -813,6 +813,14 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     isAvailable: (ctx) => ctx.isDesktopLocalOrigin && ctx.isMac,
   },
   {
+    id: 'sessions.desktop-mac-menu-bar-animation',
+    page: 'general',
+    titleKey: 'settings.openchamber.desktopNetwork.field.macMenuBarAnimation',
+    descriptionKey: 'settings.openchamber.desktopNetwork.field.macMenuBarAnimationDescription',
+    keywords: ['desktop', 'menu bar', 'tray', 'animation', 'breathing', 'macos'],
+    isAvailable: (ctx) => ctx.isDesktopLocalOrigin && ctx.isMac,
+  },
+  {
     id: 'sessions.desktop-linux-native-frame',
     page: 'general',
     titleKey: 'settings.openchamber.desktopNetwork.field.linuxNativeFrame',

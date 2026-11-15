@@ -1175,6 +1175,8 @@ export const settingsDict = {
   'settings.openchamber.desktopNetwork.field.macMenuBarAria': 'הצג את OpenChamber בשורת התפריטים של macOS',
   'settings.openchamber.desktopNetwork.field.macMenuBar': 'הצג את OpenChamber בשורת התפריטים',
   'settings.openchamber.desktopNetwork.field.macMenuBarDescription': 'נדרשת הפעלה מחדש של האפליקציה. כשהאפשרות כבויה, OpenChamber לא יוצר את הפריט בשורת התפריטים ולא מריץ את עדכוני ההפעלות, האישורים והשימוש שלו.',
+  'settings.openchamber.desktopNetwork.field.macMenuBarAnimation': 'הנפשת פעימה בשורת התפריטים',
+  'settings.openchamber.desktopNetwork.field.macMenuBarAnimationDescription': 'חל מיד. סימוני תוכן שלא נקרא נשארים זמינים גם כשההנפשה כבויה.',
   'settings.openchamber.desktopNetwork.field.minimizeToTrayAria': 'סגור את OpenChamber למגש המערכת',
   'settings.openchamber.desktopNetwork.field.minimizeToTray': 'סגור למגש המערכת',
   'settings.openchamber.desktopNetwork.field.minimizeToTrayDescription': 'משאיר את OpenChamber פועל במגש המערכת כשהחלון הראשי נסגר. מזעור עדיין משאיר את החלון בשורת המשימות.',

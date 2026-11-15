@@ -1176,6 +1176,8 @@ export const settingsDict = {
   'settings.openchamber.desktopNetwork.field.macMenuBarAria': 'OpenChamber tonen in de macOS-menubalk',
   'settings.openchamber.desktopNetwork.field.macMenuBar': 'OpenChamber tonen in de menubalk',
   'settings.openchamber.desktopNetwork.field.macMenuBarDescription': 'Vereist een herstart van de app. Zolang dit uit staat, maakt OpenChamber geen menubalkitem aan en voert het geen sessie-, goedkeurings- en gebruiksupdates uit.',
+  'settings.openchamber.desktopNetwork.field.macMenuBarAnimation': 'Pulserende animatie in de menubalk',
+  'settings.openchamber.desktopNetwork.field.macMenuBarAnimationDescription': 'Wordt direct toegepast. Indicatoren voor ongelezen inhoud blijven beschikbaar wanneer de animatie uitstaat.',
   'settings.openchamber.desktopNetwork.field.minimizeToTrayAria': 'OpenChamber sluiten naar de systeembalk',
   'settings.openchamber.desktopNetwork.field.minimizeToTray': 'Sluiten naar de systeembalk',
   'settings.openchamber.desktopNetwork.field.minimizeToTrayDescription': 'Houdt OpenChamber actief in de systeembalk wanneer het hoofdvenster wordt gesloten. Minimaliseren laat het venster wel in de taakbalk staan.',

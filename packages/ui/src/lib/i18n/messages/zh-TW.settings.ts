@@ -2534,6 +2534,8 @@ export const settingsDict = {
   'settings.openchamber.desktopNetwork.field.macMenuBarAria': '在 macOS 選單列中顯示 OpenChamber',
   'settings.openchamber.desktopNetwork.field.macMenuBar': '在選單列中顯示 OpenChamber',
   'settings.openchamber.desktopNetwork.field.macMenuBarDescription': '需要重新啟動應用程式。關閉後，OpenChamber 不會建立選單列項目，也不會執行相關的工作階段、核准與用量更新。',
+  'settings.openchamber.desktopNetwork.field.macMenuBarAnimation': '選單列呼吸動畫',
+  'settings.openchamber.desktopNetwork.field.macMenuBarAnimationDescription': '立即生效。關閉動畫後仍保留未讀提示。',
   'settings.openchamber.desktopNetwork.field.minimizeToTrayAria': '將 OpenChamber 關閉到系統匣',
   'settings.openchamber.desktopNetwork.field.minimizeToTray': '關閉到系統匣',
   'settings.openchamber.desktopNetwork.field.minimizeToTrayDescription': '關閉主視窗時，讓 OpenChamber 繼續在系統匣中執行；最小化仍會將視窗保留在工作列。',

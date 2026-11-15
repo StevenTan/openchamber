@@ -1143,6 +1143,8 @@ export const settingsDict = {
   'settings.openchamber.desktopNetwork.field.macMenuBarAria': 'macOS 메뉴 막대에 OpenChamber 표시',
   'settings.openchamber.desktopNetwork.field.macMenuBar': '메뉴 막대에 OpenChamber 표시',
   'settings.openchamber.desktopNetwork.field.macMenuBarDescription': '앱을 다시 시작해야 합니다. 끄면 OpenChamber가 메뉴 막대 항목을 만들지 않으며 세션, 승인 및 사용량 업데이트도 실행하지 않습니다.',
+  'settings.openchamber.desktopNetwork.field.macMenuBarAnimation': '메뉴 막대 숨쉬기 애니메이션',
+  'settings.openchamber.desktopNetwork.field.macMenuBarAnimationDescription': '즉시 적용됩니다. 애니메이션을 꺼도 읽지 않은 항목 표시는 유지됩니다.',
   'settings.openchamber.desktopNetwork.field.minimizeToTrayAria': 'OpenChamber를 시스템 트레이로 닫기',
   'settings.openchamber.desktopNetwork.field.minimizeToTray': '시스템 트레이로 닫기',
   'settings.openchamber.desktopNetwork.field.minimizeToTrayDescription': '메인 창을 닫아도 OpenChamber가 시스템 트레이에서 계속 실행됩니다. 최소화하면 창은 작업 표시줄에 남습니다.',

@@ -1143,6 +1143,8 @@ export const settingsDict = {
   'settings.openchamber.desktopNetwork.field.macMenuBarAria': '在 macOS 菜单栏中显示 OpenChamber',
   'settings.openchamber.desktopNetwork.field.macMenuBar': '在菜单栏中显示 OpenChamber',
   'settings.openchamber.desktopNetwork.field.macMenuBarDescription': '需要重启应用。关闭后，OpenChamber 不会创建菜单栏项目，也不会运行相关的会话、审批和用量更新。',
+  'settings.openchamber.desktopNetwork.field.macMenuBarAnimation': '菜单栏呼吸动画',
+  'settings.openchamber.desktopNetwork.field.macMenuBarAnimationDescription': '立即生效。关闭动画后仍保留未读提示。',
   'settings.openchamber.desktopNetwork.field.minimizeToTrayAria': '将 OpenChamber 关闭到系统托盘',
   'settings.openchamber.desktopNetwork.field.minimizeToTray': '关闭到系统托盘',
   'settings.openchamber.desktopNetwork.field.minimizeToTrayDescription': '关闭主窗口时，让 OpenChamber 继续在系统托盘中运行；最小化仍会将窗口保留在任务栏。',
