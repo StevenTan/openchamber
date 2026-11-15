@@ -15,7 +15,9 @@ let runtime;
 let tools;
 let approvals;
 let childEnv;
-const context = { sessionID: 'session-a', agent: 'build', messageID: 'message-a', id: 'call-a', progress: async () => {} };
+let cleanupPlugin;
+let promptHook;
+const context = { sessionID: 'session-a', agent: 'build', messageID: 'message-a', id: 'call-a', progress: async () => {}, signal: new AbortController().signal };
 
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-command-'));
@@ -34,14 +36,17 @@ beforeEach(async () => {
   const plugin = await import(pathToFileURL(path.join(directory, 'index.js')).href);
   approvals = vi.fn(async () => {});
   const registered = new Map([['shell', {}]]);
-  await plugin.default.setup({
+  cleanupPlugin = await plugin.default.setup({
     location: { directory: root }, permission: { assert: approvals },
-    tool: { transform: async transform => transform({ remove: id => registered.delete(id), add: tool => registered.set(tool.name, tool) }) },
+    tool: { transform: async transform => transform({ remove: id => registered.delete(id), namespace: () => {}, add: tool => registered.set(tool.options.namespace ? `${tool.options.namespace}_${tool.name}` : tool.name, tool) }) },
+    session: { hook: async (name, callback) => { if (name === 'prompt') promptHook = callback; } },
   });
   tools = registered;
 });
 
 afterEach(async () => {
+  cleanupPlugin();
+  vi.useRealTimers();
   await runtime.closeCommands();
   await new Promise(resolve => server.close(resolve));
   await fs.rm(root, { recursive: true, force: true });
@@ -52,10 +57,55 @@ const run = async (name, input, caller = context) => JSON.parse((await tools.get
 
 describe('managed command tools', () => {
   it('exposes command execution and continuation as direct tools', () => {
-    expect([...tools.keys()]).toEqual(['exec_command', 'write_stdin']);
+    expect([...tools.keys()]).toEqual(['exec_command', 'write_stdin', 'clock_sleep']);
     expect([...tools.values()].every(tool => tool.options.codemode === false)).toBe(true);
     expect(tools.get('exec_command').input.required).toEqual(['cmd']);
     expect(tools.get('write_stdin').input.required).toEqual(['session_id']);
+    expect(tools.get('clock_sleep').input.required).toEqual(['duration_ms']);
+  });
+
+  it('completes a clock sleep and reports elapsed time', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    const sleeping = tools.get('clock_sleep').execute({ duration_ms: 20 }, context);
+    await vi.advanceTimersByTimeAsync(20);
+    const result = await sleeping;
+    expect(result.content).toContain('Sleep completed.');
+    expect(result.metadata).toMatchObject({ duration_ms: 20, interrupted: false });
+    expect(result.metadata.wall_time_seconds).toBe(0.02);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('wakes sleeping tools only for new input in their own session', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    const sleeping = tools.get('clock_sleep').execute({ duration_ms: 10000 }, context);
+    await promptHook({ sessionID: 'session-b' });
+    expect(vi.getTimerCount()).toBe(1);
+    await promptHook({ sessionID: context.sessionID });
+    expect((await sleeping).metadata.interrupted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('cancels a clock sleep when its tool call is aborted', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    const controller = new AbortController();
+    const sleeping = tools.get('clock_sleep').execute({ duration_ms: 10000 }, { ...context, signal: controller.signal });
+    const rejected = expect(sleeping).rejects.toThrow('Cancelled');
+    controller.abort(new Error('Cancelled'));
+    await rejected;
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('releases sleeping tools when the plugin unloads', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    const sleeping = tools.get('clock_sleep').execute({ duration_ms: 10000 }, context);
+    const rejected = expect(sleeping).rejects.toThrow('Clock plugin unloaded');
+    cleanupPlugin();
+    await rejected;
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each([0, -1, 0.5, 43200001])('rejects unsupported sleep duration %s', async duration_ms => {
+    await expect(tools.get('clock_sleep').execute({ duration_ms }, context)).rejects.toThrow('duration_ms must be between');
   });
 
   it('captures standard output, errors, Unicode and the exit code', async () => {

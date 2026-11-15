@@ -5,6 +5,8 @@
 This module owns command processes for managed OpenCode sessions, their output
 buffers, and the `openchamber-command-tool` plugin. `exec_command` starts a process;
 `write_stdin` waits on it, reads new output, and sends raw PTY input.
+The same plugin provides `clock.sleep`, exposed as `clock_sleep` on OpenCode's
+direct tool list. Its timer runs in the plugin process.
 The neighbouring `terminal` module owns the user's visible terminals and the
 shared PTY provider and process-tree shutdown implementation.
 
@@ -38,6 +40,10 @@ External OpenCode and VS Code lifecycles receive no plugin injection.
 - Cancelling a launch terminates that launch's process. Cancelling a continuation
   stops its wait. Session deletion and server shutdown terminate owned processes;
   plugin refresh preserves command handles.
+- `clock.sleep` accepts integer durations from 1 millisecond to 12 hours and
+  reports elapsed time. The session's prompt hook wakes active sleeps when new
+  input arrives. Tool cancellation and plugin unload reject pending sleeps and
+  clear their timers.
 
 ## Decisions
 

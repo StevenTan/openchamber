@@ -8,23 +8,62 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 const waitTime = (value: number) =>
   z.number().int().min(0).max(2147483647).default(value);
 const outputLimit = z.number().int().min(1).default(16000);
+const outputDescription =
+  "Output character budget. Defaults to 16000 characters. A truncated response returns the newest characters from the selected output lines; retained output can be inspected with write_stdin using offset and length.";
 const commandInput = z
   .object({
-    cmd: z.string().min(1),
-    workdir: z.string().optional(),
-    yield_time_ms: waitTime(1000),
-    max_output_chars: outputLimit,
-    login: z.boolean().default(true),
+    cmd: z.string().min(1).describe("Shell command to execute."),
+    workdir: z
+      .string()
+      .optional()
+      .describe(
+        "Working directory for the command. Defaults to the session's working directory.",
+      ),
+    yield_time_ms: waitTime(1000).describe(
+      "Wait before returning output, in milliseconds. Defaults to 1000 ms; use 0 to return without waiting. Process completion or a detected input prompt can return earlier. Running commands continue after this wait.",
+    ),
+    max_output_chars: outputLimit.describe(outputDescription),
+    login: z
+      .boolean()
+      .default(true)
+      .describe(
+        "True starts a login shell when supported; false disables login mode. Defaults to true.",
+      ),
   })
   .strict();
 const stdinInput = z
   .object({
-    session_id: z.string().min(1),
-    chars: z.string().default(""),
-    yield_time_ms: waitTime(10000),
-    max_output_chars: outputLimit,
-    offset: z.number().int().optional(),
-    length: z.number().int().min(1).default(1000),
+    session_id: z
+      .string()
+      .min(1)
+      .describe(
+        "Session identifier returned by exec_command. Running sessions accept input and waits; completed sessions remain available for retained-output reads.",
+      ),
+    chars: z
+      .string()
+      .default("")
+      .describe(
+        "Characters to write to stdin. Defaults to empty, which waits without writing. Input is sent verbatim; include a newline to submit a line, or Ctrl+C (U+0003) to interrupt.",
+      ),
+    yield_time_ms: waitTime(10000).describe(
+      "Wait for new output or process completion, in milliseconds. Defaults to 10000 ms. Existing unread output returns immediately. Absolute and tail reads return immediately.",
+    ),
+    max_output_chars: outputLimit.describe(outputDescription),
+    offset: z
+      .number()
+      .int()
+      .optional()
+      .describe(
+        "Line offset in retained output. Omit or use 0 to continue from the previous read; positive offsets are absolute within the retained buffer, and negative offsets count from the end.",
+      ),
+    length: z
+      .number()
+      .int()
+      .min(1)
+      .default(1000)
+      .describe(
+        "Maximum number of output lines to read. Defaults to 1000. The response also applies max_output_chars.",
+      ),
   })
   .strict();
 const requestInput = z
@@ -227,11 +266,9 @@ export function createCommandToolRuntime({
           }
         } catch (error) {
           if (!res.destroyed)
-            return res
-              .status(400)
-              .json({
-                error: error instanceof Error ? error.message : String(error),
-              });
+            return res.status(400).json({
+              error: error instanceof Error ? error.message : String(error),
+            });
         } finally {
           res.off("close", abort);
         }

@@ -4,6 +4,7 @@ import {
 } from "./vendor/shell-permissions.js";
 import { commandShell } from "./process.js";
 import type { z } from "zod";
+import { createSleepClock } from "./sleep.js";
 
 export const COMMAND_PLUGIN_ID = "openchamber-command-tool";
 
@@ -21,6 +22,7 @@ const shell = ${JSON.stringify(commandShell())}
 export default {
   id: ${JSON.stringify(COMMAND_PLUGIN_ID)},
   async setup(ctx) {
+    const clock = (${createSleepClock.toString()})()
     const endpoint = new URL('/api/openchamber/command-tool', process.env.OPENCHAMBER_AGENT_TOOL_URL).href
     const token = process.env.OPENCHAMBER_AGENT_TOOL_TOKEN
     const host = new URL(endpoint).hostname.replace(/^\[|\]$/g, '')
@@ -65,7 +67,7 @@ export default {
       tools.remove('shell')
       tools.add({
         name: 'exec_command',
-        description: 'Run a shell command in a PTY. Return current output and, while it is running, a session_id for write_stdin. yield_time_ms limits this wait; the command continues after it returns.',
+        description: 'Runs a command in a PTY, returning output and a session ID for ongoing interaction. When status is running, continue with write_stdin using the returned session_id. Completed commands retain their session_id for output inspection; status and exit_code report completion.',
         options: { codemode: false },
         input: ${JSON.stringify(schemas.exec_command)},
         async execute(input, context) {
@@ -91,7 +93,7 @@ export default {
       })
       tools.add({
         name: 'write_stdin',
-        description: 'Continue a command session. Empty chars waits and reads new output. chars sends raw terminal input; include a newline to submit a line or use \\u0003 for Ctrl+C. offset/length inspect retained output by line; a negative offset reads from the end.',
+        description: 'Writes characters to an existing command session and returns recent output. Empty chars waits without writing. Use status to check completion; completed sessions remain readable through offset and length.',
         options: { codemode: false },
         input: ${JSON.stringify(schemas.write_stdin)},
         async execute(input, context) {
@@ -100,7 +102,11 @@ export default {
           return toolResult(result)
         },
       })
+      tools.namespace({ name: 'clock', description: 'Tools for waiting on time.' })
+      tools.add(clock.tool)
     })
+    await ctx.session.hook('prompt', event => clock.interrupt(event.sessionID))
+    return () => clock.close()
   },
 }
 `;
