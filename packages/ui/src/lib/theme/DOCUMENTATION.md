@@ -20,12 +20,14 @@ Desktop scroll containers contain scroll chaining while allowing Chromium's
 native boundary effect. The root remains clipped and permits that effect;
 `overscroll-behavior: none` on the root suppresses it in descendant viewports.
 
-OPPO Sans, Fira Code and Courier Prime are bundled in `assets/fonts` and declared in
+OPPO Sans and Courier Prime Nerd Variable are bundled in `assets/fonts` and declared in
 `styles/bundled-fonts.css`. The font effect imports that sheet so production
 asset URLs resolve before stylesheet inlining. These faces work offline;
 licenses ship in `web/public/fonts`.
 The default interface font is OPPO Sans; chat follows the interface family.
-Code and terminals default to Courier Prime. All four font sizes default to 16px.
+Code and terminals default to Courier Prime Nerd Variable, with variable weights
+from 400 to 700. Other optional fonts load on demand from their configured CDN
+sources. All four font sizes default to 16px.
 
 `useCustomCss.ts` loads the active server's stylesheet through `runtimeFetch`.
 Runtime switches clear the old sheet and abort pending reads. Read failures

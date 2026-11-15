@@ -1,6 +1,6 @@
 export type UiFontOption = 'inter' | 'fixel' | 'geist-sans' | 'atkinson-hyperlegible' | 'source-sans-3' | 'roboto' | 'noto-sans' | 'dm-sans' | 'manrope' | 'system' | 'custom' | 'oppo-sans';
 
-export type MonoFontOption = 'jetbrains-mono' | 'fira-code' | 'geist-mono' | 'commit-mono' | 'source-code-pro' | 'cascadia-code' | 'roboto-mono' | 'iosevka' | 'system-mono' | 'custom' | 'courier-prime';
+export type MonoFontOption = 'jetbrains-mono' | 'fira-code' | 'geist-mono' | 'commit-mono' | 'source-code-pro' | 'cascadia-code' | 'roboto-mono' | 'iosevka' | 'system-mono' | 'custom' | 'courier-prime' | 'courier-prime-nerd';
 
 interface FontsourceFaceSource {
     family: string;
@@ -143,7 +143,8 @@ export const CODE_FONT_OPTIONS: FontOptionDefinition<MonoFontOption>[] = [
         id: 'fira-code',
         label: 'Fira Code',
         description: 'Readable coding font with ligature support.',
-        stack: '"Fira Code", "SFMono-Regular", "Menlo", monospace'
+        stack: '"Fira Code", "SFMono-Regular", "Menlo", monospace',
+        source: { family: 'Fira Code', packageName: '@fontsource-variable/fira-code', filePrefix: 'fira-code', weightRange: [300, 700] }
     },
     {
         id: 'geist-mono',
@@ -196,8 +197,15 @@ export const CODE_FONT_OPTIONS: FontOptionDefinition<MonoFontOption>[] = [
     {
         id: 'courier-prime',
         label: 'Courier Prime',
-        description: 'Bundled monospace with classic typewriter letterforms.',
-        stack: '"Courier Prime", "Fira Code", "SFMono-Regular", "Menlo", monospace'
+        description: 'Monospace with classic typewriter letterforms.',
+        stack: '"Courier Prime", "SFMono-Regular", "Menlo", monospace',
+        source: { family: 'Courier Prime', packageName: '@fontsource/courier-prime', filePrefix: 'courier-prime', weights: [400, 700] }
+    },
+    {
+        id: 'courier-prime-nerd',
+        label: 'Courier Prime Nerd Variable',
+        description: 'Bundled variable monospace with Nerd Font symbols.',
+        stack: '"Courier Prime Nerd Variable", "SFMono-Regular", "Menlo", monospace'
     }
 ];
 
@@ -208,7 +216,7 @@ export const UI_FONT_OPTION_MAP = buildFontMap(UI_FONT_OPTIONS);
 export const CODE_FONT_OPTION_MAP = buildFontMap(CODE_FONT_OPTIONS);
 
 export const DEFAULT_UI_FONT: UiFontOption = 'oppo-sans';
-export const DEFAULT_MONO_FONT: MonoFontOption = 'courier-prime';
+export const DEFAULT_MONO_FONT: MonoFontOption = 'courier-prime-nerd';
 
 /** The option that uses a font installed on this device, named by the user. */
 export const CUSTOM_FONT_ID = 'custom';
