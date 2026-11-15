@@ -27,6 +27,9 @@ import { Icon } from "@/components/icon/Icon";
 import { TooltipLabelWithShortcut } from '@/components/ui/action-toolbar';
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { AnimatePresence, motion, useIsPresent, useReducedMotion } from 'motion/react';
+import { TabMotion } from '@/components/ui/tab-motion';
+import { TAB_SPRING, tabLayoutRect, tabScrollRange } from '@/lib/motion/tabTransition';
 
 export type SortableTabsStripItem = {
   id: string;
@@ -122,7 +125,8 @@ const restrictToXAxis: Modifier = ({ transform }) => ({
   y: 0,
 });
 
-const SortableTabWrapper: React.FC<{ id: string; children: React.ReactNode; className?: string }> = ({ id, children, className }) => {
+const SortableTabWrapper: React.FC<{ id: string; children: React.ReactNode }> = ({ id, children }) => {
+  const isPresent = useIsPresent();
   const {
     attributes,
     listeners,
@@ -130,7 +134,7 @@ const SortableTabWrapper: React.FC<{ id: string; children: React.ReactNode; clas
     transform,
     transition,
     isDragging,
-  } = useSortable({ id });
+  } = useSortable({ id, disabled: !isPresent });
 
   return (
     <div
@@ -142,7 +146,7 @@ const SortableTabWrapper: React.FC<{ id: string; children: React.ReactNode; clas
         transform: DndCSS.Translate.toString(transform),
         transition,
       }}
-      className={cn('h-full rounded-md', className, isDragging && 'opacity-50')}
+      className={cn('h-full rounded-md', isDragging && 'opacity-50')}
       {...attributes}
       {...listeners}
     >
@@ -151,8 +155,8 @@ const SortableTabWrapper: React.FC<{ id: string; children: React.ReactNode; clas
   );
 };
 
-const StaticTabWrapper: React.FC<{ id: string; children: React.ReactNode; className?: string }> = ({ id, children, className }) => (
-  <div className={cn('h-full', className)} data-sortable-tab-id={id}>{children}</div>
+const StaticTabWrapper: React.FC<{ id: string; children: React.ReactNode }> = ({ id, children }) => (
+  <div className="h-full" data-sortable-tab-id={id}>{children}</div>
 );
 
 export const SortableTabsStrip: React.FC<SortableTabsStripProps> = ({
@@ -177,6 +181,8 @@ export const SortableTabsStrip: React.FC<SortableTabsStripProps> = ({
   onTabDragOut,
 }) => {
   const { t, direction } = useI18n();
+  const reducedMotion = useReducedMotion();
+  const indicatorId = React.useId();
   const isRtl = direction === 'rtl';
   const isMobile = useUIStore((state) => state.isMobile);
   const { isTablet } = useDeviceInfo();
@@ -264,25 +270,7 @@ export const SortableTabsStrip: React.FC<SortableTabsStripProps> = ({
       return;
     }
 
-    // Walk offsetParent chain to compute position relative to the scroll container.
-    // Unlike getBoundingClientRect, offsetLeft/offsetTop are unaffected by CSS
-    // transforms (e.g. dropdown entry scale animation), preventing pill mis-positioning
-    // on first render.
-    let left = 0;
-    let top = 0;
-    let el: HTMLElement | null = activeTab;
-    while (el && el !== container) {
-      left += el.offsetLeft;
-      top += el.offsetTop;
-      el = el.offsetParent as HTMLElement | null;
-    }
-
-    const nextRect = {
-      left,
-      top,
-      width: activeTab.offsetWidth,
-      height: activeTab.offsetHeight,
-    };
+    const nextRect = tabLayoutRect(container, activeTab);
 
     setPillRect((prev) => (isSamePillRect(prev, nextRect) ? prev : nextRect));
   }, [activeId, isSamePillRect, usesIndicator]);
@@ -292,12 +280,13 @@ export const SortableTabsStrip: React.FC<SortableTabsStripProps> = ({
     // scrollLeft runs from 0 at the start of the strip: positive toward the end
     // in LTR, negative in RTL, so its magnitude is the distance from the start.
     const fromStart = element ? Math.abs(element.scrollLeft) : 0;
+    const range = element ? tabScrollRange(element, isRtl) : { min: 0, max: 0 };
     const start = element ? fromStart > 2 : false;
-    const end = element ? fromStart + element.clientWidth < element.scrollWidth - 2 : false;
+    const end = element ? fromStart < range.max - range.min - 2 : false;
     // The observer reports every width change of a strip being resized; an
     // unchanged answer keeps the state, so the strip does not re-render.
     setOverflow((prev) => (prev.start === start && prev.end === end ? prev : { start, end }));
-  }, [isScrollable]);
+  }, [isRtl, isScrollable]);
 
   React.useEffect(() => {
     if (!isScrollable) {
@@ -419,12 +408,16 @@ export const SortableTabsStrip: React.FC<SortableTabsStripProps> = ({
       // strip's ends, where the fade is gone.
       const fade = usesActivePillIndicator ? EDGE_FADE_PILL_PX : EDGE_FADE_PX;
       const strip = element.getBoundingClientRect();
-      const tab = target.getBoundingClientRect();
+      const layout = tabLayoutRect(element, target);
+      const left = strip.left + layout.left - element.scrollLeft;
+      const tab = { left, right: left + layout.width, width: layout.width };
+      const range = tabScrollRange(element, isRtl);
       // A tab wider than the space between the fades (an uncapped file tab
       // with its folder) cannot clear both; keep the plain nearest scroll,
       // which leaves a partly visible one where it is.
       if (tab.width > strip.width - 2 * fade) {
         target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        element.scrollLeft = Math.min(range.max, Math.max(range.min, element.scrollLeft));
         updateOverflow();
         return;
       }
@@ -432,16 +425,19 @@ export const SortableTabsStrip: React.FC<SortableTabsStripProps> = ({
       const overEnd = tab.right - (strip.right - fade);
       const delta = overStart < 0 ? overStart : overEnd > 0 ? overEnd : 0;
       // The first or last tab goes all the way, so no fade is left over the track's padding.
-      const tabs = element.querySelectorAll('[data-sortable-tab-id]');
+      const tabs = element.querySelectorAll('[data-sortable-tab-id]:not([inert] *)');
       const outermost = target === tabs[0] || target === tabs[tabs.length - 1];
-      if (delta !== 0) element.scrollBy({ left: outermost ? Math.sign(delta) * element.scrollWidth : delta });
+      const destination = outermost && delta !== 0
+        ? (delta > 0 ? range.max : range.min)
+        : element.scrollLeft + delta;
+      element.scrollLeft = Math.min(range.max, Math.max(range.min, destination));
       updateOverflow();
     });
 
     return () => {
       window.cancelAnimationFrame(frame);
     };
-  }, [activeId, isScrollable, items.length, updateOverflow, usesActivePillIndicator]);
+  }, [activeId, isRtl, isScrollable, items.length, updateOverflow, usesActivePillIndicator]);
 
   const dragOutRef = React.useRef<ReturnType<NonNullable<typeof onTabDragOut>> | null>(null);
   const handleDragStart = React.useCallback((event: DragStartEvent) => {
@@ -480,6 +476,7 @@ export const SortableTabsStrip: React.FC<SortableTabsStripProps> = ({
     onReorder(String(active.id), String(over.id));
   }, [onReorder]);
 
+  const tabLayoutKey = [...itemIDs].sort().join('\0');
   const list = (
     <div className={cn('relative flex h-full min-w-0 flex-1', className)}>
       {isScrollable && overflow.start ? (
@@ -502,7 +499,8 @@ export const SortableTabsStrip: React.FC<SortableTabsStripProps> = ({
           )}
         />
       ) : null}
-      <div
+      <motion.div
+        layoutScroll
         ref={scrollRef}
         className={cn(
           'relative flex h-full min-w-0 flex-1',
@@ -520,7 +518,7 @@ export const SortableTabsStrip: React.FC<SortableTabsStripProps> = ({
         role="tablist"
         aria-label={t('sortableTabsStrip.aria.tabs')}
       >
-        {usesActivePillIndicator && pillRect ? (
+        {!onClose && usesActivePillIndicator && pillRect ? (
           <div
             className={cn(
               // Light themes paint elevated darker than the canvas, so the
@@ -544,7 +542,7 @@ export const SortableTabsStrip: React.FC<SortableTabsStripProps> = ({
                 }}
           />
         ) : null}
-        {useUnderlineIndicator && pillRect ? (
+        {!onClose && useUnderlineIndicator && pillRect ? (
           <div
             className={cn(
               // The active tab is a selection, so its mark is neutral text colour; the accent stays with primary actions.
@@ -559,228 +557,229 @@ export const SortableTabsStrip: React.FC<SortableTabsStripProps> = ({
             aria-hidden
           />
         ) : null}
-        {items.map((item, index) => {
-          const isActive = item.id === activeId;
-          const showInactiveIconOnly = (iconOnly || (inactiveTabsIconOnly && !isActive)) && usesActivePillIndicator && Boolean(item.icon);
-          const shouldShowLabel = !showInactiveIconOnly;
-          const shouldShowIcon = Boolean(item.icon);
-          const useIntrinsicActiveTab = inactiveTabsIconOnly && usesActivePillIndicator && isActive && !isScrollable && !useIntrinsicPillSizing;
-          const closable = item.closable !== false && Boolean(onClose);
-          const closeReplacesIcon = closable && Boolean(item.icon);
-          const closeLabel = item.closeLabel ?? t('contextPanel.tab.closeTabAria', { label: item.label });
-          const withCloseTooltip = (control: React.ReactElement) => (
-            <Tooltip>
-              <TooltipTrigger asChild>{control}</TooltipTrigger>
-              <TooltipContent side="bottom" sideOffset={6}><TooltipLabelWithShortcut label={closeLabel} shortcut={item.closeShortcut} /></TooltipContent>
-            </Tooltip>
-          );
-          // Inside the tab button: the empty title keeps the tab's own native
-          // title from showing beside the tooltip.
-          const closeInsideTab = withCloseTooltip(
-            <span
-              role="button"
-              tabIndex={-1}
-              className={cn('absolute inset-0 z-20 flex !min-h-0 !min-w-0 items-center justify-center rounded-sm text-muted-foreground transition-opacity hover:text-foreground', alwaysShowCloseControls ? 'opacity-100' : 'opacity-0 group-hover:opacity-100')}
-              onPointerDown={(event) => {
-                event.stopPropagation();
-              }}
-              onClick={(event) => {
-                event.stopPropagation();
-                onClose?.(item.id);
-              }}
-              aria-label={closeLabel}
-              title=""
-            >
-              <Icon name="close" className="h-3.5 w-3.5" />
-            </span>,
-          );
-          // A scrolling pill row scrolls instead of squeezing its pills: a
-          // shrinking wrapper took the active pill's label down to nothing.
-          const wrapperClassName = (isScrollable || useIntrinsicPillSizing)
-            ? (useIntrinsicPillSizing ? 'shrink-0' : undefined)
-            : usesActivePillIndicator
-              ? (useIntrinsicActiveTab
-                ? 'flex-none basis-auto'
-                : (isMobile ? 'flex-1 basis-0 min-w-0' : 'flex-1 basis-0 min-w-fit'))
-              : 'min-w-0 flex-1 basis-0';
-          const handleAuxClick = closable
-            ? (event: React.MouseEvent<HTMLDivElement>) => {
-                // Middle-click (button === 1) closes the tab. Matches browser tab behavior.
-                if (event.button !== 1) {
-                  return;
-                }
-                event.preventDefault();
-                event.stopPropagation();
-                onClose?.(item.id);
-              }
-            : undefined;
-          const handleMouseDown = closable
-            ? (event: React.MouseEvent<HTMLDivElement>) => {
-                // Prevent the browser's middle-click autoscroll affordance.
-                if (event.button === 1) {
+        <AnimatePresence initial={false} mode="popLayout">
+          {items.map((item, index) => {
+            const isActive = item.id === activeId;
+            const showInactiveIconOnly = (iconOnly || (inactiveTabsIconOnly && !isActive)) && usesActivePillIndicator && Boolean(item.icon);
+            const shouldShowLabel = !showInactiveIconOnly;
+            const shouldShowIcon = Boolean(item.icon);
+            const useIntrinsicActiveTab = inactiveTabsIconOnly && usesActivePillIndicator && isActive && !isScrollable && !useIntrinsicPillSizing;
+            const closable = item.closable !== false && Boolean(onClose);
+            const closeLabel = item.closeLabel ?? t('contextPanel.tab.closeTabAria', { label: item.label });
+            const withCloseTooltip = (control: React.ReactElement) => (
+              <Tooltip>
+                <TooltipTrigger asChild>{control}</TooltipTrigger>
+                <TooltipContent side="bottom" sideOffset={6}><TooltipLabelWithShortcut label={closeLabel} shortcut={item.closeShortcut} /></TooltipContent>
+              </Tooltip>
+            );
+            // A scrolling pill row scrolls instead of squeezing its pills: a
+            // shrinking wrapper took the active pill's label down to nothing.
+            const wrapperClassName = (isScrollable || useIntrinsicPillSizing)
+              ? (useIntrinsicPillSizing ? 'shrink-0' : undefined)
+              : usesActivePillIndicator
+                ? (useIntrinsicActiveTab
+                  ? 'flex-none basis-auto'
+                  : (isMobile ? 'flex-1 basis-0 min-w-0' : 'flex-1 basis-0 min-w-fit'))
+                : 'min-w-0 flex-1 basis-0';
+            const handleAuxClick = closable
+              ? (event: React.MouseEvent<HTMLDivElement>) => {
+                  // Middle-click (button === 1) closes the tab. Matches browser tab behavior.
+                  if (event.button !== 1) {
+                    return;
+                  }
                   event.preventDefault();
+                  event.stopPropagation();
+                  onClose?.(item.id);
                 }
-              }
-            : undefined;
-          const tabMenuItems = !isMobile && tabContextMenu
-            ? tabContextMenu({
-              id: item.id,
-              index,
-              isActive,
-              allIds: itemIDs,
-              close: () => onClose?.(item.id),
-            })
-            : null;
+              : undefined;
+            const handleMouseDown = closable
+              ? (event: React.MouseEvent<HTMLDivElement>) => {
+                  // Prevent the browser's middle-click autoscroll affordance.
+                  if (event.button === 1) {
+                    event.preventDefault();
+                  }
+                }
+              : undefined;
+            const tabMenuItems = !isMobile && tabContextMenu
+              ? tabContextMenu({
+                id: item.id,
+                index,
+                isActive,
+                allIds: itemIDs,
+                close: () => onClose?.(item.id),
+              })
+              : null;
 
-          const tabElement = (
-            <div
-                ref={(element) => setTabRef(item.id, element)}
-                onAuxClick={handleAuxClick}
-                onMouseDown={handleMouseDown}
-                className={cn(
-                  'group flex h-full min-w-0 flex-nowrap items-center',
-                  (isScrollable || useIntrinsicPillSizing)
-                    ? 'shrink-0'
-                    : usesActivePillIndicator
-                      ? 'w-full'
-                      : 'w-full min-w-0',
-                  usesActivePillIndicator
-                    ? 'relative z-10 bg-transparent'
-                    : isActive
-                      ? 'relative z-10 bg-transparent text-foreground'
-                      : 'relative z-10 bg-transparent text-muted-foreground hover:text-foreground'
-                )}
-              >
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={isActive}
-                  aria-label={showInactiveIconOnly ? (item.title ?? item.label) : undefined}
-                  onClick={() => onSelect(item.id)}
-                  onDoubleClick={onDoubleClickTab ? () => onDoubleClickTab(item.id) : undefined}
-                  onPointerDown={usesIndicator ? () => {
-                    setPillTransitionEnabled(true);
-                    setPressedId(item.id);
-                  } : undefined}
-                  onPointerUp={usesIndicator ? () => setPressedId(null) : undefined}
-                  onPointerLeave={usesIndicator ? () => setPressedId(null) : undefined}
-                  onPointerCancel={usesIndicator ? () => setPressedId(null) : undefined}
+            const tabElement = (
+              <div
+                  ref={(element) => setTabRef(item.id, element)}
+                  onAuxClick={handleAuxClick}
+                  onMouseDown={handleMouseDown}
                   className={cn(
+                    'group flex h-full min-w-0 flex-nowrap items-center',
+                    (isScrollable || useIntrinsicPillSizing)
+                      ? 'shrink-0'
+                      : usesActivePillIndicator
+                        ? 'w-full'
+                        : 'w-full min-w-0',
                     usesActivePillIndicator
-                      ? 'animated-tabs__button pill-tabs__button relative z-10 flex flex-1 min-w-0 flex-nowrap items-center justify-center rounded-md text-sm font-medium transition-colors duration-150 !min-h-0'
-                      : 'flex h-full min-w-0 flex-nowrap items-center typography-micro',
-                    usesActivePillIndicator && (showInactiveIconOnly ? 'gap-0' : 'gap-1.5'),
-                    usesActivePillIndicator
-                      ? useIntrinsicPillSizing
-                        ? 'shrink-0 whitespace-nowrap px-3 text-center'
-                        : isScrollable
-                          ? cn(!item.labelFolder && 'max-w-56', 'shrink-0 px-3 text-center')
-                          : (showInactiveIconOnly
-                            ? 'px-2 !min-w-0 text-center'
-                            : useIntrinsicActiveTab
-                              ? 'shrink-0 whitespace-nowrap px-3 text-center'
-                              : 'px-3 text-center')
-                      : isScrollable
-                        ? cn(!item.labelFolder && 'max-w-56', 'justify-start truncate px-3 text-start')
-                        : 'w-full justify-center truncate px-3 text-center',
-                    usesActivePillIndicator
-                      // 24px buttons in a 2px-padded track: the switch is
-                      // 28px, as tall as the toolbar controls beside it (32px
-                      // with 28px buttons for a form). Callers may add classes
-                      // (padding) on top.
-                      ? cn(isActivePillVariant ? (isMobile ? 'h-[38px]' : pillSize === 'form' ? 'h-7' : 'h-6') : 'h-7', activePillButtonClassName)
-                      : null,
-                    usesActivePillIndicator
-                      ? isActive
-                        ? 'text-foreground'
-                        : 'text-muted-foreground hover:text-foreground'
-                      : null,
-                    usesActivePillIndicator
-                      ? 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--interactive-focus-ring)] focus-visible:ring-offset-1 focus-visible:ring-offset-background'
-                      : null
+                      ? 'relative z-10 bg-transparent'
+                      : isActive
+                        ? 'relative z-10 bg-transparent text-foreground'
+                        : 'relative z-10 bg-transparent text-muted-foreground hover:text-foreground'
                   )}
-                  title={item.title ?? item.label}
                 >
-                  {usesActivePillIndicator ? (
-                    <>
-                      {shouldShowIcon ? (
-                        <span className="relative flex h-4 w-4 shrink-0 items-center justify-center">
-                          <span className={cn('flex items-center justify-center transition-opacity', closeReplacesIcon && (alwaysShowCloseControls ? 'opacity-0' : 'group-hover:opacity-0'))}>{item.icon}</span>
-                          {closeReplacesIcon ? closeInsideTab : null}
-                        </span>
-                      ) : null}
-                      {shouldShowLabel ? <span className={cn('animated-tabs__label truncate', item.preview && 'italic')}><TabLabelText item={item} /></span> : null}
-                      {shouldShowLabel ? item.accessory : null}
-                    </>
-                  ) : (
-                    <span className={cn('flex min-w-0 flex-nowrap items-center gap-1.5', !isScrollable && 'justify-center')}>
-                      {shouldShowIcon ? (
-                        <span
-                          className={cn(
-                            'relative flex h-4 w-4 shrink-0 items-center justify-center transition-colors duration-200 ease-out',
-                            isActive ? 'text-foreground' : 'text-muted-foreground'
-                          )}
-                        >
-                          <span className={cn('flex items-center justify-center transition-opacity', closeReplacesIcon && (alwaysShowCloseControls ? 'opacity-0' : 'group-hover:opacity-0'))}>{item.icon}</span>
-                          {closeReplacesIcon ? closeInsideTab : null}
-                        </span>
-                      ) : null}
-                      <span className={cn('truncate leading-[1.2]', item.preview && 'italic')}><TabLabelText item={item} /></span>
-                      {item.accessory}
-                    </span>
-                  )}
-                </button>
-                {closable && !closeReplacesIcon ? withCloseTooltip(
                   <button
                     type="button"
-                    onPointerDown={(event) => {
-                      event.stopPropagation();
-                    }}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onClose?.(item.id);
-                    }}
+                    role="tab"
+                    aria-selected={isActive}
+                    aria-label={showInactiveIconOnly ? (item.title ?? item.label) : undefined}
+                    onClick={() => onSelect(item.id)}
+                    onDoubleClick={onDoubleClickTab ? () => onDoubleClickTab(item.id) : undefined}
+                    onPointerDown={usesIndicator ? () => {
+                      setPillTransitionEnabled(true);
+                      setPressedId(item.id);
+                    } : undefined}
+                    onPointerUp={usesIndicator ? () => setPressedId(null) : undefined}
+                    onPointerLeave={usesIndicator ? () => setPressedId(null) : undefined}
+                    onPointerCancel={usesIndicator ? () => setPressedId(null) : undefined}
                     className={cn(
-                      'relative z-20 inline-flex !min-h-0 !min-w-0 items-center justify-center transition-opacity',
                       usesActivePillIndicator
-                        ? '-ms-2.5 me-1 h-[88%] w-5 self-center !aspect-auto rounded-md'
-                        : 'aspect-square h-[65%] min-h-4 max-h-5 rounded-sm me-1',
+                        ? 'animated-tabs__button pill-tabs__button relative z-10 flex flex-1 min-w-0 flex-nowrap items-center justify-center rounded-md text-sm font-medium transition-colors duration-150 !min-h-0'
+                        : 'flex h-full min-w-0 flex-nowrap items-center typography-micro',
+                      usesActivePillIndicator && (showInactiveIconOnly ? 'gap-0' : 'gap-1.5'),
                       usesActivePillIndicator
-                        ? (isActive
-                          ? 'text-muted-foreground hover:bg-transparent hover:text-foreground'
-                          : 'text-muted-foreground opacity-0 hover:bg-transparent hover:text-foreground group-hover:opacity-100')
-                        : (isActive
-                          ? 'text-muted-foreground hover:bg-interactive-hover/60 hover:text-foreground'
-                          : 'text-muted-foreground opacity-0 hover:bg-interactive-hover/80 hover:text-foreground group-hover:opacity-100')
+                        ? useIntrinsicPillSizing
+                          ? 'shrink-0 whitespace-nowrap px-3 text-center'
+                          : isScrollable
+                            ? cn(!item.labelFolder && 'max-w-56', 'shrink-0 px-3 text-center')
+                            : (showInactiveIconOnly
+                              ? 'px-2 !min-w-0 text-center'
+                              : useIntrinsicActiveTab
+                                ? 'shrink-0 whitespace-nowrap px-3 text-center'
+                                : 'px-3 text-center')
+                        : isScrollable
+                          ? cn(!item.labelFolder && 'max-w-56', 'justify-start truncate px-3 text-start')
+                          : 'w-full justify-center truncate px-3 text-center',
+                      usesActivePillIndicator
+                        // 24px buttons in a 2px-padded track: the switch is
+                        // 28px, as tall as the toolbar controls beside it (32px
+                        // with 28px buttons for a form). Callers may add classes
+                        // (padding) on top.
+                        ? cn(isActivePillVariant ? (isMobile ? 'h-[38px]' : pillSize === 'form' ? 'h-7' : 'h-6') : 'h-7', activePillButtonClassName)
+                        : null,
+                      usesActivePillIndicator
+                        ? isActive
+                          ? 'text-foreground'
+                          : 'text-muted-foreground hover:text-foreground'
+                        : null,
+                      usesActivePillIndicator
+                        ? 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--interactive-focus-ring)] focus-visible:ring-offset-1 focus-visible:ring-offset-background'
+                        : null
                     )}
-                    aria-label={closeLabel}
+                    title={item.title ?? item.label}
                   >
-                    <Icon name="close" className="h-3 w-3" />
-                  </button>
-                ) : null}
-              </div>
-          );
-
-          return (
-            <Wrapper key={item.id} id={item.id} className={wrapperClassName}>
-              {tabMenuItems ? (
-                <ContextMenu>
-                  <ContextMenuTrigger
-                    render={(triggerProps) => (
-                      <div {...triggerProps} className={cn('flex h-full min-w-0', triggerProps.className)}>
-                        {tabElement}
-                      </div>
+                    {usesActivePillIndicator ? (
+                      <>
+                        {shouldShowIcon ? (
+                          <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                            {item.icon}
+                          </span>
+                        ) : null}
+                        {shouldShowLabel ? <span className={cn('animated-tabs__label truncate', item.preview && 'italic')}><TabLabelText item={item} /></span> : null}
+                        {shouldShowLabel ? item.accessory : null}
+                      </>
+                    ) : (
+                      <span className={cn('flex min-w-0 flex-nowrap items-center gap-1.5', !isScrollable && 'justify-center')}>
+                        {shouldShowIcon ? (
+                          <span
+                            className={cn(
+                              'flex h-4 w-4 shrink-0 items-center justify-center transition-colors duration-200 ease-out',
+                              isActive ? 'text-foreground' : 'text-muted-foreground'
+                            )}
+                          >
+                            {item.icon}
+                          </span>
+                        ) : null}
+                        <span className={cn('truncate leading-[1.2]', item.preview && 'italic')}><TabLabelText item={item} /></span>
+                        {item.accessory}
+                      </span>
                     )}
+                  </button>
+                  {closable ? withCloseTooltip(
+                    <button
+                      type="button"
+                      onPointerDown={(event) => {
+                        event.stopPropagation();
+                      }}
+                      onMouseDown={(event) => {
+                        if (event.button === 1) event.preventDefault();
+                        event.stopPropagation();
+                      }}
+                      onTouchStart={(event) => event.stopPropagation()}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onClose?.(item.id);
+                      }}
+                      className={cn(
+                        'relative z-20 inline-flex shrink-0 !min-h-0 !min-w-0 items-center justify-center transition-opacity focus-visible:opacity-100 group-focus-within:opacity-100',
+                        usesActivePillIndicator
+                          ? '-ms-2.5 me-1 h-[88%] w-5 self-center !aspect-auto rounded-md'
+                          : 'aspect-square h-[65%] min-h-4 max-h-5 rounded-sm me-1',
+                        usesActivePillIndicator
+                          ? (isActive || alwaysShowCloseControls
+                            ? 'text-muted-foreground hover:bg-transparent hover:text-foreground'
+                            : 'text-muted-foreground opacity-0 hover:bg-transparent hover:text-foreground group-hover:opacity-100')
+                          : (isActive || alwaysShowCloseControls
+                            ? 'text-muted-foreground hover:bg-interactive-hover/60 hover:text-foreground'
+                            : 'text-muted-foreground opacity-0 hover:bg-interactive-hover/80 hover:text-foreground group-hover:opacity-100')
+                      )}
+                      aria-label={closeLabel}
+                    >
+                      <Icon name="close" className="h-3 w-3" />
+                    </button>
+                  ) : null}
+                </div>
+            );
+
+            return (
+              <TabMotion key={item.id} layoutKey={tabLayoutKey} enabled={Boolean(onClose)} className={cn('relative h-full', wrapperClassName)}>
+                {onClose && isActive && usesIndicator ? (
+                  <motion.div
+                    layoutId={!reducedMotion && (useUnderlineIndicator || shouldAnimateActivePill) ? indicatorId : undefined}
+                    layoutDependency={`${tabLayoutKey}\0${activeId}`}
+                    initial={false}
+                    transition={reducedMotion ? { duration: 0 } : TAB_SPRING}
+                    className={cn(
+                      'pointer-events-none absolute inset-x-0',
+                      usesActivePillIndicator
+                        ? 'oc-raised inset-y-0 z-0 rounded-md bg-[var(--surface-background)] dark:bg-[var(--surface-elevated)]'
+                        : '-bottom-px z-10 h-[3px] rounded-t-[2px] bg-foreground',
+                    )}
+                    aria-hidden
                   />
-                  <ContextMenuContent className="w-52">{tabMenuItems}</ContextMenuContent>
-                </ContextMenu>
-              ) : (
-                tabElement
-              )}
-            </Wrapper>
-          );
-        })}
-      </div>
+                ) : null}
+                <Wrapper id={item.id}>
+                  {tabMenuItems ? (
+                    <ContextMenu>
+                      <ContextMenuTrigger
+                        render={(triggerProps) => (
+                          <div {...triggerProps} className={cn('flex h-full min-w-0', triggerProps.className)}>
+                            {tabElement}
+                          </div>
+                        )}
+                      />
+                      <ContextMenuContent className="w-52">{tabMenuItems}</ContextMenuContent>
+                    </ContextMenu>
+                  ) : (
+                    tabElement
+                  )}
+                </Wrapper>
+              </TabMotion>
+            );
+          })}
+        </AnimatePresence>
+      </motion.div>
     </div>
   );
 

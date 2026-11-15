@@ -16,6 +16,15 @@ This folder owns runtime-independent controls and their Base UI integration, inc
 
 ## Invariants
 
+- Closable tabs retain their icons and accessory marks. A trailing close button
+  reserves its width at rest, stays visible on the active tab and touch layouts,
+  and appears on inactive tabs during hover or keyboard focus. Closing owns its
+  pointer input without selecting or dragging the tab.
+- `TabMotion` owns tab presence and membership layout transitions. Its outer
+  wrapper springs into position while the inner sortable element owns drag
+  transforms. Exiting tabs leave layout immediately and are inert while fading;
+  reduced motion applies changes directly. Non-closable selectors keep their
+  existing selection animations.
 - A root dropdown opened by keyboard or controlled state stays open when the pointer leaves its popup. Hover dismissal applies only to a dropdown opened by trigger hover.
 - Escape, outside presses, item selection, and window blur retain their normal dismissal behavior. Submenu hover behavior stays with Base UI.
 - An open dropdown whose content changes (a filtered picker list, items that arrive late) eases into its new height (`useHeightMorph` in `DropdownMenuContent`); the edge facing the trigger stays where it was in every painted frame.

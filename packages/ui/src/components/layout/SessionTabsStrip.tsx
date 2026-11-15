@@ -48,6 +48,9 @@ import { useIsSessionAiRenamePending } from '@/sync/use-session-ai-rename';
 import { useMultiRunMemberIds } from '@/lib/multirun/useMultiRuns';
 import { SessionProjectIcon } from './SessionProjectIcon';
 import { SESSION_TAB_EDGE_FADE_PX, sessionTabRevealDelta } from './sessionTabReveal';
+import { AnimatePresence, motion, useIsPresent, useReducedMotion } from 'motion/react';
+import { TabMotion } from '@/components/ui/tab-motion';
+import { TAB_SPRING, tabLayoutRect, tabScrollRange } from '@/lib/motion/tabTransition';
 
 const restrictToXAxis: Modifier = ({ transform }) => ({ ...transform, y: 0 });
 
@@ -80,8 +83,8 @@ export type SessionTabMenuArgs = {
 };
 
 /**
- * One tab, active or not. The tab drags to reorder; on hover the close
- * control takes the project icon's slot at the tab's start. The session menu, supplied by the
+ * One tab, active or not. The tab drags to reorder; its close control has a
+ * reserved trailing slot. The session menu, supplied by the
  * header via `renderMenu`, opens on right-click under the cursor without
  * changing the active tab. While the active tab is renaming, the close
  * control is hidden; only the rename controls show.
@@ -109,7 +112,8 @@ const SessionTabItem: React.FC<{
     ? formatShortcutForDisplay(`${tabPrefix}+${tabNumber}`)
     : undefined;
   const [contextMenuOpen, setContextMenuOpen] = React.useState(false);
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: tab.id });
+  const isPresent = useIsPresent();
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: tab.id, disabled: !isPresent });
 
   const title = tab.session.title?.trim() || t('sessions.sidebar.session.untitled');
 
@@ -135,7 +139,7 @@ const SessionTabItem: React.FC<{
     <div
       ref={setNodeRef}
       style={{ transform: DndCSS.Translate.toString(transform), transition }}
-      className={cn('app-region-no-drag session-tab-slot flex h-7 w-44 shrink-0 touch-none', isDragging && 'z-10 opacity-60')}
+      className={cn('flex h-full w-full touch-none', isDragging && 'z-10 opacity-60')}
       data-active={isActive ? 'true' : 'false'}
       {...(isActive ? { 'data-active-session-tab': true } : {})}
       {...attributes}
@@ -194,31 +198,8 @@ const SessionTabItem: React.FC<{
                   )}
                 >
                   <div className="flex min-w-0 flex-1 items-center">
-                    {/* Which project the session belongs to, so a strip of
-                        tabs from several projects stays readable. On hover
-                        the close button takes its slot, so the tab reserves
-                        no room for it at the end. */}
-                    <span className="relative me-1.5 inline-flex size-3.5 shrink-0 items-center justify-center">
-                      <SessionProjectIcon
-                        directory={resolveGlobalSessionDirectory(tab.session)}
-                        className={cn(!suppressControls && 'group-hover/session-tab:opacity-0 group-has-[:focus-visible]/session-tab:opacity-0')}
-                      />
-                      {!suppressControls ? (
-                        <Tooltip>
-                        <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          aria-label={t('header.sessionTabs.closeTab')}
-                          onClick={(event) => { event.stopPropagation(); onClose(tab.id); }}
-                          onPointerDown={(event) => event.stopPropagation()}
-                          className="absolute inset-0 flex items-center justify-center rounded text-muted-foreground opacity-0 hover:text-foreground focus-visible:opacity-100 group-hover/session-tab:opacity-100"
-                        >
-                          <Icon name="close" className="size-3.5" />
-                        </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom" sideOffset={6}><TooltipLabelWithShortcut label={t('header.sessionTabs.closeTab')} shortcut={isActive ? formatShortcutForDisplay(isDesktopShell() ? 'mod+w' : getEffectiveShortcutCombo('close_session_tab', shortcutOverrides), '') : undefined} /></TooltipContent>
-                        </Tooltip>
-                      ) : null}
+                    <span className="me-1.5 inline-flex size-3.5 shrink-0 items-center justify-center">
+                      <SessionProjectIcon directory={resolveGlobalSessionDirectory(tab.session)} />
                     </span>
                     <div className={cn(
                       'min-w-0 flex-1 overflow-hidden whitespace-nowrap',
@@ -244,6 +225,35 @@ const SessionTabItem: React.FC<{
                     ) : showDot ? (
                       <SessionActivityIndicator state={turnActivity ?? 'unread'} className="ms-1.5 shrink-0" />
                     ) : null}
+                    <span className="ms-1 inline-flex size-5 shrink-0 items-center justify-center">
+                      {!suppressControls ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label={t('header.sessionTabs.closeTab')}
+                              onClick={(event) => { event.stopPropagation(); onClose(tab.id); }}
+                              onPointerDown={(event) => event.stopPropagation()}
+                              onMouseDown={(event) => {
+                                if (event.button === 1) event.preventDefault();
+                                event.stopPropagation();
+                              }}
+                              onTouchStart={(event) => event.stopPropagation()}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter' || event.key === ' ') event.stopPropagation();
+                              }}
+                              className={cn(
+                                'flex size-5 items-center justify-center rounded-sm text-muted-foreground transition-opacity hover:bg-interactive-hover/60 hover:text-foreground focus-visible:opacity-100 group-focus-within/session-tab:opacity-100',
+                                !isActive && 'opacity-0 group-hover/session-tab:opacity-100',
+                              )}
+                            >
+                              <Icon name="close" className="size-3" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" sideOffset={6}><TooltipLabelWithShortcut label={t('header.sessionTabs.closeTab')} shortcut={isActive ? formatShortcutForDisplay(isDesktopShell() ? 'mod+w' : getEffectiveShortcutCombo('close_session_tab', shortcutOverrides), '') : undefined} /></TooltipContent>
+                        </Tooltip>
+                      ) : null}
+                    </span>
                   </div>
                 </div>
               )}
@@ -286,6 +296,7 @@ export const SessionTabsStrip: React.FC<{
   children: React.ReactNode;
 }> = ({ renderMenu, onMenuOpenChangeComplete, suppressActiveTabControls = false, menuReturnsFocus, children }) => {
   const { t, direction } = useI18n();
+  const reducedMotion = useReducedMotion();
   // The horizontal strategy assumes later tabs sit further right; RTL uses real rects.
   const isRtl = direction === 'rtl';
   const tabIds = useSessionTabsStore((state) => state.tabIds);
@@ -425,8 +436,9 @@ export const SessionTabsStrip: React.FC<{
     if (!node) return;
     // The fade mask is physical, so measure from the physical left: in RTL
     // scrollLeft runs from 0 at the right end down to -max at the left end.
-    const max = node.scrollWidth - node.clientWidth;
-    const fromLeft = isRightToLeft(node) ? max + node.scrollLeft : node.scrollLeft;
+    const range = tabScrollRange(node, isRightToLeft(node));
+    const max = range.max - range.min;
+    const fromLeft = node.scrollLeft - range.min;
     const left = fromLeft > 2;
     const right = fromLeft < max - 2;
     setEdges((prev) => (prev.left === left && prev.right === right ? prev : { left, right }));
@@ -444,13 +456,16 @@ export const SessionTabsStrip: React.FC<{
   // fades so the tab's own controls stay readable.
   React.useEffect(() => {
     const node = scrollRef.current;
-    const tab = node?.querySelector<HTMLElement>('[data-active-session-tab]');
+    const tab = node?.querySelector<HTMLElement>('[data-active-session-tab]:not([inert] *)');
     if (!node || !tab) return;
-    const delta = sessionTabRevealDelta(node.getBoundingClientRect(), tab.getBoundingClientRect());
-    if (delta === 0) return;
-    node.scrollLeft += delta;
+    const viewport = node.getBoundingClientRect();
+    const layout = tabLayoutRect(node, tab);
+    const left = viewport.left + layout.left - node.scrollLeft;
+    const delta = sessionTabRevealDelta(viewport, { left, right: left + layout.width });
+    const range = tabScrollRange(node, isRightToLeft(node));
+    node.scrollLeft = Math.min(range.max, Math.max(range.min, node.scrollLeft + delta));
     updateEdges();
-  }, [currentSessionId, updateEdges]);
+  }, [currentSessionId, tabs.length, updateEdges]);
 
   const maskImage = edges.left && edges.right
     ? `linear-gradient(to right, transparent, black ${SESSION_TAB_EDGE_FADE_PX}px, black calc(100% - ${SESSION_TAB_EDGE_FADE_PX}px), transparent)`
@@ -465,14 +480,17 @@ export const SessionTabsStrip: React.FC<{
   // The pill covers just the moment a current session has not reached its
   // tab yet.
   const showPendingTab = Boolean(currentSessionId) && !tabs.some((tab) => tab.id === currentSessionId);
+  // Reordering is animated by the drag controller, independently of membership.
+  const tabLayoutKey = [...tabIdsInOrder, ...(showDraftTab ? ['draft'] : []), ...(showPendingTab ? ['pending'] : [])].sort().join('\0');
 
   return (
     <div className="flex h-full min-w-0 flex-1 items-center" role="tablist" aria-label={t('header.sessionTabs.stripAria')}>
-      <div
+      <motion.div
+        layoutScroll
         ref={scrollRef}
         onScroll={updateEdges}
         onWheel={scrollTabsWithWheel}
-        className="session-tabs-scroll flex min-w-0 flex-initial items-center gap-1.5 overflow-x-auto overscroll-x-contain"
+        className="session-tabs-scroll relative flex min-w-0 flex-initial items-center gap-1.5 overflow-x-auto overscroll-x-contain"
         style={maskImage ? { maskImage, WebkitMaskImage: maskImage } : undefined}
       >
         <DndContext
@@ -482,66 +500,81 @@ export const SessionTabsStrip: React.FC<{
           onDragEnd={handleDragEnd}
         >
           <SortableContext items={tabIdsInOrder} strategy={isRtl ? rectSortingStrategy : horizontalListSortingStrategy}>
-            {tabs.map((tab, index) => (
-              <SessionTabItem
-                tabNumber={index + 1}
-                key={tab.id}
-                tab={tab}
-                isActive={tab.id === currentSessionId}
-                isPreview={tab.id === previewTabId}
-                suppressControls={tab.id === currentSessionId && suppressActiveTabControls}
-                onSelect={handleSelect}
-                onPin={pinTab}
-                onClose={handleClose}
-                renderMenu={renderMenu}
-                closeOtherTabs={handleCloseOthers}
-                onMenuOpenChangeComplete={onMenuOpenChangeComplete}
-                menuReturnsFocus={menuReturnsFocus}
-              >
-                {tab.id === currentSessionId ? children : null}
-              </SessionTabItem>
-            ))}
+            <AnimatePresence initial={false} mode="popLayout">
+              {tabs.map((tab, index) => (
+                <TabMotion
+                  key={tab.id}
+                  layoutKey={tabLayoutKey}
+                  className="app-region-no-drag session-tab-slot flex h-7 w-44 shrink-0"
+                  data-active={tab.id === currentSessionId ? 'true' : 'false'}
+                >
+                  <SessionTabItem
+                    tabNumber={index + 1}
+                    tab={tab}
+                    isActive={tab.id === currentSessionId}
+                    isPreview={tab.id === previewTabId}
+                    suppressControls={tab.id === currentSessionId && suppressActiveTabControls}
+                    onSelect={handleSelect}
+                    onPin={pinTab}
+                    onClose={handleClose}
+                    renderMenu={renderMenu}
+                    closeOtherTabs={handleCloseOthers}
+                    onMenuOpenChangeComplete={onMenuOpenChangeComplete}
+                    menuReturnsFocus={menuReturnsFocus}
+                  >
+                    {tab.id === currentSessionId ? children : null}
+                  </SessionTabItem>
+                </TabMotion>
+              ))}
+              {showDraftTab ? (
+                <TabMotion key="draft" layoutKey={tabLayoutKey} className="app-region-no-drag session-tab-slot h-7 w-44 shrink-0" data-active="true">
+                  <div
+                    role="tab"
+                    aria-selected
+                    className="flex h-full w-full items-center rounded-md bg-interactive-selection px-2 text-interactive-selection-foreground"
+                    data-active="true"
+                    data-active-session-tab
+                  >
+                    <Icon name="edit" className="me-1.5 size-3.5 shrink-0" />
+                    <div className="session-tab-title min-w-0 flex-1 overflow-hidden whitespace-nowrap italic">
+                      <span dir="auto" className="block max-w-full overflow-hidden whitespace-nowrap oc-ui-start-align text-[0.8125rem] font-medium leading-4">
+                        {draftFirstLine || t('sessions.switcher.draftTitle')}
+                      </span>
+                    </div>
+                  </div>
+                </TabMotion>
+              ) : null}
+              {showPendingTab ? (
+                <TabMotion key="pending" layoutKey={tabLayoutKey} className="app-region-no-drag session-tab-slot h-7 w-44 shrink-0" data-active="true">
+                  <div
+                    role="tab"
+                    aria-selected
+                    className="flex h-full w-full items-center rounded-md bg-interactive-selection px-2"
+                    data-active="true"
+                  >
+                    <div className="min-w-0 flex-1">{children}</div>
+                  </div>
+                </TabMotion>
+              ) : null}
+            </AnimatePresence>
           </SortableContext>
         </DndContext>
-        {showDraftTab ? (
-          <div
-            role="tab"
-            aria-selected
-            className="app-region-no-drag session-tab-slot flex h-7 w-44 shrink-0 items-center rounded-md bg-interactive-selection px-2 text-interactive-selection-foreground"
-            data-active="true"
-            data-active-session-tab
-          >
-            <Icon name="edit" className="me-1.5 size-3.5 shrink-0" />
-            <div className="session-tab-title min-w-0 flex-1 overflow-hidden whitespace-nowrap italic">
-              <span dir="auto" className="block max-w-full overflow-hidden whitespace-nowrap oc-ui-start-align text-[0.8125rem] font-medium leading-4">
-                {draftFirstLine || t('sessions.switcher.draftTitle')}
-              </span>
-            </div>
-          </div>
-        ) : null}
-        {showPendingTab ? (
-          <div
-            role="tab"
-            aria-selected
-            className="app-region-no-drag session-tab-slot flex h-7 w-44 shrink-0 items-center rounded-md bg-interactive-selection px-2"
-            data-active="true"
-          >
-            <div className="min-w-0 flex-1">{children}</div>
-          </div>
-        ) : null}
-      </div>
+      </motion.div>
       {/* Right after the last tab, outside the scroller so it stays in view
           when the tabs overflow. */}
       <Tooltip>
         <TooltipTrigger asChild>
-          <button
+          <motion.button
+            layout={reducedMotion ? false : 'position'}
+            layoutDependency={tabLayoutKey}
+            transition={reducedMotion ? { duration: 0 } : TAB_SPRING}
             type="button"
             onClick={openNewSessionHere}
             aria-label={t('sessions.sidebar.header.actions.newSession')}
             className="app-region-no-drag ms-1 inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Icon name="add" className="size-4" />
-          </button>
+          </motion.button>
         </TooltipTrigger>
         <TooltipContent side="bottom" sideOffset={6}>
           <TooltipLabelWithShortcut label={t('sessions.sidebar.header.actions.newSession')} shortcut={formatShortcutForDisplay(getEffectiveShortcutCombo('new_chat', shortcutOverrides), '')} />

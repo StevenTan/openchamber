@@ -61,21 +61,13 @@ describe('issue #4075 header tab-strip whitespace stays draggable', () => {
       .split('\n')
       .filter((line) => line.includes('session-tab-slot'));
 
-    expect(slotLines.length).toBeGreaterThanOrEqual(2);
+    expect(slotLines.length).toBe(3);
     for (const line of slotLines) {
       expect(line).toContain(NO_DRAG);
     }
   });
 
-  test('the dragged tab item itself is a no-drag slot', () => {
-    const tabItem = lineWith(stripSource, 'tab item root', 'shrink-0 touch-none');
-    expect(tabItem).toContain(NO_DRAG);
-  });
-
-  test('the draft and pending pills and the new-session button are no-drag', () => {
-    const pills = stripSource.split('\n').filter((line) => line.includes('bg-interactive-selection px-2'));
-    expect(pills.length).toBe(2);
-    for (const pill of pills) expect(pill).toContain(NO_DRAG);
+  test('the new-session button is no-drag', () => {
     expect(lineWith(stripSource, 'new-session button', 'onClick={openNewSessionHere}')).toBeDefined();
     const plusButton = stripSource.slice(stripSource.indexOf('onClick={openNewSessionHere}'));
     expect(plusButton.split('\n').slice(0, 4).join('\n')).toContain(NO_DRAG);
