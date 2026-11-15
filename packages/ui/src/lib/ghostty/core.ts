@@ -295,7 +295,7 @@ export class GhosttyTerminalCore {
     this.runtime.free(options, optionsSize);
     this.assertSuccess('ghostty_terminal_new', terminalResult);
     this.terminal = this.runtime.readPointer(this.terminalSlot);
-    this.applyDefaultCursorBlink();
+    this.applyCursorDefaults();
     this.ptyWriter = onPtyData;
     this.ptyWriterId = this.runtime.attachPtyWriter(this.terminal, onPtyData);
 
@@ -365,9 +365,7 @@ export class GhosttyTerminalCore {
   resetAndWrite(data: string): void {
     this.ensureActive();
     this.runtime.call('ghostty_terminal_reset', this.terminal);
-    // RIS returns the cursor to Ghostty's built-in steady default, so the
-    // embedder default has to be applied again before the replay runs.
-    this.applyDefaultCursorBlink();
+    this.applyCursorDefaults();
     this.rows = [];
     if (data.length === 0) return;
     const writer = this.ptyWriter;
@@ -400,13 +398,15 @@ export class GhosttyTerminalCore {
   }
 
   /**
-   * Ghostty's built-in default cursor is steady, while the xterm.js renderer
-   * this replaced ran with `cursorBlink: true`. Option 23 is the embedder's
-   * default blink, which is the state a session starts in and returns to on
-   * DECSCUSR reset (CSI 0 q), so programs that ask for a specific cursor
-   * through DECSCUSR or DEC mode 12 still win.
+   * Options 22 and 23 define a blinking bar for new sessions and DECSCUSR
+   * reset (CSI 0 q). Explicit application cursor styles and DEC mode 12
+   * remain authoritative. The C cursor-style enum is a 32-bit value; bar is 0.
    */
-  private applyDefaultCursorBlink(): void {
+  private applyCursorDefaults(): void {
+    const style = this.runtime.alloc(4);
+    new DataView(this.runtime.memory.buffer, style, 4).setUint32(0, 0, true);
+    this.runtime.call('ghostty_terminal_set', this.terminal, 22, style);
+    this.runtime.free(style, 4);
     const blink = this.runtime.alloc(1);
     this.runtime.bytes(blink, 1)[0] = 1;
     this.runtime.call('ghostty_terminal_set', this.terminal, 23, blink);
