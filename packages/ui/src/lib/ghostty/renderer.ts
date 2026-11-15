@@ -304,28 +304,8 @@ export function renderGhosttySnapshot(options: {
       // An unfocused terminal draws a hollow cursor so the active pane is obvious.
       context.strokeStyle = cssColor(snapshot.cursor);
       context.strokeRect(left + 0.5, top + 0.5, metrics.width - 1, metrics.height - 1);
-    } else if (snapshot.cursorStyle === 0) {
-      context.fillRect(left, top, 2, metrics.height);
-    } else if (snapshot.cursorStyle === 2) {
-      context.fillRect(left, top + metrics.height - 2, metrics.width, 2);
-    } else if (snapshot.cursorStyle === 3) {
-      context.strokeStyle = cssColor(snapshot.cursor);
-      context.strokeRect(left + 0.5, top + 0.5, metrics.width - 1, metrics.height - 1);
     } else {
-      context.fillRect(left, top, metrics.width, metrics.height);
-      const cell = snapshot.rowData[snapshot.cursorY]?.cells[snapshot.cursorX];
-      if (cell?.text && isBoxDrawingText(cell.text)) {
-        drawBoxDrawingGlyph(
-          context,
-          cell.text,
-          { x: left, y: top, width: metrics.width, height: metrics.height },
-          snapshot.background,
-        );
-      } else if (cell?.text) {
-        context.font = fontForCell(cell, fontSize, fontFamily);
-        context.fillStyle = cssColor(snapshot.background);
-        context.fillText(cell.text, left, top + metrics.baseline, metrics.width);
-      }
+      context.fillRect(left, top, 1, metrics.height);
     }
   }
 }

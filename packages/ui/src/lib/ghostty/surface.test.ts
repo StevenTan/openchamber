@@ -279,9 +279,10 @@ describe('layout helpers', () => {
     expect(terminalScrollbarGeometry({ total: 24, offset: 0, len: 24 }, 200)).toBeNull();
   });
 
-  test('blinks only a focused visible cursor the terminal asked to blink', () => {
-    expect(shouldBlinkTerminalCursor({ focused: true, cursorBlinking: true, cursorVisible: true, reducedMotion: false })).toBe(true);
-    expect(shouldBlinkTerminalCursor({ focused: false, cursorBlinking: true, cursorVisible: true, reducedMotion: false })).toBe(false);
-    expect(shouldBlinkTerminalCursor({ focused: true, cursorBlinking: true, cursorVisible: true, reducedMotion: true })).toBe(false);
+  test('blinks a focused visible cursor unless reduced motion is enabled', () => {
+    expect(shouldBlinkTerminalCursor({ focused: true, cursorVisible: true, reducedMotion: false })).toBe(true);
+    expect(shouldBlinkTerminalCursor({ focused: false, cursorVisible: true, reducedMotion: false })).toBe(false);
+    expect(shouldBlinkTerminalCursor({ focused: true, cursorVisible: true, reducedMotion: true })).toBe(false);
+    expect(shouldBlinkTerminalCursor({ focused: true, cursorVisible: false, reducedMotion: false })).toBe(false);
   });
 });

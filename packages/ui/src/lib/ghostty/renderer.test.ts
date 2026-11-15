@@ -136,13 +136,14 @@ describe('renderGhosttySnapshot', () => {
     ]);
   });
 
-  test('constrains text runs and cursor glyphs to their terminal cells', () => {
+  test('draws a bar cursor over text constrained to its terminal cells', () => {
     const fillTextCalls: unknown[][] = [];
+    const fillRectCalls: number[][] = [];
     const context = {
       canvas: { width: 200, height: 40 },
       beginPath: () => {},
       clip: () => {},
-      fillRect: () => {},
+      fillRect: (...args: number[]) => fillRectCalls.push(args),
       fillText: (...args: unknown[]) => fillTextCalls.push(args),
       rect: () => {},
       resetTransform: () => {},
@@ -189,10 +190,8 @@ describe('renderGhosttySnapshot', () => {
       cursorOn: true,
     });
 
-    expect(fillTextCalls).toEqual([
-      ['abx', 4, 15, 21.6],
-      ['x', 18.4, 15, 7.2],
-    ]);
+    expect(fillTextCalls).toEqual([['abx', 4, 15, 21.6]]);
+    expect(fillRectCalls.at(-1)).toEqual([18.4, 4, 1, 16]);
   });
 
   test('repaints the cell without an overlay during the blink off phase', () => {
@@ -254,8 +253,7 @@ describe('renderGhosttySnapshot', () => {
       cursorOn: false,
     });
 
-    // The cursor row still repaints so the block disappears, but the inverted
-    // glyph the on phase draws over the cell is gone.
+    // The cursor row repaints during the off phase to clear the bar.
     expect(fillTextCalls).toEqual([['abx', 4, 15, 21.6]]);
   });
 

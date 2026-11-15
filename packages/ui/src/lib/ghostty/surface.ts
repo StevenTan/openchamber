@@ -137,11 +137,10 @@ export function terminalFontSize(size?: number): number {
  */
 export function shouldBlinkTerminalCursor(state: {
   readonly focused: boolean;
-  readonly cursorBlinking: boolean;
   readonly cursorVisible: boolean;
   readonly reducedMotion: boolean;
 }): boolean {
-  return state.focused && state.cursorBlinking && state.cursorVisible && !state.reducedMotion;
+  return state.focused && state.cursorVisible && !state.reducedMotion;
 }
 
 /**
@@ -2232,7 +2231,6 @@ export class GhosttyTerminalSurface {
     if (!snapshot || !this.visible || !this.hasSize) return false;
     return shouldBlinkTerminalCursor({
       focused: this.focused,
-      cursorBlinking: snapshot.cursorBlinking,
       cursorVisible: snapshot.cursorVisible,
       reducedMotion: this.reducedMotionMedia?.matches ?? false,
     });

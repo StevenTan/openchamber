@@ -39,9 +39,10 @@ Touch-owned viewports have no menu and no paste shortcut, so `TerminalView` puts
 - A hidden surface (`setVisible(false)`) keeps parsing output and answering VT queries but schedules no frames, no cursor timer and no scrollbar work. Reveal repaints in full.
 - Touch hosts (`handleTouchPointer: false`) own scroll and long-press gestures through `scrollLines`, `selectWordAt` and `extendSelectionTo`; the surface ignores touch pointers and the compatibility mouse events that follow them so a tap does not summon the soft keyboard.
 - Every terminal frees its own handles on `dispose()`; the WebAssembly instance is shared and never torn down.
-- New terminals and cursor resets use a blinking bar. History replay starts
-  with the same defaults; application cursor-style and blink sequences take
-  precedence over those defaults.
+- The focused terminal displays a 1px blinking bar, independently of application
+  cursor-style and blink modes, for both live output and history replay. Cursor
+  position and visibility follow the terminal state. An unfocused cursor is
+  a steady outline; reduced motion keeps the focused bar steady.
 
 ## Decisions
 
