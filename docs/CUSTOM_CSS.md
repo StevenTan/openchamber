@@ -52,11 +52,6 @@ rules; it is not validated or repaired by OpenChamber.
 
 ## Bundled appearance
 
-This fork's composer, chat gutters, menus, selection toolbar, text selection,
-prose rhythm and content-card styles live in
-`packages/ui/src/styles/fork-defaults.css`. They work without a local CSS file
-or the custom CSS setting. Code uses its code-size token and uniform 450 weight;
-prose uses 500 weight. The default interface weight is 500 and remains adjustable
-in Appearance.
-`custom.css` loads afterward and can override them. Code colors belong to the
-theme's syntax palette; the bundled stylesheet reads those tokens.
+Bundled appearance overrides live in `packages/ui/src/styles/fork-defaults.css`
+and apply independently of custom CSS. `custom.css` loads afterward and can
+override them. Code colors remain owned by the theme's syntax palette.

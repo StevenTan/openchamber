@@ -16,8 +16,6 @@ import {
   type GhosttyCellRange,
   type GhosttyCellMetrics,
 } from './renderer';
-import { WHEEL_MULTIPLIER } from '../motion/vendor/smooth-scrollbar/overscroll';
-import { TerminalScrollEdgeEvent } from '../motion/elasticScroll';
 
 // Bundled with the app: prompt symbols must not depend on a CDN fetch, and the
 // cell grid must be measured with the faces that will actually render.
@@ -1923,22 +1921,8 @@ export class GhosttyTerminalSurface {
   private readonly onWheel = (event: WheelEvent) => {
     if (event.deltaY === 0) return;
     event.preventDefault();
-    const reportMouse = shouldReportTerminalMouse(this.core.isMouseTracking(), event);
-    const alternateScreen = this.core.isAlternateScreen();
-    if (!reportMouse && !alternateScreen) {
-      const state = this.readScrollbarState();
-      const atEdge = state !== null
-        && (event.deltaY < 0 ? state.offset === 0 : state.offset >= state.total - state.len);
-      const pixels = event.deltaY * (event.deltaMode === 1 ? this.metrics.height : event.deltaMode === 2 ? this.rows * this.metrics.height : 1);
-      const feedback = new TerminalScrollEdgeEvent(pixels, atEdge, this.onWheel);
-      this.mount.dispatchEvent(feedback);
-      if (feedback.defaultPrevented) {
-        this.wheelRemainder = 0;
-        return;
-      }
-    }
     const delta = terminalWheelDeltaRows(
-      { deltaY: event.deltaY * (reportMouse || alternateScreen ? 1 : WHEEL_MULTIPLIER), deltaMode: event.deltaMode },
+      event,
       this.metrics.height,
       this.rows,
       this.wheelRemainder,
@@ -1946,14 +1930,14 @@ export class GhosttyTerminalSurface {
     this.wheelRemainder = delta.remainder;
     if (delta.rows === 0) return;
     const magnitude = Math.abs(delta.rows);
-    if (reportMouse) {
+    if (shouldReportTerminalMouse(this.core.isMouseTracking(), event)) {
       const button = delta.rows < 0 ? 4 : 5;
       for (let index = 0; index < magnitude; index += 1) {
         this.sendMouse('press', button, event);
       }
       return;
     }
-    if (alternateScreen) {
+    if (this.core.isAlternateScreen()) {
       // The alternate screen has no scrollback: translate wheel motion into
       // arrow keys so full-screen apps like vim and less scroll, matching xterm.
       this.options.onData(terminalWheelArrowData(delta.rows, this.core.isApplicationCursorKeys()));

@@ -1,4 +1,14 @@
 /* Appearance defaults for this fork; custom.css can override them. */
+:root.desktop-runtime,
+:root.desktop-runtime body,
+:root.desktop-runtime #root {
+  overscroll-behavior: contain;
+}
+
+:root.desktop-runtime :is(.overlay-scrollbar-container.flex-1, .overflow-y-auto, .cm-scroller, textarea) {
+  overscroll-behavior-y: contain;
+}
+
 [data-chat-column="main"] .oc-composer-surface {
   border-radius: 24px !important;
 }
@@ -61,7 +71,7 @@
   }
 }
 
-/* Fenced code uses the code size and a uniform 450 weight. */
+/* Code block typography. */
 .markdown-content [data-streamdown="code-block"] {
   background-color: var(--syntax-background) !important;
 }

@@ -2200,17 +2200,6 @@ export interface ClipboardAPI {
   };
 }
 
-/** Window-local AppKit scroll input; phases are NSEventPhase bit flags. */
-export interface NativeScrollEvent {
-  phase: number;
-  momentumPhase: number;
-}
-
-export interface NativeScrollAPI {
-  ready(): Promise<boolean>;
-  subscribe(handler: (event: NativeScrollEvent) => void): () => void;
-}
-
 export interface RuntimeAPIs {
   /** Native local picker. Web/mobile fall back to their browser file input; VS Code does not import themes. */
   themeFiles?: {
@@ -2218,8 +2207,6 @@ export interface RuntimeAPIs {
   };
   /** Linux desktop's native PRIMARY buffer; absent in browsers, mobile, VS Code and remote pages. */
   clipboard?: ClipboardAPI;
-  /** Available only to a trusted macOS Electron main frame. */
-  nativeScroll?: NativeScrollAPI;
   runtime: RuntimeDescriptor;
   terminal: TerminalAPI;
   git: GitAPI;

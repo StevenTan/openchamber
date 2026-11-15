@@ -58,7 +58,6 @@ type DesktopClipboardBridge = {
 type DesktopBridgeGlobal = {
   pickThemeFile?: () => Promise<unknown>;
   clipboard?: DesktopClipboardBridge;
-  nativeScroll?: RuntimeAPIs['nativeScroll'];
   invoke?: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
   openDialog?: (options: Record<string, unknown>) => Promise<unknown>;
   grantFileAccess?: (path: string) => Promise<unknown>;
@@ -171,18 +170,6 @@ export const createDesktopThemeFileAPI = (): RuntimeAPIs['themeFiles'] => {
       const file = z.object({ name: z.string(), size: z.number().nonnegative(), text: z.string() }).nullable().parse(await pick());
       return { status: 'picked', file };
     },
-  };
-};
-
-export const createDesktopNativeScrollAPI = (): RuntimeAPIs['nativeScroll'] => {
-  const bridge = getDesktopBridge()?.nativeScroll;
-  if (!bridge) return undefined;
-  const event = z.object({
-    phase: z.number().int().nonnegative(), momentumPhase: z.number().int().nonnegative(),
-  });
-  return {
-    ready: async () => z.boolean().parse(await bridge.ready()),
-    subscribe: (handler) => bridge.subscribe((payload) => handler(event.parse(payload))),
   };
 };
 

@@ -13,8 +13,8 @@ export const sessionTreeRowPaddingLeft = (depth: number): string => fileTreeRowP
  */
 export const sessionDetailedRowPaddingLeft = (depth: number): string => `calc(${sessionTreeRowPaddingLeft(depth)} + 4px)`;
 
-/** Where the text of a tree row starts: past the level's chevron slot (14px) and gap (6px). */
-export const sessionTreeTextInset = (depth: number): string => `calc(${sessionTreeRowPaddingLeft(depth)} + 20px)`;
+/** Match the row's w-3.5 chevron slot and gap-1.5, including appearance spacing. */
+export const sessionTreeTextInset = (depth: number): string => `calc(${sessionTreeRowPaddingLeft(depth)} + 1.25rem * var(--padding-scale, 1))`;
 
 /**
  * One guide line a tree row draws: the line of `level`, which runs under the

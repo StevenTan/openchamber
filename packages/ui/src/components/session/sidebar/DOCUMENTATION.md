@@ -1314,20 +1314,12 @@ rest it is as quiet as the button was.
   the list back to that header and the sidebar would not scroll until focus
   left it; `moveHost` keeps the scroll position across a move that carries
   focus.
-- Every change to row membership or order uses one keyed transition in
-  `SessionSidebarRows`: opening and closing sections, Show more / Show less,
-  session creation, archiving, completion and reordering all reach it through
-  the resulting row model. Mounted rows glide from their previous viewport
-  positions, new occurrences fade in, and removed occurrences remain as inert
-  fading ghosts for 200ms. Only transform and opacity animate; virtual row
-  heights and the authoritative model settle immediately. Previously mounted
-  surviving rows stay in the virtual range until the transition ends.
-  Overlapping changes start from the current animated positions and opacity,
-  including a row removed during its entrance. Scroll anchoring runs first,
-  preserving the visible row for background changes and the clicked header
-  for disclosures. Metadata-only updates, scrolling, search, hidden lists,
-  held drag rows and reduced motion start no transition. The phone uses the
-  same renderer.
+- `SessionSidebarRows` animates keyed membership and order changes after scroll
+  anchoring. Removed rows remain inert until their exit finishes; surviving
+  mounted rows stay in the virtual range while moving. Interrupted transitions
+  resume from displayed positions and opacity. The row model and virtual heights
+  settle immediately. Metadata-only changes, scrolling, search, hidden lists,
+  drag-held rows and reduced motion skip the transition.
 - Shift selection and Ctrl/Cmd+A consume the model's logical row order. API
   session IDs are deduplicated only at the action boundary, after hidden
   descendants have been included. Selection is cleared on runtime switch and
@@ -1391,7 +1383,8 @@ rest it is as quiet as the button was.
   micro size so it reads as a control rather than a row: Show more while
   something is hidden, Show less once more than the first batch shows
   (maintainer, 2026-10-27). Reveal
-  controls change the logical list, not the viewport's bounded mounted window.
+  controls align with their list's text column through shared geometry helpers.
+  They change the logical list, not the viewport's bounded mounted window.
   Show more carries the collapsed-header activity indicator after its label,
   covering only the sessions it hides, including runs and worktree contents.
   Desktop and phone mount its activity subscriptions only while Show more exists.

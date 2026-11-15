@@ -422,6 +422,7 @@ export const buildMainWindowOptions = ({ bounds, backgroundColor, additionalArgu
       contextIsolation: true,
       nodeIntegration: false,
       webviewTag: true,
+      scrollBounce: process.platform === 'darwin',
       // sandbox must stay off: the preload uses contextBridge + ipcRenderer
       // from Electron's Node layer. contextIsolation + nodeIntegration:false
       // keep the renderer world walled off from Node. Do NOT flip to true —

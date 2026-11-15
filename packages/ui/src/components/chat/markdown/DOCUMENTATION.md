@@ -73,9 +73,8 @@ OpenCode drops the output when the shell is removed and records "output is no lo
 
 ## Ownership
 
-`MarkdownTable` owns table actions and the horizontal scroller; `index.css` places the action strip over the header at its inline end, with a translucent theme surface and background blur. Buttons share that glass surface; the wrap toggle marks its enabled state with the foreground icon color, while resting actions use muted icons. Hover, keyboard focus and open menus use a faint theme tint.
-
-Table headers are transparent. Tables have no outer frame or column borders; body rows use faint foreground-tinted separators, with the header divider kept distinct.
+`MarkdownTable` owns table actions and horizontal scrolling. `index.css`
+places the action strip over the header in a shared grid cell.
 
 ## Decisions
 

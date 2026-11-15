@@ -1,43 +1,22 @@
 # Theme definitions and rendering
 
-The custom distribution's code baseline is 0.8125rem (13px at a 16px root),
-authored in `lib/typography.ts` and mirrored by the design-system CSS fallback.
-Interface and chat percentages remain independent multipliers. Saved settings,
-editor and terminal pixel sizes, VS Code typography and mobile size overrides
-keep their existing ownership.
+`styles/fork-defaults.css` owns bundled appearance overrides. The external
+`custom.css` loads afterward. Typography tokens live in `lib/typography.ts`;
+default preferences and reset actions share constants in `stores/useUIStore`.
+Desktop scroll containers contain scroll chaining while allowing Chromium's
+native boundary effect. The root remains clipped and permits that effect;
+`overscroll-behavior: none` on the root suppresses it in descendant viewports.
 
-This fork defaults to the built-in `pure-white-light` palette in light mode,
-including One Light syntax colors. Existing theme choices keep their IDs.
-`styles/fork-defaults.css` owns the bundled layout, prose, selection and floating
-surface styles. Fenced code uses its code-size token and uniform 450 token weight;
-prose and the default interface weight are 500. Chat prose emphasis uses 600;
-light-mode paragraphs use 16px spacing while lists keep their compact rhythm.
-Interface weight remains an
-Appearance setting rather than a stylesheet override. The external
-`custom.css` is loaded afterward for personal overrides.
+OPPO Sans and Fira Code are bundled in `assets/fonts` and declared in
+`styles/bundled-fonts.css`. The font effect imports that sheet so production
+asset URLs resolve before stylesheet inlining. These faces work offline;
+licenses ship in `web/public/fonts`.
 
-The default faces are OPPO Sans 4.0 for the interface and Fira Code for code.
-OPPO Sans and Fira Code variable fonts are bundled in `assets/fonts`,
-declared by `styles/bundled-fonts.css`. The font effect
-imports that sheet directly so the production CSS pipeline resolves its asset
-URLs before stylesheet inlining. Their font options
-have no CDN source, so enterprise mode can use them offline. Other downloadable
-faces retain their existing loader and policy. Font licenses ship in
-`web/public/fonts`. Defaults and reset actions share the UI store's scale
-constants: interface 115%, chat 95%, spacing 110%, editor 15px and terminal 15px.
-The semantic typography bases stay unchanged; stored choices remain overrides.
-
-`useCustomCss.ts` owns the trusted server stylesheet, read through `runtimeFetch`
-from `/api/config/custom-css`. `ThemeSystemProvider` mounts it on web, desktop,
-hosted mobile and Capacitor; VS Code skips it. `customCssEnabled` is a persisted
-device setting, and `?custom-css=off` bypasses loading for recovery. The hook
-reloads on control-stream file changes and reconnection, aborts superseded reads,
-and clears immediately before a runtime switch, on disable and on unmount.
-Each read checks its abort signal after parsing, rejecting old replies even
-across A→B→A switches or transports that finish an aborted request. Read failures
-retain only the same runtime's last successful stylesheet; successful empty
-responses clear it. Theme variable updates replace their style element in place
-so the custom stylesheet stays after it. See `docs/CUSTOM_CSS.md` for authoring.
+`useCustomCss.ts` loads the active server's stylesheet through `runtimeFetch`.
+Runtime switches clear the old sheet and abort pending reads. Read failures
+retain the same runtime's last successful sheet; successful empty responses
+clear it. Theme variables are replaced in place to preserve stylesheet order.
+See `docs/CUSTOM_CSS.md` for supported surfaces, settings and authoring.
 
 `definition.ts` parses authored JSON into the complete runtime `Theme`. Built-ins and custom-file responses use this same boundary. Embedded windows receive an already resolved theme. The server checks required authored roles and file limits; the UI validates all supported overrides before rendering. An invalid sibling is skipped, while an invalid response shape leaves the previous custom library intact. Theme values are written into a `<style>` element, so the boundary also guards CSS: a colour must be a hex value, a keyword or a colour function (`rgb()`, `hsl()`, `oklch()`, `color-mix()` and kin), and fonts and transitions may not contain `; { } < > \` or load anything (`url()`, `image-set()`, `@import`). A theme that fails is skipped like any other invalid sibling.
 

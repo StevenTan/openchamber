@@ -5,21 +5,10 @@ Electron desktop runtime for OpenChamber on macOS, Windows, and Linux.
 This custom distribution's desktop update check always reports no update.
 The app and its bundled OpenCode CLI are upgraded by replacing the desktop package.
 
-On macOS, `macos-scroll-events.mjs` uses the optional `objc-js` dependency to
-observe this app's AppKit scroll events. Each managed window sends only contact
-and momentum phase flags to its trusted local main frame. Preload exposes the
-read-only `nativeScroll` capability there; remote pages, webviews and other
-platforms do not receive it. The monitor returns each native event unchanged and
-is removed when its window closes. Shared UI owns resistance and release motion,
-including Ghostty scrollback; it does not infer touch release from a quiet gap.
-The window's readiness promise reports successful monitor setup before shared UI
-uses the capability; native load errors are logged and leave the wheel-only driver.
-The package keeps `objc-js` external to the main bundle and ships its N-API
-prebuilds with the application.
-
-`objc-js` is pinned to 1.6.0 for its Node-environment lifetime guards: desktop
-restart and confirmed quit use `app.exit()`, which can finalize Objective-C
-callbacks during Node teardown without delivering window close events.
+On macOS, managed main windows enable Electron's `scrollBounce`. Chromium owns
+scroll elasticity. The desktop stylesheet contains scrolling at each viewport
+and allows the boundary effect through the app's root. Terminal canvas input
+uses Ghostty's scrollback and application mouse handling.
 
 This package owns the native shell: windows, menus, deep links, native notifications, auto-updates, host switching, SSH connections, tunnel helpers, and packaged desktop builds. The web UI and OpenChamber server logic still live in `packages/web` and shared React UI lives in `packages/ui`.
 

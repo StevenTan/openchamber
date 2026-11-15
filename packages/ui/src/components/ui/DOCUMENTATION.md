@@ -3,7 +3,7 @@
 `DisclosureChevron` keeps one glyph mounted and rotates it for expanded state.
 Its closed direction is right, up or down; right-facing disclosures mirror in
 RTL. It respects reduced motion. Collapsible panels
-transition their measured height and opacity for 200 ms; Base UI owns their
+transition their measured height and opacity; Base UI owns their
 closing lifetime and restores automatic height when opening settles.
 Vertical padding belongs to an inner content wrapper, so the panel itself can
 reach zero height before unmounting.

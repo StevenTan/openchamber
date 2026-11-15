@@ -550,27 +550,22 @@ function SessionProjectScrollerComponent({ model, view, actions }: SessionProjec
         toggleParent={model.groupProps.toggleParent}
       />;
     }
-    // Show more aligns with the text of the rows it closes: 10px in under
-    // gutterless timeline-style rows, the detailed text column under two-line
-    // rows, past the tree level's chevron slot on tree rows. The archive's
-    // empty line keeps the tree column.
+    // Align controls with the text column of their list presentation.
     const rowTextInset = row.kind === 'show-control' && row.flat === true
       ? FLAT_TEXT_INSET_PX
       : row.kind === 'show-control' && row.detailed === true
         ? sessionDetailedRowPaddingLeft(row.depth ?? 0)
         : sessionTreeTextInset(row.kind === 'show-control' || row.kind === 'empty' ? row.depth ?? 0 : 0);
     if (row.kind === 'show-control') {
-      // Small and short, so it reads as a control under the list, not a row of it.
       const control = (kind: 'more' | 'fewer') => (
-        <button type="button" className="inline-flex items-center gap-1.5 rounded-md py-0.5 typography-micro text-muted-foreground leading-tight hover:text-foreground hover:underline" onClick={() => applyShowControl(row, kind, { model, actions })}>
+        <Button variant="ghost" size="xs" className="first:-ms-2 gap-1.5 rounded-md text-muted-foreground leading-tight hover:bg-interactive-hover/60" onClick={() => applyShowControl(row, kind, { model, actions })}>
           {t(kind === 'more' ? 'sessions.sidebar.group.showMore' : 'sessions.sidebar.group.showFewer')}
           {kind === 'more' ? <CollapsedSessionActivityIndicator nodes={row.hiddenNodes} /> : null}
-        </button>
+        </Button>
       );
       return (
         <div className="mt-0.5 flex items-center gap-1.5 pe-1.5" style={{ paddingInlineStart: rowTextInset }}>
           {row.more ? control('more') : null}
-          {row.more && row.fewer ? <span aria-hidden="true" className="typography-micro text-muted-foreground/50">·</span> : null}
           {row.fewer ? control('fewer') : null}
         </div>
       );

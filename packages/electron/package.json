@@ -214,8 +214,5 @@
       "owner": "openchamber",
       "repo": "openchamber"
     }
-  },
-  "optionalDependencies": {
-    "objc-js": "1.6.0"
   }
 }

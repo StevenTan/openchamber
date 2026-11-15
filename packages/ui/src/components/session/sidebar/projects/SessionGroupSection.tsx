@@ -12,7 +12,7 @@ import { useOpenCodeTrustPausedDirectory, useResumeOpenCodeFolder } from '@/comp
 import { Icon } from "@/components/icon/Icon";
 import { Spinner } from "@/components/ui/spinner";
 import { FileTreeChevron } from '@/components/views/files/FileTreeRowParts';
-import { sessionTreeRowPaddingLeft } from '../sessions/sessionTreeGeometry';
+import { sessionTreeRowPaddingLeft, sessionTreeTextInset } from '../sessions/sessionTreeGeometry';
 import { cn } from '@/lib/utils';
 import { sessionEvents } from '@/lib/sessionEvents';
 import { useUIStore } from '@/stores/useUIStore';
@@ -908,23 +908,29 @@ function SessionGroupSectionBase(props: SessionGroupSectionProps): React.ReactNo
         </div>
       ) : null}
       {remainingCount > 0 ? (
-        <button
-          type="button"
-          onClick={() => showMoreGroupSessions(groupKey, visibleSessions.length, sessionBatchSize ?? 7)}
-          className="mt-0.5 flex items-center justify-start gap-1.5 rounded-md ps-[26px] pe-1.5 py-0.5 text-start typography-micro text-muted-foreground leading-tight hover:text-foreground hover:underline"
-        >
-          {t('sessions.sidebar.group.showMore')}
-          <CollapsedSessionActivityIndicator nodes={ungroupedSessions.slice(visibleSessions.length)} />
-        </button>
+        <div className="mt-0.5" style={{ paddingInlineStart: sessionTreeTextInset(0) }}>
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => showMoreGroupSessions(groupKey, visibleSessions.length, sessionBatchSize ?? 7)}
+            className="-ms-2 gap-1.5 rounded-md text-muted-foreground leading-tight hover:bg-interactive-hover/60"
+          >
+            {t('sessions.sidebar.group.showMore')}
+            <CollapsedSessionActivityIndicator nodes={ungroupedSessions.slice(visibleSessions.length)} />
+          </Button>
+        </div>
       ) : null}
       {canShowLess ? (
-        <button
-          type="button"
-          onClick={() => resetGroupSessionLimit(groupKey)}
-          className="mt-0.5 flex items-center justify-start rounded-md ps-[26px] pe-1.5 py-0.5 text-start typography-micro text-muted-foreground leading-tight hover:text-foreground hover:underline"
-        >
-          {t('sessions.sidebar.group.showFewer')}
-        </button>
+        <div className="mt-0.5" style={{ paddingInlineStart: sessionTreeTextInset(0) }}>
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => resetGroupSessionLimit(groupKey)}
+            className="-ms-2 rounded-md text-muted-foreground leading-tight hover:bg-interactive-hover/60"
+          >
+            {t('sessions.sidebar.group.showFewer')}
+          </Button>
+        </div>
       ) : null}
     </SessionFolderDndScope>
   );

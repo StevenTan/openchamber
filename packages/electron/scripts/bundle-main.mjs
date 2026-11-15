@@ -40,7 +40,6 @@ const result = await Bun.build({
     '@openchamber/web/*',
     'bun-pty',
     'node-pty',
-    'objc-js',
     './main.mjs',
     './early-startup.mjs',
   ],
