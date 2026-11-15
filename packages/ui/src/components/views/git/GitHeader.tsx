@@ -415,7 +415,7 @@ export const GitHeader: React.FC<GitHeaderProps> = ({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="w-7 px-0"
+                  className="h-7 w-7 p-0"
                   aria-label={t('gitView.header.repositoryViews')}
                 >
                   <Icon name="more-fill" className="size-4" />

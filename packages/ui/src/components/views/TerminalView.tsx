@@ -1392,7 +1392,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ visible, directory, 
             {enableTabs && directoryTerminalState ? (
                 <ContextPanelHeaderToolbar>
                     <div className={cn('app-region-no-drag flex min-w-0 items-center gap-2 text-xs', inPanelHeader ? 'flex-1 pe-1' : cn('sticky top-0 z-20 shrink-0 bg-[var(--surface-background)]', isTouchTerminal ? 'px-4 py-1.5' : 'ps-4 pe-2.5 py-1'))}>
-                        <div className={cn('min-w-0 flex-1', inPanelHeader ? 'self-stretch' : isTouchTerminal ? 'h-8' : 'h-7')}>
+                        <div className={cn('min-w-0 flex-1', inPanelHeader ? 'self-stretch' : isTouchTerminal ? 'h-auto min-h-8' : 'h-auto min-h-7')}>
                             <SortableTabsStrip
                                 items={terminalTabItems}
                                 activeId={activeTabId}
@@ -1470,7 +1470,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ visible, directory, 
                                         type="button"
                                         size="xs"
                                         variant="outline"
-                                        className="h-6 shrink-0 gap-1 px-2"
+                                        className="h-auto min-h-6 shrink-0 gap-1 px-2"
                                         onClick={() => {
                                             if (!contextDirectory) return;
                                             openContextPreview(contextDirectory, previewUrl);
@@ -1554,7 +1554,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ visible, directory, 
                                 <Button
                                     size="sm"
                                     variant="secondary"
-                                    className="h-6 px-2 py-0 text-xs"
+                                    className="h-auto min-h-6 px-2 py-0 text-xs"
                                     onClick={handleHardRestart}
                                     disabled={isRestarting}
                                     type="button"

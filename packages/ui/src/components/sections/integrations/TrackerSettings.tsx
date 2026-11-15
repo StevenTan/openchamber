@@ -341,7 +341,7 @@ export const TrackerSettings: React.FC<TrackerSettingsProps> = ({ descriptor, ex
   const showForms = Boolean(extension) && (!connected || (capabilities.multipleAccounts && adding));
   const bothMethods = takesOauth && takesToken;
   const formMethod: 'oauth' | 'token' = !takesToken ? 'oauth' : !takesOauth ? 'token' : method;
-  const fieldClass = 'h-8 min-w-0 flex-1 rounded-md px-3';
+  const fieldClass = 'h-auto min-h-8 min-w-0 flex-1 rounded-md px-3';
 
   const connectForms = showForms ? (
     <div className="space-y-3">

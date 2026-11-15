@@ -46,7 +46,7 @@ export function LinkedReferenceRow(props: LinkedReferenceRowProps) {
 
     return (
         <div
-            className="inline-flex h-7 max-w-full min-w-0 items-center gap-1.5 rounded-lg border border-edge bg-background ps-2 pe-1 text-xs"
+            className="inline-flex min-h-7 max-w-full min-w-0 items-center gap-1.5 rounded-lg border border-edge bg-background ps-2 pe-1 py-[calc(0.25em*var(--padding-scale,1))] text-xs leading-[1.45]"
         >
             <button
                 type="button"

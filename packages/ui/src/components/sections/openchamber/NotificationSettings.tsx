@@ -630,7 +630,7 @@ export const NotificationSettings: React.FC = () => {
                     <Input
                       value={notificationTemplates[event].title}
                       onChange={(e) => updateTemplate(event, 'title', e.target.value)}
-                      className="h-7"
+                      className="h-auto min-h-7 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                       placeholder={t(DEFAULT_NOTIFICATION_TEMPLATES[event].titleKey)}
                     />
                   </div>
@@ -639,7 +639,7 @@ export const NotificationSettings: React.FC = () => {
                     <Input
                       value={notificationTemplates[event].message}
                       onChange={(e) => updateTemplate(event, 'message', e.target.value)}
-                      className="h-7"
+                      className="h-auto min-h-7 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                       placeholder={t(DEFAULT_NOTIFICATION_TEMPLATES[event].messageKey)}
                     />
                   </div>

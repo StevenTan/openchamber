@@ -1044,7 +1044,7 @@ export function DesktopHostSwitcherDialog({
                             type="button"
                             variant="outline"
                             size="sm"
-                            className="h-8 px-2.5"
+                            className="h-auto min-h-8 px-2.5"
                             disabled={switchingHostId === host.id}
                             onClick={(e) => {
                               e.stopPropagation();

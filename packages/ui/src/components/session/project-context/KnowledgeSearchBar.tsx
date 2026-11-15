@@ -47,7 +47,7 @@ export const KnowledgeSearchBar: React.FC<{
         }}
         placeholder={placeholder}
         aria-label={placeholder}
-        className="h-7 w-48 min-w-0 bg-transparent typography-meta text-foreground outline-none placeholder:text-muted-foreground"
+        className="h-auto min-h-7 w-48 min-w-0 bg-transparent typography-meta text-foreground outline-none placeholder:text-muted-foreground py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
       />
       {nothingFound ? (
         <span className="shrink-0 typography-micro text-muted-foreground" role="status" aria-live="polite">

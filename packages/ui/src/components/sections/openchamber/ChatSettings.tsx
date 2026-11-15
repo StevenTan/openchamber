@@ -697,7 +697,7 @@ export const ChatSettings: React.FC = () => {
           layoutMode="fit"
           variant="active-pill"
           pillSize="form"
-          className="h-8 max-w-[28rem]"
+          className="h-auto min-h-8 max-w-[28rem]"
         />
       </div>
       {tab === 'messages' ? <MessagesTab /> : null}

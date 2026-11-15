@@ -478,7 +478,7 @@ export const SortableTabsStrip: React.FC<SortableTabsStripProps> = ({
 
   const tabLayoutKey = [...itemIDs].sort().join('\0');
   const list = (
-    <div className={cn('relative flex h-full min-w-0 flex-1', className)}>
+    <div className={cn('relative flex min-w-0 flex-1', usesActivePillIndicator ? 'h-auto min-h-7' : 'h-full', className)}>
       {isScrollable && overflow.start ? (
         <div
           className={cn(
@@ -503,7 +503,8 @@ export const SortableTabsStrip: React.FC<SortableTabsStripProps> = ({
         layoutScroll
         ref={scrollRef}
         className={cn(
-          'relative flex h-full min-w-0 flex-1',
+          'relative flex min-w-0 flex-1',
+          usesActivePillIndicator ? 'h-auto min-h-7' : 'h-full',
           usesActivePillIndicator ? 'items-center overflow-x-hidden overflow-y-hidden' : 'items-stretch',
           usesActivePillIndicator && !intrinsicWidth && '@container/pill-tabs',
           usesActivePillIndicator && 'pill-tabs__track',
@@ -645,7 +646,7 @@ export const SortableTabsStrip: React.FC<SortableTabsStripProps> = ({
                     onPointerCancel={usesIndicator ? () => setPressedId(null) : undefined}
                     className={cn(
                       usesActivePillIndicator
-                        ? 'animated-tabs__button pill-tabs__button relative z-10 flex flex-1 min-w-0 flex-nowrap items-center justify-center rounded-md text-sm font-medium transition-colors duration-150 !min-h-0'
+                        ? 'animated-tabs__button pill-tabs__button relative z-10 flex h-auto flex-1 min-w-0 flex-nowrap items-center justify-center rounded-md py-[calc(0.125em*var(--padding-scale,1))] text-sm font-medium leading-[1.45] transition-colors duration-150'
                         : 'flex h-full min-w-0 flex-nowrap items-center typography-micro',
                       usesActivePillIndicator && (showInactiveIconOnly ? 'gap-0' : 'gap-1.5'),
                       usesActivePillIndicator
@@ -662,11 +663,7 @@ export const SortableTabsStrip: React.FC<SortableTabsStripProps> = ({
                           ? cn(!item.labelFolder && 'max-w-56', 'justify-start truncate px-3 text-start')
                           : 'w-full justify-center truncate px-3 text-center',
                       usesActivePillIndicator
-                        // 24px buttons in a 2px-padded track: the switch is
-                        // 28px, as tall as the toolbar controls beside it (32px
-                        // with 28px buttons for a form). Callers may add classes
-                        // (padding) on top.
-                        ? cn(isActivePillVariant ? (isMobile ? 'h-[38px]' : pillSize === 'form' ? 'h-7' : 'h-6') : 'h-7', activePillButtonClassName)
+                        ? cn(isActivePillVariant ? (isMobile ? 'min-h-[38px]' : pillSize === 'form' ? 'min-h-7' : 'min-h-6') : 'min-h-7', activePillButtonClassName)
                         : null,
                       usesActivePillIndicator
                         ? isActive

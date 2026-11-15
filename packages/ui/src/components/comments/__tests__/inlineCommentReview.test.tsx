@@ -13,6 +13,7 @@ describe('the comment field outside and inside a change request review', () => {
 
     beforeEach(() => {
         browser = new Window();
+        Object.defineProperty(browser.document, 'fonts', { value: new browser.EventTarget() });
         const globals = {
             window: browser,
             document: browser.document,

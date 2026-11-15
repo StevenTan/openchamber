@@ -61,16 +61,16 @@
 :where(.oc-sdk) :where(button), :where(button.oc-sdk) { cursor: pointer; background: none; border: 0; padding: 0; }
 .oc-sdk button:disabled, button.oc-sdk:disabled, .oc-sdk[aria-disabled="true"], .oc-sdk [aria-disabled="true"] { opacity: .5; pointer-events: none; }
 
-.oc-sdk-btn { display: inline-flex; align-items: center; justify-content: center; gap: ${g(8)}; height: ${g(32)}; padding: 0 ${g(12)}; border: 1px solid transparent; font-size: 0.875rem; font-weight: 500; line-height: 1; white-space: nowrap; }
-.oc-sdk-btn[data-size="sm"] { gap: ${g(6)}; height: ${g(28)}; padding: 0 ${g(10)}; font-size: 0.8125rem; }
-.oc-sdk-btn[data-size="xs"] { gap: ${g(4)}; height: ${g(24)}; padding: 0 ${g(8)}; font-size: 0.75rem; }
+.oc-sdk-btn { display: inline-flex; align-items: center; justify-content: center; gap: ${g(8)}; min-height: ${g(32)}; padding: .25em ${g(12)}; border: 1px solid transparent; font-size: 0.875rem; font-weight: 500; line-height: 1.45; white-space: nowrap; }
+.oc-sdk-btn[data-size="sm"] { gap: ${g(6)}; min-height: ${g(28)}; padding: .25em ${g(10)}; font-size: 0.8125rem; }
+.oc-sdk-btn[data-size="xs"] { gap: ${g(4)}; min-height: ${g(24)}; padding: .25em ${g(8)}; font-size: 0.75rem; }
 .oc-sdk-btn[data-loading="true"] { opacity: .5; pointer-events: none; }
 .oc-sdk-btn > .oc-sdk-spinner-ring { width: ${g(14)}; height: ${g(14)}; }
 
 .oc-sdk-field { display: flex; flex-direction: column; gap: ${g(4)}; min-width: 0; }
 .oc-sdk-field-label { font-size: 0.8125rem; font-weight: 500; }
 .oc-sdk-field-note { font-size: 0.75rem; }
-.oc-sdk-input { display: block; width: 100%; min-width: 0; height: ${g(32)}; padding: 0 ${g(10)}; border: 0; font-size: 0.875rem; line-height: 1.45; appearance: none; }
+.oc-sdk-input { display: block; width: 100%; min-width: 0; height: auto; min-height: ${g(32)}; padding: .25em ${g(10)}; border: 0; font-size: 0.875rem; line-height: 1.45; appearance: none; }
 textarea.oc-sdk-input { height: auto; padding: ${g(8)} ${g(10)}; resize: vertical; }
 
 .oc-sdk-search { position: relative; min-width: 0; }
@@ -80,12 +80,12 @@ textarea.oc-sdk-input { height: auto; padding: ${g(8)} ${g(10)}; resize: vertica
 .oc-sdk-search[data-active="true"] .oc-sdk-search-clear { display: inline-flex; }
 
 .oc-sdk-select { position: relative; display: flex; flex-direction: column; gap: ${g(4)}; min-width: 0; }
-.oc-sdk-trigger { display: inline-flex; align-items: center; gap: ${g(6)}; align-self: flex-start; width: auto; max-width: 100%; min-width: 0; height: ${g(28)}; padding: 0 ${g(10)}; border: 1px solid transparent; font-size: 0.8125rem; text-align: left; }
+.oc-sdk-trigger { display: inline-flex; align-items: center; gap: ${g(6)}; align-self: flex-start; width: auto; max-width: 100%; min-width: 0; min-height: ${g(28)}; padding: .25em ${g(10)}; border: 1px solid transparent; font-size: 0.8125rem; text-align: left; }
 .oc-sdk-trigger-value { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .oc-sdk-trigger-chevron { flex: 0 0 auto; }
 .oc-sdk-popup { position: fixed; z-index: 50; display: flex; flex-direction: column; gap: ${g(2)}; min-width: ${g(160)}; max-width: calc(100vw - ${g(16)}); max-height: min(${g(320)}, calc(100vh - ${g(16)})); overflow: auto; padding: ${g(4)}; border: 1px solid transparent; }
 .oc-sdk-popup-search { flex: 0 0 auto; padding: ${g(2)} ${g(2)} ${g(4)}; }
-.oc-sdk-popup-search .oc-sdk-input { height: ${g(28)}; font-size: 0.8125rem; }
+.oc-sdk-popup-search .oc-sdk-input { min-height: ${g(28)}; font-size: 0.8125rem; }
 .oc-sdk-option { display: flex; align-items: center; gap: ${g(8)}; width: 100%; padding: ${g(6)} ${g(8)}; font-size: 0.8125rem; text-align: left; }
 .oc-sdk-option-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .oc-sdk-option-hint { flex: 0 0 auto; font-size: 0.75rem; }
@@ -104,7 +104,7 @@ textarea.oc-sdk-input { height: auto; padding: ${g(8)} ${g(10)}; resize: vertica
 .oc-sdk-check-desc { font-size: 0.75rem; }
 
 .oc-sdk-tabs { display: inline-flex; gap: ${g(2)}; padding: ${g(2)}; max-width: 100%; overflow: auto; }
-.oc-sdk-tab { display: inline-flex; align-items: center; gap: ${g(6)}; height: ${g(28)}; padding: 0 ${g(10)}; border: 1px solid transparent; font-size: 0.8125rem; font-weight: 500; white-space: nowrap; }
+.oc-sdk-tab { display: inline-flex; align-items: center; gap: ${g(6)}; min-height: ${g(28)}; padding: .125em ${g(10)}; border: 1px solid transparent; font-size: 0.8125rem; font-weight: 500; white-space: nowrap; }
 .oc-sdk-tab-count { font-size: 0.75rem; font-variant-numeric: tabular-nums; }
 
 .oc-sdk-badge { display: inline-flex; align-items: center; padding: ${g(1)} ${g(6)}; font-size: ${g(11)}; font-weight: 500; line-height: ${g(16)}; white-space: nowrap; }
@@ -154,8 +154,8 @@ textarea.oc-sdk-input { height: auto; padding: ${g(8)} ${g(10)}; resize: vertica
 /* Under a finger the controls reach the app's touch sizes: rows and options 44px like its sheets, every other
    control at least 36px. Inputs keep 16px text, below which iOS zooms the page on focus. */
 @media (pointer: coarse) {
-  .oc-sdk-btn, .oc-sdk-input { height: ${g(40)}; }
-  .oc-sdk-btn[data-size="sm"], .oc-sdk-btn[data-size="xs"], .oc-sdk-trigger, .oc-sdk-tab, .oc-sdk-popup-search .oc-sdk-input { height: ${g(36)}; }
+  .oc-sdk-btn, .oc-sdk-input { min-height: ${g(40)}; }
+  .oc-sdk-btn[data-size="sm"], .oc-sdk-btn[data-size="xs"], .oc-sdk-trigger, .oc-sdk-tab, .oc-sdk-popup-search .oc-sdk-input { min-height: ${g(36)}; }
   .oc-sdk-input, .oc-sdk-popup-search .oc-sdk-input { font-size: max(16px, 0.875rem); }
   .oc-sdk-search-clear { width: ${g(36)}; height: ${g(36)}; right: 0; }
   .oc-sdk-row, .oc-sdk-option { min-height: ${g(44)}; }

@@ -1352,11 +1352,11 @@ export const McpPage: React.FC = () => {
                     value={draftName}
                     onChange={(e) => setDraftName(normalizeMcpServerName(e.target.value))}
                     placeholder={t('settings.mcp.page.server.namePlaceholder')}
-                    className="h-7 w-48 min-w-0 max-w-full shrink font-mono px-2"
+                    className="h-auto min-h-7 w-48 min-w-0 max-w-full shrink font-mono px-2 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                     autoFocus
                   />
                   <Select value={draftScope} onValueChange={(value) => setDraftScope(value as McpScope)}>
-                    <SelectTrigger className="!h-7 min-w-0 max-w-full gap-1.5 px-2">
+                    <SelectTrigger className="!h-auto !min-h-7 min-w-0 max-w-full gap-1.5 px-2">
                       <Icon
                         name={draftScope === 'user' ? 'user-3' : 'folder'}
                         className="h-3.5 w-3.5 shrink-0"
@@ -1423,7 +1423,7 @@ export const McpPage: React.FC = () => {
                 variant="active-pill"
                 pillSize="form"
                 activePillButtonClassName="px-3"
-                className="h-8 flex-none"
+                className="h-auto min-h-8 flex-none"
               />
             </div>
 
@@ -1492,7 +1492,7 @@ export const McpPage: React.FC = () => {
                         }}
                       >
                         <SelectTrigger
-                          className="!h-7 w-fit max-w-[16rem] px-2"
+                          className="!h-auto !min-h-7 w-fit max-w-[16rem] px-2"
                           aria-label={t('settings.mcp.page.advanced.protocol')}
                         >
                           <span className="truncate">{t(MCP_PROTOCOL_LABEL_KEYS[protocol])}</span>
@@ -1521,7 +1521,7 @@ export const McpPage: React.FC = () => {
                             value={timeoutStartup}
                             onChange={(e) => setTimeoutStartup(e.target.value)}
                             placeholder="5000"
-                            className="h-7 w-32 font-mono px-2"
+                            className="h-auto min-h-7 w-32 font-mono px-2 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                             data-bwignore="true"
                             data-1p-ignore="true"
                           />
@@ -1540,7 +1540,7 @@ export const McpPage: React.FC = () => {
                           value={timeoutCatalog}
                           onChange={(e) => setTimeoutCatalog(e.target.value)}
                           placeholder="30000"
-                          className="h-7 w-32 font-mono px-2"
+                          className="h-auto min-h-7 w-32 font-mono px-2 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                           data-bwignore="true"
                           data-1p-ignore="true"
                         />
@@ -1558,7 +1558,7 @@ export const McpPage: React.FC = () => {
                           value={timeoutExecution}
                           onChange={(e) => setTimeoutExecution(e.target.value)}
                           placeholder="30000"
-                          className="h-7 w-32 font-mono px-2"
+                          className="h-auto min-h-7 w-32 font-mono px-2 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                           data-bwignore="true"
                           data-1p-ignore="true"
                         />
@@ -1584,7 +1584,7 @@ export const McpPage: React.FC = () => {
                         }}
                       >
                         <SelectTrigger
-                          className="!h-7 w-fit max-w-[16rem] px-2"
+                          className="!h-auto !min-h-7 w-fit max-w-[16rem] px-2"
                           aria-label={t('settings.mcp.page.advanced.codemode')}
                         >
                           <span className="truncate">{t(MCP_CODEMODE_LABEL_KEYS[codemode])}</span>
@@ -1649,7 +1649,7 @@ export const McpPage: React.FC = () => {
                             placeholder={t('settings.mcp.page.advanced.oauthMetadataUrlPlaceholder')}
                             aria-label={t('settings.mcp.page.advanced.oauthMetadataUrl')}
                             aria-invalid={authServerMetadataUrlError ? true : undefined}
-                            className="h-7 w-full max-w-[24rem] font-mono typography-meta px-2"
+                            className="h-auto min-h-7 w-full max-w-[24rem] font-mono typography-meta px-2 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                             data-bwignore="true"
                             data-1p-ignore="true"
                           />

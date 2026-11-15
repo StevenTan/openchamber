@@ -191,7 +191,7 @@ const SessionTabItem: React.FC<{
                     // here reads as the switch itself being slow, since the
                     // old and new tab trade colors over several frames right
                     // after the click.
-                    'session-tab group/session-tab relative flex h-7 w-full min-w-0 select-none items-center rounded-md px-2',
+                    'session-tab group/session-tab relative flex min-h-7 w-full min-w-0 select-none items-center rounded-md px-2 py-[calc(0.15em*var(--padding-scale,1))]',
                     isActive
                       ? 'bg-interactive-selection text-interactive-selection-foreground'
                       : 'cursor-pointer text-muted-foreground hover:bg-interactive-hover hover:text-foreground',
@@ -505,7 +505,7 @@ export const SessionTabsStrip: React.FC<{
                 <TabMotion
                   key={tab.id}
                   layoutKey={tabLayoutKey}
-                  className="app-region-no-drag session-tab-slot flex h-7 w-44 shrink-0"
+                  className="app-region-no-drag session-tab-slot flex min-h-7 w-44 shrink-0"
                   data-active={tab.id === currentSessionId ? 'true' : 'false'}
                 >
                   <SessionTabItem
@@ -527,11 +527,11 @@ export const SessionTabsStrip: React.FC<{
                 </TabMotion>
               ))}
               {showDraftTab ? (
-                <TabMotion key="draft" layoutKey={tabLayoutKey} className="app-region-no-drag session-tab-slot h-7 w-44 shrink-0" data-active="true">
+                <TabMotion key="draft" layoutKey={tabLayoutKey} className="app-region-no-drag session-tab-slot flex min-h-7 w-44 shrink-0" data-active="true">
                   <div
                     role="tab"
                     aria-selected
-                    className="flex h-full w-full items-center rounded-md bg-interactive-selection px-2 text-interactive-selection-foreground"
+                    className="flex min-h-7 w-full items-center rounded-md bg-interactive-selection px-2 py-[calc(0.15em*var(--padding-scale,1))] text-interactive-selection-foreground"
                     data-active="true"
                     data-active-session-tab
                   >
@@ -545,11 +545,11 @@ export const SessionTabsStrip: React.FC<{
                 </TabMotion>
               ) : null}
               {showPendingTab ? (
-                <TabMotion key="pending" layoutKey={tabLayoutKey} className="app-region-no-drag session-tab-slot h-7 w-44 shrink-0" data-active="true">
+                <TabMotion key="pending" layoutKey={tabLayoutKey} className="app-region-no-drag session-tab-slot flex min-h-7 w-44 shrink-0" data-active="true">
                   <div
                     role="tab"
                     aria-selected
-                    className="flex h-full w-full items-center rounded-md bg-interactive-selection px-2"
+                    className="flex min-h-7 w-full items-center rounded-md bg-interactive-selection px-2 py-[calc(0.15em*var(--padding-scale,1))]"
                     data-active="true"
                   >
                     <div className="min-w-0 flex-1">{children}</div>

@@ -71,7 +71,7 @@ export const WorkStatusSection: React.FC<{
     <section className={SECTION_CLASS}>
       {/* As tall as a collapsible section's heading, so every gap between
           sections is the same. */}
-      <div data-work-status-heading className={cn('flex items-center gap-2', touch ? 'mb-1.5 min-h-6 px-2.5' : 'mb-0.5 h-6 px-1')}>
+      <div data-work-status-heading className={cn('flex items-center gap-2', touch ? 'mb-1.5 min-h-6 px-2.5' : 'mb-0.5 min-h-[var(--oc-work-status-heading-height)] px-1 py-[calc(0.15em*var(--padding-scale,1))] leading-[1.4]')}>
         {touch ? null : <Icon name={icon} className="size-[13px] shrink-0 text-muted-foreground" />}
         <h3 className={cn(touch ? TOUCH_HEADING_CLASS : HEADING_CLASS, 'min-w-0 flex-1 truncate')}>
           {title}
@@ -126,7 +126,7 @@ export const WorkStatusCollapsibleSection: React.FC<{
       open={expanded}
       onOpenChange={(open) => setExpandedInStore(id, open)}
     >
-      <div data-work-status-heading className={cn('flex items-center gap-1', touch ? 'mb-1.5 min-h-9 ps-2.5' : 'mb-0.5', actionLayout === 'inline' && !touch && 'h-6')}>
+      <div data-work-status-heading className={cn('flex items-center gap-1', touch ? 'mb-1.5 min-h-9 ps-2.5' : 'mb-0.5 min-h-[var(--oc-work-status-heading-height)] py-[calc(0.15em*var(--padding-scale,1))] leading-[1.4]')}>
         <BaseCollapsible.Trigger
           {...(collapsedContent ? { 'aria-controls': previewId } : {})}
           className={cn(
@@ -267,8 +267,7 @@ export const WorkStatusRow: React.FC<RowProps> = ({
 
   const shared = cn(
     'flex w-full items-center text-start text-muted-foreground',
-    // 26px, a heading's height with its gap, so rows and headings keep one pitch.
-    touch ? 'min-h-11 gap-3 rounded-xl px-2.5' : 'h-[1.625rem] gap-2 rounded-md px-1',
+    touch ? 'min-h-11 gap-3 rounded-xl px-2.5' : 'min-h-[1.625rem] gap-2 rounded-md px-1 py-[calc(0.2em*var(--padding-scale,1))] leading-[1.4]',
     className,
   );
 

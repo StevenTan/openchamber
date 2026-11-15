@@ -80,7 +80,7 @@ export const SnippetAliasesField: React.FC<SnippetAliasesFieldProps> = ({ aliase
         onBlur={() => { if (draft) add([draft]); }}
         placeholder={aliases.length === 0 ? t('settings.snippets.page.field.aliasPlaceholder') : undefined}
         aria-label={t('settings.snippets.page.field.aliases')}
-        className="h-6 min-w-[8ch] flex-1 bg-transparent px-1 typography-ui-label text-foreground outline-none placeholder:text-muted-foreground"
+        className="h-auto min-h-6 min-w-[8ch] flex-1 bg-transparent px-1 typography-ui-label text-foreground outline-none placeholder:text-muted-foreground py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
         spellCheck={false}
         autoComplete="off"
         autoCorrect="off"

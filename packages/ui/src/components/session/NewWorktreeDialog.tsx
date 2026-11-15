@@ -750,7 +750,7 @@ export function NewWorktreeDialog({
           onClick={source.open}
           aria-label={source.label}
           title={source.label}
-          className="h-8 gap-1.5"
+          className="h-auto min-h-8 gap-1.5"
         >
           {source.icon}
           <span className="max-w-[10rem] truncate">{source.name}</span>
@@ -823,7 +823,7 @@ export function NewWorktreeDialog({
       // A PR brings its branch; with nothing chosen yet there is no name to give.
       disabled={mode === 'from-item' && (!linked || Boolean(linkedPr))}
       placeholder={t('session.newWorktree.branchNamePlaceholder')}
-      className={cn('h-8', validation.touched && validation.branchError && 'border-destructive')}
+      className={cn('h-auto min-h-8 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]', validation.touched && validation.branchError && 'border-destructive')}
     />
   );
 
@@ -856,7 +856,7 @@ export function NewWorktreeDialog({
         onKeyDown={handleCreateKeyDown}
         disabled={mode === 'from-item' && !linked}
         placeholder={t('session.newWorktree.worktreeDirectoryPlaceholder')}
-        className={cn('h-8 min-w-0 flex-1', validation.touched && validation.worktreeError && 'border-destructive')}
+        className={cn('h-auto min-h-8 min-w-0 flex-1 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]', validation.touched && validation.worktreeError && 'border-destructive')}
       />
       {/* Kept in place, disabled while the folder already follows the branch. */}
       <Button

@@ -33,7 +33,7 @@ const HISTORY_DIFF_CACHE_MAX_ENTRIES = 12;
 const HISTORY_DIFF_CACHE_MAX_TOTAL_SIZE_BYTES = 8 * 1024 * 1024;
 // In the graph's action row only Checkout stands raised; the rest read as
 // text actions, so seven raised buttons do not crowd one row.
-const SECONDARY_ACTION_CLASS = 'h-6 text-foreground/80 hover:bg-transparent hover:text-foreground';
+const SECONDARY_ACTION_CLASS = 'h-auto min-h-6 text-foreground/80 hover:bg-transparent hover:text-foreground';
 
 type HistoryDiffCacheValue = CommitFileDiffResponse | 'loading' | 'error';
 
@@ -421,7 +421,7 @@ export const HistoryCommitRow = React.memo(({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-5 px-1 shrink-0"
+                  className="h-auto min-h-5 px-1 shrink-0"
                   onClick={(e) => {
                     e.stopPropagation();
                     onCopyHash(entry.hash);
@@ -446,7 +446,7 @@ export const HistoryCommitRow = React.memo(({
                 {t(`gitView.history.actions.${pendingAction}Confirm` as never)}
               </span>
               <Button
-                variant="destructive" size="xs" className="h-6 shrink-0"
+                variant="destructive" size="xs" className="h-auto min-h-6 shrink-0"
                 disabled={actionLoading !== null}
                 onClick={(e) => { e.stopPropagation(); void confirmPendingAction(); }}
               >
@@ -456,7 +456,7 @@ export const HistoryCommitRow = React.memo(({
                 {t('gitView.history.actions.confirmButton')}
               </Button>
               <Button
-                variant="ghost" size="xs" className="h-6 shrink-0"
+                variant="ghost" size="xs" className="h-auto min-h-6 shrink-0"
                 disabled={actionLoading !== null}
                 onClick={(e) => { e.stopPropagation(); setPendingAction(null); }}
               >
@@ -466,7 +466,7 @@ export const HistoryCommitRow = React.memo(({
           ) : isGraphMode ? (
             <div className="flex flex-wrap items-center gap-1.5 py-2 border-b border-edge-muted mb-2">
               <ButtonTooltip sideOffset={8} label={t('contextTooltips.git.checkoutCommit')}>
-                <Button variant="outline" size="xs" className="h-6"
+                <Button variant="outline" size="xs" className="h-auto min-h-6"
                   disabled={actionLoading !== null}
                   onClick={(e) => { e.stopPropagation(); setPendingAction('checkout'); }}
                 >
@@ -484,9 +484,9 @@ export const HistoryCommitRow = React.memo(({
                       if (e.key === 'Escape') { setShowCreateBranch(false); setNewBranchName(''); }
                     }}
                     placeholder={t('gitView.history.actions.createBranchPlaceholder')}
-                    className="oc-raised oc-field h-6 text-xs px-2 rounded bg-surface-elevated outline-none min-w-0 w-32"
+                    className="oc-raised oc-field h-auto min-h-6 text-xs px-2 rounded bg-surface-elevated outline-none min-w-0 w-32 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                   />
-                  <Button variant="outline" size="xs" className="h-6"
+                  <Button variant="outline" size="xs" className="h-auto min-h-6"
                     disabled={!newBranchName.trim() || actionLoading !== null}
                     onClick={(e) => { e.stopPropagation(); void handleCreateBranch(); }}
                   >
@@ -641,7 +641,7 @@ export const HistoryCommitRow = React.memo(({
                                 type="button"
                                 variant="ghost"
                                 size="xs"
-                                className="h-6 px-0 text-primary hover:bg-transparent hover:underline"
+                                className="h-auto min-h-6 px-0 text-primary hover:bg-transparent hover:underline"
                                 onClick={() => {
                                   setForceRenderLargePaths(prev => new Set(prev).add(file.path));
                                   void loadFileDiff(file);

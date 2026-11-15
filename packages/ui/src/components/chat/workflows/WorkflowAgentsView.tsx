@@ -175,7 +175,7 @@ const AgentRow: React.FC<{
         onClick={onToggle}
         aria-expanded={open}
         title={agent.label}
-        className="flex h-7 w-full min-w-0 items-center gap-2 rounded-md text-start typography-meta text-foreground/80 hover:text-foreground"
+        className="flex h-auto min-h-7 w-full min-w-0 items-center gap-2 rounded-md text-start typography-meta text-foreground/80 hover:text-foreground py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
       >
         <Icon name={look.icon} className="size-3.5 shrink-0" style={look.color ? { color: look.color } : undefined} aria-label={t(look.labelKey)} />
         <span className="min-w-0 flex-1 truncate" dir="auto">{agent.label}</span>
@@ -263,7 +263,7 @@ export const WorkflowAgentsView: React.FC<{ run: WorkflowRun; directory: string 
                 type="button"
                 onClick={() => flip(setToggledPhases, key)}
                 aria-expanded={expanded}
-                className="flex h-7 w-full min-w-0 items-center gap-1.5 text-start typography-micro font-medium text-muted-foreground hover:text-foreground"
+                className="flex h-auto min-h-7 w-full min-w-0 items-center gap-1.5 text-start typography-micro font-medium text-muted-foreground hover:text-foreground py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
               >
                 <Icon name="arrow-right-s" className={cn('size-3.5 shrink-0 transition-transform', expanded && 'rotate-90 rtl:-rotate-90')} />
                 <span className="min-w-0 truncate" dir="auto">{group.title ?? t('chat.workflow.phase.unphased')}</span>

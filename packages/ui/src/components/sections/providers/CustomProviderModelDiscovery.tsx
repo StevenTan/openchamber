@@ -91,7 +91,7 @@ export const CustomProviderModelDiscovery: React.FC<Props> = ({ models, existing
             }}
             placeholder={t('settings.agents.modelSelector.searchPlaceholder')}
             aria-label={t('settings.agents.modelSelector.searchPlaceholder')}
-            className="h-8 rounded-md ps-8"
+            className="h-auto min-h-8 rounded-md ps-8 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
           />
         </div>
       ) : null}

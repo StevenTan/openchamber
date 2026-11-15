@@ -207,7 +207,7 @@ export const DesktopNetworkSettings: React.FC = () => {
         <Input
           id="desktop-ui-password"
           type="password"
-          className="h-8 min-w-0 flex-1"
+          className="h-auto min-h-8 min-w-0 flex-1 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
           value={draftPassword}
           onChange={(event) => handlePasswordChange(event.target.value)}
           placeholder={t(hasSavedPassword && !removePassword

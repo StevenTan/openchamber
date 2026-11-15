@@ -176,7 +176,7 @@ function PromptHistorySearchPanelView({ history, initialQuery, olderRequest, onP
                             setSelectedCandidate(null);
                             setQuery(event.target.value);
                         }}
-                        className="h-8 min-w-0 flex-1 bg-transparent p-0 typography-meta text-[max(16px,0.875rem)] outline-none placeholder:text-muted-foreground"
+                        className="h-auto min-h-8 min-w-0 flex-1 bg-transparent p-0 typography-meta text-[max(16px,0.875rem)] outline-none placeholder:text-muted-foreground py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                     />
                     <Tooltip>
                         <TooltipTrigger asChild>

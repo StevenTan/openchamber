@@ -78,11 +78,12 @@ export const buttonVariants = cva(
           "text-foreground hover:bg-interactive-hover hover:text-foreground",
          link: "text-[var(--primary-text)] underline-offset-4 hover:underline",
       },
+      // Text sizes reserve a full line, vertical padding and 1px borders.
       size: {
-        default: "h-8 px-3 has-[>svg]:px-2.5",
-        sm: "h-7 gap-1.5 px-2.5 has-[>svg]:px-2",
-        xs: "h-6 gap-1 px-2 typography-micro has-[>svg]:px-1.5 rounded-[5px]",
-        lg: "h-9 px-4 has-[>svg]:px-3.5 rounded-lg",
+        default: "h-[max(var(--spacing-8),calc(1lh+0.5em*var(--padding-scale,1)+2px))] py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45] px-3 has-[>svg]:px-2.5",
+        sm: "h-[max(var(--spacing-7),calc(1lh+0.5em*var(--padding-scale,1)+2px))] py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45] gap-1.5 px-2.5 has-[>svg]:px-2",
+        xs: "h-[max(var(--spacing-6),calc(1lh+0.5em*var(--padding-scale,1)+2px))] py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45] gap-1 px-2 typography-micro has-[>svg]:px-1.5 rounded-[5px]",
+        lg: "h-[max(var(--spacing-9),calc(1lh+0.5em*var(--padding-scale,1)+2px))] py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45] px-4 has-[>svg]:px-3.5 rounded-lg",
         icon: "size-8",
       },
     },

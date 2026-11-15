@@ -1209,7 +1209,7 @@ function Tabs({ props }: NodeProps) {
         layoutMode="scrollable"
         intrinsicWidth
         pillSize="toolbar"
-        className="h-7 max-w-full flex-none self-start"
+        className="h-auto min-h-7 max-w-full flex-none self-start"
       />
       {/* In a tile, so the tab's content does not run into the reply's text after the block. */}
       {/* It frames what it holds as a card does: a chart or table inside takes no frame of its own. */}

@@ -1796,10 +1796,10 @@ export const RemoteInstancesPage: React.FC = () => {
               <DialogDescription>{t('settings.remoteInstances.direct.addDialog.description')}</DialogDescription>
             </DialogHeader>
             <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); void handleAddDirectHost(); }}>
-              <Input className="h-8" value={directLabel} onChange={(event) => setDirectLabel(event.target.value)} placeholder={t('settings.remoteInstances.direct.field.labelPlaceholder')} disabled={directSaving} />
-              <Input className="h-8" value={directUrl} onChange={(event) => setDirectUrl(event.target.value)} placeholder={t('settings.remoteInstances.direct.field.urlPlaceholder')} disabled={directSaving} autoFocus />
+              <Input className="h-auto min-h-8 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]" value={directLabel} onChange={(event) => setDirectLabel(event.target.value)} placeholder={t('settings.remoteInstances.direct.field.labelPlaceholder')} disabled={directSaving} />
+              <Input className="h-auto min-h-8 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]" value={directUrl} onChange={(event) => setDirectUrl(event.target.value)} placeholder={t('settings.remoteInstances.direct.field.urlPlaceholder')} disabled={directSaving} autoFocus />
               <div className="space-y-1">
-                <Input className="h-8" value={directToken} onChange={(event) => setDirectToken(event.target.value)} placeholder={t('settings.remoteInstances.direct.field.tokenPlaceholder')} type="password" disabled={directSaving} />
+                <Input className="h-auto min-h-8 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]" value={directToken} onChange={(event) => setDirectToken(event.target.value)} placeholder={t('settings.remoteInstances.direct.field.tokenPlaceholder')} type="password" disabled={directSaving} />
                 <p className="px-1 typography-micro text-muted-foreground">{t('settings.remoteInstances.direct.note')}</p>
               </div>
               <div className="space-y-2">
@@ -1809,8 +1809,8 @@ export const RemoteInstancesPage: React.FC = () => {
                 </div>
                 {directHeaders.map((header) => (
                   <div key={header.id} className="flex w-full gap-2">
-                    <Input className="h-8 font-mono text-xs" value={header.name} onChange={(event) => setDirectHeaders((headers) => headers.map((item) => item.id === header.id ? { ...item, name: event.target.value } : item))} placeholder={t('settings.remoteInstances.direct.headers.field.namePlaceholder')} disabled={directSaving} />
-                    <Input className="h-8 font-mono text-xs" value={header.value} onChange={(event) => setDirectHeaders((headers) => headers.map((item) => item.id === header.id ? { ...item, value: event.target.value } : item))} placeholder={t('settings.remoteInstances.direct.headers.field.valuePlaceholder')} type="password" disabled={directSaving} />
+                    <Input className="h-auto min-h-8 font-mono text-xs py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]" value={header.name} onChange={(event) => setDirectHeaders((headers) => headers.map((item) => item.id === header.id ? { ...item, name: event.target.value } : item))} placeholder={t('settings.remoteInstances.direct.headers.field.namePlaceholder')} disabled={directSaving} />
+                    <Input className="h-auto min-h-8 font-mono text-xs py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]" value={header.value} onChange={(event) => setDirectHeaders((headers) => headers.map((item) => item.id === header.id ? { ...item, value: event.target.value } : item))} placeholder={t('settings.remoteInstances.direct.headers.field.valuePlaceholder')} type="password" disabled={directSaving} />
                     <button type="button" onClick={() => setDirectHeaders((headers) => headers.filter((item) => item.id !== header.id))} className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-[var(--status-error-background)] hover:text-[var(--status-error)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--interactive-focus-ring)]" aria-label={t('settings.remoteInstances.direct.headers.removeAria')} disabled={directSaving}>
                       <Icon name="close" className="h-4 w-4" />
                     </button>
@@ -1837,10 +1837,10 @@ export const RemoteInstancesPage: React.FC = () => {
               <DialogDescription>{t('settings.remoteInstances.direct.description')}</DialogDescription>
             </DialogHeader>
             <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); void saveDirectHostEdit(); }}>
-              <Input className="h-8" value={directEditLabel} onChange={(event) => setDirectEditLabel(event.target.value)} placeholder={t('settings.remoteInstances.direct.field.labelPlaceholder')} disabled={directSaving} autoFocus={directEditingRelayOnly} />
+              <Input className="h-auto min-h-8 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]" value={directEditLabel} onChange={(event) => setDirectEditLabel(event.target.value)} placeholder={t('settings.remoteInstances.direct.field.labelPlaceholder')} disabled={directSaving} autoFocus={directEditingRelayOnly} />
               {directEditingRelayOnly ? null : <>
-              <Input className="h-8" value={directEditUrl} onChange={(event) => setDirectEditUrl(event.target.value)} placeholder={t('settings.remoteInstances.direct.field.urlPlaceholder')} disabled={directSaving} autoFocus />
-              <Input className="h-8" value={directEditToken} onChange={(event) => setDirectEditToken(event.target.value)} placeholder={t('settings.remoteInstances.direct.field.tokenPlaceholder')} type="password" disabled={directSaving} />
+              <Input className="h-auto min-h-8 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]" value={directEditUrl} onChange={(event) => setDirectEditUrl(event.target.value)} placeholder={t('settings.remoteInstances.direct.field.urlPlaceholder')} disabled={directSaving} autoFocus />
+              <Input className="h-auto min-h-8 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]" value={directEditToken} onChange={(event) => setDirectEditToken(event.target.value)} placeholder={t('settings.remoteInstances.direct.field.tokenPlaceholder')} type="password" disabled={directSaving} />
               <div className="space-y-2">
                 <div className="flex items-center gap-1.5">
                   <SettingsGroupTitle>{t('settings.remoteInstances.direct.headers.title')}</SettingsGroupTitle>
@@ -1848,8 +1848,8 @@ export const RemoteInstancesPage: React.FC = () => {
                 </div>
                 {directEditHeaders.map((header) => (
                   <div key={header.id} className="flex w-full gap-2">
-                    <Input className="h-8 font-mono text-xs" value={header.name} onChange={(event) => setDirectEditHeaders((headers) => headers.map((item) => item.id === header.id ? { ...item, name: event.target.value } : item))} placeholder={t('settings.remoteInstances.direct.headers.field.namePlaceholder')} disabled={directSaving} />
-                    <Input className="h-8 font-mono text-xs" value={header.value} onChange={(event) => setDirectEditHeaders((headers) => headers.map((item) => item.id === header.id ? { ...item, value: event.target.value } : item))} placeholder={t('settings.remoteInstances.direct.headers.field.valuePlaceholder')} type="password" disabled={directSaving} />
+                    <Input className="h-auto min-h-8 font-mono text-xs py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]" value={header.name} onChange={(event) => setDirectEditHeaders((headers) => headers.map((item) => item.id === header.id ? { ...item, name: event.target.value } : item))} placeholder={t('settings.remoteInstances.direct.headers.field.namePlaceholder')} disabled={directSaving} />
+                    <Input className="h-auto min-h-8 font-mono text-xs py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]" value={header.value} onChange={(event) => setDirectEditHeaders((headers) => headers.map((item) => item.id === header.id ? { ...item, value: event.target.value } : item))} placeholder={t('settings.remoteInstances.direct.headers.field.valuePlaceholder')} type="password" disabled={directSaving} />
                     <button type="button" onClick={() => setDirectEditHeaders((headers) => headers.filter((item) => item.id !== header.id))} className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-[var(--status-error-background)] hover:text-[var(--status-error)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--interactive-focus-ring)]" aria-label={t('settings.remoteInstances.direct.headers.removeAria')} disabled={directSaving}>
                       <Icon name="close" className="h-4 w-4" />
                     </button>
@@ -1888,7 +1888,7 @@ export const RemoteInstancesPage: React.FC = () => {
                 setDirectImporting(false);
               }
             }}>
-              <Input className="h-8" value={directConnectLink} onChange={(event) => { setDirectConnectLink(event.target.value); setDirectError(null); }} placeholder={t('settings.remoteInstances.direct.import.placeholder')} disabled={directSaving || directImporting} aria-describedby={directError ? 'direct-import-error' : undefined} autoFocus />
+              <Input className="h-auto min-h-8 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]" value={directConnectLink} onChange={(event) => { setDirectConnectLink(event.target.value); setDirectError(null); }} placeholder={t('settings.remoteInstances.direct.import.placeholder')} disabled={directSaving || directImporting} aria-describedby={directError ? 'direct-import-error' : undefined} autoFocus />
               {directError ? <p id="direct-import-error" role="alert" className="typography-meta text-[var(--status-error)]">{directError}</p> : null}
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" size="xs" className="!font-normal" onClick={() => setDirectImportDialogOpen(false)} disabled={directSaving || directImporting}>{t('settings.common.actions.cancel')}</Button>
@@ -1909,7 +1909,7 @@ export const RemoteInstancesPage: React.FC = () => {
             {addDevicePhase === 'configure' ? (
               <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void createPairingLink(); }}>
                 <Input
-                  className="h-8"
+                  className="h-auto min-h-8 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                   value={remoteClientLabel}
                   onChange={(event) => setRemoteClientLabel(event.target.value)}
                   placeholder={t('settings.remoteInstances.clientAuth.field.labelPlaceholder')}
@@ -2092,7 +2092,7 @@ export const RemoteInstancesPage: React.FC = () => {
             {sshAddMode === 'saved' ? (
               <div className="space-y-2">
                 <Input
-                  className="h-8"
+                  className="h-auto min-h-8 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                   value={sshHostSearch}
                   onChange={(event) => setSshHostSearch(event.target.value)}
                   placeholder={t('settings.remoteInstances.page.addDialog.searchPlaceholder')}
@@ -2131,8 +2131,8 @@ export const RemoteInstancesPage: React.FC = () => {
               </div>
             ) : (
               <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); void createSshInstanceFromDialog(); }}>
-                <Input className="h-8" value={sshNameDraft} onChange={(event) => setSshNameDraft(event.target.value)} placeholder={t('settings.remoteInstances.page.field.nicknamePlaceholder')} disabled={isSaving} />
-                <Input className="h-8" value={sshCommandDraft} onChange={(event) => setSshCommandDraft(event.target.value)} placeholder={t('settings.remoteInstances.page.field.sshCommandPlaceholder')} disabled={isSaving} autoFocus />
+                <Input className="h-auto min-h-8 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]" value={sshNameDraft} onChange={(event) => setSshNameDraft(event.target.value)} placeholder={t('settings.remoteInstances.page.field.nicknamePlaceholder')} disabled={isSaving} />
+                <Input className="h-auto min-h-8 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]" value={sshCommandDraft} onChange={(event) => setSshCommandDraft(event.target.value)} placeholder={t('settings.remoteInstances.page.field.sshCommandPlaceholder')} disabled={isSaving} autoFocus />
                 <div className="flex justify-end gap-2">
                   <Button type="button" variant="outline" size="xs" className="!font-normal" onClick={() => setSshAddDialogOpen(false)} disabled={isSaving}>{t('settings.common.actions.cancel')}</Button>
                   <Button type="submit" size="xs" className="!font-normal" disabled={isSaving || !sshCommandDraft.trim()}>{t('settings.common.actions.create')}</Button>
@@ -2309,7 +2309,7 @@ export const RemoteInstancesPage: React.FC = () => {
           <div className="flex flex-col gap-1.5 py-1.5 md:flex-row md:items-center md:gap-8">
             <span className="typography-ui-label text-foreground w-56 shrink-0">{t('settings.remoteInstances.page.field.sshCommand')}</span>
             <Input
-              className="h-7 md:max-w-xl"
+              className="h-auto min-h-7 md:max-w-xl py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
               value={draft.sshCommand}
               onChange={(event) =>
                 updateDraft((current) => ({
@@ -2323,7 +2323,7 @@ export const RemoteInstancesPage: React.FC = () => {
           <div className="flex flex-col gap-1.5 py-1.5 md:flex-row md:items-center md:gap-8">
             <span className="typography-ui-label text-foreground w-56 shrink-0">{t('settings.remoteInstances.page.field.nickname')}</span>
             <Input
-              className="h-7 md:max-w-sm"
+              className="h-auto min-h-7 md:max-w-sm py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
               value={draft.nickname || ''}
               onChange={(event) =>
                 updateDraft((current) => ({
@@ -2652,7 +2652,7 @@ export const RemoteInstancesPage: React.FC = () => {
               />
             </div>
             <Input
-              className="h-7 md:max-w-sm"
+              className="h-auto min-h-7 md:max-w-sm py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
               type="password"
               value={draft.auth.sshPassword?.value || ''}
               onChange={(event) =>
@@ -2684,7 +2684,7 @@ export const RemoteInstancesPage: React.FC = () => {
               />
             </div>
             <Input
-              className={cn('h-7 md:max-w-sm', uiPasswordMissing && 'border-[var(--status-error)]')}
+              className={cn('h-auto min-h-7 md:max-w-sm py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]', uiPasswordMissing && 'border-[var(--status-error)]')}
               type="password"
               ref={uiPasswordRef}
               aria-invalid={uiPasswordMissing}
@@ -2836,7 +2836,7 @@ export const RemoteInstancesPage: React.FC = () => {
                       </div>
                       <div className="flex items-center gap-1.5">
                         <Input
-                          className="h-7 w-32"
+                          className="h-auto min-h-7 w-32 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                           value={forward.localHost || '127.0.0.1'}
                           onChange={(event) =>
                             updateForward((item) => ({
@@ -2878,7 +2878,7 @@ export const RemoteInstancesPage: React.FC = () => {
                         </div>
                         <div className="flex items-center gap-1.5">
                           <Input
-                            className="h-7 w-32"
+                            className="h-auto min-h-7 w-32 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                             value={forward.remoteHost || ''}
                             onChange={(event) =>
                               updateForward((item) => ({

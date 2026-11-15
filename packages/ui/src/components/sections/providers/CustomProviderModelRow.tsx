@@ -117,7 +117,7 @@ export const CustomProviderModelRow: React.FC<Props> = ({
                 value={model.id}
                 onChange={(event) => onChange('id', event.target.value)}
                 placeholder={t('settings.providers.page.custom.models.idPlaceholder')}
-                className="mt-1 h-8 rounded-md px-3 font-mono text-xs"
+                className="mt-1 h-auto min-h-8 rounded-md px-3 font-mono text-xs py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                 aria-invalid={Boolean(errors?.id)}
                 aria-label={t('settings.providers.page.custom.models.idLabel')}
               />
@@ -129,7 +129,7 @@ export const CustomProviderModelRow: React.FC<Props> = ({
                 value={model.name}
                 onChange={(event) => onChange('name', event.target.value)}
                 placeholder={t('settings.providers.page.custom.models.namePlaceholder')}
-                className="mt-1 h-8 rounded-md px-3"
+                className="mt-1 h-auto min-h-8 rounded-md px-3 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                 aria-invalid={Boolean(errors?.name)}
                 aria-label={t('settings.providers.page.custom.models.nameLabel')}
               />
@@ -145,7 +145,7 @@ export const CustomProviderModelRow: React.FC<Props> = ({
                 value={model.contextWindow}
                 onChange={(event) => onChange('contextWindow', event.target.value)}
                 placeholder="128000"
-                className="mt-1 h-8 rounded-md px-3 font-mono text-xs"
+                className="mt-1 h-auto min-h-8 rounded-md px-3 font-mono text-xs py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                 aria-invalid={Boolean(errors?.contextWindow)}
                 aria-label={t('settings.providers.page.custom.models.contextWindow')}
               />
@@ -158,7 +158,7 @@ export const CustomProviderModelRow: React.FC<Props> = ({
                 value={model.maxOutputTokens}
                 onChange={(event) => onChange('maxOutputTokens', event.target.value)}
                 placeholder="16384"
-                className="mt-1 h-8 rounded-md px-3 font-mono text-xs"
+                className="mt-1 h-auto min-h-8 rounded-md px-3 font-mono text-xs py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                 aria-invalid={Boolean(errors?.maxOutputTokens)}
                 aria-label={t('settings.providers.page.custom.models.maxOutputTokens')}
               />
@@ -175,7 +175,7 @@ export const CustomProviderModelRow: React.FC<Props> = ({
               value={model.variants}
               onChange={(event) => onChange('variants', event.target.value)}
               placeholder={t('settings.providers.page.custom.models.variantsPlaceholder')}
-              className="mt-1 h-8 rounded-md px-3 font-mono text-xs"
+              className="mt-1 h-auto min-h-8 rounded-md px-3 font-mono text-xs py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
               aria-label={t('settings.providers.page.custom.models.variantsLabel')}
             />
           </div>

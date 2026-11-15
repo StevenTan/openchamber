@@ -115,7 +115,7 @@ export function PublishDialog({ context, onSelect }: {
               label={<label htmlFor={`${id}-branch`}>{t('gitView.publish.destinationBranch')}</label>}
               controlClassName={CONTROL_CLASS}
             >
-              <Input id={`${id}-branch`} list={`${id}-branches`} className="h-8 rounded-md" value={pushBranch} onChange={(event) => setPushBranch(event.target.value)} />
+              <Input id={`${id}-branch`} list={`${id}-branches`} className="h-auto min-h-8 rounded-md py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]" value={pushBranch} onChange={(event) => setPushBranch(event.target.value)} />
               <datalist id={`${id}-branches`}>{destinationBranches.map((branch) => <option key={branch} value={branch} />)}</datalist>
             </SettingsStackedField>
           </SettingsControlGroup>

@@ -31,7 +31,7 @@ export const SettingsSidebarSearch: React.FC<{
         }}
         placeholder={t('settings.common.sidebar.searchPlaceholder')}
         aria-label={t('settings.common.sidebar.searchPlaceholder')}
-        className="h-8 ps-7 typography-meta"
+        className="h-auto min-h-8 ps-7 typography-meta py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
       />
     </div>
   );

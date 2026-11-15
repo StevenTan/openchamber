@@ -336,7 +336,7 @@ function DraftTargetSelectorsView(props: DraftTargetProps) {
                             variant="ghost"
                             size="sm"
                             aria-haspopup="dialog"
-                            className="h-7 min-w-0 w-fit max-w-[42vw] justify-start gap-1 overflow-hidden px-1.5 normal-case hover:bg-transparent data-[popup-open]:bg-transparent sm:max-w-[18rem]"
+                            className="h-auto min-h-7 min-w-0 w-fit max-w-[42vw] justify-start gap-1 overflow-hidden px-1.5 normal-case hover:bg-transparent data-[popup-open]:bg-transparent sm:max-w-[18rem]"
                             onPointerDownCapture={(event) => syncProjectPopupContainers(event.currentTarget)}
                             onFocusCapture={(event) => syncProjectPopupContainers(event.currentTarget)}
                         />
@@ -484,7 +484,7 @@ function DraftTargetSelectorsView(props: DraftTargetProps) {
                             <SelectTrigger
                                 ref={worktreeTriggerRef}
                                 onKeyDown={handlePickerKeyDown}
-                                className="h-7 min-w-0 w-fit max-w-[48vw] overflow-hidden sm:max-w-[20rem] bg-transparent dark:bg-transparent shadow-none px-1.5 hover:[background-image:none] data-[popup-open]:[background-image:none]"
+                                className="h-auto min-h-7 min-w-0 w-fit max-w-[48vw] overflow-hidden sm:max-w-[20rem] bg-transparent dark:bg-transparent shadow-none px-1.5 hover:[background-image:none] data-[popup-open]:[background-image:none]"
                             >
                                 {selectedIsSpace ? <Icon name="instance" className="size-3.5 shrink-0 text-muted-foreground" aria-label={t('sessions.sidebar.group.space')} /> : null}
                                 <SelectValue>
@@ -583,7 +583,7 @@ export function MobileDraftTargetTriggers(
         <div className="mb-1.5 flex min-w-0 items-center gap-x-2 px-0.5">
             <button
                 type="button"
-                className="inline-flex h-7 min-w-0 max-w-[42vw] flex-shrink cursor-pointer items-center gap-1 rounded-lg px-1.5 typography-micro font-medium text-foreground/80 hover:bg-[var(--interactive-hover)]"
+                className="inline-flex h-auto min-h-7 min-w-0 max-w-[42vw] flex-shrink cursor-pointer items-center gap-1 rounded-lg px-1.5 typography-micro font-medium text-foreground/80 hover:bg-[var(--interactive-hover)] py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                 onClick={() => onOpenPicker('project')}
             >
                 {selectedProject.kind === 'chat'
@@ -594,7 +594,7 @@ export function MobileDraftTargetTriggers(
             {showBranchSelector ? (
                 <button
                     type="button"
-                    className="inline-flex h-7 min-w-0 max-w-[48vw] flex-shrink cursor-pointer items-center gap-1 rounded-lg px-1.5 typography-micro font-medium text-foreground/80 hover:bg-[var(--interactive-hover)]"
+                    className="inline-flex h-auto min-h-7 min-w-0 max-w-[48vw] flex-shrink cursor-pointer items-center gap-1 rounded-lg px-1.5 typography-micro font-medium text-foreground/80 hover:bg-[var(--interactive-hover)] py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                     onClick={() => onOpenPicker('branch')}
                 >
                     <span className="truncate">{selectedBranchLabel ?? t('chat.chatInput.branch')}</span>

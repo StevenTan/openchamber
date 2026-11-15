@@ -145,7 +145,7 @@ export const SourceControlProviderCard: React.FC<{ descriptor: SourceControlProv
           >
             <div className={`${SETTINGS_CONTROL_CLUSTER_CLASS} flex flex-col gap-2 @xl:flex-row @xl:items-center`}>
               <Input
-                className="h-8 w-full min-w-0 rounded-md"
+                className="h-auto min-h-8 w-full min-w-0 rounded-md py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                 value={instanceInput}
                 onChange={(event) => setInstanceInput(event.target.value)}
                 placeholder={instances.placeholder}

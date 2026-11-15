@@ -13,8 +13,8 @@ import { isRightToLeft, useI18n } from '@/lib/i18n';
 import { ModelPickerList, type ModelPickerEntry, type ModelPickerProvider } from '@/components/model-picker/ModelPickerList';
 import { listModelVariantIds, type ModelVariantSource } from '@/lib/modelVariants';
 
-/** Chip height class - shared between chips and add button */
-const CHIP_HEIGHT_CLASS = 'h-7';
+/** Minimum chip height and padding for its text. */
+const CHIP_HEIGHT_CLASS = 'h-auto min-h-7 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]';
 
 /** UI-only type with instanceId for React keys and duplicate tracking */
 export interface ModelSelectionWithId {

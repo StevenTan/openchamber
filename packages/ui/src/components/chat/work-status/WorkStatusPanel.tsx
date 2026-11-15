@@ -265,9 +265,8 @@ export const WorkStatusPanel: React.FC<Props> = ({ sessionId, directory, visible
             type="button"
             aria-label={t('chat.workStatus.sections.open')}
             onClick={() => setSectionsDialogOpen(true)}
-            // Centred on the first heading's line (the card's 8px padding plus
-            // half the 24px heading), at the rows' 13px icon size.
-            className="absolute inset-e-2 top-2 z-10 inline-flex h-6 items-center rounded px-1 text-muted-foreground transition-colors hover:text-foreground"
+            // Shares the first heading's height so its icon stays centred.
+            className="absolute inset-e-2 top-2 z-10 inline-flex h-[var(--oc-work-status-heading-height)] items-center rounded px-1 text-muted-foreground transition-colors hover:text-foreground"
           >
             {/* Acts on the card itself (which sections show): the glyph of every
                 control that configures what a list shows, as on the rail. */}

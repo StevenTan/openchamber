@@ -1635,7 +1635,7 @@ const SidebarFilesTreeContent: React.FC<{ visible: boolean; currentDirectory: st
           <span className="min-w-0 flex-1 truncate text-[var(--status-error)]" title={row.message}>{row.message}</span>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="xs" className="h-6 gap-1" onClick={() => void refreshDirectory(row.directory)}>
+              <Button variant="ghost" size="xs" className="h-auto min-h-6 gap-1" onClick={() => void refreshDirectory(row.directory)}>
                 <Icon name="refresh" className="h-3.5 w-3.5" />
                 {t('sidebarFilesTree.actions.refreshTitle')}
               </Button>
@@ -1780,7 +1780,7 @@ const SidebarFilesTreeContent: React.FC<{ visible: boolean; currentDirectory: st
                     searchInputRef.current?.focus();
                   }}
                   aria-label={t('sidebarFilesTree.search.regexTitle')}
-                  className="absolute inset-e-1 top-1/2 h-5 min-w-0 -translate-y-1/2 px-1 font-mono typography-micro"
+                  className="absolute inset-e-1 top-1/2 h-auto min-h-5 min-w-0 -translate-y-1/2 px-1 font-mono typography-micro"
                 >
                   .*
                 </Button>

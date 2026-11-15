@@ -476,7 +476,7 @@ export const AgentsPage: React.FC = () => {
                 value={draftName}
                 onChange={(e) => setDraftName(e.target.value)}
                 placeholder={t('settings.agents.page.field.agentNamePlaceholder')}
-                className="h-7 w-40 px-2"
+                className="h-auto min-h-7 w-40 px-2 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
               />
             </div>
             <Select value={draftScope} onValueChange={(v) => setDraftScope(v as AgentScope)}>
@@ -618,7 +618,7 @@ export const AgentsPage: React.FC = () => {
                 onChange={(event) => setVariant(event.target.value)}
                 placeholder={t('settings.agents.page.field.variantPlaceholder')}
                 disabled={!model && !variant}
-                className="h-8 w-40 rounded-md px-3"
+                className="h-auto min-h-8 w-40 rounded-md px-3 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
               />
               {variant && (
                 <Button

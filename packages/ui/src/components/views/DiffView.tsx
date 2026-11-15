@@ -3417,7 +3417,7 @@ export const DiffView: React.FC<DiffViewProps> = ({
                                 size="sm"
                                 onClick={handleExpandOrCollapseAll}
                                 className={cn(
-                                    'diff-toolbar__expand-button h-7 flex-shrink-0 gap-1 px-1.5 text-muted-foreground hover:text-foreground',
+                                    'diff-toolbar__expand-button h-auto min-h-7 flex-shrink-0 gap-1 px-1.5 text-muted-foreground hover:text-foreground',
                                     'ms-auto',
                                 )}
                             >
@@ -3454,7 +3454,7 @@ export const DiffView: React.FC<DiffViewProps> = ({
                                     size="sm"
                                     onClick={() => setReviewDialogOpen(true)}
                                     disabled={reviewFlowSubmitting}
-                                    className="diff-toolbar__review-button h-7 flex-shrink-0 gap-1.5 px-2"
+                                    className="diff-toolbar__review-button h-auto min-h-7 flex-shrink-0 gap-1.5 px-2"
                                     aria-label={t('diffView.actions.reviewAria')}
                                 >
                                     {reviewFlowSubmitting ? (
@@ -3478,7 +3478,7 @@ export const DiffView: React.FC<DiffViewProps> = ({
                                 variant="outline"
                                 size="sm"
                                 onClick={openWalkthrough}
-                                className="diff-toolbar__walkthrough-button h-7 flex-shrink-0 gap-1.5 px-2"
+                                className="diff-toolbar__walkthrough-button h-auto min-h-7 flex-shrink-0 gap-1.5 px-2"
                                 aria-label={t('walkthrough.action.open')}
                             >
                                 <Icon name="route" className="size-4" />

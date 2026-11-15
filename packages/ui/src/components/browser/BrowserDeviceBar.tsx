@@ -105,7 +105,7 @@ export const BrowserDeviceBar: React.FC<{
               type="button"
               variant="ghost"
               size="xs"
-              className="w-6 shrink-0 rounded-full px-0 text-muted-foreground hover:text-foreground"
+              className="h-6 w-6 shrink-0 rounded-full p-0 text-muted-foreground hover:text-foreground"
               onClick={() => onViewportChange(rotateViewport(viewport))}
               disabled={!size}
               aria-label={t('contextPanel.browser.device.rotate')}

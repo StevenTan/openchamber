@@ -895,7 +895,7 @@ export const DirectoryExplorerDialog: React.FC<DirectoryExplorerDialogProps> = (
   const existingRepositoryIdentity = view === 'folder' && existingRepository ? renderIdentityPicker('max-w-48') : null;
 
   // Both fields hold their own controls, so a control never needs a row of its own.
-  const fieldClassName = 'oc-raised oc-field flex h-8 items-center gap-0.5 rounded-md bg-[var(--surface-elevated)] px-0.5';
+  const fieldClassName = 'oc-raised oc-field flex h-auto min-h-8 items-center gap-0.5 rounded-md bg-[var(--surface-elevated)] px-0.5';
   const fieldInputClassName = 'min-w-0 flex-1 bg-transparent font-mono typography-ui-label shadow-none hover:[&:not(:focus)]:[background-image:none] dark:bg-transparent';
 
   const fieldsSection = isOpenCodeView ? null : (
@@ -1256,7 +1256,7 @@ export const DirectoryExplorerDialog: React.FC<DirectoryExplorerDialogProps> = (
               aria-pressed={place.pressed}
               onClick={place.onSelect}
               className={cn(
-                'flex h-7.5 shrink-0 items-center gap-2 rounded-lg px-2 text-start typography-ui-label transition-colors',
+                'flex h-auto min-h-7.5 shrink-0 items-center gap-2 rounded-lg px-2 text-start typography-ui-label transition-colors py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]',
                 place.startsGroup && 'mt-3',
                 place.pressed ? 'bg-interactive-selection text-interactive-selection-foreground' : 'text-muted-foreground hover:text-foreground',
               )}

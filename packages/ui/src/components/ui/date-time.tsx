@@ -335,7 +335,7 @@ export const TimePill: React.FC<TimePillProps> = ({
         <Select value={parts.meridiem} onValueChange={(next) => setPeriod(next as 'AM' | 'PM')}>
           <SelectTrigger
             aria-label={periodAriaLabel}
-            className="ms-1 h-6 min-h-6 w-fit bg-transparent dark:bg-transparent ps-2 pe-1 shadow-none hover:bg-interactive-hover"
+            className="ms-1 h-auto min-h-6 min-h-6 w-fit bg-transparent dark:bg-transparent ps-2 pe-1 shadow-none hover:bg-interactive-hover"
           >
             <SelectValue>{parts.meridiem === 'PM' ? pmLabel : amLabel}</SelectValue>
           </SelectTrigger>
@@ -469,7 +469,7 @@ export function DatePicker({ value, onChange, placeholder, disablePast = false, 
                     }}
                     disabled={isPast}
                     className={cn(
-                      'h-8 rounded-md typography-ui-label',
+                      'h-auto min-h-8 rounded-md typography-ui-label py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]',
                       dayClass,
                       isToday && !isSelected && 'ring-1 ring-inset ring-ring bg-interactive-selection text-interactive-selection-foreground',
                       isPast && 'cursor-not-allowed opacity-45',

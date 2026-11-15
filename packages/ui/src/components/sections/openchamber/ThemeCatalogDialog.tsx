@@ -163,7 +163,7 @@ export function ThemeCatalogDialog({ pickFile, fileBusy, onClose }: { pickFile: 
     <Button
       variant="ghost"
       size="sm"
-      className="w-7 shrink-0 px-0"
+      className="h-7 w-7 shrink-0 p-0"
       aria-label={t('settings.themeImport.back')}
       title={t('settings.themeImport.back')}
       disabled={saving || (state.step === 'package' && state.status === 'loading')}
@@ -306,7 +306,7 @@ export function ThemeCatalogDialog({ pickFile, fileBusy, onClose }: { pickFile: 
           <Button
             variant="ghost"
             size="sm"
-            className="ms-1 w-7 shrink-0 px-0 text-muted-foreground hover:text-foreground"
+            className="ms-1 h-7 w-7 shrink-0 p-0 text-muted-foreground hover:text-foreground"
             aria-label={t('dialog.common.actions.close')}
             onClick={onClose}
           >

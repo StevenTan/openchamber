@@ -206,7 +206,7 @@ export const NotificationChannelCard: React.FC<NotificationChannelCardProps> = (
               placeholder={instances.placeholder ?? 'https://'}
               autoComplete="off"
               spellCheck={false}
-              className="h-8 min-w-0 flex-1 rounded-md px-3"
+              className="h-auto min-h-8 min-w-0 flex-1 rounded-md px-3 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
               disabled={isBusy}
             />
           </SettingsStackedField>
@@ -218,7 +218,7 @@ export const NotificationChannelCard: React.FC<NotificationChannelCardProps> = (
               onChange={(event) => setUsername(event.target.value)}
               autoComplete="off"
               spellCheck={false}
-              className="h-8 min-w-0 flex-1 rounded-md px-3"
+              className="h-auto min-h-8 min-w-0 flex-1 rounded-md px-3 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
               disabled={isBusy}
             />
           </SettingsStackedField>
@@ -234,7 +234,7 @@ export const NotificationChannelCard: React.FC<NotificationChannelCardProps> = (
             onChange={(event) => setToken(event.target.value)}
             autoComplete="off"
             spellCheck={false}
-            className="h-8 min-w-0 flex-1 rounded-md px-3"
+            className="h-auto min-h-8 min-w-0 flex-1 rounded-md px-3 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
             disabled={isBusy}
           />
         </SettingsStackedField>

@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 export const PICKER_SECTION_HEADER_CLASS = 'typography-micro font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2 px-2 py-1.5';
 
 /** The borderless search field of pickers, under a hairline. */
-export const PICKER_SEARCH_INPUT_CLASS = 'h-7 rounded-none bg-transparent ps-8 pe-0 typography-meta ring-0 hover:[&:not(:focus)]:bg-transparent hover:[&:not(:focus)]:[background-image:none] focus:ring-0 focus-visible:ring-0';
+export const PICKER_SEARCH_INPUT_CLASS = 'h-auto min-h-7 rounded-none bg-transparent ps-8 pe-0 typography-meta ring-0 hover:[&:not(:focus)]:bg-transparent hover:[&:not(:focus)]:[background-image:none] focus:ring-0 focus-visible:ring-0';
 
 interface MobileSheetSectionProps {
   title: string;

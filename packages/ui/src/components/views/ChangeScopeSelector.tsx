@@ -61,7 +61,7 @@ export const ChangeScopeSelector = React.memo<ChangeScopeSelectorProps>(({
                 <DropdownMenuTrigger asChild>
                     <button
                         type="button"
-                        className="flex h-7 flex-shrink-0 items-center gap-1.5 rounded-md px-2 typography-ui-label font-semibold text-foreground outline-none hover:bg-interactive-hover focus-visible:ring-2 focus-visible:ring-ring"
+                        className="flex h-auto min-h-7 flex-shrink-0 items-center gap-1.5 rounded-md px-2 typography-ui-label font-semibold text-foreground outline-none hover:bg-interactive-hover focus-visible:ring-2 focus-visible:ring-ring py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                         aria-label={t('diffView.scope.selectorAria')}
                     >
                         <span className="whitespace-nowrap">

@@ -312,7 +312,7 @@ const SectionRow: React.FC<{ entry: SidebarSectionEntry }> = ({ entry }) => {
                 aria-pressed={inPlace.keep}
                 onClick={() => inPlace.set(!inPlace.keep)}
                 className={cn(
-                  'inline-flex h-5 shrink-0 items-center gap-1 rounded px-1.5 typography-micro focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+                  'inline-flex h-auto min-h-5 shrink-0 items-center gap-1 rounded px-1.5 typography-micro focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]',
                   inPlace.keep ? 'oc-tile-inset text-foreground' : 'oc-tile text-muted-foreground hover:text-foreground',
                 )}
               >
@@ -562,11 +562,11 @@ const SectionEditor: React.FC<{ draft: CustomSidebarSection }> = ({ draft }) => 
                             placeCondition('text', draft.filter.text.length > 0);
                           }
                         }}
-                        className="h-5 min-w-24 flex-1 bg-transparent px-1 typography-micro text-foreground outline-none placeholder:text-muted-foreground"
+                        className="h-auto min-h-5 min-w-24 flex-1 bg-transparent px-1 typography-micro text-foreground outline-none placeholder:text-muted-foreground py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                         dir="auto"
                       />
                     ) : draft.filter.text.length < SIDEBAR_SECTION_PHRASES_MAX ? (
-                      <button type="button" onClick={() => setPhraseDraft('')} className="inline-flex h-5 items-center gap-0.5 rounded border border-dashed border-[color-mix(in_srgb,var(--foreground)_24%,transparent)] px-1.5 typography-micro text-muted-foreground hover:border-[color-mix(in_srgb,var(--foreground)_40%,transparent)] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
+                      <button type="button" onClick={() => setPhraseDraft('')} className="inline-flex h-auto min-h-5 items-center gap-0.5 rounded border border-dashed border-[color-mix(in_srgb,var(--foreground)_24%,transparent)] px-1.5 typography-micro text-muted-foreground hover:border-[color-mix(in_srgb,var(--foreground)_40%,transparent)] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]">
                         <Icon name="add" className="size-3" />
                         {t('sessions.sidebar.sections.addValue')}
                       </button>
@@ -615,7 +615,7 @@ const SectionEditor: React.FC<{ draft: CustomSidebarSection }> = ({ draft }) => 
                   {category !== 'activity' && options.some((option) => !values.includes(option.value)) ? (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <button type="button" className="inline-flex h-5 items-center gap-0.5 rounded border border-dashed border-[color-mix(in_srgb,var(--foreground)_24%,transparent)] px-1.5 typography-micro text-muted-foreground hover:border-[color-mix(in_srgb,var(--foreground)_40%,transparent)] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
+                        <button type="button" className="inline-flex h-auto min-h-5 items-center gap-0.5 rounded border border-dashed border-[color-mix(in_srgb,var(--foreground)_24%,transparent)] px-1.5 typography-micro text-muted-foreground hover:border-[color-mix(in_srgb,var(--foreground)_40%,transparent)] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]">
                           <Icon name="add" className="size-3" />
                           {addLabel}
                         </button>

@@ -231,7 +231,7 @@ const TeamFileSection: React.FC<{ projectRef: ProjectRef; setupState: ProjectSet
               placeholder={t('settings.projects.shared.plansDirPlaceholder')}
               aria-label={t('settings.projects.shared.plansDirAria')}
               disabled={busy || setup.shared.status === 'invalid'}
-              className="h-8 rounded-md px-3 font-mono text-xs"
+              className="h-auto min-h-8 rounded-md px-3 font-mono text-xs py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
             />
           </SettingsFieldRow>
         </>

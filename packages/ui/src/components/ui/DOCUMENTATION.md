@@ -70,6 +70,11 @@ This folder owns runtime-independent controls and their Base UI integration, inc
 - Every scroller a user sees draws the app's overlay scrollbar, never the native one: `ScrollableOverlay` for a scroller the caller renders, `AttachedOverlayScrollbar` for one a library creates (CodeMirror's `.cm-scroller`), `PopupOverlayScrollbar` for a popup that scrolls itself (`DialogContent`, `DropdownMenuContent`, `ContextMenuContent`, the framed `Textarea`). A new `overflow-auto` element goes through one of them. Only fallback screens after a crash keep the native bar, so they depend on nothing that may have failed.
 - `OverlayScrollbar` draws a thumb only on an axis whose computed overflow is `auto` or `scroll`: a scroller its owner switched to `hidden`, or a menu left at `visible`, overflows without scrolling and shows none.
 
+- Text controls keep their size floor and fit the current line height and
+  font-relative vertical padding. Explicit square button sizes stay fixed.
+  Active-pill tracks and their containers use minimum heights so labels can
+  increase their height with the interface font preference.
+
 ## Decisions
 
 ### Which tooltip a control takes

@@ -112,7 +112,7 @@ const RenameField: React.FC<{
           }
         }}
         aria-label={t('settings.providers.accounts.nameAria')}
-        className="h-8 max-w-[18rem]"
+        className="h-auto min-h-8 max-w-[18rem] py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
       />
       <Button type="submit" size="xs">{t('settings.providers.accounts.save')}</Button>
       <Button type="button" variant="ghost" size="xs" onClick={onCancel}>

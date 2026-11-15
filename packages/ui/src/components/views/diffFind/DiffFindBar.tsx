@@ -121,7 +121,7 @@ export const DiffFindBar: React.FC<DiffFindBarProps> = ({
           onKeyDown={handleKeyDown}
           placeholder={t('diffFind.placeholder')}
           aria-label={t('diffFind.placeholder')}
-          className="h-7 w-40 rounded-md px-2 py-0 text-sm md:w-56"
+          className="h-auto min-h-7 w-40 rounded-md px-2 py-0 text-sm md:w-56 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
         />
         <span
           className="min-w-12 px-1 text-center typography-micro text-muted-foreground tabular-nums"

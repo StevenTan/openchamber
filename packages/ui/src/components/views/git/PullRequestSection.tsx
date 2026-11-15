@@ -1129,7 +1129,7 @@ export const PullRequestSection: React.FC<{
                 <Button
                   variant="outline"
                   size="sm"
-                  className="pr-actions__walkthrough-button h-7 shrink-0 gap-1.5 px-2"
+                  className="pr-actions__walkthrough-button h-auto min-h-7 shrink-0 gap-1.5 px-2"
                   onClick={() => {
                     requestWalkthroughTarget(directory, {
                       source: {
@@ -1255,7 +1255,7 @@ export const PullRequestSection: React.FC<{
                       onChange={(e) => chooseTargetBaseBranch(e.target.value)}
                       placeholder={t('gitView.pr.placeholder.main')}
                       aria-label={t('gitView.pr.field.baseBranch')}
-                      className="h-7 w-32"
+                      className="h-auto min-h-7 w-32 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                     />
                   )}
                   <div className="ms-auto flex shrink-0 items-center gap-0.5">

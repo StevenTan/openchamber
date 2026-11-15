@@ -194,7 +194,7 @@ const ImagePreview = memo(({ file, onRemove, onShowPopup, gallery, index = 0 }: 
     return (
       <button
         type="button"
-        className="flex items-center gap-1.5 text-sm hover:opacity-80 transition-opacity text-start h-5"
+        className="flex items-center gap-1.5 text-sm hover:opacity-80 transition-opacity text-start h-auto min-h-5 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
       >
         <FileTypeIcon filePath={file.filename} extension={extension} className="h-4 w-4" />
         <span className="text-foreground truncate max-w-[200px]">
@@ -299,7 +299,7 @@ const FileChip = memo(({ file, onRemove }: FileChipProps) => {
           return;
         }
       }}
-      className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-edge bg-background ps-2 pe-1 text-xs text-foreground text-start hover:opacity-90 transition-opacity"
+      className="inline-flex h-auto min-h-7 items-center gap-1.5 rounded-lg border border-edge bg-background ps-2 pe-1 text-xs text-foreground text-start hover:opacity-90 transition-opacity py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
     >
       <FileTypeIcon filePath={file.filename} extension={extension} className="h-4 w-4 flex-shrink-0" />
       <span className="truncate max-w-[200px]" title={displayName}>{displayName}</span>

@@ -155,7 +155,7 @@ const SocketOverrideRow: React.FC<{
             onChange={(event) => setValue(event.target.value)}
             placeholder={t('settings.extensions.service.socket.path', { id: binding.id })}
             aria-label={t('settings.extensions.service.socket.path.aria', { id: binding.id })}
-            className="h-8 min-w-0 flex-1 rounded-md px-3"
+            className="h-auto min-h-8 min-w-0 flex-1 rounded-md px-3 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
             disabled={busy || saving}
             autoFocus
           />
@@ -1048,7 +1048,7 @@ export const ExtensionsPage: React.FC = () => {
                   }}
                   placeholder={t('settings.extensions.add.placeholder')}
                   aria-label={t('settings.extensions.add.label')}
-                  className={cn('h-8 min-w-0 flex-1 rounded-md ps-3', nativePaths ? 'pe-14' : 'pe-8')}
+                  className={cn('h-auto min-h-8 min-w-0 flex-1 rounded-md ps-3 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]', nativePaths ? 'pe-14' : 'pe-8')}
                   disabled={busy}
                 />
                 <input
@@ -1192,7 +1192,7 @@ export const ExtensionsPage: React.FC = () => {
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-9 shrink-0 gap-1.5"
+                className="h-auto min-h-9 shrink-0 gap-1.5"
                 data-settings-item="extensions.browse"
                 title={t('settings.extensions.browse.hint')}
                 onClick={() => void openExternalUrl(communityExtensionsUrl(locale))}
@@ -1207,7 +1207,7 @@ export const ExtensionsPage: React.FC = () => {
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-9 shrink-0"
+                className="h-auto min-h-9 shrink-0"
                 disabled={busy || checking}
                 onClick={() => void updateAll()}
               >

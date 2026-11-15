@@ -18,6 +18,8 @@ import { GuestIcon } from '@/components/layout/GuestRailIcon';
 import { useGuestActions } from '@/hooks/useGuestSurfaces';
 import { guestActionsWhere } from '@/lib/guests/actions';
 import { runGuestAction } from '@/lib/guests/run-action';
+import { useUIStore } from '@/stores/useUIStore';
+import { useFontPreferences } from '@/hooks/useFontPreferences';
 
 export interface InlineCommentInputProps {
   initialText?: string;
@@ -100,6 +102,10 @@ export function InlineCommentInput({
 }: InlineCommentInputProps) {
   const { t } = useI18n();
   const { isMobile } = useDeviceInfo();
+  const interfaceFontSizePx = useUIStore(state => state.interfaceFontSizePx);
+  const padding = useUIStore(state => state.padding);
+  const uiFontWeight = useUIStore(state => state.uiFontWeight);
+  const { uiFont, customUiFont } = useFontPreferences();
   const lineActions = guestActionsWhere(useGuestActions(), 'diff');
   const [text, setText] = React.useState(initialText);
   const [addingToReview, setAddingToReview] = React.useState(false);
@@ -107,19 +113,38 @@ export function InlineCommentInput({
   const saveShortcut = formatShortcutForDisplay('enter');
   void isEditing;
 
-  const resizeTextarea = () => {
+  const resizeTextarea = React.useCallback(() => {
     const element = textareaRef.current;
     if (!element) return;
     element.style.height = 'auto';
     element.style.height = `${Math.min(element.scrollHeight, MAX_FIELD_HEIGHT_PX)}px`;
-  };
+  }, []);
 
   const handleTextChange = (value: string) => {
     setText(value);
     onTextChange?.(value);
   };
 
-  React.useLayoutEffect(resizeTextarea, [text]);
+  React.useLayoutEffect(resizeTextarea, [text, interfaceFontSizePx, padding, resizeTextarea]);
+  React.useEffect(resizeTextarea, [uiFont, customUiFont, uiFontWeight, resizeTextarea]);
+
+  React.useEffect(() => {
+    const field = textareaRef.current;
+    if (!field) return;
+    let width = 0;
+    const observer = new ResizeObserver(([entry]) => {
+      // Height writes must not trigger another measurement of the same width.
+      if (entry.contentRect.width === width) return;
+      width = entry.contentRect.width;
+      resizeTextarea();
+    });
+    observer.observe(field);
+    document.fonts.addEventListener('loadingdone', resizeTextarea);
+    return () => {
+      observer.disconnect();
+      document.fonts.removeEventListener('loadingdone', resizeTextarea);
+    };
+  }, [resizeTextarea]);
 
   // Stable range snapshot to prevent race with selection clearing
   const stableRangeRef = useRef(lineRange);
@@ -294,11 +319,11 @@ export function InlineCommentInput({
           aria-label={ariaLabel}
           spellCheck
           className={cn(
-            'min-w-0 resize-none bg-transparent text-sm leading-5 text-foreground outline-none placeholder:text-muted-foreground',
-            floating ? 'flex-1 py-1.5' : 'block w-full px-3 pb-1 pt-2',
-            isMobile && 'text-base leading-6'
+            'min-w-0 resize-none overflow-y-auto bg-transparent text-sm leading-[1.45] text-foreground outline-none placeholder:text-muted-foreground',
+            floating ? 'min-h-[calc(1lh+var(--spacing-3))] flex-1 py-1.5' : 'min-h-[calc(2lh+var(--spacing-3))] block w-full px-3 pb-1 pt-2',
+            isMobile && 'text-base'
           )}
-          style={{ minHeight: 0 }}
+          style={{ maxHeight: MAX_FIELD_HEIGHT_PX }}
         />
         {floating ? (
           <Tooltip>

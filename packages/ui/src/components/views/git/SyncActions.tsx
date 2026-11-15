@@ -113,7 +113,7 @@ export const SyncActions: React.FC<SyncActionsProps> = ({
               onClick={handleSync}
               disabled={isPrimaryDisabled}
               className={cn(
-                'inline-flex h-7 items-center gap-1.5 px-2 typography-ui-label font-medium text-foreground',
+                'inline-flex h-auto min-h-7 items-center gap-1.5 px-2 typography-ui-label font-medium text-foreground py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]',
                 'transition-colors hover:bg-interactive-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
               )}
               aria-label={publish ? publishLabel : t('gitView.sync.syncChanges')}

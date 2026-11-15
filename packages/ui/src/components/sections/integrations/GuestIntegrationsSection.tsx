@@ -311,7 +311,7 @@ export const GuestIntegrationCard: React.FC<GuestIntegrationCardProps> = ({ gues
                     onChange={(event) => setClientId(event.target.value)}
                     autoComplete="off"
                     spellCheck={false}
-                    className="h-8 min-w-0 flex-1 rounded-md px-3"
+                    className="h-auto min-h-8 min-w-0 flex-1 rounded-md px-3 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                     disabled={isBusy}
                   />
                 </SettingsStackedField>
@@ -325,7 +325,7 @@ export const GuestIntegrationCard: React.FC<GuestIntegrationCardProps> = ({ gues
                     onChange={(event) => setClientSecret(event.target.value)}
                     autoComplete="off"
                     spellCheck={false}
-                    className="h-8 min-w-0 flex-1 rounded-md px-3"
+                    className="h-auto min-h-8 min-w-0 flex-1 rounded-md px-3 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                     disabled={isBusy}
                   />
                 </SettingsStackedField>
@@ -341,7 +341,7 @@ export const GuestIntegrationCard: React.FC<GuestIntegrationCardProps> = ({ gues
                   onChange={(event) => setUsername(event.target.value)}
                   autoComplete="off"
                   spellCheck={false}
-                  className="h-8 min-w-0 flex-1 rounded-md px-3"
+                  className="h-auto min-h-8 min-w-0 flex-1 rounded-md px-3 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                   disabled={isBusy}
                 />
               </SettingsStackedField>
@@ -358,7 +358,7 @@ export const GuestIntegrationCard: React.FC<GuestIntegrationCardProps> = ({ gues
                   onChange={(event) => setToken(event.target.value)}
                   autoComplete="off"
                   spellCheck={false}
-                  className="h-8 min-w-0 flex-1 rounded-md px-3"
+                  className="h-auto min-h-8 min-w-0 flex-1 rounded-md px-3 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                   disabled={isBusy}
                 />
               </SettingsStackedField>
@@ -379,7 +379,7 @@ export const GuestIntegrationCard: React.FC<GuestIntegrationCardProps> = ({ gues
                   onBlur={() => void saveDeclaredSettings()}
                   autoComplete="off"
                   spellCheck={false}
-                  className="h-8 min-w-0 flex-1 rounded-md px-3"
+                  className="h-auto min-h-8 min-w-0 flex-1 rounded-md px-3 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                   disabled={isBusy}
                 />
               </SettingsStackedField>
@@ -393,7 +393,7 @@ export const GuestIntegrationCard: React.FC<GuestIntegrationCardProps> = ({ gues
                 <Input
                   value={status?.redirectUri ?? ''}
                   readOnly
-                  className="h-8 min-w-0 flex-1 rounded-md px-3"
+                  className="h-auto min-h-8 min-w-0 flex-1 rounded-md px-3 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                 />
                 <Button
                   type="button"

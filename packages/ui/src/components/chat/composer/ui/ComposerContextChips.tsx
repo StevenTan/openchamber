@@ -230,7 +230,7 @@ const DraftPreviewEntry: React.FC<{
                                 enterSubmits
                                 imagePaste={imagePaste}
                                 placeholder={t('chat.textSelection.comment.placeholder')}
-                                className="oc-surface-elevated oc-raised oc-field mt-0.5 w-full rounded-md bg-surface-elevated px-2 py-1 text-sm leading-5 text-foreground"
+                                className="oc-surface-elevated oc-raised oc-field mt-0.5 w-full rounded-md bg-surface-elevated px-2 py-1 text-sm leading-[1.45] text-foreground"
                             />
                         ) : (
                             <div dir="auto" className="mt-0.5 whitespace-pre-wrap break-words text-sm text-foreground">
@@ -531,7 +531,7 @@ function ComposerContextChipsView({ draftTarget, colors, previewHost, isMobile }
                     // Same chip shape as attached files and linked
                     // references; the inline minimums opt out of the
                     // mobile 36px button floor so the row stays even.
-                    className="inline-flex h-7 max-w-full min-w-0 items-center gap-1.5 rounded-lg border border-edge bg-background px-2 text-start text-xs transition-opacity hover:opacity-80"
+                    className="inline-flex h-auto min-h-7 max-w-full min-w-0 items-center gap-1.5 rounded-lg border border-edge bg-background px-2 text-start text-xs transition-opacity hover:opacity-80 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                     style={{ minHeight: 0, minWidth: 0 }}
                     onPointerEnter={onMouseHover(() => {
                         cancelClose();

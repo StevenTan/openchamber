@@ -187,7 +187,7 @@ export const ReviewSubmitButton: React.FC<{
             <Tooltip>
                 <TooltipTrigger asChild>
                     <span className="inline-flex flex-shrink-0">
-                        <Popover.Trigger render={<Button size="sm" className={cn('h-7 flex-shrink-0 gap-1.5 px-2', className)} aria-label={label} />}>
+                        <Popover.Trigger render={<Button size="sm" className={cn('h-auto min-h-7 flex-shrink-0 gap-1.5 px-2', className)} aria-label={label} />}>
                             {content}
                         </Popover.Trigger>
                     </span>

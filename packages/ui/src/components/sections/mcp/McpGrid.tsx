@@ -180,7 +180,7 @@ export const McpGrid: React.FC = () => {
             <Button
               variant="ghost"
               size="sm"
-              className="w-7 shrink-0 px-0 text-muted-foreground"
+              className="h-7 w-7 shrink-0 p-0 text-muted-foreground"
               disabled={isRefreshing}
               onClick={handleRefresh}
               aria-label={t('settings.mcp.sidebar.actions.refreshStatusAria')}

@@ -76,14 +76,14 @@ export function SessionDeleteConfirmDialog(props: {
             <button
               type="button"
               onClick={() => setValue(null)}
-              className="inline-flex h-8 items-center justify-center rounded-md border border-border px-3 typography-ui-label text-foreground hover:bg-interactive-hover/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="inline-flex h-auto min-h-8 items-center justify-center rounded-md border border-border px-3 typography-ui-label text-foreground hover:bg-interactive-hover/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
             >
               {t('sessions.sidebar.dialogs.cancel')}
             </button>
             <button
               type="button"
               onClick={() => void onConfirm()}
-              className="inline-flex h-8 items-center justify-center rounded-md bg-destructive px-3 typography-ui-label text-destructive-foreground hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50"
+              className="inline-flex h-auto min-h-8 items-center justify-center rounded-md bg-destructive px-3 typography-ui-label text-destructive-foreground hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
             >
               {value?.archivedBucket ? t('sessions.sidebar.bulkActions.delete') : t('sessions.sidebar.bulkActions.archive')}
             </button>
@@ -147,14 +147,14 @@ export function BulkSessionDeleteConfirmDialog(props: {
             <button
               type="button"
               onClick={() => setValue(null)}
-              className="inline-flex h-8 items-center justify-center rounded-md border border-border px-3 typography-ui-label text-foreground hover:bg-interactive-hover/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="inline-flex h-auto min-h-8 items-center justify-center rounded-md border border-border px-3 typography-ui-label text-foreground hover:bg-interactive-hover/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
             >
               {t('sessions.sidebar.dialogs.cancel')}
             </button>
             <button
               type="button"
               onClick={() => void onConfirm()}
-              className="inline-flex h-8 items-center justify-center rounded-md bg-destructive px-3 typography-ui-label text-destructive-foreground hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50"
+              className="inline-flex h-auto min-h-8 items-center justify-center rounded-md bg-destructive px-3 typography-ui-label text-destructive-foreground hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
             >
               {archived ? t('sessions.sidebar.bulkActions.delete') : t('sessions.sidebar.bulkActions.archive')}
             </button>
@@ -210,14 +210,14 @@ export function FolderDeleteConfirmDialog(props: {
           <button
             type="button"
             onClick={() => setValue(null)}
-              className="inline-flex h-8 items-center justify-center rounded-md border border-border px-3 typography-ui-label text-foreground hover:bg-interactive-hover/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="inline-flex h-auto min-h-8 items-center justify-center rounded-md border border-border px-3 typography-ui-label text-foreground hover:bg-interactive-hover/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
           >
             {t('sessions.sidebar.dialogs.cancel')}
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className="inline-flex h-8 items-center justify-center rounded-md bg-destructive px-3 typography-ui-label text-destructive-foreground hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50"
+            className="inline-flex h-auto min-h-8 items-center justify-center rounded-md bg-destructive px-3 typography-ui-label text-destructive-foreground hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
           >
             {t('sessions.sidebar.bulkActions.delete')}
           </button>

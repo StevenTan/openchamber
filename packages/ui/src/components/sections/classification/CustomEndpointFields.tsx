@@ -14,7 +14,7 @@ import { ClassifierTestButton } from './ClassifierTestButton';
 
 // Same footprint as the TypeSafe key row above.
 const ROW_CLASS = 'flex w-full min-w-0 items-center gap-2';
-const INPUT_CLASS = 'h-8 rounded-md px-3 min-w-0 flex-1';
+const INPUT_CLASS = 'h-auto min-h-8 rounded-md px-3 min-w-0 flex-1';
 
 /**
  * The custom System One endpoint: URL, model and an optional key. Saving

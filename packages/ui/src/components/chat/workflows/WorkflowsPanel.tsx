@@ -484,7 +484,7 @@ const WorkflowRunView: React.FC<{
                       aria-current={active ? 'page' : undefined}
                       aria-label={t(entry.labelKey)}
                       className={cn(
-                        'flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 transition-colors',
+                        'flex h-auto min-h-7 shrink-0 items-center gap-1.5 rounded-md px-2 transition-colors py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]',
                         active ? 'bg-interactive-selection text-interactive-selection-foreground' : 'text-muted-foreground hover:text-foreground',
                       )}
                     >

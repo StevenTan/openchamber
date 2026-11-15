@@ -91,7 +91,7 @@ export const EnvironmentVariablesEditor: React.FC<EnvironmentVariablesEditorProp
                     placeholder={t('settings.environment.editor.newValuePlaceholder')}
                     aria-label={t('settings.environment.editor.newValueAria', { name })}
                     disabled={controlsDisabled}
-                    className="h-8 min-w-0 max-w-[16rem] flex-1 font-mono text-xs"
+                    className="h-auto min-h-8 min-w-0 max-w-[16rem] flex-1 font-mono text-xs py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                   />
                   <Button type="submit" size="xs" disabled={controlsDisabled} className="shrink-0 !font-normal">
                     {t('settings.environment.editor.save')}
@@ -152,7 +152,7 @@ export const EnvironmentVariablesEditor: React.FC<EnvironmentVariablesEditorProp
             aria-label={t('settings.environment.editor.nameAria')}
             aria-invalid={nameInvalid || undefined}
             disabled={controlsDisabled}
-            className="h-8 w-40 font-mono text-xs"
+            className="h-auto min-h-8 w-40 font-mono text-xs py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
           />
           <Input
             type="password"
@@ -161,7 +161,7 @@ export const EnvironmentVariablesEditor: React.FC<EnvironmentVariablesEditorProp
             placeholder={t('settings.environment.editor.valuePlaceholder')}
             aria-label={t('settings.environment.editor.valueAria')}
             disabled={controlsDisabled}
-            className="h-8 min-w-0 flex-1 font-mono text-xs"
+            className="h-auto min-h-8 min-w-0 flex-1 font-mono text-xs py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
           />
           <Button
             type="submit"

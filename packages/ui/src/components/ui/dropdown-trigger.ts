@@ -26,7 +26,7 @@ export const dropdownTriggerVariants = cva(
   [
     'oc-surface-elevated oc-raised flex items-center justify-between gap-1.5 rounded-md bg-[var(--surface-background)] dark:bg-surface-elevated',
     'aria-invalid:[--oc-raised-edge:var(--status-error)]',
-    'typography-ui-label whitespace-nowrap outline-none text-start',
+    'typography-ui-label whitespace-nowrap outline-none text-start py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]',
     'hover:[background-image:linear-gradient(var(--interactive-hover),var(--interactive-hover))] data-[popup-open]:[background-image:linear-gradient(var(--interactive-active),var(--interactive-active))]',
     'focus-visible:outline-none',
     'disabled:cursor-not-allowed disabled:opacity-50',
@@ -35,9 +35,9 @@ export const dropdownTriggerVariants = cva(
   {
     variants: {
       size: {
-        default: "h-7 min-h-7 px-2.5 [&_svg:not([class*='size-'])]:size-4",
-        mobile: "h-8 min-h-8 px-3 [&_svg:not([class*='size-'])]:size-4",
-        touch: "h-11 min-h-11 px-3 [&_svg:not([class*='size-'])]:size-4",
+        default: "h-auto min-h-7 px-2.5 [&_svg:not([class*='size-'])]:size-4",
+        mobile: "h-auto min-h-8 px-3 [&_svg:not([class*='size-'])]:size-4",
+        touch: "h-auto min-h-11 px-3 [&_svg:not([class*='size-'])]:size-4",
       },
     },
     defaultVariants: {

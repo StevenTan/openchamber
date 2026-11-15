@@ -988,7 +988,7 @@ export const ProvidersPage: React.FC = () => {
                 value={modelQuery}
                 onChange={(event) => setModelQuery(event.target.value)}
                 placeholder={t('settings.providers.page.models.filterPlaceholder')}
-                className="h-7 ps-8 w-full"
+                className="h-auto min-h-7 ps-8 w-full py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
               />
             </div>
 

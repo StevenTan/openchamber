@@ -407,7 +407,7 @@ const MachineField: React.FC<{ machine: string | null; onChange: (place: SpacePl
           onKeyDown={(event) => { if (event.key === 'Enter' && !saving && !unchanged) { event.preventDefault(); void save(draft); } }}
           placeholder={t('settings.openchamber.spaces.places.machine.placeholder')}
           aria-label={t('settings.openchamber.spaces.places.machine.label')}
-          className="h-8 min-w-[14rem] flex-1 max-w-[24rem] font-mono"
+          className="h-auto min-h-8 min-w-[14rem] flex-1 max-w-[24rem] font-mono py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
           autoComplete="off"
           spellCheck={false}
           disabled={saving}

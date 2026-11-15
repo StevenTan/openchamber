@@ -197,7 +197,7 @@ export const ChatSearchBar: React.FC<{
         }}
         placeholder={t('chat.search.placeholder')}
         aria-label={t('chat.search.placeholder')}
-        className="h-7 w-48 min-w-0 bg-transparent typography-meta text-foreground outline-none placeholder:text-muted-foreground"
+        className="h-auto min-h-7 w-48 min-w-0 bg-transparent typography-meta text-foreground outline-none placeholder:text-muted-foreground py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
       />
       <span className="min-w-[4.5rem] shrink-0 text-end typography-micro text-muted-foreground" role="status" aria-live="polite">{status}</span>
       <SearchAction label={t('chat.search.previous')} icon="arrow-up-s" disabled={hits.length === 0} onClick={() => step(-1)} />

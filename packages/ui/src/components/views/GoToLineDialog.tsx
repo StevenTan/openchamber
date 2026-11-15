@@ -227,7 +227,7 @@ export function GoToLineDialog({ open, onOpenChange, viewRef, variant = 'overlay
             }
           }}
           placeholder={t('goToLineDialog.field.linePlaceholderShort')}
-          className="h-6 w-20 rounded-md border-edge bg-transparent px-2 typography-meta"
+          className="h-auto min-h-6 w-20 rounded-md border-edge bg-transparent px-2 typography-meta py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
         />
         <Tooltip>
           <TooltipTrigger asChild>
@@ -238,7 +238,7 @@ export function GoToLineDialog({ open, onOpenChange, viewRef, variant = 'overlay
                 size="xs"
                 onClick={handleSubmit}
                 disabled={!view || lineNumber === null}
-                className="h-6 px-2"
+                className="h-auto min-h-6 px-2"
               >
                 {t('goToLineDialog.actions.go')}
               </Button>
@@ -275,7 +275,7 @@ export function GoToLineDialog({ open, onOpenChange, viewRef, variant = 'overlay
             }
           }}
           placeholder={t('goToLineDialog.field.linePlaceholder')}
-          className="h-8 w-full rounded-md border-edge bg-surface-elevated/60 typography-ui-label"
+          className="h-auto min-h-8 w-full rounded-md border-edge bg-surface-elevated/60 typography-ui-label py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
         />
         <div className="mt-2 rounded-md bg-primary/15 px-3 py-1.5 typography-ui-label text-foreground/95">
           {helperText}

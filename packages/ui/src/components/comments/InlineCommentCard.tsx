@@ -104,7 +104,7 @@ export function InlineCommentCard({
               <Button
                 variant="ghost"
                 size="sm"
-                className="mt-1 h-6 w-full justify-start px-0 text-xs text-muted-foreground hover:text-foreground"
+                className="mt-1 h-auto min-h-6 w-full justify-start px-0 text-xs text-muted-foreground hover:text-foreground"
               >
                 {isOpen ? (
                   <>

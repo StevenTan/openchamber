@@ -13,4 +13,4 @@ export const WorkStatusTouchContext = React.createContext(false);
  * rows) keep the desktop's `xs` button, grown to the phone's 36px touch floor,
  * with room for a word its wider padding would otherwise cut.
  */
-export const TOUCH_CONTROL_CLASS = 'h-9 max-w-[8rem] px-3';
+export const TOUCH_CONTROL_CLASS = 'h-auto min-h-9 max-w-[8rem] px-3';

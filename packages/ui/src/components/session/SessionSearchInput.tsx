@@ -28,7 +28,7 @@ type SessionSearchInputProps = {
 
 const FIELD_CLASS = 'rounded-md border border-border oc-raised oc-field hover:[&:not(:focus-within)]:[background-image:linear-gradient(var(--interactive-hover),var(--interactive-hover))]';
 const QUIET_REST_CLASS = 'rounded-md border border-transparent hover:bg-interactive-hover';
-const BARE_INPUT_CLASS = 'h-6 min-w-0 flex-1 rounded-none border-0 bg-transparent p-0 shadow-none dark:bg-transparent typography-ui-label text-foreground hover:[&:not(:focus)]:[background-image:none]';
+const BARE_INPUT_CLASS = 'h-auto min-h-6 min-w-0 flex-1 rounded-none border-0 bg-transparent p-0 shadow-none dark:bg-transparent typography-ui-label text-foreground hover:[&:not(:focus)]:[background-image:none] py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]';
 
 // Keeps the draft local and commits it on a debounce, so typing renders only the field.
 export function SessionSearchInput({
@@ -96,7 +96,7 @@ export function SessionSearchInput({
       }}
       className={cn(
         'relative flex min-w-0 cursor-text items-center gap-0.5',
-        mobile ? 'border-b border-edge-muted py-1 ps-8' : cn('h-8 pe-1', quiet ? 'ps-7' : 'ps-8', atRest ? QUIET_REST_CLASS : FIELD_CLASS),
+        mobile ? 'border-b border-edge-muted py-1 ps-8' : cn('h-auto min-h-8 pe-1', quiet ? 'ps-7' : 'ps-8', atRest ? QUIET_REST_CLASS : FIELD_CLASS),
       )}
     >
       <Icon name="search" className={cn('pointer-events-none absolute top-1/2 -translate-y-1/2 text-muted-foreground', mobile ? 'inset-s-2.5 size-3.5' : cn('size-4', quiet ? 'inset-s-1.5' : 'inset-s-2'))} />

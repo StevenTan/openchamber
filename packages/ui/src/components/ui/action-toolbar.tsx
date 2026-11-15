@@ -83,7 +83,7 @@ export function ToolbarButton({
       size="xs"
       aria-label={label}
       aria-pressed={pressed}
-      className={cn('w-6 px-0 has-[>svg]:px-0', pressed ? PRESSED_CLASS : REST_CLASS, className)}
+      className={cn('h-6 w-6 p-0 has-[>svg]:px-0', pressed ? PRESSED_CLASS : REST_CLASS, className)}
       {...props}
     >
       <Icon

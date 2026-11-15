@@ -629,7 +629,7 @@ const SkillsInstalledPage: React.FC = () => {
                   value={draftName}
                   onChange={(e) => setDraftName(e.target.value.toLowerCase().replace(/\s+/g, '-'))}
                   placeholder={t('settings.skills.page.field.skillNamePlaceholder')}
-                  className="h-7 w-40 px-2"
+                  className="h-auto min-h-7 w-40 px-2 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                 />
                 <Select
                   value={locationValueFrom(draftScope, draftSource)}

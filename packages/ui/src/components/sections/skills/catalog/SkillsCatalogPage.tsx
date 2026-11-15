@@ -382,7 +382,7 @@ export const SkillsCatalogPage: React.FC<SkillsCatalogPageProps> = ({ mode, onMo
       >
       {showModeTabs && (
             <div className="mb-4">
-              <div className="h-7">
+              <div className="h-auto min-h-7">
                 <SortableTabsStrip
                   items={[
                     { id: 'manual', label: t('settings.skills.catalog.page.mode.manual') },
@@ -409,7 +409,7 @@ export const SkillsCatalogPage: React.FC<SkillsCatalogPageProps> = ({ mode, onMo
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t('settings.skills.catalog.page.searchAllPlaceholder')}
-              className={cn('h-8 ps-8 w-full', search && 'pe-8')}
+              className={cn('h-auto min-h-8 ps-8 w-full py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]', search && 'pe-8')}
             />
             {search && (
               <button

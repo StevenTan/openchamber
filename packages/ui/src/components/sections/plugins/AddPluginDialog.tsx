@@ -155,7 +155,7 @@ export const AddPluginDialog: React.FC<AddPluginDialogProps> = ({
           layoutMode="fit"
           variant="active-pill"
           pillSize="form"
-          className="h-8"
+          className="h-auto min-h-8"
         />
 
         <div className="flex flex-col gap-4">

@@ -664,10 +664,10 @@ export const Header: React.FC = () => {
       return '';
     }
     if (macosMajorVersion >= 26) {
-      return 'h-11';
+      return 'min-h-11';
     }
     if (macosMajorVersion <= 15) {
-      return 'h-14';
+      return 'min-h-14';
     }
     return '';
   }, [isDesktopApp, isMacPlatform, macosMajorVersion]);
@@ -697,7 +697,7 @@ export const Header: React.FC = () => {
       return {};
     }
 
-    const style: React.CSSProperties = { minHeight: height, height };
+    const style: React.CSSProperties = { minHeight: height };
     // The start inset is handled by the no-drag spacer (see renderDesktop). The
     // end inset clears the window-controls overlay, and in a right-to-left
     // layout also the macOS traffic lights, which stay on the left.
@@ -833,7 +833,7 @@ export const Header: React.FC = () => {
     <div
       onMouseDown={handleDragStart}
       className={cn(
-        'app-region-drag relative flex h-12 select-none items-center',
+        'app-region-drag relative flex min-h-12 shrink-0 select-none items-center',
         // 10 px puts the last 24 px button's centre 22 px from the window edge,
         // on the axis of the 44 px icon rail below it.
         endEdgeOwnedByInWindowControls ? 'pe-0' : 'pe-2.5',

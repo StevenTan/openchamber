@@ -104,7 +104,7 @@ export const SettingsColorField: React.FC<{
           placeholder="#RRGGBB"
           aria-invalid={draftInvalid}
           aria-label={labels.hex}
-          className="h-7 w-24 rounded-md px-2 font-mono typography-meta"
+          className="h-auto min-h-7 w-24 rounded-md px-2 font-mono typography-meta py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
         />
       ) : null}
     </div>

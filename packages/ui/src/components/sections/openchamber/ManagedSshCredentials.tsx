@@ -163,7 +163,7 @@ export function ManagedSshCredentials({ selection, disabled = false }: {
   return <div className="flex min-w-0 flex-1 flex-col gap-2">
     <SettingsStackedField label={t('settings.sourceControl.ssh.passphrase')}
       info={t('settings.sourceControl.ssh.passphraseHint')}>
-      <Input type="password" value={passphrase} autoComplete="off" maxLength={1024} className="h-8 rounded-md px-3"
+      <Input type="password" value={passphrase} autoComplete="off" maxLength={1024} className="h-auto min-h-8 rounded-md px-3 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
         aria-label={t('settings.sourceControl.ssh.passphrase')} disabled={controlsDisabled}
         onChange={(event) => {
           setPassphrase(event.target.value);

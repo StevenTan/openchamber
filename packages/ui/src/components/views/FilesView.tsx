@@ -2718,7 +2718,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full', visible = t
                   <span className="min-w-0 flex-1 truncate text-[var(--status-error)]" title={loadErrorsByDir[node.path]}>{loadErrorsByDir[node.path]}</span>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button variant="ghost" size="xs" className="h-6 gap-1" onClick={() => void refreshDirectory(node.path)}>
+                      <Button variant="ghost" size="xs" className="h-auto min-h-6 gap-1" onClick={() => void refreshDirectory(node.path)}>
                         <Icon name="refresh" className="size-3.5" />
                         {t('filesView.tree.actions.refreshTitle')}
                       </Button>
@@ -5315,7 +5315,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full', visible = t
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t('filesView.tree.search.placeholder')}
-              className="h-8 ps-8 pe-8 typography-meta"
+              className="h-auto min-h-8 ps-8 pe-8 typography-meta py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
             />
             {searchQuery.trim().length > 0 && (
               <Tooltip>

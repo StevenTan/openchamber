@@ -29,7 +29,7 @@ export type ReferenceThreadActions = {
 };
 
 // Text actions under a thread: a colour change on hover, no fill.
-const THREAD_ACTION_CLASS = cn('h-6 px-1.5 hover:bg-transparent hover:text-foreground', REFERENCE_META_TEXT);
+const THREAD_ACTION_CLASS = cn('h-auto min-h-6 px-1.5 hover:bg-transparent hover:text-foreground', REFERENCE_META_TEXT);
 
 const Avatar: React.FC<{ comment: ReferenceCommentItem; className: string }> = ({ comment, className }) => {
     const { broken, onError } = useAvatarImage(comment.avatarUrl);

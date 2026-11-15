@@ -8,6 +8,7 @@
     --oc-safe-area-bottom-visual: 0px;
     --oc-safe-area-left: 0px;
     --oc-header-height: 56px;
+    --oc-work-status-heading-height: max(var(--spacing-6), calc(1.4em + 0.3em * var(--padding-scale, 1)));
     --oc-visual-viewport-offset-top: 0px;
     --oc-visual-viewport-height: 100dvh;
     --oc-wco-left-inset: 0px;

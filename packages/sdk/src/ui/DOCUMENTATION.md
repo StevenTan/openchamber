@@ -33,6 +33,8 @@ Every `mountX(root, props)` returns `{ update(partial), dispose() }`.
 ## Invariants
 
 - Each primitive is the twin of the app's own in `packages/ui/src/components/ui` (button, input, dropdown trigger, select item, checkbox, tabs, badge). A change to the app's sizes, radii, or states changes the twin here in the same change, then the example bundles are rebuilt.
+- Text buttons, inputs, picker triggers and tabs use minimum heights and
+  font-relative padding so their text can increase the control height.
 - Call `applyHostReady` from `onReady` before the first mount. Without those tokens the kit has no colours.
 - The required `*Text` tokens come from the host's `lib/theme/readableColors.ts`. The SDK never duplicates the contrast calculation. `applyHostTheme` writes both naming schemes on every snapshot. Tinted button labels, badge text, banner titles and error text use these values; fills keep the base colors.
 - Syntax tokens are optional. Each theme snapshot clears a missing optional token, so a previous theme cannot leave a stale syntax color behind. Guests that need to support older snapshots should fall back to an existing semantic token in their own CSS.

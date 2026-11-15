@@ -1464,7 +1464,7 @@ export const TunnelSettings: React.FC = () => {
                                 });
                               }}
                               placeholder={hasSavedToken ? t('settings.openchamber.tunnel.field.savedTokenAvailablePlaceholder') : t('settings.openchamber.tunnel.field.pasteTokenPlaceholder')}
-                              className="h-7"
+                              className="h-auto min-h-7 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                               disabled={state === 'starting' || state === 'stopping'}
                             />
                             <div className="flex items-center justify-end">
@@ -1502,14 +1502,14 @@ export const TunnelSettings: React.FC = () => {
                   value={newPresetName}
                   onChange={(event) => setNewPresetName(event.target.value)}
                   placeholder={t('settings.openchamber.tunnel.field.newPresetNamePlaceholder')}
-                  className="h-7"
+                  className="h-auto min-h-7 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                   disabled={isSavingMode || state === 'starting' || state === 'stopping'}
                 />
                 <Input
                   value={newPresetHostname}
                   onChange={(event) => setNewPresetHostname(event.target.value)}
                   placeholder={t('settings.openchamber.tunnel.field.newPresetHostnamePlaceholder')}
-                  className="h-7"
+                  className="h-auto min-h-7 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                   disabled={isSavingMode || state === 'starting' || state === 'stopping'}
                 />
                 <Input
@@ -1517,7 +1517,7 @@ export const TunnelSettings: React.FC = () => {
                   value={newPresetToken}
                   onChange={(event) => setNewPresetToken(event.target.value)}
                   placeholder={t('settings.openchamber.tunnel.field.newPresetTokenPlaceholder')}
-                  className="h-7"
+                  className="h-auto min-h-7 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                   disabled={isSavingMode || state === 'starting' || state === 'stopping'}
                 />
                 {typeof suggestedConnectorPort === 'number' && (
@@ -1591,7 +1591,7 @@ export const TunnelSettings: React.FC = () => {
                     void handleManagedLocalConfigInputBlur();
                   }}
                   placeholder={t('settings.openchamber.tunnel.field.configurationFilePlaceholder')}
-                  className="h-7"
+                  className="h-auto min-h-7 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                   disabled={state === 'starting' || state === 'stopping' || isSavingMode}
                 />
                 <Button

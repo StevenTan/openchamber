@@ -169,7 +169,7 @@ export const ProjectEnvironmentSection: React.FC<{ projectRef: ProjectRef }> = (
                 placeholder="direnv export json"
                 aria-label={t('settings.projects.environment.command.label')}
                 disabled={disabled}
-                className="h-8 min-w-0 flex-1 font-mono text-xs"
+                className="h-auto min-h-8 min-w-0 flex-1 font-mono text-xs py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
               />
               {commandChanged ? (
                 <Button type="submit" size="xs" disabled={disabled} className="shrink-0 !font-normal">

@@ -990,7 +990,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
                             onClick={() => openPage(page.slug)}
                             aria-current={selected ? 'page' : undefined}
                             className={cn(
-                              'flex h-11 w-full items-center gap-2.5 rounded-md px-3 overflow-hidden sm:h-8 sm:gap-2 sm:px-2',
+                              'flex h-11 w-full items-center gap-2.5 rounded-md px-3 overflow-hidden sm:h-auto sm:min-h-8 sm:gap-2 sm:px-2 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]',
                               selected
                                 ? 'oc-selected text-foreground'
                                 : 'text-foreground hover:bg-interactive-hover'

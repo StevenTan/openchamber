@@ -124,7 +124,7 @@ export function NewWorktreeBranchPicker({
   if (isMobile) {
     return (
       <>
-        <Button variant="outline" size="sm" onClick={() => changeOpen(true)} disabled={disabled} className="h-8 w-full justify-between">
+        <Button variant="outline" size="sm" onClick={() => changeOpen(true)} disabled={disabled} className="h-auto min-h-8 w-full justify-between">
           {triggerLabel}
           <Icon name="git-branch" className="h-4 w-4 text-muted-foreground" />
         </Button>

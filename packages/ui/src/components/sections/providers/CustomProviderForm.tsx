@@ -266,7 +266,7 @@ export const CustomProviderForm: React.FC<CustomProviderFormProps> = ({
             value={form.providerID}
             onChange={(event) => setField('providerID', event.target.value)}
             placeholder={t('settings.providers.page.custom.field.providerID.placeholder')}
-            className="h-8 rounded-md px-3 font-mono text-xs"
+            className="h-auto min-h-8 rounded-md px-3 font-mono text-xs py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
             autoFocus={!isEdit}
             disabled={isEdit || busy}
             aria-invalid={Boolean(err.providerID)}
@@ -319,7 +319,7 @@ export const CustomProviderForm: React.FC<CustomProviderFormProps> = ({
             value={form.name}
             onChange={(event) => setField('name', event.target.value)}
             placeholder={t('settings.providers.page.custom.field.name.placeholder')}
-            className="h-8 rounded-md px-3"
+            className="h-auto min-h-8 rounded-md px-3 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
             aria-invalid={Boolean(err.name)}
             aria-label={t('settings.providers.page.custom.field.name.label')}
           />
@@ -389,7 +389,7 @@ export const CustomProviderForm: React.FC<CustomProviderFormProps> = ({
             value={form.baseURL}
             onChange={(event) => setField('baseURL', event.target.value)}
             placeholder={t('settings.providers.page.custom.field.baseURL.placeholder')}
-            className="h-8 rounded-md px-3 font-mono text-xs"
+            className="h-auto min-h-8 rounded-md px-3 font-mono text-xs py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
             aria-invalid={Boolean(err.baseURL)}
             aria-label={t('settings.providers.page.custom.field.baseURL.label')}
           />
@@ -413,7 +413,7 @@ export const CustomProviderForm: React.FC<CustomProviderFormProps> = ({
                 ? t('settings.providers.page.custom.field.apiKey.editPlaceholder')
                 : t('settings.providers.page.custom.field.apiKey.placeholder')
             }
-            className="h-8 rounded-md px-3 font-mono text-xs"
+            className="h-auto min-h-8 rounded-md px-3 font-mono text-xs py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
             aria-invalid={Boolean(err.apiKey)}
             aria-label={t('settings.providers.page.custom.field.apiKey.label')}
           />
@@ -516,7 +516,7 @@ export const CustomProviderForm: React.FC<CustomProviderFormProps> = ({
                     value={header.key}
                     onChange={(event) => setHeader(index, 'key', event.target.value)}
                     placeholder={t('settings.providers.page.custom.headers.keyPlaceholder')}
-                    className="mt-1 h-8 rounded-md px-3 font-mono text-xs"
+                    className="mt-1 h-auto min-h-8 rounded-md px-3 font-mono text-xs py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                     aria-label={t('settings.providers.page.custom.headers.keyLabel')}
                   />
                   {headerErrors[index]?.key ? (
@@ -531,7 +531,7 @@ export const CustomProviderForm: React.FC<CustomProviderFormProps> = ({
                     value={header.value}
                     onChange={(event) => setHeader(index, 'value', event.target.value)}
                     placeholder={t('settings.providers.page.custom.headers.valuePlaceholder')}
-                    className="mt-1 h-8 rounded-md px-3 font-mono text-xs"
+                    className="mt-1 h-auto min-h-8 rounded-md px-3 font-mono text-xs py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                     aria-label={t('settings.providers.page.custom.headers.valueLabel')}
                   />
                   {headerErrors[index]?.value ? (

@@ -340,7 +340,7 @@ export const PluginsGrid: React.FC<{
             <Button
               variant="ghost"
               size="sm"
-              className="w-7 shrink-0 px-0 text-muted-foreground"
+              className="h-7 w-7 shrink-0 p-0 text-muted-foreground"
               onClick={() => void handleRefresh()}
               disabled={refreshing}
               aria-label={t('settings.plugins.sidebar.actions.refresh')}

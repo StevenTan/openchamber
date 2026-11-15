@@ -33,6 +33,7 @@ describe('comment fields and the return key', () => {
 
     beforeEach(() => {
         browser = new Window();
+        Object.defineProperty(browser.document, 'fonts', { value: new browser.EventTarget() });
         const globals = {
             window: browser,
             document: browser.document,

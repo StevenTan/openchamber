@@ -2930,7 +2930,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                                             value={agentSearchQuery}
                                             onChange={(e) => setAgentSearchQuery(e.target.value)}
                                             onKeyDown={handleAgentSearchKeyDown}
-                                            className="h-7 rounded-none bg-transparent ps-8 pe-0 typography-meta ring-0 hover:[&:not(:focus)]:bg-transparent hover:[&:not(:focus)]:[background-image:none] focus:ring-0 focus-visible:ring-0"
+                                            className="h-auto min-h-7 rounded-none bg-transparent ps-8 pe-0 typography-meta ring-0 hover:[&:not(:focus)]:bg-transparent hover:[&:not(:focus)]:[background-image:none] focus:ring-0 focus-visible:ring-0 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                                         />
                                     </div>
                                 </div>

@@ -224,7 +224,7 @@ const ProviderKeyRow: React.FC<{ provider: WebSearchProvider; access: WebSearchP
   const submitOnEnter = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') void handleSave();
   };
-  const inputClassName = 'h-8 min-w-0 flex-1 rounded-md px-3 font-mono text-xs';
+  const inputClassName = 'h-auto min-h-8 min-w-0 flex-1 rounded-md px-3 font-mono text-xs';
   const inputs: React.ReactNode[] = connect.fields.map((field) => (
     <Input
       key={field.key}

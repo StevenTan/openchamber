@@ -27,7 +27,7 @@ const ToolbarButton: React.FC<ToolbarButtonProps> = ({ icon, label, onClick, dis
           variant={pressed ? 'secondary' : 'ghost'}
           size="xs"
           className={cn(
-            'w-6 shrink-0 rounded-full px-0 text-muted-foreground',
+            'h-6 w-6 shrink-0 rounded-full p-0 text-muted-foreground',
             'hover:text-foreground',
             pressed && 'text-foreground',
           )}
@@ -190,7 +190,7 @@ export const BrowserToolbar: React.FC<BrowserToolbarProps> = ({
           aria-expanded={visibleSuggestions.length > 0}
           aria-controls="openchamber-browser-address-suggestions"
           className={cn(
-            'oc-raised oc-field h-6 w-full rounded-full bg-[var(--surface-elevated)] px-3',
+            'oc-raised oc-field h-auto min-h-6 w-full rounded-full bg-[var(--surface-elevated)] px-3 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]',
             addressMark && 'ps-8',
             'typography-micro text-foreground outline-none',
           )}

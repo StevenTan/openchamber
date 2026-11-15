@@ -6,6 +6,9 @@ subagents.
 
 ## Structure
 
+Desktop rows use minimum heights and font-relative padding. The first heading
+and the section-settings control share a height token to keep their icons aligned.
+
 Every readout is a **labelled row**: icon, name, trailing value. A number
 without a name is unreadable at a glance, which is what an unlabelled stream of
 values degenerates into.

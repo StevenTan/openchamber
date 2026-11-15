@@ -131,7 +131,7 @@ function FontField<T extends string>({
                         aria-label={t('settings.openchamber.visual.field.customFontAria')}
                         spellCheck={false}
                         autoComplete="off"
-                        className="h-8 basis-full rounded-md px-3"
+                        className="h-auto min-h-8 basis-full rounded-md px-3 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                     />
                 ) : null}
             </div>

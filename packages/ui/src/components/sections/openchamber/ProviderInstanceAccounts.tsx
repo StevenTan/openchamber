@@ -449,7 +449,7 @@ export const ProviderInstanceAccounts: React.FC<ProviderInstanceAccountsProps> =
         >
           <div className={`${SETTINGS_CONTROL_CLUSTER_CLASS} flex flex-col gap-2 @xl:flex-row @xl:items-center`}>
             <Input
-              className="h-8 w-full min-w-0 rounded-md"
+              className="h-auto min-h-8 w-full min-w-0 rounded-md py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
               value={sshUrl}
               onChange={(event) => setSshUrl(event.target.value)}
               placeholder={t('settings.sourceControl.field.sshUrl.placeholder')}
@@ -484,7 +484,7 @@ export const ProviderInstanceAccounts: React.FC<ProviderInstanceAccountsProps> =
         >
           <div className={`${SETTINGS_CONTROL_CLUSTER_CLASS} flex flex-col gap-2 @xl:flex-row @xl:items-center`}>
             <Input
-              className="h-8 w-full min-w-0 rounded-md"
+              className="h-auto min-h-8 w-full min-w-0 rounded-md py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
               value={aliases}
               onChange={(event) => setAliases(event.target.value)}
               placeholder={t('settings.sourceControl.field.aliases.placeholder')}
@@ -585,7 +585,7 @@ export const ProviderInstanceAccounts: React.FC<ProviderInstanceAccountsProps> =
             <SettingsFieldRow label={t('settings.sourceControl.field.username.label')} info={t('settings.sourceControl.field.username.info', { provider })}>
               <div className={SETTINGS_CONTROL_CLUSTER_CLASS}>
                 <Input
-                  className="h-8 w-full min-w-0 rounded-md"
+                  className="h-auto min-h-8 w-full min-w-0 rounded-md py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                   value={username}
                   onChange={(event) => setUsername(event.target.value)}
                   aria-label={t('settings.sourceControl.field.username.label')}
@@ -615,7 +615,7 @@ export const ProviderInstanceAccounts: React.FC<ProviderInstanceAccountsProps> =
             >
               <div className={`${SETTINGS_CONTROL_CLUSTER_CLASS} flex flex-col gap-2 @xl:flex-row @xl:items-center`}>
                 <Input
-                  className="h-8 w-full min-w-0 rounded-md"
+                  className="h-auto min-h-8 w-full min-w-0 rounded-md py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                   type="password"
                   value={token}
                   onChange={(event) => setToken(event.target.value)}

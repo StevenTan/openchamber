@@ -426,7 +426,7 @@ const Line: React.FC<{ row: Extract<GuestStatusRow, { kind: 'line' }> }> = ({ ro
     <span dir="auto" tabIndex={labelTooltip ? 0 : undefined} className={cn('min-w-0 truncate', row.content ? 'w-24 shrink-0' : 'flex-1')}>{row.label}</span>
   );
   const body = (
-    <div className={cn('flex w-full items-center gap-2 rounded-md text-start text-[length:var(--text-ui-compact)] text-muted-foreground', touch ? 'min-h-7 px-2.5' : 'h-7 px-1')} tabIndex={rowTooltip ? 0 : undefined}>
+    <div className={cn('flex w-full items-center gap-2 rounded-md text-start text-[length:var(--text-ui-compact)] text-muted-foreground', touch ? 'min-h-7 px-2.5' : 'min-h-7 px-1 py-[calc(0.2em*var(--padding-scale,1))] leading-[1.4]')} tabIndex={rowTooltip ? 0 : undefined}>
       {row.dot ? <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: strokeColor(row.dot) }} /> : null}
       {icon ? <Icon name={icon} className="size-[13px] shrink-0 text-muted-foreground" /> : null}
       {labelTooltip ? <RowTooltip text={labelTooltip}>{label}</RowTooltip> : label}

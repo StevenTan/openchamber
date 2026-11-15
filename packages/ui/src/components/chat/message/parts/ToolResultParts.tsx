@@ -40,7 +40,7 @@ export const QuietAction: React.FC<
     <button
         {...handlers}
         type="button"
-        className="inline-flex h-6 items-center gap-1.5 whitespace-nowrap typography-meta text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:text-foreground"
+        className="inline-flex h-auto min-h-6 items-center gap-1.5 whitespace-nowrap typography-meta text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:text-foreground py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
         onPointerDown={(event) => {
             onPointerDown?.(event);
             event.stopPropagation();

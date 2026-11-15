@@ -39,7 +39,7 @@ export const QuotaCredentials: React.FC<{ providerId: QuotaCredentialProviderId;
     } catch (error) { toast.error(error instanceof Error && error.message ? error.message : t('settings.providers.page.openCodeGo.saveFailed')); }
     finally { setBusy(false); }
   };
-  const field = (name: keyof CredentialPayload, label: string, placeholder: string) => <label className="block typography-ui-label text-foreground">{label}<Input className="mt-1 h-7 font-mono text-xs" type="password" autoComplete="off" value={values[name] ?? ''} onChange={(event) => setValues((current) => ({ ...current, [name]: event.target.value }))} placeholder={status?.secretMasked ?? placeholder} /></label>;
+  const field = (name: keyof CredentialPayload, label: string, placeholder: string) => <label className="block typography-ui-label text-foreground">{label}<Input className="mt-1 h-auto min-h-7 font-mono text-xs py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]" type="password" autoComplete="off" value={values[name] ?? ''} onChange={(event) => setValues((current) => ({ ...current, [name]: event.target.value }))} placeholder={status?.secretMasked ?? placeholder} /></label>;
   return <div data-settings-item={`usage.${providerId}-credentials`} className="mb-8">
     <div className="mb-1 px-1"><h3 className="typography-ui-header font-medium text-foreground">{providerName}</h3></div>
     <section className="space-y-3 px-2 pb-2 pt-0">

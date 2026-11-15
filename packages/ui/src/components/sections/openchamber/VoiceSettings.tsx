@@ -42,7 +42,7 @@ import { SettingsInlineLink } from '@/components/sections/classification/JevAcce
 import { selectSmallModelAvailability, useSmallModelStore } from '@/stores/useSmallModelStore';
 import { useUIStore } from '@/stores/useUIStore';
 
-const VOICE_TEXT_INPUT_CLASS = 'oc-surface-elevated oc-raised oc-field w-full min-w-0 h-8 rounded-md bg-surface-elevated px-3 typography-ui-label text-foreground placeholder:text-muted-foreground focus:outline-none';
+const VOICE_TEXT_INPUT_CLASS = 'oc-surface-elevated oc-raised oc-field w-full min-w-0 h-auto min-h-8 rounded-md bg-surface-elevated px-3 typography-ui-label text-foreground placeholder:text-muted-foreground focus:outline-none py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]';
 
 // languageHint: the model takes the dictation language instead of detecting it.
 const LOCAL_STT_MODELS = [

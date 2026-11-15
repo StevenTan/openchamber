@@ -444,7 +444,7 @@ export const ProjectNotesTodoPanel: React.FC<ProjectNotesTodoPanelProps> = ({
         onClick={interactive ? () => setStoredTab(section.id) : undefined}
         aria-current={isActive ? 'page' : undefined}
         className={cn(
-          'flex h-7 flex-shrink-0 items-center gap-1.5 rounded-md px-2 transition-colors',
+          'flex h-auto min-h-7 flex-shrink-0 items-center gap-1.5 rounded-md px-2 transition-colors py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
           isActive
             ? 'bg-interactive-selection text-interactive-selection-foreground'

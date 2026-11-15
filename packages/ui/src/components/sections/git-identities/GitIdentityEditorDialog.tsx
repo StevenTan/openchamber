@@ -455,7 +455,7 @@ export const GitIdentityEditorDialog: React.FC<GitIdentityEditorDialogProps> = (
                     <div className="flex min-w-0 flex-1 flex-col gap-2">
                       <SettingsStackedField label={t('settings.sourceControl.ssh.passphrase')}
                         info={t('settings.sourceControl.ssh.passphraseHint')}>
-                        <Input type="password" value="" autoComplete="off" className="h-8 rounded-md px-3"
+                        <Input type="password" value="" autoComplete="off" className="h-auto min-h-8 rounded-md px-3 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                           aria-label={t('settings.sourceControl.ssh.passphrase')} disabled />
                       </SettingsStackedField>
                       <div className="flex min-w-0 items-center gap-2">

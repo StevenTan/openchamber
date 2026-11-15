@@ -377,7 +377,7 @@ export const AgentPermissionsEditor: React.FC<AgentPermissionsEditorProps> = ({
                   onChange={(event) => setPattern(key, index, event.target.value, rule.effect, false)}
                   placeholder={t('settings.agents.page.permissionsEditor.patternPlaceholder')}
                   aria-label={t('settings.agents.page.permissionsEditor.patternActionAria', { key })}
-                  className="h-8 w-full max-w-[24rem] min-w-0 flex-1 font-mono text-xs"
+                  className="h-auto min-h-8 w-full max-w-[24rem] min-w-0 flex-1 font-mono text-xs py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                 />
                 <SettingsChipGroup
                   value={rule.effect}
@@ -456,7 +456,7 @@ export const AgentPermissionsEditor: React.FC<AgentPermissionsEditorProps> = ({
             }
           }}
           placeholder={t('settings.agents.page.permissionsEditor.customKeyPlaceholder')}
-          className="h-8 w-full max-w-[16rem] font-mono text-xs"
+          className="h-auto min-h-8 w-full max-w-[16rem] font-mono text-xs py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
         />
         <Button variant="outline" size="xs" className="!font-normal" onClick={addCustomKey} disabled={!customKeyDraft.trim()}>
           <Icon name="add" className="me-1 h-3.5 w-3.5" />

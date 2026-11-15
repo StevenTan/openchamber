@@ -104,7 +104,7 @@ const DraftsHerePickerView: React.FC = () => {
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="ms-auto h-7 w-fit shrink-0 gap-1 px-1.5 normal-case hover:bg-transparent data-[popup-open]:bg-transparent"
+                            className="ms-auto h-auto min-h-7 w-fit shrink-0 gap-1 px-1.5 normal-case hover:bg-transparent data-[popup-open]:bg-transparent"
                         >
                             <Icon name="edit" className="size-3.5 shrink-0 text-muted-foreground" />
                             <span className="typography-ui-label">{countLabel}</span>
@@ -147,7 +147,7 @@ const MobileDraftsHerePickerView: React.FC = () => {
         <>
             <button
                 type="button"
-                className="ms-auto inline-flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-lg px-1.5 typography-micro font-medium text-foreground/80 hover:bg-[var(--interactive-hover)]"
+                className="ms-auto inline-flex h-auto min-h-7 shrink-0 cursor-pointer items-center gap-1 rounded-lg px-1.5 typography-micro font-medium text-foreground/80 hover:bg-[var(--interactive-hover)] py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                 onClick={() => setOpen(true)}
             >
                 <Icon name="edit" className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />

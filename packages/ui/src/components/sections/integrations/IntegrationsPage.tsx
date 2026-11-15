@@ -57,7 +57,7 @@ export const IntegrationsPage: React.FC = () => {
           type="button"
           variant="outline"
           size="sm"
-          className="h-9 shrink-0 gap-1.5"
+          className="h-auto min-h-9 shrink-0 gap-1.5"
           data-settings-item="integrations.browse"
           title={t('settings.integrations.browse.hint')}
           onClick={openCatalog}

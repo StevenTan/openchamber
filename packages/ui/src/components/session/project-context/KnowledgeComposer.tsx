@@ -224,7 +224,7 @@ export const KnowledgeComposer: React.FC<{
         onClick={() => void submit()}
         disabled={!canSend}
         className={cn(
-          'inline-flex h-6 flex-shrink-0 items-center rounded-md px-1.5 typography-ui-label font-medium transition-colors',
+          'inline-flex h-auto min-h-6 flex-shrink-0 items-center rounded-md px-1.5 typography-ui-label font-medium transition-colors py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]',
           'focus-visible:outline-none disabled:cursor-not-allowed',
           canSend ? 'text-[var(--primary-text)] hover:bg-interactive-hover' : 'text-muted-foreground opacity-50',
         )}

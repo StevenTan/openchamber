@@ -268,7 +268,7 @@ export const ClassificationProvidersPage: React.FC<ClassificationProvidersPagePr
                     onKeyDown={(event) => { if (event.key === 'Enter') void handleSaveToken(); }}
                     placeholder={tokenPresent ? t('settings.routing.token.replacePlaceholder') : t('settings.routing.token.placeholder')}
                     aria-label={t('settings.routing.token.label')}
-                    className="h-8 rounded-md px-3 min-w-0 flex-1"
+                    className="h-auto min-h-8 rounded-md px-3 min-w-0 flex-1 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                     disabled={tokenBusy}
                   />
                   <Button size="sm" variant="outline" onClick={() => void handleSaveToken()} disabled={tokenBusy || tokenInput.trim().length === 0}>

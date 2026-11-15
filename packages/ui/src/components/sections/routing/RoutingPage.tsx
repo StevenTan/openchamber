@@ -147,7 +147,7 @@ const CategoryRow: React.FC<{
                 value={category.name}
                 onChange={(event) => onChange({ name: event.target.value })}
                 aria-label={t('settings.routing.category.name')}
-                className="h-8 w-full rounded-md px-3"
+                className="h-auto min-h-8 w-full rounded-md px-3 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                 maxLength={60}
               />
             </SettingsStackedField>
@@ -448,7 +448,7 @@ export const RoutingPage: React.FC = () => {
                     onKeyDown={(event) => { if (event.key === 'Enter') addCategory(); }}
                     placeholder={t('settings.routing.categories.addPlaceholder')}
                     aria-label={t('settings.routing.categories.addLabel')}
-                    className="h-8 rounded-md px-3 min-w-0 flex-1"
+                    className="h-auto min-h-8 rounded-md px-3 min-w-0 flex-1 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
                     maxLength={60}
                   />
                   <Button size="sm" variant="outline" onClick={addCategory} disabled={newCategoryName.trim().length === 0}>
