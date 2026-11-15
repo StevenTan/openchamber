@@ -38,12 +38,12 @@ const SECTION_CLASS = cn(
 
 // A section's header at the rows' size, in the foreground over the muted row
 // labels under it, so a header never reads as one more row.
-const HEADING_CLASS = 'text-[0.8125rem] font-medium text-foreground';
+const HEADING_CLASS = 'text-[length:var(--text-ui-compact)] font-medium text-foreground';
 const TOUCH_HEADING_CLASS = 'typography-meta font-semibold text-muted-foreground';
 const SUMMARY_CLASS = 'min-w-0 max-w-[60%] truncate text-end tabular-nums';
 // A heading's value reads as a row's value does: the rows' size, in the text
 // colour (WorkStatusRow). The phone keeps its quieter meta value.
-const SUMMARY_DESKTOP_CLASS = 'text-[0.8125rem] text-foreground';
+const SUMMARY_DESKTOP_CLASS = 'text-[length:var(--text-ui-compact)] text-foreground';
 const SUMMARY_TOUCH_CLASS = 'typography-meta text-muted-foreground';
 
 /** A section's rows on the phone: one toned card, a tone step from the page, no border. */
@@ -254,13 +254,13 @@ export const WorkStatusRow: React.FC<RowProps> = ({
         // the status glyphs sections centre in a 13px slot line up as well.
         <span className="flex size-5 shrink-0 items-center justify-center [&>span]:size-5 [&_svg]:size-4">{leadingNode}</span>
       ) : leadingNode}
-      <span id={labelId} dir={labelDir} className={cn('min-w-0 flex-1 truncate', labelDir && 'oc-ui-start-align', touch ? 'typography-ui-label' : 'text-[0.8125rem]', muted && 'text-muted-foreground')}>
+      <span id={labelId} dir={labelDir} className={cn('min-w-0 flex-1 truncate', labelDir && 'oc-ui-start-align', touch ? 'typography-ui-label' : 'text-[length:var(--text-ui-compact)]', muted && 'text-muted-foreground')}>
         {label}
       </span>
       {value !== undefined && value !== null ? (
         // The value is what the row reports, so it reads in the text colour
         // while the label beside it stays muted.
-        <span className={cn('flex shrink-0 items-center gap-1.5 tabular-nums text-foreground', touch ? 'typography-ui-label font-medium' : 'text-[0.8125rem]')}>{value}</span>
+        <span className={cn('flex shrink-0 items-center gap-1.5 tabular-nums text-foreground', touch ? 'typography-ui-label font-medium' : 'text-[length:var(--text-ui-compact)]')}>{value}</span>
       ) : null}
     </>
   );
@@ -305,7 +305,7 @@ export const WorkStatusRow: React.FC<RowProps> = ({
   );
 };
 
-const PILL_CLASS = 'px-1.5 py-px text-[0.6875rem] leading-4';
+const PILL_CLASS = 'px-1.5 py-px text-[length:var(--text-ui-small)] leading-[max(1rem,1.25em)]';
 const PILL_TOUCH_CLASS = 'px-2 py-0.5 typography-micro';
 
 type WorkStatusTone = 'default' | 'muted' | 'success' | 'error' | 'warning' | 'info';
@@ -406,7 +406,7 @@ export const WorkStatusCallout: React.FC<{ children: React.ReactNode }> = ({ chi
     <div
       className={cn(
         'flex items-center gap-2 font-medium',
-        touch ? 'mx-1.5 my-1 rounded-lg px-2.5 py-2 typography-ui-label' : 'mx-1 mb-1 rounded-md px-2 py-1.5 text-[0.8125rem]',
+        touch ? 'mx-1.5 my-1 rounded-lg px-2.5 py-2 typography-ui-label' : 'mx-1 mb-1 rounded-md px-2 py-1.5 text-[length:var(--text-ui-compact)]',
       )}
       style={{ backgroundColor: 'var(--status-warning-background)', color: 'var(--status-warning)' }}
     >
@@ -450,7 +450,7 @@ export const WorkStatusNote: React.FC<{ children: React.ReactNode; truncate?: bo
     <p
       className={cn(
         'text-muted-foreground tabular-nums',
-        touch ? 'mb-2 ms-[2.625rem] me-2.5 typography-meta' : 'mx-1 mb-1 text-[0.6875rem] leading-4',
+        touch ? 'mb-2 ms-[2.625rem] me-2.5 typography-meta' : 'mx-1 mb-1 text-[length:var(--text-ui-small)] leading-[max(1rem,1.25em)]',
         (truncate || tooltip) && 'truncate',
       )}
       tabIndex={tooltip ? 0 : undefined}

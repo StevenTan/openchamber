@@ -672,13 +672,9 @@ export const Header: React.FC = () => {
     return '';
   }, [isDesktopApp, isMacPlatform, macosMajorVersion]);
 
-  // Native window controls keep a fixed physical footprint, so their clearance
-  // must be expressed in pixels. The interface font-size setting scales the
-  // root rem unit, so a rem-based height floor collapses with it and lets
-  // sidebar content slide underneath the macOS traffic lights. Mirrors the
-  // pixel left inset above. macOS 26 centres its window
-  // controls in 44px and macOS <= 15 in 56px (`macTrafficLightPosition` in the
-  // Electron shell); `macosHeaderSizeClass` encodes the same heights.
+  // Native titlebar clearance uses pixels, matching the left inset and
+  // macTrafficLightPosition in the Electron shell: 44px on macOS 26,
+  // 56px on older versions. macosHeaderSizeClass uses the same heights.
   const titlebarMinHeight = React.useMemo(() => {
     if (isDesktopApp && isMacPlatform && !isDesktopWindowFullscreen) {
       return macosMajorVersion !== null && macosMajorVersion <= 15 ? '56px' : '44px';
@@ -687,11 +683,8 @@ export const Header: React.FC = () => {
   }, [isDesktopApp, isDesktopWindowFullscreen, isMacPlatform, macosMajorVersion]);
 
   const headerChromeStyle = React.useMemo<React.CSSProperties>(() => {
-    // Height is owned by the native chrome floor plus the browser's
-    // window-controls overlay. The rem term keeps the header growing with the
-    // interface scale on runtimes that have no native controls to clear.
-    // The macOS floor is a little lower so the 44px titlebar is not lifted
-    // back to 3rem; it still grows with the interface scale past that.
+    // Header height combines native clearance, window-controls overlay and
+    // the stylesheet's layout root. Interface font preferences are independent.
     const remFloor = isDesktopApp && isMacPlatform ? '2.75rem' : '3rem';
     const height = `max(${remFloor}, ${titlebarMinHeight}, var(--oc-wco-titlebar-height, 0px))`;
 
@@ -887,11 +880,11 @@ export const Header: React.FC = () => {
             <TooltipContent side="bottom">{t('header.mainSurface.backToChat')}</TooltipContent>
           </Tooltip>
           <div className="me-3 flex min-w-0 flex-col items-start px-1 py-0.5 -my-0.5 text-start">
-            <span className="truncate typography-ui-label text-[0.875rem] font-normal leading-tight text-foreground max-w-full">
+            <span className="truncate typography-ui-label text-[length:var(--text-ui-header)] font-normal leading-tight text-foreground max-w-full">
               {activeSurfaceHeader.title}
             </span>
             {activeSurfaceHeader.subtitle ? (
-              <span className="truncate typography-micro text-[0.65625rem] font-normal leading-tight text-muted-foreground max-w-full">
+              <span className="truncate typography-micro text-[length:var(--text-ui-caption)] font-normal leading-tight text-muted-foreground max-w-full">
                 {activeSurfaceHeader.subtitle}
               </span>
             ) : null}
@@ -934,7 +927,7 @@ export const Header: React.FC = () => {
                     onChange={(event) => setHeaderSessionTitleDraft(event.target.value)}
                     onKeyDown={(event) => handleSessionRenameKeyDown(event, () => setIsRenamingHeaderSession(false))}
                     placeholder={t('sessions.sidebar.session.menu.rename')}
-                    className="min-w-0 flex-1 bg-transparent typography-ui-label text-[0.875rem] font-normal leading-tight outline-none placeholder:text-muted-foreground"
+                    className="min-w-0 flex-1 bg-transparent typography-ui-label text-[length:var(--text-ui-header)] font-normal leading-tight outline-none placeholder:text-muted-foreground"
                   />
                   <button
                     type="submit"
@@ -955,7 +948,7 @@ export const Header: React.FC = () => {
                   </button>
                 </form>
               ) : isNewSessionDraftOpen ? null : (
-                <span dir="auto" className="oc-ui-start-align truncate typography-ui-label text-[0.875rem] font-normal leading-tight text-foreground max-w-full">
+                <span dir="auto" className="oc-ui-start-align truncate typography-ui-label text-[length:var(--text-ui-header)] font-normal leading-tight text-foreground max-w-full">
                   {currentSessionTitle}
                 </span>
               )}
@@ -965,8 +958,8 @@ export const Header: React.FC = () => {
                 <span className={cn(
                   'flex min-w-0 max-w-full items-center gap-1.5 truncate font-normal leading-tight',
                   isNewSessionDraftOpen
-                    ? 'typography-ui-label text-[0.875rem] text-foreground'
-                    : 'typography-micro text-[0.65625rem] text-muted-foreground',
+                    ? 'typography-ui-label text-[length:var(--text-ui-header)] text-foreground'
+                    : 'typography-micro text-[length:var(--text-ui-caption)] text-muted-foreground',
                 )}>
                   {activeProjectLabel ? <span dir="auto" className="truncate">{activeProjectLabel}</span> : null}
                   {currentBranchLabel ? (
@@ -1058,7 +1051,7 @@ export const Header: React.FC = () => {
                     onChange={(event) => setHeaderSessionTitleDraft(event.target.value)}
                     onKeyDown={(event) => handleSessionRenameKeyDown(event, () => setIsRenamingHeaderSession(false))}
                     placeholder={t('sessions.sidebar.session.menu.rename')}
-                    className="min-w-0 flex-1 bg-transparent text-[0.8125rem] font-medium leading-4 outline-none placeholder:text-muted-foreground"
+                    className="min-w-0 flex-1 bg-transparent text-[length:var(--text-ui-compact)] font-medium leading-[max(1rem,1.25em)] outline-none placeholder:text-muted-foreground"
                   />
                   <button
                     type="submit"
@@ -1079,7 +1072,7 @@ export const Header: React.FC = () => {
                   </button>
                 </form>
               ) : (
-                <span dir="auto" className="block overflow-hidden whitespace-nowrap oc-ui-start-align text-[0.8125rem] font-medium leading-4 text-foreground max-w-full">
+                <span dir="auto" className="block overflow-hidden whitespace-nowrap oc-ui-start-align text-[length:var(--text-ui-compact)] font-medium leading-[max(1rem,1.25em)] text-foreground max-w-full">
                   {isNewSessionDraftOpen ? t('sessions.switcher.draftTitle') : currentSessionTitle}
                 </span>
               )}

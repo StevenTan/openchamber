@@ -391,7 +391,7 @@ export function InlineCommentInput({
             >
               {saving ? <Spinner className="size-3.5" /> : saveLabel ? null : <Icon name="attachment-2" className="size-3.5" />}
               {compactAttach ? null : saveLabel ?? t('review.action.attach')}
-              {isMobile ? null : <span className="text-[0.6875rem] opacity-70">{saveShortcut}</span>}
+              {isMobile ? null : <span className="text-[length:var(--text-ui-small)] opacity-70">{saveShortcut}</span>}
             </Button>
             </div>
           </div>

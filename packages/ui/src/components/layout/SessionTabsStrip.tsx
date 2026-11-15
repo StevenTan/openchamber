@@ -215,7 +215,7 @@ const SessionTabItem: React.FC<{
                           its content. */}
                       {isActive ? children : (
                         <div className="flex min-w-0 flex-col justify-center">
-                          <span dir="auto" className="block max-w-full overflow-hidden whitespace-nowrap oc-ui-start-align text-[0.8125rem] font-medium leading-4">{title}</span>
+                          <span dir="auto" className="block max-w-full overflow-hidden whitespace-nowrap oc-ui-start-align text-[length:var(--text-ui-compact)] font-medium leading-[max(1rem,1.25em)]">{title}</span>
                         </div>
                       )}
                     </div>
@@ -537,7 +537,7 @@ export const SessionTabsStrip: React.FC<{
                   >
                     <Icon name="edit" className="me-1.5 size-3.5 shrink-0" />
                     <div className="session-tab-title min-w-0 flex-1 overflow-hidden whitespace-nowrap italic">
-                      <span dir="auto" className="block max-w-full overflow-hidden whitespace-nowrap oc-ui-start-align text-[0.8125rem] font-medium leading-4">
+                      <span dir="auto" className="block max-w-full overflow-hidden whitespace-nowrap oc-ui-start-align text-[length:var(--text-ui-compact)] font-medium leading-[max(1rem,1.25em)]">
                         {draftFirstLine || t('sessions.switcher.draftTitle')}
                       </span>
                     </div>

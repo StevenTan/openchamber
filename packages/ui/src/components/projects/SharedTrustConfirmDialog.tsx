@@ -59,7 +59,7 @@ export const SharedTrustConfirmDialog = () => {
           {request && request.setupCommands.length > 0 ? (
             <div className="space-y-1">
               <p className="typography-meta text-muted-foreground">{t('projects.sharedTrust.setupCommands')}</p>
-              <div className="rounded-lg bg-[var(--surface-muted)] px-3 py-2 font-mono text-[0.8125rem] leading-relaxed break-all text-[var(--surface-foreground)]">
+              <div className="rounded-lg bg-[var(--surface-muted)] px-3 py-2 font-mono text-[length:var(--text-ui-compact)] leading-relaxed break-all text-[var(--surface-foreground)]">
                 {request.setupCommands.map((command, index) => (
                   <div dir="ltr" key={`${index}-${command}`}>{command}</div>
                 ))}
@@ -69,7 +69,7 @@ export const SharedTrustConfirmDialog = () => {
           {request && request.teardownCommands.length > 0 ? (
             <div className="space-y-1">
               <p className="typography-meta text-muted-foreground">{t('projects.sharedTrust.teardownCommands')}</p>
-              <div className="rounded-lg bg-[var(--surface-muted)] px-3 py-2 font-mono text-[0.8125rem] leading-relaxed break-all text-[var(--surface-foreground)]">
+              <div className="rounded-lg bg-[var(--surface-muted)] px-3 py-2 font-mono text-[length:var(--text-ui-compact)] leading-relaxed break-all text-[var(--surface-foreground)]">
                 {request.teardownCommands.map((command, index) => (
                   <div dir="ltr" key={`${index}-${command}`}>{command}</div>
                 ))}
@@ -79,7 +79,7 @@ export const SharedTrustConfirmDialog = () => {
           {request && request.actions.length > 0 ? (
             <div className="space-y-1">
               <p className="typography-meta text-muted-foreground">{t('projects.sharedTrust.actions')}</p>
-              <div className="rounded-lg bg-[var(--surface-muted)] px-3 py-2 text-[0.8125rem] leading-relaxed break-all text-[var(--surface-foreground)]">
+              <div className="rounded-lg bg-[var(--surface-muted)] px-3 py-2 text-[length:var(--text-ui-compact)] leading-relaxed break-all text-[var(--surface-foreground)]">
                 {request.actions.map((action) => (
                   <div key={action.id}>
                     <span>{action.name}</span>

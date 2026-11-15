@@ -3,7 +3,8 @@
 `styles/fork-defaults.css` owns bundled appearance overrides. The external
 `custom.css` loads afterward. Typography tokens live in `lib/typography.ts`;
 default preferences and reset actions share constants in `stores/useUIStore`.
-The root rem stays at the stylesheet value. Interface preferences set text
+The desktop root is fixed at 18.5px for layout. Other surfaces keep their
+stylesheet root size. Interface preferences set text
 tokens in pixels; chat and code have independent pixel tokens. Font effects
 publish `--font-chat`, which follows `--font-sans` unless a chat family is chosen.
 Native page zoom scales text, spacing, icons and embedded editors together.
@@ -13,14 +14,18 @@ Native page zoom scales text, spacing, icons and embedded editors together.
 Font preferences control reading size independently of layout dimensions.
 Keeping rem stable preserves spacing and icon geometry; Chromium page zoom
 provides the separate whole-window scale, including canvas-based terminals.
+Compact labels, captions and badges derive their sizes from the interface
+label token, so their hierarchy follows that preference independently of rem.
 Desktop scroll containers contain scroll chaining while allowing Chromium's
 native boundary effect. The root remains clipped and permits that effect;
 `overscroll-behavior: none` on the root suppresses it in descendant viewports.
 
-OPPO Sans and Fira Code are bundled in `assets/fonts` and declared in
+OPPO Sans, Fira Code and Courier Prime are bundled in `assets/fonts` and declared in
 `styles/bundled-fonts.css`. The font effect imports that sheet so production
 asset URLs resolve before stylesheet inlining. These faces work offline;
 licenses ship in `web/public/fonts`.
+The default interface font is OPPO Sans; chat follows the interface family.
+Code and terminals default to Courier Prime. All four font sizes default to 16px.
 
 `useCustomCss.ts` loads the active server's stylesheet through `runtimeFetch`.
 Runtime switches clear the old sheet and abort pending reads. Read failures

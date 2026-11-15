@@ -1,6 +1,6 @@
 export type UiFontOption = 'inter' | 'fixel' | 'geist-sans' | 'atkinson-hyperlegible' | 'source-sans-3' | 'roboto' | 'noto-sans' | 'dm-sans' | 'manrope' | 'system' | 'custom' | 'oppo-sans';
 
-export type MonoFontOption = 'jetbrains-mono' | 'fira-code' | 'geist-mono' | 'commit-mono' | 'source-code-pro' | 'cascadia-code' | 'roboto-mono' | 'iosevka' | 'system-mono' | 'custom';
+export type MonoFontOption = 'jetbrains-mono' | 'fira-code' | 'geist-mono' | 'commit-mono' | 'source-code-pro' | 'cascadia-code' | 'roboto-mono' | 'iosevka' | 'system-mono' | 'custom' | 'courier-prime';
 
 interface FontsourceFaceSource {
     family: string;
@@ -192,6 +192,12 @@ export const CODE_FONT_OPTIONS: FontOptionDefinition<MonoFontOption>[] = [
         label: 'System Mono',
         description: 'Native operating system monospace font.',
         stack: 'ui-monospace, "SFMono-Regular", "Menlo", "Cascadia Mono", "Segoe UI Mono", monospace'
+    },
+    {
+        id: 'courier-prime',
+        label: 'Courier Prime',
+        description: 'Bundled monospace with classic typewriter letterforms.',
+        stack: '"Courier Prime", "Fira Code", "SFMono-Regular", "Menlo", monospace'
     }
 ];
 
@@ -202,7 +208,7 @@ export const UI_FONT_OPTION_MAP = buildFontMap(UI_FONT_OPTIONS);
 export const CODE_FONT_OPTION_MAP = buildFontMap(CODE_FONT_OPTIONS);
 
 export const DEFAULT_UI_FONT: UiFontOption = 'oppo-sans';
-export const DEFAULT_MONO_FONT: MonoFontOption = 'fira-code';
+export const DEFAULT_MONO_FONT: MonoFontOption = 'courier-prime';
 
 /** The option that uses a font installed on this device, named by the user. */
 export const CUSTOM_FONT_ID = 'custom';

@@ -47,7 +47,7 @@ const RowPerson: React.FC<{ name: string; avatarUrl: string | null | undefined }
             {avatarUrl && !broken ? (
                 <img src={rowAvatarUrl(avatarUrl)} alt="" loading="lazy" className="size-4 shrink-0 rounded-full bg-surface-muted" onError={onError} />
             ) : (
-                <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-surface-muted text-[0.625rem] leading-none">
+                <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-surface-muted text-[length:var(--text-ui-badge)] leading-none">
                     {name.slice(0, 1).toUpperCase()}
                 </span>
             )}

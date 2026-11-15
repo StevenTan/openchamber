@@ -817,7 +817,7 @@ export function ArchiveSessionsView({ layout, onLeave }: {
                       <span dir="auto" className="min-w-0 flex-1 truncate oc-ui-start-align typography-ui-label text-foreground">
                         {session.title || t('sessions.sidebar.session.untitled')}
                       </span>
-                      <span className="flex-shrink-0 text-[0.72rem] text-muted-foreground">
+                      <span className="flex-shrink-0 text-[length:var(--text-ui-detail)] text-muted-foreground">
                         {formatSessionDateLabel(session.time?.archived ?? session.time?.updated ?? session.time?.created ?? Date.now())}
                       </span>
                       {restorable ? <button

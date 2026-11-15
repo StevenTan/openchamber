@@ -203,7 +203,7 @@ export const MobileWorkspaceDrawer: React.FC<{
           {count > 0 ? (
             <span
               aria-hidden="true"
-              className="absolute -top-1.5 -end-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-[var(--status-info)] px-0.5 text-[0.5625rem] font-medium leading-none text-[var(--status-info-foreground)]"
+              className="absolute -top-1.5 -end-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-[var(--status-info)] px-0.5 text-[length:var(--text-ui-badge-small)] font-medium leading-none text-[var(--status-info-foreground)]"
             >
               {count > 99 ? '99+' : count}
             </span>

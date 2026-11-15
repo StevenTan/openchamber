@@ -62,7 +62,7 @@ export function LinkedReferenceRow(props: LinkedReferenceRowProps) {
                         onError={onError}
                     />
                 ) : author?.avatarUrl ? (
-                    <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-surface-muted text-[0.625rem] leading-none">
+                    <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-surface-muted text-[length:var(--text-ui-badge)] leading-none">
                         {author.login.slice(0, 1).toUpperCase()}
                     </span>
                 ) : null}

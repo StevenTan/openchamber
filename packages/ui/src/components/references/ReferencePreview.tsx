@@ -606,7 +606,7 @@ const RepositoryPreview: React.FC<{
                                 {reference.author.avatarUrl && !authorBroken ? (
                                     <img src={reference.author.avatarUrl} alt="" className="size-4 rounded-full" loading="lazy" onError={onError} />
                                 ) : reference.author.avatarUrl ? (
-                                    <span className="flex size-4 items-center justify-center rounded-full bg-surface-muted text-[0.625rem] leading-none">
+                                    <span className="flex size-4 items-center justify-center rounded-full bg-surface-muted text-[length:var(--text-ui-badge)] leading-none">
                                         {reference.author.login.slice(0, 1).toUpperCase()}
                                     </span>
                                 ) : null}

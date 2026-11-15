@@ -218,7 +218,7 @@ const Chart: React.FC<Extract<GuestStatusContent, { kind: 'chart' }>> = ({ value
 
 const Chip: React.FC<{ chip: GuestStatusChip }> = ({ chip }) => {
   const { openUrl } = useActions();
-  const className = 'shrink-0 rounded-full px-1.5 py-px text-[11px] font-medium leading-4 tabular-nums';
+  const className = 'shrink-0 rounded-full px-1.5 py-px text-[length:var(--text-ui-small)] font-medium leading-[max(1rem,1.25em)] tabular-nums';
   const fallback = !chip.tone || chip.tone === 'default' || chip.tone === 'muted';
   if (!chip.url) {
     return <span dir="auto" className={cn(className, fallback && 'bg-[var(--interactive-hover)] text-muted-foreground')} style={pillStyle(chip.tone)}>{chip.label}</span>;
@@ -426,7 +426,7 @@ const Line: React.FC<{ row: Extract<GuestStatusRow, { kind: 'line' }> }> = ({ ro
     <span dir="auto" tabIndex={labelTooltip ? 0 : undefined} className={cn('min-w-0 truncate', row.content ? 'w-24 shrink-0' : 'flex-1')}>{row.label}</span>
   );
   const body = (
-    <div className={cn('flex w-full items-center gap-2 rounded-md text-start text-[13px] text-muted-foreground', touch ? 'min-h-7 px-2.5' : 'h-7 px-1')} tabIndex={rowTooltip ? 0 : undefined}>
+    <div className={cn('flex w-full items-center gap-2 rounded-md text-start text-[length:var(--text-ui-compact)] text-muted-foreground', touch ? 'min-h-7 px-2.5' : 'h-7 px-1')} tabIndex={rowTooltip ? 0 : undefined}>
       {row.dot ? <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: strokeColor(row.dot) }} /> : null}
       {icon ? <Icon name={icon} className="size-[13px] shrink-0 text-muted-foreground" /> : null}
       {labelTooltip ? <RowTooltip text={labelTooltip}>{label}</RowTooltip> : label}

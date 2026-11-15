@@ -1,4 +1,8 @@
 /* Appearance defaults for this fork; custom.css can override them. */
+:root.desktop-runtime {
+  font-size: 18.5px;
+}
+
 :root.desktop-runtime,
 :root.desktop-runtime body,
 :root.desktop-runtime #root {

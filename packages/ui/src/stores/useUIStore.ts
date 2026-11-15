@@ -1561,8 +1561,8 @@ const openFileTab = (state: UIStore, directory: string, filePath: string, previe
 
 /** What the selection menu's thumb-up says when the user set no text of their own. */
 export const DEFAULT_SELECTION_APPROVAL_TEXT = 'Sounds good';
-export const DEFAULT_EDITOR_FONT_SIZE = 15;
-export const DEFAULT_TERMINAL_FONT_SIZE = 15;
+export const DEFAULT_EDITOR_FONT_SIZE = 16;
+export const DEFAULT_TERMINAL_FONT_SIZE = 16;
 export const DEFAULT_SPACING_SCALE = 110;
 /** The Files tree beside the editor: narrow enough that the code beside it does not wrap. */
 export const DEFAULT_CONTEXT_EDITOR_TREE_WIDTH = 208;

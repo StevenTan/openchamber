@@ -55,7 +55,7 @@ export function AutocompleteRowDetail({ scope, extension, description }: {
       {label ? (
         <span
           className={cn(
-            'max-w-32 shrink-0 truncate rounded border px-1.5 py-1 text-[0.625rem] font-bold uppercase leading-none tracking-tight',
+            'max-w-32 shrink-0 truncate rounded border px-1.5 py-1 text-[length:var(--text-ui-badge)] font-bold uppercase leading-none tracking-tight',
             scope === 'project' ? SCOPE_TONE.project : scope === 'user' ? SCOPE_TONE.user : SCOPE_TONE.other,
           )}
         >

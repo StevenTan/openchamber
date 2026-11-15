@@ -162,7 +162,7 @@ export const WorkStatusUsageSection: React.FC<{ visible?: boolean }> = ({ visibl
                   <span className="inline-flex min-w-0 items-baseline gap-1.5">
                     <span className="truncate">{rowLabel}</span>
                     {resetLabel ? (
-                      <span className="shrink-0 text-[0.6875rem] text-muted-foreground">{resetLabel}</span>
+                      <span className="shrink-0 text-[length:var(--text-ui-small)] text-muted-foreground">{resetLabel}</span>
                     ) : null}
                   </span>
                 )}

@@ -28,8 +28,8 @@ function getTypographyVariable(key: SemanticTypographyKey): string {
   return `--text-${key.replace(/([A-Z])/g, '-$1').toLowerCase()}`;
 }
 
-export const DEFAULT_INTERFACE_FONT_SIZE = 15.5;
-export const DEFAULT_CHAT_FONT_SIZE = 15.5;
+export const DEFAULT_INTERFACE_FONT_SIZE = 16;
+export const DEFAULT_CHAT_FONT_SIZE = 16;
 export const DEFAULT_APP_ZOOM = 100;
 
 export function getInterfaceTypographyStyle(

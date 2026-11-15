@@ -711,7 +711,8 @@ const readColumnWidth = (scroller: HTMLElement | null): number => {
     }
     const width = scroller?.clientWidth || window.innerWidth;
     const wide = Boolean(scroller?.closest('.wide-chat-layout'));
-    return Math.min(width, wide ? width : 768) - (width >= 1024 ? 48 : 32);
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
+    return Math.min(width, wide ? width : 48 * rem) - (width >= 1024 ? 3 * rem : 2 * rem);
 };
 
 // A touch device: raised tap targets (mobile.css) and native scroll momentum.

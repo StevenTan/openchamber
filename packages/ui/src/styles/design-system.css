@@ -51,6 +51,13 @@
     --text-micro: 0.75rem;
     --text-settings-page-title: 1.0625rem;
 
+    --text-ui-compact: calc(var(--text-ui-label) * 13 / 13.5);
+    --text-ui-detail: calc(var(--text-ui-label) * 11.52 / 13.5);
+    --text-ui-small: calc(var(--text-ui-label) * 11 / 13.5);
+    --text-ui-caption: calc(var(--text-ui-label) * 10.5 / 13.5);
+    --text-ui-badge: calc(var(--text-ui-label) * 10 / 13.5);
+    --text-ui-badge-small: calc(var(--text-ui-label) * 9 / 13.5);
+
     /* Text selection colour shared by native ::selection and the comment overlay */
     --oc-text-selection: var(--interactive-selection);
 

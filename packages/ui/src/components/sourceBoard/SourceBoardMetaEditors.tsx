@@ -33,7 +33,7 @@ const Person: React.FC<{ person: RepositoryReferenceReviewer }> = ({ person }) =
             {person.avatarUrl && !broken ? (
                 <img src={person.avatarUrl} alt="" className="size-4 shrink-0 rounded-full" loading="lazy" onError={onError} />
             ) : person.avatarUrl ? (
-                <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-surface-muted text-[0.625rem] leading-none">
+                <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-surface-muted text-[length:var(--text-ui-badge)] leading-none">
                     {person.login.slice(0, 1).toUpperCase()}
                 </span>
             ) : null}

@@ -1021,7 +1021,7 @@ function SessionGroupSectionBase(props: SessionGroupSectionProps): React.ReactNo
                     // drag handle, so it keeps its pointer and keys to itself.
                     <button
                       type="button"
-                      className={cn('ms-auto flex-shrink-0 rounded text-[0.72rem] font-medium leading-none text-muted-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:no-underline', headerCoveredFadeClass)}
+                      className={cn('ms-auto flex-shrink-0 rounded text-[length:var(--text-ui-detail)] font-medium leading-none text-muted-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:no-underline', headerCoveredFadeClass)}
                       disabled={!groupPrSummary.url}
                       aria-label={groupPrLabel}
                       onPointerDown={(event) => event.stopPropagation()}
@@ -1039,7 +1039,7 @@ function SessionGroupSectionBase(props: SessionGroupSectionProps): React.ReactNo
                     <button
                       type="button"
                       className={cn(
-                        'ms-auto inline-flex flex-shrink-0 items-center gap-1 rounded text-[0.72rem] font-medium leading-none hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                        'ms-auto inline-flex flex-shrink-0 items-center gap-1 rounded text-[length:var(--text-ui-detail)] font-medium leading-none hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                         'text-muted-foreground',
                         headerCoveredFadeClass,
                       )}
@@ -1074,7 +1074,7 @@ function SessionGroupSectionBase(props: SessionGroupSectionProps): React.ReactNo
                 ) : (
                   <Icon name="git-branch" className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
                 )}
-                <span className="min-w-0 truncate text-[0.6875rem] font-medium text-muted-foreground">
+                <span className="min-w-0 truncate text-[length:var(--text-ui-small)] font-medium text-muted-foreground">
                   {statusLine.label}
                 </span>
               </span>

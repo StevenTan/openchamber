@@ -76,7 +76,7 @@ export const OpenCodeTrustDialog = () => {
           {plugins.length > 0 ? (
             <div className="space-y-1">
               <p className="typography-meta text-muted-foreground">{t('projects.opencodeTrust.plugins')}</p>
-              <div className="rounded-lg bg-[var(--surface-muted)] px-3 py-2 font-mono text-[0.8125rem] leading-relaxed break-all text-[var(--surface-foreground)]">
+              <div className="rounded-lg bg-[var(--surface-muted)] px-3 py-2 font-mono text-[length:var(--text-ui-compact)] leading-relaxed break-all text-[var(--surface-foreground)]">
                 {plugins.map((item) => (
                   <div key={`${item.kind}-${item.source}-${item.name}`}>{pluginLabel(item)}</div>
                 ))}
@@ -86,7 +86,7 @@ export const OpenCodeTrustDialog = () => {
           {commands.length > 0 ? (
             <div className="space-y-1">
               <p className="typography-meta text-muted-foreground">{t('projects.opencodeTrust.commands')}</p>
-              <div className="rounded-lg bg-[var(--surface-muted)] px-3 py-2 text-[0.8125rem] leading-relaxed break-all text-[var(--surface-foreground)]">
+              <div className="rounded-lg bg-[var(--surface-muted)] px-3 py-2 text-[length:var(--text-ui-compact)] leading-relaxed break-all text-[var(--surface-foreground)]">
                 {commands.map((item) => (
                   <div key={`${item.kind}-${item.source}-${item.name}`}>
                     <span>{commandLabel(item)}</span>

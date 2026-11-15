@@ -151,7 +151,7 @@ const ContextPanelRailItem: React.FC<RailItemProps> = ({
             {showOrderNumber && orderNumber != null ? (
               <span
                 aria-hidden="true"
-                className="absolute inset-e-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-surface-muted px-1 text-[0.625rem] font-medium leading-none text-muted-foreground"
+                className="absolute inset-e-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-surface-muted px-1 text-[length:var(--text-ui-badge)] font-medium leading-none text-muted-foreground"
               >
                 {orderNumber === 10 ? '0' : orderNumber}
               </span>

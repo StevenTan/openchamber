@@ -22,6 +22,12 @@
     --text-meta: 0.875rem !important;
     --text-micro: 0.8125rem !important;
     --text-settings-page-title: 1.125rem !important;
+    --text-ui-compact: 13px !important;
+    --text-ui-detail: 11.52px !important;
+    --text-ui-small: 11px !important;
+    --text-ui-caption: 10.5px !important;
+    --text-ui-badge: 10px !important;
+    --text-ui-badge-small: 9px !important;
   }
 
   /* Additional override for elements using typography classes */

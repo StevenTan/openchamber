@@ -1,4 +1,4 @@
-/* Variable faces are bundled by Vite, so the default fonts work offline. */
+/* Bundled faces use Vite asset URLs and work offline. */
 @font-face {
   font-family: "OPPO Sans";
   src: url("../assets/fonts/OPPOSans-4.0.ttf") format("truetype");
@@ -11,6 +11,14 @@
   font-family: "Fira Code";
   src: url("../assets/fonts/FiraCode-latin-wght-normal.woff2") format("woff2");
   font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Courier Prime";
+  src: url("../assets/fonts/CourierPrime-Regular.ttf") format("truetype");
+  font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
