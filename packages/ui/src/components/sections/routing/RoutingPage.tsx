@@ -33,6 +33,7 @@ import { modelVariantNames } from '@/lib/modelVariants';
 import { isAutoModel } from '@/lib/routing/autoModel';
 import { useRoutingStore } from '@/stores/useRoutingStore';
 import { JevAccessNote } from '@/components/sections/classification/JevAccessNote';
+import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 
 const DEFAULT_VARIANT_VALUE = '__default__';
 const SAVE_DEBOUNCE_MS = 500;
@@ -120,7 +121,7 @@ const CategoryRow: React.FC<{
     : t('settings.routing.model.useFallback');
   const summary = [modelLabel, category.agent].filter(Boolean).join(' · ');
   return (
-    <div className={cn('py-1', !category.enabled && 'opacity-60')}>
+    <Collapsible open={expanded} className={cn('py-1', !category.enabled && 'opacity-60')}>
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -138,7 +139,7 @@ const CategoryRow: React.FC<{
           aria-label={t('settings.routing.category.enabledAria', { name: category.name })}
         />
       </div>
-      {expanded ? (
+      <CollapsibleContent>
         <div className="space-y-4 px-1 pb-4 pt-2">
           <SettingsTwoColumn>
             <SettingsStackedField label={t('settings.routing.category.name')} controlClassName="max-w-none">
@@ -199,8 +200,8 @@ const CategoryRow: React.FC<{
             <Button size="sm" variant="ghost" onClick={onRemove}>{t('settings.routing.category.remove')}</Button>
           </div>
         </div>
-      ) : null}
-    </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 };
 

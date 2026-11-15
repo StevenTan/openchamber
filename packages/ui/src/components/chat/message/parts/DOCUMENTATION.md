@@ -163,7 +163,8 @@ Plain-text user messages resolve each line on its own: the container keeps
 an empty mark whose CSS-generated LRM or RLM gives the line its majority
 direction. Chips do not count. Direction changes must preserve source and copy
 text. Disclosures use native `details` and `summary` with a React-owned chevron
-that follows the open state.
+that follows the open state. Its marker uses the unordered-list gutter, with
+summary labels aligned to list text. Plain-text summary chevrons centre on the first line.
 
 ### Why word majority and not the first letter
 

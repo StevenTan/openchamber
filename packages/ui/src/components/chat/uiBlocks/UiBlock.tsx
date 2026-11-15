@@ -8,6 +8,9 @@ import { SortableTabsStrip } from '@/components/ui/sortable-tabs-strip';
 import { DatePicker, TimePill } from '@/components/ui/date-time';
 import { Input as FieldInput } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
+import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
+import { ScrollableOverlay } from '@/components/ui/ScrollableOverlay';
 import { useThemeSystem } from '@/contexts/useThemeSystem';
 import { useCalendarPreferences } from '@/components/ui/useCalendarPreferences';
 import { useI18n } from '@/lib/i18n';
@@ -1389,7 +1392,7 @@ function Details({ props }: NodeProps) {
   const panelId = React.useId();
   if (!value || value.children.length === 0) return null;
   return (
-    <div className="flex flex-col gap-2">
+    <Collapsible open={open} className="flex flex-col">
       <button
         type="button"
         aria-expanded={open}
@@ -1397,14 +1400,16 @@ function Details({ props }: NodeProps) {
         onClick={() => setOpen((current) => !current)}
         className="flex w-fit items-center gap-1 text-start font-medium text-foreground/80 transition-colors hover:text-foreground"
       >
-        <Icon name="arrow-right-s" className={cn('size-4 shrink-0 text-muted-foreground transition-transform duration-150', open && 'rotate-90 rtl:-rotate-90')} />
+        <DisclosureChevron expanded={open} className="size-4 shrink-0 text-muted-foreground" />
         <Markdown source={value.title} className="oc-ui-block-title" />
       </button>
       {/* Kept mounted while closed, so a field inside keeps what the user typed. */}
-      <div id={panelId} hidden={!open} className="flex flex-col gap-3 ps-5">
-        <Children nodes={value.children} />
-      </div>
-    </div>
+      <CollapsibleContent id={panelId} keepMounted data-disclosure-overflow="">
+        <div className="flex flex-col gap-3 ps-5 pt-2">
+          <Children nodes={value.children} />
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -1483,17 +1488,21 @@ function NotDrawn({ source, errors, partial = false }: { source: string; errors:
     <div className="flex flex-col gap-1 typography-meta">
       <div className={partial ? 'text-muted-foreground' : 'text-[var(--status-error)]'}>{t(partial ? 'chat.uiBlock.partial' : 'chat.uiBlock.invalid')}</div>
       {[...new Set(shown)].map((error) => <div key={error} className="text-muted-foreground">{error}</div>)}
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={panelId}
-        onClick={() => setOpen((current) => !current)}
-        className="flex w-fit items-center gap-1 text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <Icon name="arrow-right-s" className={cn('size-4 shrink-0 transition-transform duration-150', open && 'rotate-90 rtl:-rotate-90')} />
-        {t('chat.uiBlock.source')}
-      </button>
-      <pre id={panelId} hidden={!open} dir="ltr"><code>{source}</code></pre>
+      <Collapsible open={open} className="flex flex-col">
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={panelId}
+          onClick={() => setOpen((current) => !current)}
+          className="flex w-fit items-center gap-1 text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <DisclosureChevron expanded={open} className="size-4 shrink-0" />
+          {t('chat.uiBlock.source')}
+        </button>
+        <CollapsibleContent id={panelId} keepMounted>
+          <ScrollableOverlay as="pre" dir="ltr" className="pt-1" fillContainer={false}><code>{source}</code></ScrollableOverlay>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 }

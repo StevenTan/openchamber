@@ -63,7 +63,7 @@ import { isExpandableTool } from './parts/toolRenderUtils';
 import { ShownPartCard, ShownToolCard } from './parts/ShownToolCard';
 import { isShownInPlace } from '@/lib/opencode/tools';
 import { LiveActivityCollapse } from '../components/LiveActivityCollapse';
-import { dispatchRowExpand } from '../lib/scroll/timelineScrollIntent';
+import { dispatchRowExpand, isInStuckTurnHeader } from '../lib/scroll/timelineScrollIntent';
 import { ActivityRowSkipContext, isActivityRowPart, isToolRowShown } from '../lib/turns/activityRows';
 import { LiveFinalActivityContext, LiveTurnHoistedPagesContext } from '../components/liveActivityContext';
 import { MessageSliceContext } from './messageSliceContext';
@@ -875,13 +875,6 @@ const UserMessageBody = React.memo(({ parts, messageCreatedAt, isMobile, alwaysS
 
 // The list keeps a sticky header's row on the chat's top edge while its turn
 // scrolls under it.
-const isInStuckTurnHeader = (element: HTMLElement | null): boolean => {
-    const header = element?.closest<HTMLElement>('[data-turn-sticky-header]');
-    const chat = header?.closest<HTMLElement>('[data-scrollbar="chat"]');
-    if (!header || !chat) return false;
-    return Math.abs(header.getBoundingClientRect().top - chat.getBoundingClientRect().top) < 1;
-};
-
 const USER_BUBBLE_TEXT_LINK_CLASS = 'py-0.5 underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:underline focus-visible:outline-none focus-visible:text-foreground';
 const INLINE_TEXT_LINK_STYLE = { minHeight: 0, minWidth: 0 };
 const TITLE_SLOT = '\u0000';

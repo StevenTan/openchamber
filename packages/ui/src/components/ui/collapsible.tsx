@@ -4,7 +4,9 @@ import * as React from "react";
 import { Collapsible as BaseCollapsible } from "@base-ui/react/collapsible";
 import { cn } from "@/lib/utils";
 
-const Collapsible = BaseCollapsible.Root;
+const Collapsible = (props: React.ComponentProps<typeof BaseCollapsible.Root>) => (
+  <BaseCollapsible.Root {...props} data-slot="collapsible" />
+);
 
 type AsChildRenderProps = {
   render?: React.ReactElement;
