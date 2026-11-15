@@ -26,6 +26,9 @@ export default defineConfig({
     "patches/**",
     "bun-patches/**",
     "tools/oxlint/**",
+    // Copied upstream implementations retain their own parsing and typing conventions.
+    "packages/web/server/lib/agent-command/src/vendor/**",
+    "packages/web/server/lib/agent-command/src/process-detection.ts",
   ],
   jsPlugins: [
     { name: "anti-slop", specifier: "./tools/oxlint/anti-slop/index.ts" },

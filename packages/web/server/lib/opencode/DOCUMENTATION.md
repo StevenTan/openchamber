@@ -56,7 +56,7 @@ entrypoint; a path to a `.js` file is skipped with "configured plugin path must
 be a directory". The config key is `plugins` (an array of absolute directory
 paths), not `plugin`.
 
-The generated entrypoint has no imports. OpenCode loads it with a plain dynamic
+The generated entrypoint has no package imports. OpenCode loads it with a plain dynamic
 `import()`, and resolution happens from the plugin's own directory, where nothing
 is installed — `import { Plugin } from "@opencode/plugin"` fails there. None of
 it is needed: a plugin only has to default-export `{ id, setup }`, and a tool's
@@ -1455,6 +1455,10 @@ file on disk no longer matches, the write is refused with `409` and code
 `AGENTS_MD_CONFLICT` instead of overwriting an edit made elsewhere.
 
 ## Managed OpenCode config layer (managed-config-file.js)
+
+The managed command plugin is always registered alongside the session title
+plugin. It exposes `exec_command` and `write_stdin` and removes `shell` from the
+model's tool list. Its contract is in `../agent-command/DOCUMENTATION.md`.
 
 OpenChamber injects its own OpenCode plugins through a file it owns rather than
 through the process environment, because an environment variable cannot change

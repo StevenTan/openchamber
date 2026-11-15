@@ -174,6 +174,7 @@ import { createSwitchController, registerSpaceRoutes } from './lib/spaces/routes
 import { configureGitEnvironment, getCheckedOutBranch, getWorktreeBootstrapGateStatus, getWorktrees, isWorktreeDirectoryPinned, readRenameableGeneratedBranch, renameGeneratedWorktreeBranch, resolvePrimaryWorktreeRoot, setWorktreeTaskTitle } from './lib/git/service.js';
 import { createEnvironmentStore } from './lib/environment/store.js';
 import { createEnvironmentRuntime } from './lib/environment/runtime.js';
+import { overlayEnvironment } from './lib/environment/variables.js';
 import { readOpenCodeServiceEnv } from './lib/environment/opencode-service-env.js';
 import { OPENCODE_CONFIG_DIR } from './lib/opencode/shared.js';
 import { createWorktreeBootstrapStore } from './lib/git/worktree-bootstrap-storage.js';
@@ -1565,6 +1566,10 @@ globalMessageStreamHub.subscribeEvent((event) => {
     if (payload.type === 'session.idle' && payload.properties?.aborted === true) {
       agentToolRuntime?.abortSession?.(payload.properties.sessionID);
     }
+    if (payload.type === 'session.deleted') {
+      void agentToolRuntime?.releaseCommandSession(payload.properties.info.id)
+        .catch(error => console.error('[agent-command] session cleanup failed:', error.message));
+    }
     // The turn ended, so nobody here waits on a page of this session any more.
     if (payload.type === 'session.idle' || payload.type === 'session.error') {
       openChamberControlService.releaseAnswerWaits(payload.properties?.sessionID);
@@ -2489,6 +2494,7 @@ const gracefulShutdownRuntime = createGracefulShutdownRuntime({
   getHealthCheckInterval: () => healthCheckInterval,
   clearHealthCheckInterval: (value) => clearInterval(value),
   getTerminalRuntime: () => terminalRuntime,
+  closeAgentCommands: () => agentToolRuntime?.closeCommands(),
   setTerminalRuntime: (value) => {
     terminalRuntime = value;
   },
@@ -2554,6 +2560,7 @@ async function main(options = {}) {
     executeAction: (...args) => openChamberControlService.execute(...args),
     // A v2 tool call carries no directory, only the session it runs in.
     resolveSessionDirectory: (sessionID) => openChamberControlService.resolveSessionDirectory(sessionID),
+    getCommandEnvironment: () => overlayEnvironment({ ...process.env, PATH: buildAugmentedPath() }, environmentRuntime.forOpenCode()),
     getActivePort: () => {
       const address = server?.address?.();
       return typeof address === 'object' && address ? address.port : null;

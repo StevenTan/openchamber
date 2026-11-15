@@ -132,6 +132,7 @@ export const createManagedConfigRuntime = ({
       directories.push(await limitFailoverRuntime.materializePlugin());
     }
     directories.push(await materializeSessionTitlePlugin({ fsPromises, path, instanceDir }));
+    if (agentToolRuntime) directories.push(await agentToolRuntime.materializeCommandPlugin());
     const disabled = includeImage ? [...DISABLED_BUILTIN_PLUGINS, BUILTIN_IMAGE_PLUGIN] : DISABLED_BUILTIN_PLUGINS;
     const authoring = await materializeAuthoringSkill({ fsPromises, instanceDir, openchamberVersion });
     const skills = [authoring.skillsRoot, ...await listExtensionSkillDirectories()];

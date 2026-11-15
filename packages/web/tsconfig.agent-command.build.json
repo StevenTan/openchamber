@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.agent-command.json",
+  "compilerOptions": {
+    "allowJs": false,
+    "noEmit": false,
+    "noCheck": true,
+    "rootDir": "server/lib/agent-command/src",
+    "outDir": "server/lib/agent-command/dist"
+  }
+}

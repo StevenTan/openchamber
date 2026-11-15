@@ -25,6 +25,10 @@ export const getTerminalShellLoginArgs = (executable, platform = process.platfor
   return null;
 };
 
+/**
+ * @param {string} executable
+ * @param {{ mode?: 'interactive' | 'command', command?: string | null, loginShell?: boolean, platform?: NodeJS.Platform }} [options]
+ */
 export const buildTerminalShellLaunch = (executable, { mode = 'interactive', command = null, loginShell = false, platform = process.platform } = {}) => {
   const loginArgs = loginShell ? getTerminalShellLoginArgs(executable, platform) : [];
   if (!loginArgs) throw new Error(`Terminal shell "${shellIdFromPath(executable) ?? executable}" does not support login mode`);

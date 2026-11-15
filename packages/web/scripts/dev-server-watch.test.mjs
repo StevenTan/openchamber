@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { EventEmitter } from 'node:events';
 
-import { createDevServerWatchCommand } from './dev-server-watch.mjs';
+import { createDevServerWatchCommand, runDevServerWatch } from './dev-server-watch.mjs';
 
 describe('createDevServerWatchCommand', () => {
   it('uses the package default port and disables relay hosting by default', () => {
@@ -77,5 +78,38 @@ describe('createDevServerWatchCommand', () => {
     expect(env).not.toHaveProperty('OPENCHAMBER_RUNTIME');
     expect(env).not.toHaveProperty('OPENCHAMBER_INJECTED_ENV');
     expect(env).toMatchObject({ PATH: '/usr/bin', OPENCHAMBER_PORT: '4200', OPENCODE_PASSWORD: 'theirs' });
+  });
+
+  it('waits for both watchers to close when the parent receives a termination signal', async () => {
+    const children = Array.from({ length: 2 }, () => Object.assign(new EventEmitter(), {
+      kill: vi.fn(), exitCode: null, signalCode: null,
+    }));
+    const signals = new Map();
+    const once = process.once;
+    vi.spyOn(process, 'once').mockImplementation(function (event, listener) {
+      if (event === 'SIGINT' || event === 'SIGTERM') {
+        signals.set(event, listener);
+        return this;
+      }
+      return once.call(this, event, listener);
+    });
+    const kill = vi.spyOn(process, 'kill').mockReturnValue(true);
+    try {
+      runDevServerWatch({ runner: vi.fn().mockReturnValueOnce(children[0]).mockReturnValueOnce(children[1]), env: {}, bunExecutable: 'bun' });
+      signals.get('SIGTERM')();
+      for (const child of children) expect(child.kill).toHaveBeenCalledWith('SIGTERM');
+      children[0].emit('close');
+      await Promise.resolve();
+      expect(kill).not.toHaveBeenCalled();
+      children[1].emit('close');
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(kill).toHaveBeenCalledWith(process.pid, 'SIGTERM');
+    } finally {
+      for (const child of children) child.emit('close');
+      await Promise.resolve();
+      await Promise.resolve();
+      vi.restoreAllMocks();
+    }
   });
 });

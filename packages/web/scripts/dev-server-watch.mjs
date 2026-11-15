@@ -2,6 +2,7 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { createRequire } from 'node:module';
 
 import { resolveBunExecutable } from '../../../scripts/lib/bun-executable.mjs';
 import { withoutInjectedEnv } from '../server/lib/injected-env.js';
@@ -9,6 +10,8 @@ import { withoutInjectedEnv } from '../server/lib/injected-env.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const webRoot = path.resolve(__dirname, '..');
+const require = createRequire(import.meta.url);
+const compilerPath = path.join(path.dirname(require.resolve('typescript/package.json')), 'bin', 'tsc');
 
 export function createDevServerWatchCommand(options = {}) {
   const platform = options.platform ?? process.platform;
@@ -59,15 +62,45 @@ export function createDevServerWatchCommand(options = {}) {
 export function runDevServerWatch(options = {}) {
   const runner = options.runner ?? spawn;
   const { command, args, spawnOptions } = createDevServerWatchCommand(options);
+  const compiler = runner(process.execPath, [compilerPath, '--project', 'tsconfig.agent-command.build.json', '--watch', '--preserveWatchOutput'], spawnOptions);
   const child = runner(command, args, spawnOptions);
+  let exitSignal = null;
+  const stop = (signal) => {
+    exitSignal = signal;
+    compiler.kill(signal);
+    child.kill(signal);
+  };
+  const interrupt = () => stop('SIGINT');
+  const terminate = () => stop('SIGTERM');
+  process.once('SIGINT', interrupt);
+  process.once('SIGTERM', terminate);
+  void Promise.all([compiler, child].map(watcher => new Promise(resolve => watcher.once('close', resolve))))
+    .then(() => {
+      process.off('SIGINT', interrupt);
+      process.off('SIGTERM', terminate);
+      if (exitSignal) process.kill(process.pid, exitSignal);
+    });
 
+  compiler.on('error', (error) => {
+    console.error('[dev:web:server] Failed to start TypeScript watcher:', error);
+    process.exitCode = 1;
+    child.kill();
+  });
+  compiler.on('exit', (code) => {
+    if (child.exitCode === null && child.signalCode === null) {
+      process.exitCode = code || 1;
+      child.kill();
+    }
+  });
   child.on('error', (error) => {
+    compiler.kill();
     console.error('[dev:web:server] Failed to start server watcher:', error);
     process.exitCode = 1;
   });
   child.on('exit', (code, signal) => {
+    compiler.kill();
     if (signal) {
-      process.kill(process.pid, signal);
+      exitSignal = signal;
       return;
     }
     process.exitCode = code ?? 1;

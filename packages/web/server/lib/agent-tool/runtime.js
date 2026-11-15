@@ -53,6 +53,7 @@ import {
   secretRunCommandLine,
 } from '../openchamber-control/secret-run.js';
 import { createCallbackAddress } from './callback-address.js';
+import { createCommandToolRuntime } from '../agent-command/dist/runtime.js';
 
 const TOOL_SCHEMA_VERSION = 1;
 const PLUGIN_ID = 'openchamber-agent-tool';
@@ -990,6 +991,7 @@ export const createAgentToolRuntime = (dependencies) => {
     getActiveHost = () => null,
     executeAction,
     resolveSessionDirectory,
+    getCommandEnvironment,
   } = dependencies;
   // The plugin embeds this server's tool declarations, so it lives in this
   // server's own directory (see ../opencode/instance-dir.js).
@@ -1030,6 +1032,7 @@ export const createAgentToolRuntime = (dependencies) => {
     if (!Number.isInteger(port) || port <= 0) {
       throw new Error('OpenChamber listener port is unavailable for managed tool injection');
     }
+    commandToolRuntime.reset();
     activeToken = crypto.randomBytes(32).toString('base64url');
     return {
       OPENCHAMBER_AGENT_TOOL_URL: `http://${callbackHost()}:${port}/api/openchamber/agent-tool`,
@@ -1136,6 +1139,7 @@ export const createAgentToolRuntime = (dependencies) => {
   };
 
   const registerRoutes = (app, express) => {
+    commandToolRuntime.registerRoutes(app, express, { authorize, trackInflight });
     app.post('/api/openchamber/agent-tool', express.json({ limit: '1mb' }), async (req, res) => {
       if (!authorize(req)) return res.status(401).json({ error: 'Unauthorized' });
       const controller = new AbortController();
@@ -1161,6 +1165,8 @@ export const createAgentToolRuntime = (dependencies) => {
     });
   };
 
+  const commandToolRuntime = createCommandToolRuntime({ instanceDir, resolveSessionDirectory, getEnvironment: getCommandEnvironment });
+
   return {
     pluginDirectory,
     materializePlugin,
@@ -1169,5 +1175,8 @@ export const createAgentToolRuntime = (dependencies) => {
     registerRoutes,
     execute,
     abortSession,
+    materializeCommandPlugin: commandToolRuntime.materializePlugin,
+    closeCommands: commandToolRuntime.close,
+    releaseCommandSession: commandToolRuntime.releaseSession,
   };
 };

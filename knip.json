@@ -35,6 +35,7 @@
       "entry": [
         "bin/cli.js",
         "server/lib/opencode/login-shell-env.js",
+        "server/lib/agent-command/src/runtime.ts",
         "src/mobile-main.tsx",
         "src/mini-chat-main.tsx",
         "src/main.tsx",
@@ -46,6 +47,7 @@
       "project": [
         "bin/**/*.js",
         "server/**/*.{js,mjs,cjs}",
+        "server/lib/agent-command/src/**/*.ts",
         "src/**/*.{ts,tsx}"
       ]
     },

@@ -395,6 +395,11 @@ error state.
 
 ## Runtime parity
 
+The separate `openchamber-command-tool` plugin exposes `exec_command` and
+`write_stdin` for managed OpenCode and shares this runtime's authenticated
+callback channel. Its command ownership, waiting and PTY contracts are in
+`../agent-command/DOCUMENTATION.md`.
+
 - Web and Desktop managed OpenCode: injected automatically.
 - External OpenCode selected with `OPENCODE_HOST` or skip-start: not injected,
   because OpenChamber does not control that process environment.

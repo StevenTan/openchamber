@@ -56,6 +56,11 @@ Behavior settings can optionally inject a managed system-prompt optimizer on
 the next OpenCode restart. It is disabled by default and is not available for
 external OpenCode servers.
 
+The managed command tools are maintained in TypeScript under
+`server/lib/agent-command/src`. `bun run build:server` checks their types and
+generates the JavaScript loaded by the server. Development startup watches these
+sources; package and desktop builds generate the runtime files automatically.
+
 ### Tunnel behavior notes
 
 - One active tunnel per running OpenChamber instance (port).
