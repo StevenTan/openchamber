@@ -15,7 +15,7 @@ export const MANAGED_CONFIG_FILE_NAME = 'opencode.managed.json';
  * unavailable instead of using `openchamber_web`. A project config that lists
  * `opencode.browser` still re-enables it, because that layer sits above ours.
  */
-const DISABLED_BUILTIN_PLUGINS = ['-opencode.browser'];
+const DISABLED_BUILTIN_PLUGINS = ['-opencode.browser', '-opencode-websearch'];
 
 /**
  * OpenCode's own `experimental_image_generate` tool (2.2.1+, on by default
@@ -133,6 +133,7 @@ export const createManagedConfigRuntime = ({
     }
     directories.push(await materializeSessionTitlePlugin({ fsPromises, path, instanceDir }));
     if (agentToolRuntime) directories.push(await agentToolRuntime.materializeCommandPlugin());
+    if (agentToolRuntime) directories.push(await agentToolRuntime.materializeSearchPlugin());
     const disabled = includeImage ? [...DISABLED_BUILTIN_PLUGINS, BUILTIN_IMAGE_PLUGIN] : DISABLED_BUILTIN_PLUGINS;
     const authoring = await materializeAuthoringSkill({ fsPromises, instanceDir, openchamberVersion });
     const skills = [authoring.skillsRoot, ...await listExtensionSkillDirectories()];

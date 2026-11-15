@@ -6,5 +6,6 @@
     "noCheck": true,
     "rootDir": "server/lib/agent-command/src",
     "outDir": "server/lib/agent-command/dist"
-  }
+  },
+  "include": ["server/lib/agent-command/src/**/*.ts"]
 }

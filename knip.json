@@ -36,6 +36,9 @@
         "bin/cli.js",
         "server/lib/opencode/login-shell-env.js",
         "server/lib/agent-command/src/runtime.ts",
+        "server/lib/agent-search/src/plugin.ts",
+        "server/lib/agent-search/src/markdown.d.ts",
+        "server/lib/agent-search/upstream-tests/*.test.ts",
         "src/mobile-main.tsx",
         "src/mini-chat-main.tsx",
         "src/main.tsx",
@@ -48,6 +51,7 @@
         "bin/**/*.js",
         "server/**/*.{js,mjs,cjs}",
         "server/lib/agent-command/src/**/*.ts",
+        "server/lib/agent-search/src/**/*.ts",
         "src/**/*.{ts,tsx}"
       ]
     },

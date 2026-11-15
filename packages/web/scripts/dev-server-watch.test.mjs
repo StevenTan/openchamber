@@ -80,8 +80,8 @@ describe('createDevServerWatchCommand', () => {
     expect(env).toMatchObject({ PATH: '/usr/bin', OPENCHAMBER_PORT: '4200', OPENCODE_PASSWORD: 'theirs' });
   });
 
-  it('waits for both watchers to close when the parent receives a termination signal', async () => {
-    const children = Array.from({ length: 2 }, () => Object.assign(new EventEmitter(), {
+  it('waits for all watchers to close when the parent receives a termination signal', async () => {
+    const children = Array.from({ length: 3 }, () => Object.assign(new EventEmitter(), {
       kill: vi.fn(), exitCode: null, signalCode: null,
     }));
     const signals = new Map();
@@ -95,13 +95,16 @@ describe('createDevServerWatchCommand', () => {
     });
     const kill = vi.spyOn(process, 'kill').mockReturnValue(true);
     try {
-      runDevServerWatch({ runner: vi.fn().mockReturnValueOnce(children[0]).mockReturnValueOnce(children[1]), env: {}, bunExecutable: 'bun' });
+      runDevServerWatch({ runner: vi.fn().mockReturnValueOnce(children[0]).mockReturnValueOnce(children[1]).mockReturnValueOnce(children[2]), env: {}, bunExecutable: 'bun' });
       signals.get('SIGTERM')();
       for (const child of children) expect(child.kill).toHaveBeenCalledWith('SIGTERM');
       children[0].emit('close');
       await Promise.resolve();
       expect(kill).not.toHaveBeenCalled();
       children[1].emit('close');
+      await Promise.resolve();
+      expect(kill).not.toHaveBeenCalled();
+      children[2].emit('close');
       await Promise.resolve();
       await Promise.resolve();
       expect(kill).toHaveBeenCalledWith(process.pid, 'SIGTERM');

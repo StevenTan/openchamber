@@ -4,12 +4,14 @@ import { z } from "zod";
 import { TerminalManager } from "./terminal-manager.js";
 import { COMMAND_PLUGIN_ID, createCommandPluginSource } from "./plugin.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { truncateOutput } from "./output.js";
+import { commandWait, continuationWait } from "./wait.js";
 
 const waitTime = (value: number) =>
-  z.number().int().min(0).max(2147483647).default(value);
-const outputLimit = z.number().int().min(1).default(16000);
+  z.number().int().min(0).default(value);
+const outputLimit = z.number().int().min(0).default(10000);
 const outputDescription =
-  "Output character budget. Defaults to 16000 characters. A truncated response returns the newest characters from the selected output lines; retained output can be inspected with write_stdin using offset and length.";
+  "Output token budget. Defaults to 10000 tokens, estimated at four UTF-8 bytes per token. Truncated responses retain the beginning and end; omission markers are additional. Inspect retained output with write_stdin using offset and length.";
 const commandInput = z
   .object({
     cmd: z.string().min(1).describe("Shell command to execute."),
@@ -19,16 +21,21 @@ const commandInput = z
       .describe(
         "Working directory for the command. Defaults to the session's working directory.",
       ),
-    yield_time_ms: waitTime(1000).describe(
-      "Wait before returning output, in milliseconds. Defaults to 1000 ms; use 0 to return without waiting. Process completion or a detected input prompt can return earlier. Running commands continue after this wait.",
+    yield_time_ms: waitTime(10000).describe(
+      "Collect output until completion or this wait ends. Defaults to 10000 ms; effective range is 250-30000 ms, or 10000-30000 ms on Windows. Running commands continue after this wait.",
     ),
-    max_output_chars: outputLimit.describe(outputDescription),
+    max_output_tokens: outputLimit.describe(outputDescription),
     login: z
       .boolean()
       .default(true)
       .describe(
         "True starts a login shell when supported; false disables login mode. Defaults to true.",
       ),
+    tty: z
+      .boolean()
+      .default(false)
+      .describe("True allocates a PTY for interactive commands. Defaults to false, which uses output pipes and closed stdin."),
+    shell: z.string().min(1).optional().describe("Shell binary to launch. Defaults to the user's default shell."),
   })
   .strict();
 const stdinInput = z
@@ -43,12 +50,12 @@ const stdinInput = z
       .string()
       .default("")
       .describe(
-        "Characters to write to stdin. Defaults to empty, which waits without writing. Input is sent verbatim; include a newline to submit a line, or Ctrl+C (U+0003) to interrupt.",
+        "Characters to write to PTY stdin. Defaults to empty, which waits without writing. Input is sent verbatim; include a newline to submit a line. Ctrl+C (U+0003) interrupts commands in either mode. Other input requires tty: true at launch.",
       ),
-    yield_time_ms: waitTime(10000).describe(
-      "Wait for new output or process completion, in milliseconds. Defaults to 10000 ms. Existing unread output returns immediately. Absolute and tail reads return immediately.",
+    yield_time_ms: z.number().int().min(0).optional().describe(
+      "Collect output until completion or this wait ends. Non-empty writes default to 250 ms, with an effective range of 250-30000 ms. Empty waits default to 5000 ms, with a range of 5000-300000 ms. Output chunks do not end the wait. Absolute and tail reads return immediately.",
     ),
-    max_output_chars: outputLimit.describe(outputDescription),
+    max_output_tokens: outputLimit.describe(outputDescription),
     offset: z
       .number()
       .int()
@@ -60,16 +67,16 @@ const stdinInput = z
       .number()
       .int()
       .min(1)
-      .default(1000)
+      .optional()
       .describe(
-        "Maximum number of output lines to read. Defaults to 1000. The response also applies max_output_chars.",
+        "Maximum number of output lines to read. Omit to select all available unread lines. The response also applies max_output_tokens.",
       ),
   })
   .strict();
 const requestInput = z
   .object({
     sessionID: z.string().min(1),
-    tool: z.enum(["exec_command", "write_stdin"]),
+    tool: z.enum(["exec_command", "write_stdin", "pending_input"]),
     input: z.unknown(),
   })
   .strict();
@@ -78,6 +85,7 @@ interface CommandRuntimeOptions {
   instanceDir: string;
   resolveSessionDirectory: (sessionID: string) => Promise<string | null>;
   getEnvironment?: () => NodeJS.ProcessEnv;
+  hasPendingInput: (sessionID: string, signal: AbortSignal) => Promise<boolean>;
 }
 
 interface CallbackRequest extends IncomingMessage {
@@ -95,7 +103,7 @@ interface CommandResult {
 }
 interface CallbackResponse extends ServerResponse {
   status(code: number): CallbackResponse;
-  json(body: CommandResult | { error: string }): CallbackResponse;
+  json(body: CommandResult | { pending: boolean } | { error: string }): CallbackResponse;
 }
 type CallbackHandler = (
   req: CallbackRequest,
@@ -117,6 +125,7 @@ export function createCommandToolRuntime({
   instanceDir,
   resolveSessionDirectory,
   getEnvironment,
+  hasPendingInput,
 }: CommandRuntimeOptions) {
   const pluginDirectory = path.join(
     instanceDir,
@@ -134,22 +143,22 @@ export function createCommandToolRuntime({
   const readResult = (
     manager: TerminalManager,
     pid: number,
-    input: { offset?: number; length?: number; max_output_chars: number },
+    input: { offset?: number; length?: number; max_output_tokens: number },
   ): CommandResult => {
     const result = manager.readOutputPaginated(
       pid,
       input.offset ?? 0,
-      input.length ?? 1000,
+      input.length ?? Number.MAX_SAFE_INTEGER,
     );
     if (!result) throw new Error("Command session not found");
-    const characters = [...result.lines.join("\n")];
+    const preview = truncateOutput(result.lines.join("\n"), input.max_output_tokens);
     const response: CommandResult = {
       status: result.isComplete ? "completed" : "running",
       session_id: String(pid),
-      output: characters.slice(-input.max_output_chars).join(""),
+      output: preview.output,
       truncated:
         result.remaining > 0 ||
-        characters.length > input.max_output_chars ||
+        preview.truncated ||
         (result.evictedLines ?? 0) > 0,
       read_from: result.readFrom,
       total_lines: result.totalLines,
@@ -205,6 +214,8 @@ export function createCommandToolRuntime({
     signal: AbortSignal,
   ) => {
     if (closed) throw new Error("Command runtime is closed");
+    if (tool === "pending_input")
+      return { pending: await hasPendingInput(sessionID, signal) };
     if (tool === "exec_command") {
       const args = commandInput.parse(input);
       let manager = managers.get(sessionID);
@@ -222,8 +233,8 @@ export function createCommandToolRuntime({
         throw new Error("Working directory is not a directory");
       const started = await manager.executeCommand(
         args.cmd,
-        args.yield_time_ms,
-        { workdir: args.workdir, login: args.login, signal },
+        commandWait(args.yield_time_ms),
+        { workdir: args.workdir, login: args.login, tty: args.tty, shell: args.shell, signal },
       );
       signal?.throwIfAborted();
       return readResult(manager, started.pid, args);
@@ -235,7 +246,7 @@ export function createCommandToolRuntime({
     if (args.chars && manager.getSession(pid))
       manager.sendInputToProcess(pid, args.chars);
     if (args.offset === undefined || args.offset === 0)
-      await manager.waitForOutput(pid, args.yield_time_ms, signal);
+      await manager.waitForOutput(pid, continuationWait(args.chars, args.yield_time_ms), signal);
     signal?.throwIfAborted();
     return readResult(manager, pid, args);
   };

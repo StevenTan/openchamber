@@ -6,16 +6,14 @@ import {
 } from "./process-detection.js";
 import { prepareCommandSpawn } from "./process.js";
 import { shutdownTerminalProcesses } from "../../terminal/shutdown.js";
-import type { IPty } from "node-pty";
+import type { CommandProcess } from "./process.js";
 import type { ProcessState } from "./process-detection.js";
 
-type CommandProcess = Pick<
-  IPty,
-  "pid" | "write" | "onData" | "onExit" | "kill"
->;
 interface CommandOptions {
   workdir: string;
   login?: boolean;
+  tty?: boolean;
+  shell?: string;
   signal?: AbortSignal;
 }
 interface ProcessStartResult {
@@ -24,7 +22,7 @@ interface ProcessStartResult {
   processState: CommandProcessState;
 }
 interface CommandProcessState extends ProcessState {
-  exitCode?: number;
+  exitCode?: number | null;
   signal?: number;
 }
 
@@ -57,11 +55,12 @@ interface ManagedSession extends TerminalSession {
   streams: StreamTails;
   shellExecutable: string;
   closed: Promise<void>;
+  completion: AbortSignal;
   termination?: Promise<void>;
 }
 interface CompletedSession {
   session: ManagedSession;
-  exitCode: number;
+  exitCode: number | null;
   signal?: number;
   endTime: Date;
 }
@@ -95,6 +94,7 @@ const MAX_LINE_CHARS = 1024 * 1024;
 
 export class TerminalManager {
   private sessions = new Map<number, ManagedSession>();
+  private launches = new Set<Promise<ManagedSession>>();
   private completedSessions = new Map<number, CompletedSession>();
   private deliveryTurn = 0;
   private deliveryTurnOpen = false;
@@ -116,18 +116,56 @@ export class TerminalManager {
   }
   async executeCommand(
     command: string,
-    timeoutMs = 1000,
-    { workdir, login = true, signal }: CommandOptions,
+    timeoutMs = 10000,
+    options: CommandOptions,
   ): Promise<ProcessStartResult> {
-    const spawn = await prepareCommandSpawn();
+    const starting = this.startCommand(command, options);
+    this.launches.add(starting);
+    const session = await starting.finally(() => this.launches.delete(starting));
+    const { signal } = options;
+    try {
+      await this.waitForOutput(session.pid, timeoutMs, signal);
+      signal?.throwIfAborted();
+    } catch (error) {
+      if (signal?.aborted) await this.forceTerminate(session.pid);
+      throw error;
+    }
+    return {
+      pid: session.pid,
+      isBlocked: this.sessions.has(session.pid),
+      processState: this.getProcessState(session.pid)!,
+    };
+  }
+  private async startCommand(
+    command: string,
+    { workdir, login = true, tty = false, shell, signal }: CommandOptions,
+  ): Promise<ManagedSession> {
+    const spawn = await prepareCommandSpawn(tty);
     signal?.throwIfAborted();
     if (this.closing) throw new Error("Command runtime is closed");
+    const launched = spawn({ command, workdir, login, env: this.getEnvironment(), shell });
+    // PTY listeners must attach in the spawn turn to capture short commands.
+    const child = launched instanceof Promise ? await launched : launched;
     const {
       process: childProcess,
       shellExecutable,
       closeNative,
-    } = spawn({ command, workdir, login, env: this.getEnvironment() });
+    } = child;
+    if (signal?.aborted || this.closing) {
+      const exited = new Promise<void>((resolve) => {
+        const subscription = childProcess.onExit(() => {
+          subscription.dispose();
+          resolve();
+        });
+      });
+      await shutdownTerminalProcesses([child], { graceMs: 0 });
+      await exited;
+      closeNative?.();
+      signal?.throwIfAborted();
+      throw new Error("Command runtime is closed");
+    }
     let resolveClosed!: () => void;
+    const completion = new AbortController();
     const session: ManagedSession = {
       pid: childProcess.pid,
       process: childProcess,
@@ -143,84 +181,28 @@ export class TerminalManager {
       closed: new Promise((resolve) => {
         resolveClosed = resolve;
       }),
+      completion: completion.signal,
     };
     this.sessions.set(childProcess.pid, session);
-    return new Promise<ProcessStartResult>((resolve, reject) => {
-      let resolved = false;
-      let periodicCheck: ReturnType<typeof setInterval> | null = null;
-      let waitTimer: ReturnType<typeof setTimeout> | null = null;
-      let abort = () => {};
-      const waitingForInput = () =>
-        this.getProcessState(childProcess.pid)?.isWaitingForInput === true;
-      const resolveOnce = (waitResult: { pid: number; isBlocked: boolean }) => {
-        if (resolved) return;
-        resolved = true;
-        signal?.removeEventListener("abort", abort);
-        if (periodicCheck) clearInterval(periodicCheck);
-        if (waitTimer) clearTimeout(waitTimer);
-        const result = {
-          ...waitResult,
-          processState: this.getProcessState(childProcess.pid)!,
-        };
-        resolve(result);
-      };
-      const dataSubscription = childProcess.onData((data) => {
-        const text = data.toString();
-        this.recordOutput(session, "stdout", text);
-        if (waitingForInput()) {
-          resolveOnce({
-            pid: childProcess.pid,
-            isBlocked: true,
-          });
-        }
-      });
-      periodicCheck = setInterval(() => {
-        if (waitingForInput()) {
-          resolveOnce({
-            pid: childProcess.pid,
-            isBlocked: true,
-          });
-        }
-      }, 100);
-      waitTimer = setTimeout(() => {
-        resolveOnce({
-          pid: childProcess.pid,
-          isBlocked: true,
-        });
-      }, timeoutMs);
-      const exitSubscription = childProcess.onExit(
-        ({ exitCode: code, signal: exitSignal }) => {
-          dataSubscription.dispose();
-          exitSubscription.dispose();
-          closeNative();
-          if (childProcess.pid) {
-            this.completedSessions.set(childProcess.pid, {
-              session,
-              exitCode: code,
-              signal: exitSignal,
-              endTime: new Date(),
-            });
-            if (this.completedSessions.size > 100) {
-              const oldestKey = Array.from(this.completedSessions.keys())[0];
-              this.completedSessions.delete(oldestKey);
-            }
-            this.sessions.delete(childProcess.pid);
-          }
-          resolveOnce({
-            pid: childProcess.pid,
-            isBlocked: false,
-          });
-          resolveClosed();
-        },
-      );
-      abort = () => {
-        void this.forceTerminate(childProcess.pid).catch(reject);
-      };
-      if (!resolved) {
-        signal?.addEventListener("abort", abort, { once: true });
-        if (signal?.aborted) abort();
-      }
+    const dataSubscription = childProcess.onData((data, stream = "stdout") => {
+      this.recordOutput(session, stream, data);
     });
+    const exitSubscription = childProcess.onExit(({ exitCode, signal: exitSignal }) => {
+      dataSubscription.dispose();
+      exitSubscription.dispose();
+      closeNative?.();
+      this.completedSessions.set(childProcess.pid, {
+        session, exitCode, signal: exitSignal, endTime: new Date(),
+      });
+      if (this.completedSessions.size > 100) {
+        const oldestKey = this.completedSessions.keys().next().value!;
+        this.completedSessions.delete(oldestKey);
+      }
+      this.sessions.delete(childProcess.pid);
+      completion.abort();
+      resolveClosed();
+    });
+    return session;
   }
   private recordOutput(
     session: ManagedSession,
@@ -338,22 +320,10 @@ export class TerminalManager {
       );
       result.evictedLines = completedSession.session.evictedLines;
       result.signal = completedSession.signal;
-      result.signal = completedSession.signal;
       return result;
     }
 
     return null;
-  }
-  hasUnreadOutput(pid: number): boolean {
-    const session =
-      this.sessions.get(pid) ?? this.completedSessions.get(pid)?.session;
-    if (!session) {
-      return false;
-    }
-    return (
-      session.outputLines.length - 1 > session.lastReadIndex ||
-      TerminalManager.openLineHasNewText(session)
-    );
   }
   private static openLineHasNewText(session: TerminalSession): boolean {
     const lines = session.outputLines;
@@ -493,9 +463,12 @@ export class TerminalManager {
   close(): Promise<void> {
     if (this.shutdown) return this.shutdown;
     this.closing = true;
-    const active = [...this.sessions.values()];
-    this.shutdown = shutdownTerminalProcesses(active, { graceMs: 0 })
-      .then(() => Promise.all(active.map((session) => session.closed)))
+    this.shutdown = Promise.allSettled([...this.launches])
+      .then(async () => {
+        const active = [...this.sessions.values()];
+        await shutdownTerminalProcesses(active, { graceMs: 0 });
+        await Promise.all(active.map((session) => session.closed));
+      })
       .then(() => {
         this.sessions.clear();
         this.completedSessions.clear();
@@ -510,14 +483,14 @@ export class TerminalManager {
     signal?.throwIfAborted();
     if (!this.getProcessState(pid))
       throw new Error("Command session not found");
-    if (!this.getSession(pid) || this.hasUnreadOutput(pid)) return;
+    const session = this.getSession(pid);
+    if (!session) return;
     await new Promise<void>((resolve, reject) => {
       let resolved = false;
-      let interval: ReturnType<typeof setInterval> | null = null;
       let timeout: ReturnType<typeof setTimeout> | null = null;
       const cleanup = () => {
-        if (interval) clearInterval(interval);
         if (timeout) clearTimeout(timeout);
+        session.completion.removeEventListener("abort", resolveOnce);
         signal?.removeEventListener("abort", abort);
       };
       const resolveOnce = () => {
@@ -531,10 +504,8 @@ export class TerminalManager {
         cleanup();
         reject(signal?.reason);
       };
-      interval = setInterval(() => {
-        if (this.hasUnreadOutput(pid) || !this.getSession(pid)) resolveOnce();
-      }, 50);
       timeout = setTimeout(resolveOnce, waitMs);
+      session.completion.addEventListener("abort", resolveOnce, { once: true });
       signal?.addEventListener("abort", abort, { once: true });
     });
   }

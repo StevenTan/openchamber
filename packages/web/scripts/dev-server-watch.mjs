@@ -63,42 +63,47 @@ export function runDevServerWatch(options = {}) {
   const runner = options.runner ?? spawn;
   const { command, args, spawnOptions } = createDevServerWatchCommand(options);
   const compiler = runner(process.execPath, [compilerPath, '--project', 'tsconfig.agent-command.build.json', '--watch', '--preserveWatchOutput'], spawnOptions);
+  const searchCompiler = runner(command, ['build', './server/lib/agent-search/src/plugin.ts', '--outfile', './server/lib/agent-search/dist/plugin.js', '--target', 'node', '--format', 'esm', '--watch'], spawnOptions);
   const child = runner(command, args, spawnOptions);
+  const watchers = [compiler, searchCompiler, child];
   let exitSignal = null;
   const stop = (signal) => {
     exitSignal = signal;
-    compiler.kill(signal);
-    child.kill(signal);
+    for (const watcher of watchers) watcher.kill(signal);
   };
   const interrupt = () => stop('SIGINT');
   const terminate = () => stop('SIGTERM');
   process.once('SIGINT', interrupt);
   process.once('SIGTERM', terminate);
-  void Promise.all([compiler, child].map(watcher => new Promise(resolve => watcher.once('close', resolve))))
+  void Promise.all(watchers.map(watcher => new Promise(resolve => watcher.once('close', resolve))))
     .then(() => {
       process.off('SIGINT', interrupt);
       process.off('SIGTERM', terminate);
       if (exitSignal) process.kill(process.pid, exitSignal);
     });
 
-  compiler.on('error', (error) => {
-    console.error('[dev:web:server] Failed to start TypeScript watcher:', error);
-    process.exitCode = 1;
-    child.kill();
-  });
-  compiler.on('exit', (code) => {
-    if (child.exitCode === null && child.signalCode === null) {
-      process.exitCode = code || 1;
-      child.kill();
-    }
-  });
+  for (const builder of [compiler, searchCompiler]) {
+    builder.on('error', (error) => {
+      console.error('[dev:web:server] Failed to start tool compiler:', error);
+      process.exitCode = 1;
+      for (const watcher of watchers) if (watcher !== builder) watcher.kill();
+    });
+    builder.on('exit', (code) => {
+      if (child.exitCode === null && child.signalCode === null) {
+        process.exitCode = code || 1;
+        for (const watcher of watchers) if (watcher !== builder) watcher.kill();
+      }
+    });
+  }
   child.on('error', (error) => {
     compiler.kill();
+    searchCompiler.kill();
     console.error('[dev:web:server] Failed to start server watcher:', error);
     process.exitCode = 1;
   });
   child.on('exit', (code, signal) => {
     compiler.kill();
+    searchCompiler.kill();
     if (signal) {
       exitSignal = signal;
       return;

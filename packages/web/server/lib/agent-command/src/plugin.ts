@@ -17,12 +17,11 @@ import path from 'node:path'
 
 const scanner = (${createShellScanner.toString()})()
 const parseCommand = (${createPermissionParser.toString()})(fs, os, path, scanner)
-const shell = ${JSON.stringify(commandShell())}
+const defaultShell = ${JSON.stringify(commandShell())}
 
 export default {
   id: ${JSON.stringify(COMMAND_PLUGIN_ID)},
   async setup(ctx) {
-    const clock = (${createSleepClock.toString()})()
     const endpoint = new URL('/api/openchamber/command-tool', process.env.OPENCHAMBER_AGENT_TOOL_URL).href
     const token = process.env.OPENCHAMBER_AGENT_TOOL_TOKEN
     const host = new URL(endpoint).hostname.replace(/^\[|\]$/g, '')
@@ -41,6 +40,22 @@ export default {
       if (!response.ok) throw new Error(result.error)
       return result
     }
+    const clock = (${createSleepClock.toString()})({
+      hasPendingInput: async (sessionID, signal) => (await request('pending_input', sessionID, {}, signal)).pending,
+    })
+    const watchingInput = (async () => {
+      try {
+        for await (const event of ctx.event.subscribe({ types: ['session.inbox.enqueued'], signal: clock.signal })) {
+          clock.interrupt(event.data.sessionID)
+        }
+        if (!clock.signal.aborted) throw new Error('Input event stream ended')
+      } catch (error) {
+        if (!clock.signal.aborted) {
+          console.error('[agent-command] input event stream failed:', error)
+          clock.close(new Error('Input event stream failed', { cause: error }))
+        }
+      }
+    })()
     const approve = (context, action, resource, save = resource) => ctx.permission.assert({
       sessionID: context.sessionID, agent: context.agent, action,
       resources: [resource], save: [save],
@@ -67,12 +82,17 @@ export default {
       tools.remove('shell')
       tools.add({
         name: 'exec_command',
-        description: 'Runs a command in a PTY, returning output and a session ID for ongoing interaction. When status is running, continue with write_stdin using the returned session_id. Completed commands retain their session_id for output inspection; status and exit_code report completion.',
+        description: 'Runs a command with output pipes by default; set tty to true for interactive commands. Collects output until the wait ends or the process exits, returning a session ID for continuation. When status is running, continue with write_stdin using the returned session_id. Completed commands retain their session_id for output inspection; status and exit_code report completion.',
         options: { codemode: false },
         input: ${JSON.stringify(schemas.exec_command)},
         async execute(input, context) {
           const root = await realpath(ctx.location.directory)
           const workdir = await realpath(path.resolve(root, input.workdir || '.'))
+          const shell = input.shell ?? defaultShell
+          if (shell !== defaultShell) {
+            const executable = "'" + shell.replaceAll("'", "'\"'\"'") + "'"
+            await approve(context, 'shell', executable)
+          }
           const parsed = parseCommand(input.cmd, shell, workdir)
           for (const directory of new Set([workdir, ...parsed.directories])) {
             const canonical = await canonicalDirectory(path.resolve(workdir, directory))
@@ -85,7 +105,7 @@ export default {
             await approve(context, 'shell', command.resource, command.save)
           }
           await context.progress({ command: input.cmd })
-          const result = await request('exec_command', context.sessionID, { ...input, workdir }, context.signal)
+          const result = await request('exec_command', context.sessionID, { ...input, workdir, shell }, context.signal)
           const response = toolResult(result)
           response.metadata.command = input.cmd
           return response
@@ -105,8 +125,10 @@ export default {
       tools.namespace({ name: 'clock', description: 'Tools for waiting on time.' })
       tools.add(clock.tool)
     })
-    await ctx.session.hook('prompt', event => clock.interrupt(event.sessionID))
-    return () => clock.close()
+    return async () => {
+      clock.close()
+      await watchingInput
+    }
   },
 }
 `;

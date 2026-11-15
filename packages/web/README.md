@@ -61,6 +61,11 @@ The managed command tools are maintained in TypeScript under
 generates the JavaScript loaded by the server. Development startup watches these
 sources; package and desktop builds generate the runtime files automatically.
 
+Managed Codex search tools live in `server/lib/agent-search`. The `native`
+search integration uses the configured proxy's `/alpha/search` endpoint for
+search, page opening, text lookup and link traversal. It requires a proxy that
+supports this protocol and uses the selected search model's provider API key.
+
 ### Tunnel behavior notes
 
 - One active tunnel per running OpenChamber instance (port).

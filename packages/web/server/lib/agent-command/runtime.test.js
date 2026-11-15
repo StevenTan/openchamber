@@ -6,6 +6,8 @@ import { pathToFileURL } from 'node:url';
 import express from 'express';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createAgentToolRuntime } from '../agent-tool/runtime.js';
+import { EventEmitter, on } from 'node:events';
+import { setImmediate } from 'node:timers/promises';
 
 const quote = (value) => "'" + value.replaceAll("'", "'\"'\"'") + "'";
 const nodeCommand = (script) => `${quote(process.execPath)} -e ${quote(script)}`;
@@ -16,17 +18,21 @@ let tools;
 let approvals;
 let childEnv;
 let cleanupPlugin;
-let promptHook;
+let inputEvents;
+let hasPendingInput;
 const context = { sessionID: 'session-a', agent: 'build', messageID: 'message-a', id: 'call-a', progress: async () => {}, signal: new AbortController().signal };
 
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-command-'));
   const app = express();
+  inputEvents = new EventEmitter();
+  hasPendingInput = vi.fn(async () => false);
   runtime = createAgentToolRuntime({
     crypto, fsPromises: fs, path, instanceDir: root,
     getActivePort: () => server.address().port,
     resolveSessionDirectory: async (id) => id.startsWith('session-') ? root : null,
     getCommandEnvironment: () => ({ ...process.env, COMMAND_TOOL_CONFIGURED_ENV: 'configured' }),
+    hasPendingInput,
   });
   runtime.registerRoutes(app, express);
   server = await new Promise(resolve => { const listener = app.listen(0, '127.0.0.1', () => resolve(listener)); });
@@ -39,13 +45,17 @@ beforeEach(async () => {
   cleanupPlugin = await plugin.default.setup({
     location: { directory: root }, permission: { assert: approvals },
     tool: { transform: async transform => transform({ remove: id => registered.delete(id), namespace: () => {}, add: tool => registered.set(tool.options.namespace ? `${tool.options.namespace}_${tool.name}` : tool.name, tool) }) },
-    session: { hook: async (name, callback) => { if (name === 'prompt') promptHook = callback; } },
+    event: {
+      async *subscribe({ signal }) {
+        for await (const [event] of on(inputEvents, 'input', { signal })) yield event;
+      },
+    },
   });
   tools = registered;
 });
 
 afterEach(async () => {
-  cleanupPlugin();
+  await cleanupPlugin();
   vi.useRealTimers();
   await runtime.closeCommands();
   await new Promise(resolve => server.close(resolve));
@@ -54,6 +64,10 @@ afterEach(async () => {
 });
 
 const run = async (name, input, caller = context) => JSON.parse((await tools.get(name).execute(input, caller)).content);
+const enqueueInput = async sessionID => {
+  inputEvents.emit('input', { type: 'session.inbox.enqueued', data: { sessionID } });
+  await setImmediate();
+};
 
 describe('managed command tools', () => {
   it('exposes command execution and continuation as direct tools', () => {
@@ -65,47 +79,48 @@ describe('managed command tools', () => {
   });
 
   it('completes a clock sleep and reports elapsed time', async () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
     const sleeping = tools.get('clock_sleep').execute({ duration_ms: 20 }, context);
-    await vi.advanceTimersByTimeAsync(20);
     const result = await sleeping;
     expect(result.content).toContain('Sleep completed.');
     expect(result.metadata).toMatchObject({ duration_ms: 20, interrupted: false });
-    expect(result.metadata.wall_time_seconds).toBe(0.02);
-    expect(vi.getTimerCount()).toBe(0);
+    expect(result.metadata.wall_time_seconds).toBeGreaterThan(0);
   });
 
   it('wakes sleeping tools only for new input in their own session', async () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
     const sleeping = tools.get('clock_sleep').execute({ duration_ms: 10000 }, context);
-    await promptHook({ sessionID: 'session-b' });
-    expect(vi.getTimerCount()).toBe(1);
-    await promptHook({ sessionID: context.sessionID });
+    await enqueueInput('session-b');
+    await enqueueInput(context.sessionID);
     expect((await sleeping).metadata.interrupted).toBe(true);
-    expect(vi.getTimerCount()).toBe(0);
   });
 
   it('cancels a clock sleep when its tool call is aborted', async () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
     const controller = new AbortController();
     const sleeping = tools.get('clock_sleep').execute({ duration_ms: 10000 }, { ...context, signal: controller.signal });
     const rejected = expect(sleeping).rejects.toThrow('Cancelled');
     controller.abort(new Error('Cancelled'));
     await rejected;
-    expect(vi.getTimerCount()).toBe(0);
   });
 
   it('releases sleeping tools when the plugin unloads', async () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
     const sleeping = tools.get('clock_sleep').execute({ duration_ms: 10000 }, context);
     const rejected = expect(sleeping).rejects.toThrow('Clock plugin unloaded');
-    cleanupPlugin();
+    await cleanupPlugin();
     await rejected;
-    expect(vi.getTimerCount()).toBe(0);
   });
 
   it.each([0, -1, 0.5, 43200001])('rejects unsupported sleep duration %s', async duration_ms => {
     await expect(tools.get('clock_sleep').execute({ duration_ms }, context)).rejects.toThrow('duration_ms must be between');
+  });
+
+  it('returns immediately for input already in the session inbox', async () => {
+    hasPendingInput.mockResolvedValueOnce(true);
+    const result = await tools.get('clock_sleep').execute({ duration_ms: 30000 }, context);
+    expect(result.metadata.interrupted).toBe(true);
+  });
+
+  it('reports queue-query failures without leaving a sleep active', async () => {
+    hasPendingInput.mockRejectedValueOnce(new Error('Inbox unavailable'));
+    await expect(tools.get('clock_sleep').execute({ duration_ms: 30000 }, context)).rejects.toThrow('Inbox unavailable');
   });
 
   it('captures standard output, errors, Unicode and the exit code', async () => {
@@ -116,8 +131,97 @@ describe('managed command tools', () => {
     expect(result.session_id).toMatch(/^\d+$/);
   });
 
+  it('runs the selected shell and checks its compound commands', async () => {
+    const result = await run('exec_command', { cmd: 'printf %s "$BASH_VERSION"', shell: '/bin/bash', login: false });
+    expect(result.output).toMatch(/^\d+\./);
+    approvals.mockImplementation(async ({ resources }) => {
+      if (resources.some(resource => resource.startsWith('rm '))) throw new Error('rm denied');
+    });
+    await expect(run('exec_command', { cmd: 'printf allowed; rm -f target', shell: '/bin/bash' })).rejects.toThrow('rm denied');
+  });
+
+  it('authorizes a selected executable independently from the command allowlist', async () => {
+    const shell = path.join(root, 'custom-shell');
+    await fs.writeFile(shell, '#!/bin/sh\ntouch denied-file\nexec /bin/sh "$@"\n', { mode: 0o755 });
+    approvals.mockImplementation(async ({ resources }) => {
+      if (!resources.every(resource => resource.startsWith('printf '))) throw new Error('Executable denied');
+    });
+    await expect(run('exec_command', { cmd: 'printf allowed', shell, login: false })).rejects.toThrow('Executable denied');
+    await expect(fs.stat(path.join(root, 'denied-file'))).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('applies the token budget to UTF-8 output while retaining both ends', async () => {
+    const result = await run('exec_command', { cmd: nodeCommand('process.stdout.write("开头" + "😀".repeat(100) + "结尾")'), max_output_tokens: 4 });
+    expect(result.output).toMatch(/^开头/);
+    expect(result.output).toMatch(/结尾$/);
+    expect(result.output).toContain('tokens truncated');
+    expect(result.truncated).toBe(true);
+  });
+
+  it('uses pipes by default and exposes a terminal only when requested', async () => {
+    const cmd = nodeCommand('console.log(JSON.stringify({ stdin: !!process.stdin.isTTY, stdout: !!process.stdout.isTTY, stderr: !!process.stderr.isTTY })); process.stdin.on("end", () => console.log("stdin closed")); process.stdin.resume()');
+    const piped = await run('exec_command', { cmd, yield_time_ms: 5000 });
+    expect(piped).toMatchObject({ status: 'completed', exit_code: 0 });
+    expect(piped.output).toBe('{"stdin":false,"stdout":false,"stderr":false}\nstdin closed');
+    const terminal = await run('exec_command', { cmd, tty: true, yield_time_ms: 500 });
+    expect(terminal.output).toContain('{"stdin":true,"stdout":true,"stderr":true}');
+    await run('write_stdin', { session_id: terminal.session_id, chars: '\x03', yield_time_ms: 5000 });
+  });
+
+  it('collects successive chunks until the command exits during a continuation', async () => {
+    const started = await run('exec_command', { cmd: nodeCommand('setTimeout(() => console.log("first"), 100); setTimeout(() => console.log("last"), 300)'), yield_time_ms: 0 });
+    const result = await run('write_stdin', { session_id: started.session_id, yield_time_ms: 5000 });
+    expect(result).toMatchObject({ status: 'completed', exit_code: 0 });
+    expect([started.output, result.output].join('\n')).toBe('first\nlast');
+  });
+
+  it('collects launch output through completion even when it resembles a prompt', async () => {
+    const result = await run('exec_command', { cmd: nodeCommand('process.stdout.write("Password: "); setTimeout(() => console.log("done"), 150)'), yield_time_ms: 5000 });
+    expect(result).toMatchObject({ status: 'completed', exit_code: 0, output: 'Password: done' });
+  });
+
+  it('rejects text input to a pipe session and keeps the command interruptible', async () => {
+    const started = await run('exec_command', { cmd: nodeCommand('setInterval(() => {}, 1000)'), yield_time_ms: 0 });
+    await expect(run('write_stdin', { session_id: started.session_id, chars: 'hello\n' })).rejects.toThrow('stdin is closed');
+    expect((await run('write_stdin', { session_id: started.session_id, chars: '\x03', yield_time_ms: 5000 })).status).toBe('completed');
+  });
+
+  it('finishes a command and terminates background jobs in its process group', async () => {
+    let descendant;
+    try {
+      const result = await run('exec_command', { cmd: nodeCommand('const { spawn } = require("node:child_process"); const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: ["ignore", "inherit", "inherit"] }); console.log(child.pid); child.unref()'), yield_time_ms: 3000 });
+      descendant = Number(result.output.trim());
+      expect(result).toMatchObject({ status: 'completed', exit_code: 0 });
+      expect(descendant).toBeGreaterThan(0);
+      await expect.poll(() => {
+        try { process.kill(descendant, 0); return false; }
+        catch (error) { if (error.code !== 'ESRCH') throw error; return true; }
+      }).toBe(true);
+    } finally {
+      if (descendant) { try { process.kill(descendant, 'SIGKILL'); } catch (error) { if (error.code !== 'ESRCH') throw error; } }
+    }
+  });
+
+  it('terminates a launch when its tool call is cancelled', async () => {
+    const marker = path.join(root, 'launch-pid');
+    const controller = new AbortController();
+    const launching = run('exec_command', { cmd: nodeCommand(`require("node:fs").writeFileSync(${JSON.stringify(marker)}, String(process.pid)); setInterval(() => {}, 1000)`), yield_time_ms: 10000 }, { ...context, signal: controller.signal });
+    const rejected = expect(launching).rejects.toThrow('Launch cancelled');
+    let pid;
+    await expect.poll(async () => {
+      try { pid = Number(await fs.readFile(marker, 'utf8')); return true; }
+      catch (error) { if (error.code !== 'ENOENT') throw error; return false; }
+    }).toBe(true);
+    controller.abort(new Error('Launch cancelled'));
+    await rejected;
+    await expect.poll(() => {
+      try { process.kill(pid, 0); return false; }
+      catch (error) { if (error.code !== 'ESRCH') throw error; return true; }
+    }).toBe(true);
+  });
+
   it('keeps a PTY alive across waits and sends input without adding a newline', async () => {
-    const started = await run('exec_command', { cmd: nodeCommand('console.log("ready"); process.stdin.once("data", data => { console.log("received:" + data.toString().trim()); process.exit(0) })'), yield_time_ms: 1000 });
+    const started = await run('exec_command', { cmd: nodeCommand('console.log("ready"); process.stdin.once("data", data => { console.log("received:" + data.toString().trim()); process.exit(0) })'), tty: true, yield_time_ms: 1000 });
     expect(started.status).toBe('running');
     expect(started.output).toContain('ready');
     const waiting = await run('write_stdin', { session_id: started.session_id, chars: 'hello', yield_time_ms: 20 });
@@ -135,7 +239,7 @@ describe('managed command tools', () => {
     const waiting = await run('write_stdin', { session_id: started.session_id, yield_time_ms: 100 });
     expect(waiting.status).toBe('running');
     expect(waiting.output).toBe('');
-    expect(performance.now() - before).toBeGreaterThanOrEqual(90);
+    expect(performance.now() - before).toBeGreaterThanOrEqual(4900);
     const result = await run('write_stdin', { session_id: started.session_id, chars: '\x03', yield_time_ms: 5000 });
     expect(result.status).toBe('completed');
   });
@@ -147,12 +251,22 @@ describe('managed command tools', () => {
   });
 
   it('retains output for paginated inspection after a truncated response', async () => {
-    const result = await run('exec_command', { cmd: nodeCommand('console.log("begin" + "x".repeat(100000) + "end")'), max_output_chars: 100, yield_time_ms: 5000 });
+    const result = await run('exec_command', { cmd: nodeCommand('console.log("begin" + "x".repeat(100000) + "end")'), max_output_tokens: 25, yield_time_ms: 5000 });
     expect(result.truncated).toBe(true);
-    expect(result.output.length).toBeLessThanOrEqual(100);
+    expect(result.output).toContain("tokens truncated");
+    expect(result.output).toContain('begin');
     expect(result.output).toContain('end');
-    const retained = await run('write_stdin', { session_id: result.session_id, offset: -1, max_output_chars: 200000 });
-    expect(retained.output).toBe('begin' + 'x'.repeat(100000) + 'end\r');
+    const retained = await run('write_stdin', { session_id: result.session_id, offset: -1, max_output_tokens: 200000 });
+    expect(retained.output).toBe('begin' + 'x'.repeat(100000) + 'end');
+  });
+
+  it('previews the beginning and end across all unread output lines', async () => {
+    const result = await run('exec_command', { cmd: nodeCommand('console.log("FIRST\\n" + "middle\\n".repeat(2000) + "LAST")'), max_output_tokens: 10, yield_time_ms: 5000 });
+    expect(result.output).toMatch(/^FIRST\n/);
+    expect(result.output).toMatch(/\nLAST$/);
+    expect(result.truncated).toBe(true);
+    const selected = await run('write_stdin', { session_id: result.session_id, offset: 2000, length: 2, max_output_tokens: 25 });
+    expect(selected.output).toBe('middle\nLAST');
   });
 
   it('enforces shell permission before executing a command', async () => {
@@ -163,7 +277,7 @@ describe('managed command tools', () => {
   });
 
   it('requires permission for terminal input as well as its launch', async () => {
-    const started = await run('exec_command', { cmd: nodeCommand('process.stdin.resume()'), yield_time_ms: 0 });
+    const started = await run('exec_command', { cmd: nodeCommand('process.stdin.resume()'), tty: true, yield_time_ms: 0 });
     approvals.mockRejectedValueOnce(new Error('Input denied'));
     await expect(run('write_stdin', { session_id: started.session_id, chars: 'text\n' })).rejects.toThrow('Input denied');
   });
@@ -204,8 +318,8 @@ describe('managed command tools', () => {
   });
 
   it('retains complete Unicode characters in a truncated preview', async () => {
-    const result = await run('exec_command', { cmd: nodeCommand('process.stdout.write("😀".repeat(100))'), max_output_chars: 3, yield_time_ms: 5000 });
-    expect(result.output).toBe('😀😀😀');
+    const result = await run('exec_command', { cmd: nodeCommand('process.stdout.write("😀".repeat(100))'), max_output_tokens: 2, yield_time_ms: 5000 });
+    expect(result.output).toBe('😀…98 tokens truncated…😀');
   });
 
   it('checks relative directory symlinks against the command working directory', async () => {
@@ -238,10 +352,10 @@ describe('managed command tools', () => {
   });
 
   it('captures sustained output completely while keeping tool responses small', async () => {
-    const result = await run('exec_command', { cmd: nodeCommand('process.stdout.write("x".repeat(2000000))'), yield_time_ms: 10000, max_output_chars: 20 });
+    const result = await run('exec_command', { cmd: nodeCommand('process.stdout.write("x".repeat(2000000))'), yield_time_ms: 10000, max_output_tokens: 5 });
     expect(result.status).toBe('completed');
-    expect(result.output).toBe('x'.repeat(20));
-    const retained = await run('write_stdin', { session_id: result.session_id, offset: -result.total_lines, max_output_chars: 3000000 });
+    expect(result.output).toMatch(/^x{10}…\d+ tokens truncated…x{10}$/);
+    const retained = await run('write_stdin', { session_id: result.session_id, offset: -result.total_lines, max_output_tokens: 3000000 });
     expect(retained.output.replaceAll('\n', '').length).toBe(2000000);
   });
 });

@@ -54,6 +54,7 @@ import {
 } from '../openchamber-control/secret-run.js';
 import { createCallbackAddress } from './callback-address.js';
 import { createCommandToolRuntime } from '../agent-command/dist/runtime.js';
+import { materializeSearchPlugin } from '../agent-search/runtime.js';
 
 const TOOL_SCHEMA_VERSION = 1;
 const PLUGIN_ID = 'openchamber-agent-tool';
@@ -992,6 +993,7 @@ export const createAgentToolRuntime = (dependencies) => {
     executeAction,
     resolveSessionDirectory,
     getCommandEnvironment,
+    hasPendingInput,
   } = dependencies;
   // The plugin embeds this server's tool declarations, so it lives in this
   // server's own directory (see ../opencode/instance-dir.js).
@@ -1165,7 +1167,7 @@ export const createAgentToolRuntime = (dependencies) => {
     });
   };
 
-  const commandToolRuntime = createCommandToolRuntime({ instanceDir, resolveSessionDirectory, getEnvironment: getCommandEnvironment });
+  const commandToolRuntime = createCommandToolRuntime({ instanceDir, resolveSessionDirectory, getEnvironment: getCommandEnvironment, hasPendingInput });
 
   return {
     pluginDirectory,
@@ -1176,6 +1178,7 @@ export const createAgentToolRuntime = (dependencies) => {
     execute,
     abortSession,
     materializeCommandPlugin: commandToolRuntime.materializePlugin,
+    materializeSearchPlugin: () => materializeSearchPlugin(instanceDir),
     closeCommands: commandToolRuntime.close,
     releaseCommandSession: commandToolRuntime.releaseSession,
   };

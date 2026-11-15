@@ -3,6 +3,11 @@
 ## Purpose
 This module provides OpenCode server integration utilities for the web server runtime, including configuration management and provider authentication.
 
+The managed config registers `agent-search` alongside `agent-command`. It
+disables the external `opencode-websearch` plugin while the built-in search
+plugin owns the `native` provider. See `../agent-search/DOCUMENTATION.md` for
+the standalone search protocol and provider selection contract.
+
 Diagnostic logging for the timeline export (`proxy.js` error lines, the lifecycle journal, the local diagnostics route in `core-routes.js`) is described in `../diagnostics/DOCUMENTATION.md`.
 
 ## Entrypoints and structure

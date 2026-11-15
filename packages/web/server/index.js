@@ -2561,6 +2561,7 @@ async function main(options = {}) {
     // A v2 tool call carries no directory, only the session it runs in.
     resolveSessionDirectory: (sessionID) => openChamberControlService.resolveSessionDirectory(sessionID),
     getCommandEnvironment: () => overlayEnvironment({ ...process.env, PATH: buildAugmentedPath() }, environmentRuntime.forOpenCode()),
+    hasPendingInput: async (sessionID, signal) => (await openCodeSessionClient().session.inbox.list({ sessionID }, { signal })).length > 0,
     getActivePort: () => {
       const address = server?.address?.();
       return typeof address === 'object' && address ? address.port : null;
