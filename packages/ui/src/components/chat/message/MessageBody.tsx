@@ -104,9 +104,9 @@ const CHANGED_FILE_CHIP_HOVER_CLASS_NAME = 'oc-tile-hover';
 const CHANGED_FILE_CHIP_STYLE = { lineHeight: 'round(1.35em, 1px)' };
 const CHANGED_FILE_CHIP_BUTTON_CLASS_NAME = 'inline-flex h-auto min-h-8 max-w-full cursor-pointer items-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[var(--interactive-focus-ring)] py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]';
 
-const TurnChangedFileChipContent = React.memo(({ file, interactive = false }: { file: TurnChangedFile; interactive?: boolean }) => (
+const TurnChangedFileChipContent = React.memo(({ file }: { file: TurnChangedFile }) => (
     <span
-        className={cn(CHANGED_FILE_CHIP_CLASS_NAME, interactive && CHANGED_FILE_CHIP_HOVER_CLASS_NAME)}
+        className={`${CHANGED_FILE_CHIP_CLASS_NAME} oc-tile-hover`}
         style={CHANGED_FILE_CHIP_STYLE}
     >
         <FileTypeIcon filePath={file.file} className="h-3.5 w-3.5 flex-shrink-0" />
@@ -139,22 +139,12 @@ const TurnChangedFilePillButton = React.memo(({
                 onOpen(file.file);
             }}
         >
-            <TurnChangedFileChipContent file={file} interactive />
+            <TurnChangedFileChipContent file={file} />
         </button>
     );
 });
 
-const StaticTurnChangedFilePills = React.memo(({ files }: { files: TurnChangedFile[] }) => (
-    <>
-        {files.map((file) => (
-            <span key={file.file} className="inline-flex h-8 max-w-full items-center" title={file.file}>
-                <TurnChangedFileChipContent file={file} />
-            </span>
-        ))}
-    </>
-));
-
-const InteractiveTurnChangedFilePills = React.memo(({ files }: { files: TurnChangedFile[] }) => {
+const InteractiveTurnChangedFilePills = React.memo(({ files, turnId }: { files: TurnChangedFile[]; turnId?: string }) => {
     const { t } = useI18n();
     const effectiveDirectory = useEffectiveDirectory();
     const isMobile = useUIStore((state) => state.isMobile);
@@ -164,40 +154,40 @@ const InteractiveTurnChangedFilePills = React.memo(({ files }: { files: TurnChan
     const mobileActions = useMobileAppActions();
     const runtime = useRuntimeAPIs();
 
-    const openLastTurnDiff = React.useCallback((file: string) => {
+    const openTurnDiff = React.useCallback((file: string, recordedTurnId?: string) => {
+        const selectedTurnId = recordedTurnId ?? turnId;
         const editor = runtime.editor;
         if (runtime.runtime.isVSCode && editor && effectiveDirectory) {
             const sessionId = useSessionUIStore.getState().currentSessionId;
-            if (!sessionId) return;
-            void opencodeClient.getSessionTurnDiff(sessionId, { directory: effectiveDirectory })
-                .then((turnDiff) => openTurnFileDiffInEditor({ directory: effectiveDirectory, editor, file, turnDiff }))
+            if (!sessionId || !selectedTurnId) return;
+            void opencodeClient.getRecordedTurnDiff(sessionId, selectedTurnId, effectiveDirectory)
+                .then((record) => {
+                    if (record.unavailable || record.error || !record.files) throw new Error(t('diffView.state.turnDiffUnavailable'));
+                    return openTurnFileDiffInEditor({ directory: effectiveDirectory, editor, file, turnDiff: record.files });
+                })
                 .catch(() => toast.error(t('diffView.state.failedToLoadDiff')));
             return;
         }
 
         if (mobileActions) {
-            mobileActions.openChanges({ diffPath: file, scope: 'turn' });
+            mobileActions.openChanges({ diffPath: file, scope: 'turn', turnId: selectedTurnId });
             return;
         }
 
         if (!isMobile && effectiveDirectory) {
             openContextDiff(effectiveDirectory, file, false, 'turn');
-            setPendingTurnDiffFile({ file, sessionId: useSessionUIStore.getState().currentSessionId });
+            setPendingTurnDiffFile({ file, sessionId: useSessionUIStore.getState().currentSessionId, turnId: selectedTurnId });
             return;
         }
 
+        setPendingTurnDiffFile({ file, sessionId: useSessionUIStore.getState().currentSessionId, turnId: selectedTurnId });
         navigateToDiff(file, false, 'turn');
-    }, [effectiveDirectory, isMobile, mobileActions, navigateToDiff, openContextDiff, runtime, setPendingTurnDiffFile, t]);
+    }, [effectiveDirectory, isMobile, mobileActions, navigateToDiff, openContextDiff, runtime, setPendingTurnDiffFile, t, turnId]);
 
     return (
         <>
-            {files.map((file) => file.inTurnDiff === false ? (
-                // The turn diff has no entry to open for this path.
-                <span key={file.file} className="inline-flex h-8 max-w-full items-center" title={file.file}>
-                    <TurnChangedFileChipContent file={file} />
-                </span>
-            ) : (
-                <TurnChangedFilePillButton key={file.file} file={file} onOpen={openLastTurnDiff} />
+            {files.map((file) => (
+                <TurnChangedFilePillButton key={`${file.turnId ?? turnId}:${file.file}`} file={file} onOpen={(path) => openTurnDiff(path, file.turnId)} />
             ))}
         </>
     );
@@ -209,7 +199,7 @@ const CHANGED_FILE_CHIP_LIMIT = 4;
  * Past the limit one more chip reveals the rest in the row; while they show,
  * the same chip at the row's end hides them again.
  */
-const TurnChangedFilePills = React.memo(({ files, isInteractive }: { files?: TurnChangedFile[]; isInteractive: boolean }) => {
+const TurnChangedFilePills = React.memo(({ files, turnId }: { files?: TurnChangedFile[]; turnId?: string }) => {
     const { t } = useI18n();
     const [expanded, setExpanded] = React.useState(false);
     const toggleRef = React.useRef<HTMLButtonElement>(null);
@@ -222,16 +212,15 @@ const TurnChangedFilePills = React.memo(({ files, isInteractive }: { files?: Tur
     }, [expanded]);
     if (!files || files.length === 0) return null;
 
-    const Pills = isInteractive ? InteractiveTurnChangedFilePills : StaticTurnChangedFilePills;
     const hiddenCount = files.length - CHANGED_FILE_CHIP_LIMIT;
-    if (hiddenCount <= 0) return <Pills files={files} />;
+    if (hiddenCount <= 0) return <InteractiveTurnChangedFilePills files={files} turnId={turnId} />;
 
     const label = expanded
         ? t('chat.changedFiles.actions.showFewer')
         : t('chat.changedFiles.actions.otherFiles', { count: hiddenCount });
     return (
         <>
-            <Pills files={expanded ? files : files.slice(0, CHANGED_FILE_CHIP_LIMIT)} />
+            <InteractiveTurnChangedFilePills files={expanded ? files : files.slice(0, CHANGED_FILE_CHIP_LIMIT)} turnId={turnId} />
             <HoverTooltip label={label}>
                 <button
                     ref={toggleRef}
@@ -2417,7 +2406,7 @@ const AssistantMessageBody = React.memo(({
                             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
                                 <TurnChangedFilePills
                                     files={turnGroupingContext?.changedFiles}
-                                    isInteractive={turnGroupingContext?.isLatestTurn === true}
+                                    turnId={turnGroupingContext?.turnId}
                                 />
                             </div>
                         ) : null}

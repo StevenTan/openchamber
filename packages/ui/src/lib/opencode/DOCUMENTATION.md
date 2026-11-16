@@ -22,6 +22,10 @@ to the shared UI domain model. Sync owns transcript membership and store writes.
   first message 404. Other errors stop the walk and propagate unchanged.
 - A runtime switch during a successful read also discards that response. Sync
   independently checks runtime identity and transcript membership before writing.
+- `getRecordedTurnDiff` uses the managed plugin's public RPC through the same
+  runtime-aware SDK transport. `turn-file-diffs.ts` validates patch records and
+  lightweight tool references. Missing plugin/history and capture failures
+  remain unavailable; a successful empty record means no net file changes.
 - A send that switches the session's agent first reads the folder's agent list.
   Sync also passes the agent when the session already sits on one the folder's
   loaded catalog lacks, so that session gets the same check.

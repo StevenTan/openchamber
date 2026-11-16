@@ -196,7 +196,7 @@ const MobileShell: React.FC<{ onActiveConnectionDeleted: () => void }> = ({ onAc
   // named (`host.openCommit`). One request at a time, so a later file tap
   // never meets a commit request still waiting beside it.
   const [changesRequest, setChangesRequest] = React.useState<
-    | { diff: { path: string; staged: boolean; scope?: 'turn' } }
+    | { diff: { path: string; staged: boolean; scope?: 'turn'; turnId?: string } }
     | { commit: MobileChangesCommitRequest }
     | null
   >(null);
@@ -353,7 +353,7 @@ const MobileShell: React.FC<{ onActiveConnectionDeleted: () => void }> = ({ onAc
     setOpenPlan({ id: event.planId, title: event.title, projectRef });
   }), []);
 
-  const openChangesSurface = React.useCallback((diff: { path: string; staged: boolean; scope?: 'turn' } | null = null) => {
+  const openChangesSurface = React.useCallback((diff: { path: string; staged: boolean; scope?: 'turn'; turnId?: string } | null = null) => {
     setChangesRequest(diff ? { diff } : null);
     setWorkspaceTab('changes');
     setWorkspaceOpen(true);
@@ -473,8 +473,8 @@ const MobileShell: React.FC<{ onActiveConnectionDeleted: () => void }> = ({ onAc
 
   const mobileActions = React.useMemo<MobileAppActions>(
     () => ({
-      openChanges: ({ diffPath, staged, scope } = {}) => {
-        openChangesSurface(diffPath ? { path: diffPath, staged: staged === true, scope } : null);
+      openChanges: ({ diffPath, staged, scope, turnId } = {}) => {
+        openChangesSurface(diffPath ? { path: diffPath, staged: staged === true, scope, turnId } : null);
       },
       openFiles: () => openFilesSurface(),
       openSourceBoard: () => openSurface('board'),

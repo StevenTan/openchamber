@@ -32,8 +32,8 @@ export interface TurnChangedFile {
     /** Absent when neither the turn diff nor the tool call reports line counts. */
     additions?: number;
     deletions?: number;
-    /** False when the turn diff view has no entry for this path, so a pill cannot open it. */
-    inTurnDiff?: boolean;
+    /** Persisted capture reference; absent for tools without capture metadata. */
+    turnId?: string;
 }
 
 export interface TurnSummaryRecord {

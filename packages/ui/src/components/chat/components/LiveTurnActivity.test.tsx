@@ -570,20 +570,20 @@ describe('live Activity with the real message body', () => {
         expect(container.querySelectorAll('button[aria-label^="Відкрити src/file-"]')).toHaveLength(4);
     });
 
-    test('a file without line counts shows its name alone, and one outside the turn diff is not a button', async () => {
+    test('file pills stay interactive when reported counts are unknown', async () => {
         const record = turn([assistant('final', [text('answer', 'Done')], 'stop')]);
         await act(async () => root.render(<Harness record={record} changedFiles={[
             { file: 'src/a.ts' },
             { file: 'src/b.ts', additions: 1, deletions: 2 },
-            { file: 'src/c.ts', additions: 1, deletions: 0, inTurnDiff: false },
+            { file: 'src/c.ts', additions: 1, deletions: 0 },
         ]} />));
         expect(container.querySelector('button[aria-label="Open src/a.ts"]')?.textContent).toBe('a.ts');
         expect(container.querySelector('button[aria-label="Open src/b.ts"]')?.textContent).toBe('b.ts+1 −2');
-        expect(container.querySelector('button[aria-label="Open src/c.ts"]')).toBeNull();
-        expect(container.querySelector('span[title="src/c.ts"]')?.textContent).toBe('c.ts+1 −0');
+        expect(container.querySelector('button[aria-label="Open src/c.ts"]') !== null).toBe(true);
+        expect(container.querySelector('button[aria-label="Open src/c.ts"]')?.textContent).toBe('c.ts+1 −0');
     });
 
-    test('keeps historical files informational and withholds the list before stop', async () => {
+    test('opens historical file pills and withholds the list before stop', async () => {
         const files = Array.from({ length: 5 }, (_, index) => ({ file: `src/file-${index}.ts`, additions: 1, deletions: 0 }));
         const final = assistant('final', [text('answer', 'Done')], 'tool-calls');
         await act(async () => root.render(<Harness record={turn([final])} changedFiles={files} isLatestTurn={false} />));
@@ -592,6 +592,6 @@ describe('live Activity with the real message body', () => {
         expect(container.textContent).toContain('file-0.ts');
         await act(async () => changedFilesToggle()?.click());
         expect(container.textContent).toContain('file-4.ts');
-        expect(container.querySelectorAll('button[aria-label^="Open src/file-"]')).toHaveLength(0);
+        expect(container.querySelectorAll('button[aria-label^="Open src/file-"]')).toHaveLength(5);
     });
 });

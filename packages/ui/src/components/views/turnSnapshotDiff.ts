@@ -1,9 +1,7 @@
-/** One file of the last turn's diff, as `GET /api/session/:id/diff` answers it. */
+/** One file's persisted net change within a turn. */
 export type TurnSnapshotDiff = {
     file?: string;
     status?: string;
-    before?: string;
-    after?: string;
     patch?: string;
     additions?: number;
     deletions?: number;

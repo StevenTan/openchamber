@@ -6,8 +6,7 @@ import { extractFirstChangedLineFromDiff } from './parts/toolDiffUtils';
 
 /**
  * VS Code has no side panel for the turn diff, so a changed-file chip opens
- * the file's whole change in the turn in the editor's own diff view. A file
- * the turn diff does not list opens as it is.
+ * the file's whole recorded change in the turn in the editor's own diff view.
  */
 export const openTurnFileDiffInEditor = async ({
     directory,
@@ -24,8 +23,7 @@ export const openTurnFileDiffInEditor = async ({
     const listed = findRepoFile(absolutePath, directory, turnDiff.flatMap((entry) => entry.file ?? []));
     const patch = listed ? turnDiff.find((entry) => entry.file === listed)?.patch : undefined;
     if (!patch) {
-        await editor.openFile(absolutePath);
-        return;
+        throw new Error('The turn has no recorded diff for this file');
     }
     await editor.openDiff('', absolutePath, undefined, { line: extractFirstChangedLineFromDiff(patch), patch });
 };

@@ -1,6 +1,7 @@
 import { isInvisibleText } from '@/lib/invisibleText';
 import { summarizeLiveActivity } from './liveActivitySummary';
 import type { ChatMessageEntry, TurnChangedFile, TurnSummaryRecord } from './types';
+import { turnDiffReferences } from '@/lib/opencode/turn-file-diffs';
 
 const getTextFromPart = (part: unknown): string | undefined => {
     const text = (part as { text?: unknown }).text;
@@ -59,27 +60,20 @@ export const projectTurnSummary = (assistantMessages: ChatMessageEntry[]): TurnS
     return {};
 };
 
-/**
- * Files this turn changed, as evidenced by its own edit/write calls.
- *
- * v1 also carried a working-tree snapshot on the user message, which supplied
- * line counts and was the only record of edits a turn delegated to subagents.
- * v2 has no such snapshot, so the turn's own tool calls are the whole story:
- * line counts come from each call's patch, and files a subagent changed in a
- * child session are not listed here.
- */
+/** Net file statistics recorded by the turn's settled file tools. */
 export const projectTurnChangedFiles = (
     assistantMessages: ChatMessageEntry[],
 ): TurnChangedFile[] | undefined => {
+    const references = turnDiffReferences(assistantMessages);
+    if (references.length) {
+        const files = references.flatMap((reference) => (reference.files ?? []).map(({ file, additions, deletions }) => ({ file, additions: reference.error ? undefined : additions, deletions: reference.error ? undefined : deletions, turnId: reference.turnID })));
+        if (files.length || references.every((reference) => reference.files)) return files.length ? files : undefined;
+    }
     const summary = summarizeLiveActivity(assistantMessages);
-
-    // Every pill opens the turn diff: OpenCode 2 computes it from the turn's
-    // snapshots (`GET /api/session/:id/diff`), which covers `write` results
-    // and subagent edits that the tool calls alone cannot describe.
     const files = summary.changedFiles.map((change): TurnChangedFile => (
         change.additions !== undefined && change.deletions !== undefined
-            ? { file: change.path, additions: change.additions, deletions: change.deletions, inTurnDiff: true }
-            : { file: change.path, inTurnDiff: true }
+            ? { file: change.path, additions: change.additions, deletions: change.deletions }
+            : { file: change.path }
     ));
 
     return files.length > 0 ? files : undefined;

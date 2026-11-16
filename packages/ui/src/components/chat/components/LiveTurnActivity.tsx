@@ -22,6 +22,7 @@ import { renderedPage } from '@/lib/opencode/tools';
 import type { ShownPart } from '../lib/turns/liveActivity';
 import { DiffCount } from '@/components/ui/diff-count';
 import { animateActivityDisclosure } from '@/lib/motion/activityDisclosure';
+import { turnDiffReferences } from '@/lib/opencode/turn-file-diffs';
 
 const NO_MESSAGES: ChatMessageEntry[] = [];
 
@@ -81,7 +82,15 @@ export function TurnFold({ turn, hasLaterAssistant, expanded, finalMessageId, on
     }, [activityMessages, lastPageMessageId, shownMessages]);
     // No diff parsing at token frequency. The report is only shown once the
     // turn settles; later authoritative tool metadata can refine it.
-    const summary = React.useMemo(() => settled ? summarizeLiveActivity(turn.assistantMessages) : null,
+    const summary = React.useMemo(() => {
+        if (!settled) return null;
+        const activity = summarizeLiveActivity(turn.assistantMessages);
+        const references = turnDiffReferences(turn.assistantMessages);
+        if (!references.length) return activity;
+        if (references.some((reference) => reference.error || !reference.files)) return { ...activity, hasCompleteDiff: false };
+        const files = references.flatMap((reference) => reference.files!);
+        return { ...activity, files: new Set(files.map((file) => file.file)).size, additions: files.reduce((sum, file) => sum + (file.additions ?? 0), 0), deletions: files.reduce((sum, file) => sum + (file.deletions ?? 0), 0), hasCompleteDiff: files.every((file) => !file.error && file.additions !== undefined && file.deletions !== undefined) };
+    },
         [settled, turn.assistantMessages]);
     const fileLabel = summary && summary.files > 0
         ? t(summary.files === 1 ? 'chat.liveActivity.changedFile' : 'chat.liveActivity.changedFiles', { count: summary.files })

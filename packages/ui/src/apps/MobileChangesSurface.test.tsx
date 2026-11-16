@@ -2,7 +2,7 @@ import React, { act } from 'react';
 import { expect, spyOn, test } from 'bun:test';
 import { Window } from 'happy-dom';
 import { OpenCode, type FileDiffInfo } from '@opencode/client';
-import { SyncProvider } from '@/sync/sync-context';
+import { SyncProvider, useDirectoryStore } from '@/sync/sync-context';
 import { opencodeClient } from '@/lib/opencode/client';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import type { GitLogEntry, GitStatus } from '@/lib/api/types';
@@ -36,6 +36,18 @@ const PUBLISHED_PR: ChangeRequest = {
 const SYNC_SDK = OpenCode.make({
   baseUrl: 'http://opencode.test',
   fetch: async () => new Response('[]', { headers: { 'content-type': 'application/json' } }),
+});
+
+const TurnTranscript = () => {
+  const store = useDirectoryStore('/repo');
+  React.useLayoutEffect(() => {
+    store.setState((state) => ({ message: { ...state.message, ses_turn: [{ id: 'user-turn', sessionID: 'ses_turn', role: 'user', time: { created: 1 } }] } }));
+  }, [store]);
+  return null;
+};
+const recordedDiff = (files: FileDiffInfo[]) => ({
+  version: 1 as const, sessionID: 'ses_turn', turnID: 'user-turn', revision: 1,
+  files: files.map((file) => ({ ...file, status: file.status === 'added' ? 'added' as const : file.status === 'deleted' ? 'deleted' as const : 'modified' as const })),
 });
 
 // Git's patch for a rename with unchanged content: headers, no hunks.
@@ -418,7 +430,7 @@ test('bounds Revert All fan-out to two in-flight revert requests', async () => {
   };
   try {
     await act(async () => {
-      root.render(<SyncProvider sdk={SYNC_SDK} directory="/repo"><I18nProvider><RuntimeAPIContext.Provider value={apis}>
+      root.render(<SyncProvider sdk={SYNC_SDK} directory="/repo"><TurnTranscript /><I18nProvider><RuntimeAPIContext.Provider value={apis}>
         <MobileChangesPane rootDirectory="/repo"
           repository={{ rootIsGitRepo: true, gitDirectory: '/repo', nestedRepos: null, nestedRepoSelection: null, repositoryOptions: null, repositoriesKnown: true, unreadable: null }}
           visible />
@@ -451,10 +463,7 @@ test('bounds Revert All fan-out to two in-flight revert requests', async () => {
   }
 }, 30_000);
 
-// The desktop Diff view computes the last turn's changes on request from the
-// session's snapshots. The mobile Changes surface mirrors it: a Last turn scope
-// in the selector, a fetch keyed on the current session, and a read-only list
-// whose status letters and counts come from the turn diff rather than from git.
+// Turn scope reads persisted patches independently of repository status.
 test('mobile changes last turn scope lists the turn diffs, opens one, and shows the empty copy', async () => {
   const dom = new Window({ url: 'http://localhost' });
   dom.happyDOM.setWindowSize({ width: 390, height: 844 });
@@ -497,12 +506,12 @@ test('mobile changes last turn scope lists the turn diffs, opens one, and shows 
     }
   }, originalFetch);
 
-  const turnDiffs = spyOn(opencodeClient, 'getSessionTurnDiff').mockResolvedValue([
+  const turnDiffs = spyOn(opencodeClient, 'getRecordedTurnDiff').mockResolvedValue(recordedDiff([
     { file: 'src/added.ts', status: 'added', additions: 1, deletions: 0,
       patch: 'diff --git a/src/added.ts b/src/added.ts\nindex 1111111..2222222 100644\nBinary files a/src/added.ts and b/src/added.ts differ\n' },
     { file: 'src/modified.ts', status: 'modified', additions: 1, deletions: 1,
       patch: 'diff --git a/src/modified.ts b/src/modified.ts\nindex 3333333..4444444 100644\nBinary files a/src/modified.ts and b/src/modified.ts differ\n' },
-  ]);
+  ]));
   const { createRoot } = await import('react-dom/client');
   const { I18nProvider } = await import('@/lib/i18n');
   const { RuntimeAPIContext } = await import('@/contexts/runtimeAPIContext');
@@ -558,7 +567,7 @@ test('mobile changes last turn scope lists the turn diffs, opens one, and shows 
     await act(async () => { button.click(); });
   };
   const renderPane = (initialDiff: { path: string; staged: boolean; scope?: 'turn' } | null) => act(async () => {
-    root.render(<SyncProvider sdk={SYNC_SDK} directory="/repo"><I18nProvider><RuntimeAPIContext.Provider value={apis}>
+    root.render(<SyncProvider sdk={SYNC_SDK} directory="/repo"><TurnTranscript /><I18nProvider><RuntimeAPIContext.Provider value={apis}>
       <MobileChangesPane rootDirectory="/repo"
         repository={{ rootIsGitRepo: true, gitDirectory: '/repo', nestedRepos: null, nestedRepoSelection: null, repositoryOptions: null, repositoriesKnown: true, unreadable: null }}
         visible initialDiff={initialDiff} />
@@ -567,9 +576,9 @@ test('mobile changes last turn scope lists the turn diffs, opens one, and shows 
   try {
     await renderPane(null);
     await act(async () => { useSessionUIStore.setState({ currentSessionId: 'ses_turn' }); });
-    // The selector offers Last turn and choosing it asks the client for the turn.
-    await chooseMode('Last turn');
-    expect(turnDiffs.mock.calls[0]).toEqual(['ses_turn', { directory: '/repo' }]);
+    // The selector offers Turn and choosing it asks the client for the turn.
+    await chooseMode('Turn');
+    expect(turnDiffs.mock.calls[0]).toEqual(['ses_turn', 'user-turn', '/repo']);
     expect(container.querySelector('[title="src/added.ts"]')).not.toBeNull();
     expect(container.querySelector('[title="src/modified.ts"]')).not.toBeNull();
     // Status letters and counts are the turn diff's, not the working tree's.
@@ -581,42 +590,41 @@ test('mobile changes last turn scope lists the turn diffs, opens one, and shows 
     expect(modified?.textContent).toContain('+1 −1');
     await openFile('src/added.ts');
     expect(container.querySelector('h2')?.textContent).toBe('added.ts');
-    expect(container.textContent).toContain('Last turn');
+    expect(container.textContent).toContain('Turn');
     expect(container.textContent).toContain('Content of this file cannot be viewed.');
     await click('[aria-label="Back"]');
     // An empty turn renders the desktop's empty copy rather than a blank list.
-    turnDiffs.mockResolvedValue([]);
+    turnDiffs.mockResolvedValue(recordedDiff([]));
     await chooseMode('Changes');
-    await chooseMode('Last turn');
-    expect(container.textContent).toContain('No last turn changes to display');
+    await chooseMode('Turn');
+    expect(container.textContent).toContain('No file changes in this turn');
     // A failed read says so with a retry instead of claiming the turn was empty.
     turnDiffs.mockRejectedValue(new Error('snapshot unavailable'));
     await chooseMode('Changes');
-    await chooseMode('Last turn');
-    expect(container.textContent).toContain('Failed to load diff');
-    expect(container.textContent).toContain('snapshot unavailable');
-    expect(container.textContent).not.toContain('No last turn changes to display');
-    turnDiffs.mockResolvedValue([
+    await chooseMode('Turn');
+    expect(container.textContent).toContain('No recorded diff is available for this file in this turn.');
+    expect(container.textContent).not.toContain('No file changes in this turn');
+    turnDiffs.mockResolvedValue(recordedDiff([
       { file: 'src/retried.ts', status: 'modified', additions: 2, deletions: 0,
         patch: 'diff --git a/src/retried.ts b/src/retried.ts\nindex 5555555..6666666 100644\nBinary files a/src/retried.ts and b/src/retried.ts differ\n' },
-    ]);
+    ]));
     const retry = [...container.querySelectorAll('button')].find((button) => button.textContent === 'Retry');
     if (!retry) throw new Error('Missing Retry');
     await act(async () => { retry.click(); });
     expect(container.querySelector('[title="src/retried.ts"]')).not.toBeNull();
-    // A chip's file opens from Last turn when the turn has it.
+    // A chip's file opens from Turn when the turn has it.
     await renderPane({ path: '/repo/src/retried.ts', staged: false, scope: 'turn' });
     expect(container.querySelector('h2')?.textContent).toBe('retried.ts');
-    expect(container.textContent).toContain('Last turn');
-    // Without it the same request lands on Changes, on that file.
+    expect(container.textContent).toContain('Turn');
+    // A missing historical file stays in Turn and never reads the working tree.
     await renderPane({ path: '/repo/src/working.png', staged: false, scope: 'turn' });
     for (let tick = 0; tick < 20 && container.querySelector('h2')?.textContent !== 'working.png'; tick += 1) {
       await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
     }
     expect(container.querySelector('h2')?.textContent).toBe('working.png');
-    expect(container.textContent).not.toContain('Last turn');
+    expect(container.textContent).toContain('No recorded diff is available for this file in this turn.');
     await click('[aria-label="Back"]');
-    expect(container.querySelector('[aria-label="Select change mode"]')?.textContent).toBe('Changes');
+    expect(container.querySelector('[aria-label="Select change mode"]')?.textContent).toBe('Turn');
   } finally {
     await act(async () => root.unmount());
     turnDiffs.mockRestore();
@@ -670,7 +678,7 @@ test('mobile changes last turn scope paints loading before the turn fetch settle
 
   let releaseTurn: (files: FileDiffInfo[]) => void = () => {};
   const pendingTurn = new Promise<FileDiffInfo[]>((resolve) => { releaseTurn = resolve; });
-  const turnDiffs = spyOn(opencodeClient, 'getSessionTurnDiff').mockImplementation(() => pendingTurn);
+  const turnDiffs = spyOn(opencodeClient, 'getRecordedTurnDiff').mockImplementation(() => pendingTurn.then(recordedDiff));
   const { createRoot } = await import('react-dom/client');
   const { I18nProvider } = await import('@/lib/i18n');
   const { RuntimeAPIContext } = await import('@/contexts/runtimeAPIContext');
@@ -708,7 +716,7 @@ test('mobile changes last turn scope paints loading before the turn fetch settle
   };
   try {
     await act(async () => {
-      root.render(<SyncProvider sdk={SYNC_SDK} directory="/repo"><I18nProvider><RuntimeAPIContext.Provider value={apis}>
+      root.render(<SyncProvider sdk={SYNC_SDK} directory="/repo"><TurnTranscript /><I18nProvider><RuntimeAPIContext.Provider value={apis}>
         <MobileChangesPane rootDirectory="/repo"
           repository={{ rootIsGitRepo: true, gitDirectory: '/repo', nestedRepos: null, nestedRepoSelection: null, repositoryOptions: null, repositoriesKnown: true, unreadable: null }}
           visible />
@@ -717,14 +725,25 @@ test('mobile changes last turn scope paints loading before the turn fetch settle
     await act(async () => { useSessionUIStore.setState({ currentSessionId: 'ses_turn' }); });
     // The fetch is still in flight here: the first paint must be loading, never
     // the "no changes" copy.
-    await chooseMode('Last turn');
+    await chooseMode('Turn');
     expect(container.textContent).toContain('Loading changes...');
-    expect(container.textContent).not.toContain('No last turn changes to display');
+    expect(container.textContent).not.toContain('No file changes in this turn');
+    const initialDiff = { path: 'src/late.ts', staged: false, scope: 'turn' as const, turnId: 'user-turn' };
+    for (const paneKey of ['before-resize', 'after-resize']) {
+      await act(async () => {
+        root.render(<SyncProvider sdk={SYNC_SDK} directory="/repo"><TurnTranscript /><I18nProvider><RuntimeAPIContext.Provider value={apis}>
+          <MobileChangesPane key={paneKey} rootDirectory="/repo"
+            repository={{ rootIsGitRepo: false, gitDirectory: null, nestedRepos: null, nestedRepoSelection: null, repositoryOptions: null, repositoriesKnown: true, unreadable: null }}
+            visible initialDiff={initialDiff} />
+        </RuntimeAPIContext.Provider></I18nProvider></SyncProvider>);
+      });
+    }
     await act(async () => {
       releaseTurn([{ file: 'src/late.ts', status: 'modified', additions: 2, deletions: 1,
         patch: 'diff --git a/src/late.ts b/src/late.ts\nindex 5555555..6666666 100644\nBinary files a/src/late.ts and b/src/late.ts differ\n' }]);
     });
     expect(container.querySelector('[title="src/late.ts"]')).not.toBeNull();
+    expect(container.querySelector('h2')?.textContent).toBe('late.ts');
     expect(container.textContent).not.toContain('Loading changes...');
   } finally {
     await act(async () => root.unmount());

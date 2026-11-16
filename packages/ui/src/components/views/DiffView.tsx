@@ -74,7 +74,6 @@ import { ChangeRequestReviewContext, useComparisonReview } from '@/components/re
 import { toastContextFileOpenFailure, validateContextFileOpen } from '@/lib/contextFileOpenGuard';
 import { StatusImage } from '@/components/ui/status-image';
 import { findRepoFile, isAbsoluteFilePath, toAbsoluteFilePath } from '@/lib/path-utils';
-import { findFileRepository } from '@/lib/nestedRepositories';
 import { sessionEvents } from '@/lib/sessionEvents';
 import { findDiffScrollAnchor, getRestoredDiffScrollTop, type DiffScrollAnchor } from './diffScrollAnchor';
 import { isRightToLeft, useI18n } from '@/lib/i18n';
@@ -89,7 +88,7 @@ import { useWalkthroughStore } from '@/stores/useWalkthroughStore';
 import { usePullRequestSelectionStore } from '@/stores/usePullRequestSelectionStore';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useProjectsStore } from '@/stores/useProjectsStore';
-import { useLastTurnDiff } from './useLastTurnDiff';
+import { useTurnFileDiffs } from './useTurnFileDiffs';
 import { getFirstChangedModifiedLineFromPatch } from './diffPatchUtils';
 import { parseDiffFromFile, type FileDiffMetadata } from '@pierre/diffs';
 import { useRepositoryBinding } from '@/lib/source-control/repository-binding';
@@ -1648,7 +1647,7 @@ export const DiffView: React.FC<DiffViewProps> = ({
     const runtimeKey = useGitStore((state) => state.runtimeKey);
     // Diffs belong to the repository being diffed: the picked one, or the
     // root when nothing is picked.
-    const { gitDirectory: nestedGitDirectory, rootIsGitRepo, repositoryOptions, repositoriesKnown, unreadable } = useNestedGitDirectory(rootDirectory ?? null, { enabled: visible, recheckOnOpen: true });
+    const { gitDirectory: nestedGitDirectory, repositoryOptions, unreadable } = useNestedGitDirectory(rootDirectory ?? null, { enabled: visible, recheckOnOpen: true });
     const effectiveDirectory = nestedGitDirectory ?? rootDirectory;
     // The binding follows the repository actually being diffed.
     const binding = useRepositoryBinding(effectiveDirectory, sourceControl);
@@ -1669,10 +1668,6 @@ export const DiffView: React.FC<DiffViewProps> = ({
     const setDiff = useGitStore((state) => state.setDiff);
     const [displayFile, setDisplayFile] = React.useState<string | null>(null);
     const [displayFileStaged, setDisplayFileStaged] = React.useState(false);
-    // A file the last turn's diff did not have, on its way to Changed. The
-    // repository is picked for it once, and its status read once per repository.
-    const [changedFallback, setChangedFallback] = React.useState<{ file: string; picked: boolean; statusReadFor: string | null } | null>(null);
-    const fallbackStatusRequestRef = React.useRef<string | null>(null);
     const [pinnedStackedTarget, setPinnedStackedTarget] = React.useState<string | null>(null);
     const [expandedFiles, setExpandedFiles] = React.useState<Set<string>>(() => new Set());
     const [mountedStackedFiles, setMountedStackedFiles] = React.useState<Set<string>>(() => new Set());
@@ -1700,6 +1695,7 @@ export const DiffView: React.FC<DiffViewProps> = ({
     const setPendingDiffFile = useUIStore((state) => state.setPendingDiffFile);
     const pendingTurnDiffFile = useUIStore((state) => state.pendingTurnDiffFile);
     const setPendingTurnDiffFile = useUIStore((state) => state.setPendingTurnDiffFile);
+    const [openedTurn, setOpenedTurn] = React.useState<{ sessionId: string | null; turnId?: string } | null>(null);
     const diffLayoutPreference = useUIStore((state) => state.diffLayoutPreference);
     const diffFileLayout = useUIStore((state) => state.diffFileLayout);
     const setDiffLayoutForAllFiles = useUIStore((state) => state.setDiffLayoutForAllFiles);
@@ -1767,10 +1763,7 @@ export const DiffView: React.FC<DiffViewProps> = ({
         });
     }, []);
 
-    // The last turn's diffs, merged per file by OpenCode from the turn's
-    // snapshots, so a file edited three times in one turn is one diff. Read
-    // in every scope while the view is shown, so the scope picker's count is
-    // current before the user switches to it.
+    // A chip binds the view to its recorded turn.
     const {
         diffs: lastTurnDiffs,
         count: turnFileCount,
@@ -1778,7 +1771,11 @@ export const DiffView: React.FC<DiffViewProps> = ({
         settled: turnDiffSettled,
         error: turnDiffError,
         retry: retryTurnDiff,
-    } = useLastTurnDiff(currentSessionId, rootDirectory ?? undefined, { enabled: visible, live: activeDiffScope === 'turn' });
+    } = useTurnFileDiffs(currentSessionId, rootDirectory ?? undefined, {
+        enabled: visible,
+        turnId: pendingTurnDiffFile?.sessionId === currentSessionId ? pendingTurnDiffFile.turnId
+            : openedTurn?.sessionId === currentSessionId ? openedTurn.turnId : undefined,
+    });
 
     const lastTurnDiffData = React.useMemo(() => {
         const map = new Map<string, DiffData>();
@@ -1788,11 +1785,6 @@ export const DiffView: React.FC<DiffViewProps> = ({
                 map.set(diff.file, createTextDiffDataFromPatch(diff.file, diff.patch, 'patch'));
                 continue;
             }
-            map.set(diff.file, {
-                original: diff.before ?? '',
-                modified: diff.after ?? '',
-                contextMode: 'full',
-            });
         }
         return map;
     }, [lastTurnDiffs]);
@@ -2363,10 +2355,7 @@ export const DiffView: React.FC<DiffViewProps> = ({
         setScrollRequestNonce((value) => value + 1);
     }, [expandStackedFile]);
 
-    // A click asked for a file in the last turn's diff. Only an answer to the
-    // session's current state decides: a list kept from an earlier turn would
-    // send a file this turn did change to Changed, and a failed read keeps its
-    // retry. Asked once per click, so picking Last turn by hand stays there.
+    // Wait for the selected capture before revealing its requested file.
     React.useEffect(() => {
         if (!pendingTurnDiffFile || !visible) return;
         if (diffScope !== 'turn' || pendingTurnDiffFile.sessionId !== currentSessionId) {
@@ -2375,6 +2364,7 @@ export const DiffView: React.FC<DiffViewProps> = ({
         }
         // Entering the scope resets what is expanded, so wait for that first.
         if (!turnDiffSettled || activeDiffScope !== 'turn') return;
+        setOpenedTurn({ sessionId: pendingTurnDiffFile.sessionId, turnId: pendingTurnDiffFile.turnId });
         setPendingTurnDiffFile(null);
         const file = toAbsoluteFilePath(rootDirectory, pendingTurnDiffFile.file);
         const listed = findRepoFile(file, rootDirectory, lastTurnDiffs.flatMap((diff) => diff.file ?? []));
@@ -2382,47 +2372,7 @@ export const DiffView: React.FC<DiffViewProps> = ({
             revealListedFile(listed);
             return;
         }
-        fallbackStatusRequestRef.current = null;
-        setChangedFallback({ file, picked: false, statusReadFor: null });
-        setActiveDiffScope('working');
-        onDiffScopeChange?.('working');
-    }, [activeDiffScope, currentSessionId, diffScope, lastTurnDiffs, onDiffScopeChange, pendingTurnDiffFile, revealListedFile, rootDirectory, setPendingTurnDiffFile, turnDiffSettled, visible]);
-
-    // Changed reads one repository, and the status on hand may predate the
-    // turn, so the file is looked for in its own repository's fresh status. A
-    // repository the picker drops again (a broken `.git`) ends the attempt.
-    React.useEffect(() => {
-        if (!changedFallback || !visible || !effectiveDirectory) return;
-        if (activeDiffScope !== 'working') {
-            setChangedFallback(null);
-            return;
-        }
-        if (!repositoriesKnown) return;
-        const repository = findFileRepository(changedFallback.file, [
-            ...(rootIsGitRepo && rootDirectory ? [rootDirectory] : []),
-            ...(repositoryOptions ?? []),
-        ]);
-        if (repository && repository !== effectiveDirectory && rootDirectory) {
-            if (changedFallback.picked) {
-                setChangedFallback(null);
-                return;
-            }
-            setChangedFallback({ ...changedFallback, picked: true });
-            selectNestedRepo(rootDirectory, repository);
-            return;
-        }
-        if (changedFallback.statusReadFor !== effectiveDirectory) {
-            if (fallbackStatusRequestRef.current === effectiveDirectory) return;
-            fallbackStatusRequestRef.current = effectiveDirectory;
-            void fetchStatus(effectiveDirectory, git, { silent: true }).finally(() => {
-                setChangedFallback((current) => current && { ...current, statusReadFor: effectiveDirectory });
-            });
-            return;
-        }
-        setChangedFallback(null);
-        const listed = findRepoFile(changedFallback.file, effectiveDirectory, changedFiles.map((file) => file.path));
-        if (listed) revealListedFile(listed);
-    }, [activeDiffScope, changedFallback, changedFiles, effectiveDirectory, fetchStatus, git, repositoriesKnown, repositoryOptions, revealListedFile, rootDirectory, rootIsGitRepo, selectNestedRepo, visible]);
+    }, [activeDiffScope, currentSessionId, diffScope, lastTurnDiffs, pendingTurnDiffFile, revealListedFile, rootDirectory, setPendingTurnDiffFile, turnDiffSettled, visible]);
 
     React.useEffect(() => {
         if (!displayFile) {
@@ -3011,7 +2961,10 @@ export const DiffView: React.FC<DiffViewProps> = ({
                 readOnlyActions={activeDiffScope === 'branch' || activeDiffScope === 'commit' || activeDiffScope === 'pr'}
                 hunkActionsEnabled={activeDiffScope === 'all' || activeDiffScope === 'working' || activeDiffScope === 'staged'}
                 contentRevision={workingTreeRevision + (fileDiffRefreshNonce.get(file.path) ?? 0)}
-                comparisonDiff={activeDiffScope === 'branch' || activeDiffScope === 'commit' || activeDiffScope === 'pr'
+                comparisonDiff={activeDiffScope === 'turn'
+                    ? lastTurnDiffData.has(file.path) ? { status: 'ready', data: lastTurnDiffData.get(file.path)! }
+                        : { status: 'error', message: t('diffView.state.turnDiffUnavailable') }
+                    : activeDiffScope === 'branch' || activeDiffScope === 'commit' || activeDiffScope === 'pr'
                     ? comparisonDiffData.get(file.path) ?? EMPTY_COMPARISON_DIFF
                     : undefined}
                 commentOrigin={commentOrigin}
@@ -3226,15 +3179,10 @@ export const DiffView: React.FC<DiffViewProps> = ({
         }
 
         if (activeDiffScope === 'turn' && turnDiffError) {
-            return (
-                <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 text-sm text-muted-foreground">
-                    <div className="typography-ui-label font-semibold text-foreground">{t('diffView.state.failedToLoadDiff')}</div>
-                    <div className="typography-meta max-w-[32rem] text-center">{turnDiffError}</div>
-                    <button type="button" className="typography-ui-label text-primary hover:underline" onClick={retryTurnDiff}>
-                        {t('diffView.actions.retry')}
-                    </button>
-                </div>
-            );
+            return <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 text-sm text-muted-foreground">
+                <div>{turnDiffError}</div>
+                <button type="button" className="typography-ui-label text-primary hover:underline" onClick={retryTurnDiff}>{t('diffView.actions.retry')}</button>
+            </div>;
         }
 
         if (activeDiffScope === 'turn' && (!turnDiffLoaded || pendingTurnDiffFile) && currentSessionId) {

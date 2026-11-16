@@ -153,9 +153,8 @@ only the note for such a row.
 Git, Changes, Walkthrough, pull requests and mobile Changes use the shared
 repository picker. Selection, discovery refresh and persistence belong to
 [`useGitStore`](../../stores/DOCUMENTATION.md#usegitstorets) and
-`useNestedGitDirectory`; diff rows do not change that selection. A changed-file
-chip falling back to Changed does (*Last turn scope*), since the chip names a
-file and only its own repository can show it.
+`useNestedGitDirectory`; diff rows do not change that selection. Turn scope
+reads saved patches independently of the repository picker.
 
 ## Find in changes
 
@@ -348,50 +347,27 @@ unmirrored arrow up inside the LTR block.
 
 A percentage max-height inside auto-height wrappers let the inner viewport grow to the entire virtual list. The Files pane then scrolled outside the virtualizer, which mounted every row and froze the renderer on large JSON. The flex layout keeps the virtualizer's viewport bounded without changing file limits, preview preferences or saved tabs.
 
-## Last turn scope
+## Turn scope
 
-`useLastTurnDiff` reads the last turn's per-file diff from OpenCode
-(`GET /api/session/:id/diff`), which compares the turn's first and last step
-snapshots. The answer moves when a step is added, when the newest step finishes
-(its end snapshot is recorded then) and when the session goes idle, so those
-three key the refetch. The desktop Diff view reads it in every scope while
-shown, so the scope picker's Last turn count is current before the user picks
-it; mobile Changes has no counts and reads it only in that scope. Outside the
-scope a running turn is not read, and its count shows as unknown until the
-turn ends. A failed read keeps its own error and retry, and another session's
-turn never shows while this one's loads.
+`useTurnFileDiffs` reads the selected turn's persisted patch record through
+the managed plugin RPC. Transcript metadata supplies its reference and
+revision; the frontend does not compose tool preview patches. Session,
+directory, turn reference and revision scope every async response. Failure
+has its own unavailable state and retry, distinct from a recorded empty turn.
 
-A changed-file chip under a reply opens Last turn, but the chip comes from the
-turn's tool calls and the scope from its snapshots, so they can disagree:
-snapshots are off, the project folder is no git repository (a repository nested
-in it still gets the edits), or a step took no snapshot. Each click therefore
-asks once (`pendingTurnDiffFile`, dropped when another session is on screen)
-whether the file is in the turn's diff. Until the list answers the session's
-current state the view shows loading; a failed read keeps its error and retry.
-A file that is there is expanded and scrolled to, on every click, since the
-chip's absolute path only matches the relative list through this request.
-A file that is not there opens Changed instead, in the repository holding the
-file, read afresh, expanded. A repository the picker drops again ends the
-attempt on the repository left on screen. Picking Last turn by hand asks
-nothing and stays there, empty or not. The phone's Changes surface
-(`apps/MobileChangesSurface.tsx`) answers the same way and opens the file's own
-diff screen, since it has no expanded list to scroll. VS Code has no Diff view
-panel: the chip reads the turn's diff once and opens the file's patch in the
-editor's own diff (`editor.openDiff` with `patch`; a file the turn deleted shows
-its old content against an empty side). A file the list does not hold opens as
-it is, and a failed read shows an error toast.
+A changed-file chip selects its owning turn, including historical turns, and
+reveals the requested file. Desktop stores that selection while its panel is
+open; mobile keeps it across tablet pane remounts. Non-Git directories and
+external paths use the same renderer. Turn files are read-only comparisons:
+the nested file viewer never loads current Git contents for a missing patch.
+VS Code sends the saved patch to `editor.openDiff`; unavailable records show
+an error toast.
 
-### Why the click is a one-shot request and not derived from the tab
+### Why turn scope reads companion records
 
-A tab keeps its target across scope changes, so a tab opened from a chip and a
-tab where the person picked Last turn by hand look the same. Deriving the
-fallback from the tab would send that person back to Changed every time.
-
-### Why the count waits for the turn to end outside the scope
-
-A read of a running step makes OpenCode capture a fresh working-copy snapshot.
-Reading on every step only to keep a count current would cost one capture per
-step of every turn while the panel is open on another scope.
+A stored patch describes the file at that turn's completion even after later
+edits, commits or deletion. Git working-tree state answers a different
+question, so an absent historical record remains unavailable.
 
 ## Pull request comparisons
 

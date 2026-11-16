@@ -51,14 +51,14 @@ describe('openTurnFileDiffInEditor', () => {
         expect(calls).toEqual([['openDiff', '', '/workspace/project/src/notes.txt', undefined, { line: 1, patch }]]);
     });
 
-    test('opens a file the turn diff does not list as it is', async () => {
+    test('reports an unavailable turn record without opening workspace contents', async () => {
         const { calls, editor } = recordingEditor();
-        await openTurnFileDiffInEditor({
+        await expect(openTurnFileDiffInEditor({
             directory: '/workspace/project',
             editor,
             file: 'src/ignored.log',
             turnDiff: [{ patch: 'entry without a file' }, { file: 'src/notes.txt', patch }],
-        });
-        expect(calls).toEqual([['openFile', '/workspace/project/src/ignored.log']]);
+        })).rejects.toThrow('The turn has no recorded diff');
+        expect(calls).toEqual([]);
     });
 });

@@ -5,9 +5,9 @@ import type { ProjectRef } from '@/lib/projectContextApi';
 export type MobileAppActions = {
   /**
    * Open the Changes surface as a modal and (optionally) navigate it to a specific diff.
-   * Scope `turn` looks for the file in Last turn first, and in Changes when Last turn has nothing for it.
+   * Scope `turn` opens the recorded changes of the selected user message.
    */
-  openChanges: (options?: { diffPath?: string | null; staged?: boolean; scope?: 'turn' }) => void;
+  openChanges: (options?: { diffPath?: string | null; staged?: boolean; scope?: 'turn'; turnId?: string }) => void;
   /** Open the Files surface as a modal. */
   openFiles: () => void;
   /** Open the issues and PRs board page; what it shows is set in its store first. */

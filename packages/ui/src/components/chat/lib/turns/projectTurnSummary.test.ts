@@ -37,8 +37,8 @@ describe('projectTurnChangedFiles', () => {
         expect(projectTurnChangedFiles([
             assistant('a', [edit('one', '/project/src/a.ts'), edit('two', '/project/src/b.ts')], 'stop'),
         ])).toEqual([
-            { file: '/project/src/a.ts', additions: 2, deletions: 1, inTurnDiff: true },
-            { file: '/project/src/b.ts', additions: 2, deletions: 1, inTurnDiff: true },
+            { file: '/project/src/a.ts', additions: 2, deletions: 1 },
+            { file: '/project/src/b.ts', additions: 2, deletions: 1 },
         ]);
     });
 
@@ -48,11 +48,39 @@ describe('projectTurnChangedFiles', () => {
             state: { status: 'completed', input: { filePath: '/project/src/c.ts', content: 'x' }, metadata: {}, output: '', time: { start: 1, end: 2 } },
         };
         expect(projectTurnChangedFiles([assistant('a', [write], 'stop')]))
-            .toEqual([{ file: '/project/src/c.ts', inTurnDiff: true }]);
+            .toEqual([{ file: '/project/src/c.ts' }]);
     });
 
     test('a turn that edited nothing yields no files', () => {
         expect(projectTurnChangedFiles([assistant('a', [], 'stop')])).toBeUndefined();
+    });
+
+    test('uses the latest recorded net statistics rather than summing repeated edits', () => {
+        const first = edit('one', '/project/src/a.ts');
+        const last = edit('two', '/project/src/a.ts');
+        last.state = { ...last.state, status: 'completed', output: '', time: { start: 1, end: 2 }, metadata: {
+            openchamberTurnDiff: { turnID: 'turn', revision: 2, files: [{ file: 'src/a.ts', status: 'modified', additions: 1, deletions: 1 }] },
+        } };
+        expect(projectTurnChangedFiles([assistant('a', [first]), assistant('b', [last], 'stop')])).toEqual([
+            { file: 'src/a.ts', additions: 1, deletions: 1, turnId: 'turn' },
+        ]);
+        last.state.metadata = { openchamberTurnDiff: { turnID: 'turn', revision: 3, files: [] } };
+        expect(projectTurnChangedFiles([assistant('a', [first]), assistant('b', [last], 'stop')])).toBeUndefined();
+    });
+
+    test('keeps each native turn reference when hidden prompts share a displayed turn', () => {
+        const one = edit('one', 'a.ts');
+        const two = edit('two', 'b.ts');
+        if (one.state.status !== 'completed' || two.state.status !== 'completed') throw new Error('Expected settled tools');
+        one.state.metadata = { openchamberTurnDiff: { turnID: 'visible', revision: 1, files: [{ file: 'a.ts', status: 'modified', additions: 1, deletions: 1 }] } };
+        two.state.metadata = { openchamberTurnDiff: { turnID: 'hidden', revision: 1, files: [{ file: 'b.ts', status: 'modified', additions: 2, deletions: 1 }] } };
+        const messages = [assistant('a', [one]), assistant('b', [two], 'stop')];
+        expect(projectTurnChangedFiles(messages)?.map(({ file, turnId }) => ({ file, turnId }))).toEqual([{ file: 'a.ts', turnId: 'visible' }, { file: 'b.ts', turnId: 'hidden' }]);
+        two.state.metadata = { openchamberTurnDiff: { turnID: 'hidden', revision: 2, files: [] } };
+        expect(projectTurnChangedFiles(messages)?.map((file) => file.file)).toEqual(['a.ts']);
+        one.state.metadata = { openchamberTurnDiff: { turnID: 'visible', error: 'Storage unavailable' } };
+        two.state.metadata = { openchamberTurnDiff: { turnID: 'hidden', revision: 3, files: [{ file: 'b.ts', status: 'modified', additions: 1, deletions: 1 }] } };
+        expect(projectTurnChangedFiles(messages)?.map(({ file, turnId }) => ({ file, turnId }))).toEqual([{ file: 'b.ts', turnId: 'hidden' }]);
     });
 
     test('v2 has no working-tree snapshot, so a subagent turn lists nothing of its own', () => {
@@ -73,7 +101,7 @@ describe('projectTurnRecords changed files', () => {
         expect(streaming.turns[0]?.changedFiles).toBeUndefined();
 
         const finished = projectTurnRecords([user(), assistant('a', parts, 'stop')], options);
-        expect(finished.turns[0]?.changedFiles).toEqual([{ file: '/project/src/a.ts', additions: 2, deletions: 1, inTurnDiff: true }]);
+        expect(finished.turns[0]?.changedFiles).toEqual([{ file: '/project/src/a.ts', additions: 2, deletions: 1 }]);
     });
 
     test('leaves files out while the setting is off', () => {

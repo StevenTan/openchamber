@@ -43,11 +43,11 @@ describe('earlier assistant text context', () => {
 });
 
 describe('completed-turn changed files', () => {
-  const files = [{ file: 'src/a.ts', additions: 2, deletions: 1, inTurnDiff: false }];
+  const files = [{ file: 'src/a.ts', additions: 2, deletions: 1, turnId: 'first' }];
 
-  test('re-renders when the turn diff later lists a file whose counts did not change', () => {
+  test('re-renders when a file points to a different recorded turn', () => {
     const before = { ...finalAnswerContext, changedFiles: files };
-    const after = { ...finalAnswerContext, changedFiles: [{ ...files[0], inTurnDiff: true }] };
+    const after = { ...finalAnswerContext, changedFiles: [{ ...files[0], turnId: 'second' }] };
     expect(areRelevantTurnGroupingContextsEqual(before, after, 'answer', false)).toBe(false);
   });
 

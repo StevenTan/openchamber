@@ -60,7 +60,7 @@ import { useGitComparison, type GitComparisonSource } from '@/hooks/useGitCompar
 import { useGitBaseBranchStore } from '@/stores/useGitBaseBranchStore';
 import { usePullRequestSelectionStore } from '@/stores/usePullRequestSelectionStore';
 import { useSessionUIStore } from '@/sync/session-ui-store';
-import { useLastTurnDiff } from '@/components/views/useLastTurnDiff';
+import { useTurnFileDiffs } from '@/components/views/useTurnFileDiffs';
 import { ReviewFlowDialog } from '@/components/session/ReviewFlowDialog';
 import { useReviewFlowStart } from '@/components/session/useReviewFlowStart';
 import { cn } from '@/lib/utils';
@@ -104,7 +104,6 @@ import { useCommitCelebration } from '@/components/views/git/useCommitCelebratio
 import { useGitCleanLine } from '@/components/views/git/useGitCleanLine';
 import { normalizePath } from '@/lib/pathNormalization';
 import { commitRequestRepository, commitRequestShown, type MobileChangesCommitRequest } from './mobileChangesCommitRequest';
-import { findFileRepository } from '@/lib/nestedRepositories';
 import { isSameRepoFile, toAbsoluteFilePath } from '@/lib/path-utils';
 import { ScrollableOverlay } from '@/components/ui/ScrollableOverlay';
 import { MOBILE_HEADER_BUTTON_CLASS, MOBILE_HEADER_CLASS, MOBILE_HEADER_TITLE_CLASS } from '@/components/ui/mobileHeader';
@@ -156,17 +155,19 @@ const isUnstagedStatusFile = (file: GitStatus['files'][number]): boolean => {
 
 const diffCacheKey = (path: string, staged: boolean): string => staged ? `${path}\u0000staged` : path;
 
-/** A chip's file on its way to a diff: Last turn is asked first, then Changes of the repository holding it. */
+/** A chip's selected turn and file while its messages load. */
 type TurnFileRequest = {
   file: string;
   sessionId: string | null;
-  step: 'turn' | 'changes';
-  picked: boolean;
-  statusReadFor: string | null;
+  turnId?: string;
 };
 
-// The pane remounts when a tablet turns and the host keeps its last request: a chip's tap is acted on once.
-const takenTurnRequests = new WeakSet<object>();
+// The host retains the request across tablet pane remounts.
+const turnRequestNavigation = new WeakMap<object, {
+  navigation: ChangesNavigation;
+  turn: { sessionId: string | null; turnId?: string };
+  pending: TurnFileRequest | null;
+}>();
 // The same for a commit request: its repository is switched to once, and its
 // commit scope applied once, so a remount never replays it over a later choice.
 const switchedCommitRequests = new WeakSet<object>();
@@ -183,10 +184,9 @@ type MobileChangesSurfaceProps = {
   /**
    * A new request object opens its working-tree diff, including repeated requests
    * for the same path. Reopening the drawer keeps the same object and navigation.
-   * Scope `turn` asks for the file a changed-file chip names: its Last turn diff,
-   * or its Changes diff when Last turn has nothing for it.
+   * Scope `turn` opens the recorded diff belonging to the chip's turn.
    */
-  initialDiff?: { path: string; staged: boolean; scope?: 'turn' } | null;
+  initialDiff?: { path: string; staged: boolean; scope?: 'turn'; turnId?: string } | null;
   /**
    * A new request object switches to the repository the commit an extension
    * named (`host.openCommit`) is selected in, then to the commit scope.
@@ -300,7 +300,7 @@ export const MobileChangesPane: React.FC<MobileChangesPaneProps> = ({ rootDirect
   ownerKeyRef.current = ownerKey;
   const [navigation, setNavigation] = React.useState<ChangesNavigation>(() => {
     if (initialDiff?.scope === 'turn') {
-      return { ownerKey, mode: takenTurnRequests.has(initialDiff) ? 'working' : 'turn', route: LIST_ROUTE };
+      return turnRequestNavigation.get(initialDiff)?.navigation ?? { ownerKey, mode: 'turn', route: LIST_ROUTE };
     }
     return {
       ownerKey,
@@ -308,9 +308,9 @@ export const MobileChangesPane: React.FC<MobileChangesPaneProps> = ({ rootDirect
       route: initialDiff?.path ? { type: 'diff', path: initialDiff.path, staged: initialDiff.staged } : LIST_ROUTE,
     };
   });
-  const [turnFileRequest, setTurnFileRequest] = React.useState<TurnFileRequest | null>(null);
-  // A repository settling while Last turn is being asked is no move away from it.
-  const modeOnNewOwner: ChangesMode = turnFileRequest?.step === 'turn' ? 'turn' : 'working';
+  const [turnFileRequest, setTurnFileRequest] = React.useState<TurnFileRequest | null>(() => initialDiff ? turnRequestNavigation.get(initialDiff)?.pending ?? null : null);
+  // Repository discovery does not change a pending turn selection.
+  const modeOnNewOwner: ChangesMode = turnFileRequest ? 'turn' : 'working';
   const mode = navigation.ownerKey === ownerKey ? navigation.mode : modeOnNewOwner;
   const route = navigation.ownerKey === ownerKey ? navigation.route : LIST_ROUTE;
   const [modeMenuOpen, setModeMenuOpen] = React.useState(false);
@@ -328,7 +328,9 @@ export const MobileChangesPane: React.FC<MobileChangesPaneProps> = ({ rootDirect
   }, [modeOnNewOwner, ownerKey]);
   React.useEffect(() => { if (!visible) setModeMenuOpen(false); }, [visible]);
 
-  const turnFileStatusReadRef = React.useRef<string | null>(null);
+  const [selectedTurn, setSelectedTurn] = React.useState<{ sessionId: string | null; turnId?: string } | null>(
+    () => initialDiff ? turnRequestNavigation.get(initialDiff)?.turn ?? null : null,
+  );
 
   // Allow the host (MobileApp) to push us into a specific diff when the surface
   // is reopened or when an external trigger (e.g. a changed-file tap in chat) requests
@@ -336,11 +338,14 @@ export const MobileChangesPane: React.FC<MobileChangesPaneProps> = ({ rootDirect
   React.useEffect(() => {
     if (!initialDiff?.path) return;
     if (initialDiff.scope === 'turn') {
-      if (takenTurnRequests.has(initialDiff)) return;
-      takenTurnRequests.add(initialDiff);
-      turnFileStatusReadRef.current = null;
-      setTurnFileRequest({ file: initialDiff.path, sessionId: useSessionUIStore.getState().currentSessionId, step: 'turn', picked: false, statusReadFor: null });
-      setNavigation({ ownerKey: ownerKeyRef.current, mode: 'turn', route: LIST_ROUTE });
+      if (turnRequestNavigation.has(initialDiff)) return;
+      const turn = { sessionId: useSessionUIStore.getState().currentSessionId, turnId: initialDiff.turnId };
+      const navigation: ChangesNavigation = { ownerKey: ownerKeyRef.current, mode: 'turn', route: LIST_ROUTE };
+      const pending = { file: initialDiff.path, ...turn };
+      turnRequestNavigation.set(initialDiff, { turn, navigation, pending });
+      setSelectedTurn(turn);
+      setTurnFileRequest(pending);
+      setNavigation(navigation);
       return;
     }
     setTurnFileRequest(null);
@@ -348,6 +353,10 @@ export const MobileChangesPane: React.FC<MobileChangesPaneProps> = ({ rootDirect
     // comparison mode. Changing directories alone must not replay this target.
     setNavigation({ ownerKey: ownerKeyRef.current, mode: 'working', route: { type: 'diff', path: initialDiff.path, staged: initialDiff.staged } });
   }, [initialDiff]);
+  React.useEffect(() => {
+    if (!initialDiff || !selectedTurn || turnRequestNavigation.get(initialDiff)?.turn !== selectedTurn) return;
+    turnRequestNavigation.set(initialDiff, { turn: selectedTurn, navigation, pending: turnFileRequest });
+  }, [initialDiff, navigation, selectedTurn, turnFileRequest]);
   // Commit scope once the requested repository is on screen: before that the
   // scope would read another repository's selection.
   React.useEffect(() => {
@@ -455,7 +464,10 @@ export const MobileChangesPane: React.FC<MobileChangesPaneProps> = ({ rootDirect
     settled: turnDiffSettled,
     error: turnDiffError,
     retry: retryTurnDiff,
-  } = useLastTurnDiff(currentSessionId, rootDirectory || undefined, { enabled: visible && mode === 'turn', live: true });
+  } = useTurnFileDiffs(currentSessionId, rootDirectory || undefined, {
+    enabled: visible && mode === 'turn',
+    turnId: selectedTurn?.sessionId === currentSessionId ? selectedTurn.turnId : undefined,
+  });
   const [reviewDialogOpen, setReviewDialogOpen] = React.useState(false);
   const closeReviewDialog = React.useCallback(() => {
     setReviewDialogOpen(false);
@@ -583,7 +595,6 @@ export const MobileChangesPane: React.FC<MobileChangesPaneProps> = ({ rootDirect
         });
         continue;
       }
-      map.set(diff.file, { original: diff.before ?? '', modified: diff.after ?? '' });
     }
     return map;
   }, [lastTurnDiffs]);
@@ -597,63 +608,18 @@ export const MobileChangesPane: React.FC<MobileChangesPaneProps> = ({ rootDirect
     return Array.from(unique.values()).sort((a, b) => a.path.localeCompare(b.path));
   }, [status?.files]);
 
-  // Only a list answering the session's current state decides, and a failed
-  // read keeps its retry. Leaving the scope or opening a file by hand ends the
-  // request. Changes reads one repository, and the status on hand may predate
-  // the turn, so the file is looked for in its own repository's fresh status.
-  // A repository the picker drops again ends the request on the one left on screen.
   React.useEffect(() => {
     if (!turnFileRequest || !visible) return;
-    if (turnFileRequest.sessionId !== currentSessionId || route.type !== 'list' || mode !== (turnFileRequest.step === 'turn' ? 'turn' : 'working')) {
+    if (turnFileRequest.sessionId !== currentSessionId || route.type !== 'list' || mode !== 'turn') {
       setTurnFileRequest(null);
       return;
     }
+    if (!turnDiffSettled) return;
     const file = toAbsoluteFilePath(rootDirectory, turnFileRequest.file);
-    if (turnFileRequest.step === 'turn') {
-      if (!turnDiffSettled) return;
-      const inTurn = closestRepoFile(file, rootDirectory, lastTurnDiffs.map((diff) => diff.file));
-      if (inTurn) {
-        setTurnFileRequest(null);
-        setNavigation({ ownerKey, mode: 'turn', route: { type: 'turn', path: inTurn } });
-        return;
-      }
-      setTurnFileRequest({ ...turnFileRequest, step: 'changes' });
-      setNavigation({ ownerKey, mode: 'working', route: LIST_ROUTE });
-      return;
-    }
-    if (!repository.repositoriesKnown || !currentDirectory) return;
-    const holder = findFileRepository(file, [
-      ...(rootIsGitRepo && rootDirectory ? [rootDirectory] : []),
-      ...(repositoryOptions ?? []),
-    ]);
-    if (holder && holder !== currentDirectory) {
-      if (turnFileRequest.picked) {
-        setTurnFileRequest(null);
-        return;
-      }
-      setTurnFileRequest({ ...turnFileRequest, picked: true });
-      usePullRequestSelectionStore.getState().clearChangesRepository(rootDirectory);
-      selectNestedRepo(rootDirectory, holder);
-      return;
-    }
-    if (turnFileRequest.statusReadFor !== currentDirectory) {
-      if (turnFileStatusReadRef.current === currentDirectory) return;
-      turnFileStatusReadRef.current = currentDirectory;
-      void fetchStatus(currentDirectory, git, { silent: true }).finally(() => {
-        setTurnFileRequest((current) => current && { ...current, statusReadFor: currentDirectory });
-      });
-      return;
-    }
+    const inTurn = closestRepoFile(file, rootDirectory, lastTurnDiffs.map((diff) => diff.file));
     setTurnFileRequest(null);
-    const listed = closestRepoFile(file, currentDirectory, changeEntries.map((candidate) => candidate.path));
-    const entry = changeEntries.find((candidate) => candidate.path === listed);
-    if (!entry) return;
-    setNavigation({
-      ownerKey,
-      mode: 'working',
-      route: { type: 'diff', path: entry.path, staged: isStagedStatusFile(entry) && !isUnstagedStatusFile(entry) },
-    });
-  }, [changeEntries, currentDirectory, currentSessionId, fetchStatus, git, lastTurnDiffs, mode, ownerKey, repository.repositoriesKnown, repositoryOptions, rootDirectory, rootIsGitRepo, route.type, selectNestedRepo, turnDiffSettled, turnFileRequest, visible]);
+    setNavigation({ ownerKey, mode: 'turn', route: { type: 'turn', path: inTurn ?? file } });
+  }, [currentSessionId, lastTurnDiffs, mode, ownerKey, rootDirectory, route.type, turnDiffSettled, turnFileRequest, visible]);
 
   // What the walkthrough reads: the same subject as the list on screen. The
   // working tree is walked through whole, as the desktop's default scope; a
@@ -1234,7 +1200,7 @@ export const MobileChangesPane: React.FC<MobileChangesPaneProps> = ({ rootDirect
     return renderListState(<MobileChangesState message={t('gitView.empty.selectSessionOrDirectory')} />);
   }
 
-  if (repository.unreadable) {
+  if (mode !== 'turn' && repository.unreadable) {
     return renderListState(
       <GitRepositoryUnreadableState directory={repository.unreadable.directory} message={repository.unreadable.message} />,
     );
@@ -1243,7 +1209,7 @@ export const MobileChangesPane: React.FC<MobileChangesPaneProps> = ({ rootDirect
   // Non-repo root: surface nested-repository resolution while the operating
   // directory has not proven to be a repository (discovering, failed,
   // unsupported, none found, or settling on the auto-selected one).
-  if (rootIsGitRepo === false && isGitRepo !== true) {
+  if (mode !== 'turn' && rootIsGitRepo === false && isGitRepo !== true) {
     return renderListState(
       <NestedRepoResolutionStates
         root={rootDirectory}
@@ -1257,7 +1223,7 @@ export const MobileChangesPane: React.FC<MobileChangesPaneProps> = ({ rootDirect
     );
   }
 
-  if (isLoadingStatus && isGitRepo === null) {
+  if (mode !== 'turn' && isLoadingStatus && isGitRepo === null) {
     return renderListState(<MobileChangesState loading message={t('gitView.loading.checkingRepository')} />);
   }
 
@@ -1283,7 +1249,9 @@ export const MobileChangesPane: React.FC<MobileChangesPaneProps> = ({ rootDirect
         path={route.path}
         subtitle={t('diffView.scope.lastTurn')}
         diff={turnDiffData.get(route.path) ?? null}
-        fileExists={turnFiles.some((file) => file.path === route.path)}
+        fileExists={true}
+        error={turnDiffError ?? (hasTurnData && !turnDiffData.has(route.path) ? t('diffView.state.turnDiffUnavailable') : null)}
+        onRetry={retryTurnDiff}
         onBack={() => setRoute(LIST_ROUTE)}
       />
     );
@@ -1371,17 +1339,10 @@ export const MobileChangesPane: React.FC<MobileChangesPaneProps> = ({ rootDirect
   };
 
   const renderTurn = () => {
-    // Render-time loading: an effect runs after paint, so entering the scope
-    // with no data yet would flash the empty copy for one frame. The data is
-    // kept across scopes like the desktop view: a revisit shows the old list
-    // while the refetch replaces it silently.
-    if (turnDiffError) {
-      return <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-        <p className="typography-ui-label font-semibold">{t('diffView.state.failedToLoadDiff')}</p>
-        <p className="typography-meta text-muted-foreground">{turnDiffError}</p>
-        <Button variant="outline" size="lg" onClick={retryTurnDiff}>{t('diffView.actions.retry')}</Button>
-      </div>;
-    }
+    if (turnDiffError) return <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+      <p className="typography-meta text-muted-foreground">{turnDiffError}</p>
+      <Button variant="outline" size="lg" onClick={retryTurnDiff}>{t('diffView.actions.retry')}</Button>
+    </div>;
     if ((!hasTurnData || turnFileRequest) && currentSessionId) return <MobileChangesState loading message={t('diffView.state.loadingChanges')} />;
     if (turnFiles.length === 0) return <MobileChangesState message={t('diffView.state.noLastTurnChanges')} />;
     return <MobileComparisonFileList files={turnFiles} onSelect={(path) => setRoute({ type: 'turn', path })} />;

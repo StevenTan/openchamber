@@ -587,26 +587,18 @@ Subagents count distinct child session IDs; commands count calls, not shell
 subcommands. Unknown tools and administrative tools stay in the disclosure
 without a guessed summary category.
 
-File statistics come exclusively from successful edit/write/patch tool
-results, not user-message summary diffs or the current workspace Git diff.
-Unique normalized paths determine file count; renames preserve identities.
-Line totals sum performed edits, including lines later removed by another
-call. Per-file patches/counts take precedence over a whole-call patch; the two
-representations are never added together. Missing or truncated diffs suppress
-the line total rather than presenting a partial total as complete. Write input
-content is not evidence of added lines. Repeated records of one call count once.
+The activity header and completed-turn file pills use each native turn's newest
+managed file-tool record. Repeated edits count the original-to-final
+change; a revert removes its entry. References carry paths, counts and a turn
+ID, while patch bodies stay in plugin storage. Tools without capture metadata
+still provide their reported file names and counts; their historical diff is
+unavailable when no record exists. Capture errors suppress complete totals.
 
-The completed-turn file pills under the final answer (the "show changed files"
-setting) use the tool-result file identities, in first-touch order, with paths
-as the tools reported them (v2 assistant messages carry no working directory).
-Line counts come from each call's patch; a file with no recoverable counts
-shows its name alone. Every pill opens the turn diff: OpenCode 2 computes it on
-request (`GET /api/session/:id/diff`, `DiffView`'s "Last turn" scope) from the
-turn's start and end snapshots, merged per file, so it also covers a `write`
-result and the edits a `subagent` made in its child session, which the pills
-themselves cannot list. Past four pills the rest wait behind one `+N` pill
-that reveals them in the row; the same pill then hides them again. The list is projected once the last assistant message
-finished with `stop`, so no tool patch is parsed while the turn streams.
+Every file pill opens its owning turn's saved diff, including historical
+turns. When hidden prompts share a displayed turn, each native record keeps
+its own files and capture reference. Past four pills, one `+N` pill reveals the rest in the row and hides
+them again. Projection runs once the final assistant message finishes with
+`stop`; streaming text does not trigger patch parsing.
 
 ### Why tool rows appear without an entrance
 

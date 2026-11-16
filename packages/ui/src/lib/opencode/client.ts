@@ -16,8 +16,6 @@ import { AgentUnavailableError } from "./agent-unavailable-error"
 import { isLocationNotFoundError } from "./location-errors"
 import { ClientError, OpenCode, type OpenCodeClient } from "@opencode/client"
 import type {
-  FileDiffInfo,
-  SessionDiffInput,
   FormAnswer,
   FormInfo,
   LocationGetOutput,
@@ -72,6 +70,7 @@ import {
 import { ascendingId } from "./ids"
 import { runningShellFromWire, shellCancellationNote, type RunningShell, type ShellToStop } from "./background-shell"
 import { runningImageJobFromWire, type RunningImageJob } from "./background-image"
+import { recordedTurnDiffSchema } from './turn-file-diffs'
 import { subagentCancellationNote } from "./subagent-run"
 import { toJsonRecord } from "./json"
 import { readMessageThroughAncestors } from "./message-ownership"
@@ -1959,21 +1958,11 @@ class OpencodeService {
     return result.text
   }
 
-  /**
-   * Per-file diffs of what a turn changed, computed by OpenCode from the
-   * turn's snapshots: `from` names the user message whose turn to diff
-   * (default: the newest), `to` extends the range through a later turn.
-   * Covers edits the tool calls alone cannot describe (a `write`, a subagent).
-   */
-  async getSessionTurnDiff(
-    sessionId: string,
-    options?: { from?: string; to?: string; context?: number; directory?: string | null },
-  ): Promise<FileDiffInfo[]> {
-    const { from, to, context } = options ?? {}
-    // The client's input type marks every field read-only, so it is built in one go.
-    const input: SessionDiffInput = { sessionID: sessionId, from, to, context }
-    const result = await call("session.diff", () => this.clientFor(options?.directory).session.diff(input))
-    return [...result]
+  async getRecordedTurnDiff(sessionId: string, turnId: string, directory?: string | null) {
+    const result = await call('turn-diffs.read', () => this.clientFor(directory).rpc.call({
+      rpcID: 'openchamber-turn-diffs', method: 'read', input: { sessionID: sessionId, turnID: turnId },
+    }))
+    return recordedTurnDiffSchema.parse(result.output)
   }
 
   /** One stateless generation with the server's default model unless `model` is given. */
