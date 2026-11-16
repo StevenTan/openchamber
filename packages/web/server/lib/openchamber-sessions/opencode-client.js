@@ -15,12 +15,12 @@ const buildDirectoryHeaders = (directory) => {
 };
 
 /** One directory-scoped `@opencode/client` for a session-route call. */
-export const createOpenCodeClient = ({ baseUrl, headers, directory }) => OpenCode.make({
+export const createOpenCodeClient = ({ baseUrl, headers, directory, fetch: requestFetch }) => OpenCode.make({
   baseUrl,
   headers: { ...headers, ...buildDirectoryHeaders(directory) },
   // Resolved per call so a test (or a runtime that swaps the global) is honoured.
   fetch: async (...args) => {
-    const response = await globalThis.fetch(...args);
+    const response = await (requestFetch ?? globalThis.fetch)(...args);
     assertOpenCodeApiResponse(response);
     return response;
   },

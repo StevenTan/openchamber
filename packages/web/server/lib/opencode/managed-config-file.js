@@ -4,6 +4,7 @@ import { isLimitFailoverConfigured } from '../limit-failover/policy.js';
 import { materializeSessionTitlePlugin } from './session-title-plugin.js';
 import { EXTENSION_AUTHORING_COMMAND, materializeAuthoringSkill } from '../guests/agent-context.js';
 import { materializeTurnDiffPlugin } from '../turn-diffs/materialize.js';
+import { materializeCollaborationPlugin } from '../agent-collaboration/runtime.js';
 
 export const MANAGED_CONFIG_FILE_NAME = 'opencode.managed.json';
 
@@ -137,6 +138,7 @@ export const createManagedConfigRuntime = ({
     if (agentToolRuntime) directories.push(await agentToolRuntime.materializeSearchPlugin());
     if (agentToolRuntime) directories.push(await agentToolRuntime.materializeQuestionPlugin());
     directories.push(await materializeTurnDiffPlugin({ fsPromises, path, instanceDir }));
+    if (agentToolRuntime) directories.push(await materializeCollaborationPlugin(instanceDir));
     const disabled = includeImage ? [...DISABLED_BUILTIN_PLUGINS, BUILTIN_IMAGE_PLUGIN] : DISABLED_BUILTIN_PLUGINS;
     const authoring = await materializeAuthoringSkill({ fsPromises, instanceDir, openchamberVersion });
     const skills = [authoring.skillsRoot, ...await listExtensionSkillDirectories()];

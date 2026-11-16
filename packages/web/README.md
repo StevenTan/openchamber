@@ -67,6 +67,10 @@ search, page opening, text lookup and link traversal. It requires a proxy that
 supports this protocol and uses the invoking model's provider API key. The direct
 `web.run` tool returns backend text and preserves structured results in metadata.
 
+Managed child-agent controls live in `server/lib/agent-collaboration`. They send
+follow-ups, wait for idle, and interrupt children started by the native
+`subagent` tool. Operations are scoped to the invoking session's direct children.
+
 ### Tunnel behavior notes
 
 - One active tunnel per running OpenChamber instance (port).

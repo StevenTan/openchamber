@@ -1471,6 +1471,10 @@ The managed command plugin is always registered alongside the session title
 plugin. It exposes `exec_command` and `write_stdin` and removes `shell` from the
 model's tool list. Its contract is in `../agent-command/DOCUMENTATION.md`.
 
+The managed child-agent coordination plugin adds follow-up, wait and interrupt
+tools alongside native `subagent`. Its contract is in
+`../agent-collaboration/DOCUMENTATION.md`.
+
 OpenChamber injects its own OpenCode plugins through a file it owns rather than
 through the process environment, because an environment variable cannot change
 under a running child.

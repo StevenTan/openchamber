@@ -65,8 +65,9 @@ export function runDevServerWatch(options = {}) {
   const compiler = runner(process.execPath, [compilerPath, '--project', 'tsconfig.agent-command.build.json', '--watch', '--preserveWatchOutput'], spawnOptions);
   const searchCompiler = runner(command, ['build', './server/lib/agent-search/src/plugin.ts', '--outfile', './server/lib/agent-search/dist/plugin.js', '--target', 'node', '--format', 'esm', '--watch'], spawnOptions);
   const questionCompiler = runner(process.execPath, [compilerPath, '--project', 'tsconfig.agent-question.build.json', '--watch', '--preserveWatchOutput'], spawnOptions);
+  const collaborationCompiler = runner(command, ['build', './server/lib/agent-collaboration/src/plugin.ts', './server/lib/agent-collaboration/src/runtime.ts', '--outdir', './server/lib/agent-collaboration/dist', '--target', 'node', '--format', 'esm', '--watch'], spawnOptions);
   const child = runner(command, args, spawnOptions);
-  const watchers = [compiler, searchCompiler, questionCompiler, child];
+  const watchers = [compiler, searchCompiler, questionCompiler, collaborationCompiler, child];
   let exitSignal = null;
   const stop = (signal) => {
     exitSignal = signal;
@@ -83,7 +84,7 @@ export function runDevServerWatch(options = {}) {
       if (exitSignal) process.kill(process.pid, exitSignal);
     });
 
-  for (const builder of [compiler, searchCompiler, questionCompiler]) {
+  for (const builder of [compiler, searchCompiler, questionCompiler, collaborationCompiler]) {
     builder.on('error', (error) => {
       console.error('[dev:web:server] Failed to start tool compiler:', error);
       process.exitCode = 1;
@@ -100,6 +101,7 @@ export function runDevServerWatch(options = {}) {
     compiler.kill();
     searchCompiler.kill();
     questionCompiler.kill();
+    collaborationCompiler.kill();
     console.error('[dev:web:server] Failed to start server watcher:', error);
     process.exitCode = 1;
   });
@@ -107,6 +109,7 @@ export function runDevServerWatch(options = {}) {
     compiler.kill();
     searchCompiler.kill();
     questionCompiler.kill();
+    collaborationCompiler.kill();
     if (signal) {
       exitSignal = signal;
       return;

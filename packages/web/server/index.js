@@ -1179,10 +1179,11 @@ const sessionGoalRuntime = createSessionGoalRuntime({
 });
 
 /** A directory-scoped OpenCode client for one session-route call. */
-const openCodeSessionClient = (directory) => createOpenCodeClient({
+const openCodeSessionClient = (directory, requestFetch) => createOpenCodeClient({
   baseUrl: buildOpenCodeUrl('/', '').replace(/\/$/, ''),
   headers: getOpenCodeAuthHeaders(),
   directory,
+  fetch: requestFetch,
 });
 
 /**
@@ -2573,6 +2574,7 @@ async function main(options = {}) {
     resolveSessionDirectory: (sessionID) => openChamberControlService.resolveSessionDirectory(sessionID),
     getCommandEnvironment: () => overlayEnvironment({ ...process.env, PATH: buildAugmentedPath() }, environmentRuntime.forOpenCode()),
     hasPendingInput: async (sessionID, signal) => (await openCodeSessionClient().session.inbox.list({ sessionID }, { signal })).length > 0,
+    collaborationClient: (requestFetch) => openCodeSessionClient(undefined, requestFetch),
     questionRuntime,
     getActivePort: () => {
       const address = server?.address?.();

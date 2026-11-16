@@ -55,6 +55,7 @@ import {
 import { createCallbackAddress } from './callback-address.js';
 import { createCommandToolRuntime } from '../agent-command/dist/runtime.js';
 import { materializeSearchPlugin } from '../agent-search/runtime.js';
+import { registerCollaborationRoutes } from '../agent-collaboration/dist/runtime.js';
 
 const TOOL_SCHEMA_VERSION = 1;
 const PLUGIN_ID = 'openchamber-agent-tool';
@@ -995,6 +996,7 @@ export const createAgentToolRuntime = (dependencies) => {
     getCommandEnvironment,
     hasPendingInput,
     questionRuntime,
+    collaborationClient,
   } = dependencies;
   // The plugin embeds this server's tool declarations, so it lives in this
   // server's own directory (see ../opencode/instance-dir.js).
@@ -1143,6 +1145,7 @@ export const createAgentToolRuntime = (dependencies) => {
 
   const registerRoutes = (app, express) => {
     commandToolRuntime.registerRoutes(app, express, { authorize, trackInflight });
+    registerCollaborationRoutes(app, express, { authorize, trackInflight, client: collaborationClient });
     app.post('/api/openchamber/async-question', express.json({ limit: '1mb' }), async (req, res) => {
       if (!authorize(req)) return res.status(401).json({ error: 'Unauthorized' });
       try { return res.json(await questionRuntime.ask(req.body)); }

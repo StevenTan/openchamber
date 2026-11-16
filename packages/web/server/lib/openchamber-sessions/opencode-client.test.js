@@ -29,4 +29,14 @@ describe('server-owned OpenCode dispatch responses', () => {
     expect(new Headers(init.headers).get('Authorization')).toBe('Bearer test');
     expect(new Headers(init.headers).get('x-opencode-directory')).toBe(encodeURIComponent('/repo/app'));
   });
+
+  it('uses an explicit request transport while preserving API response validation', async () => {
+    const transport = vi.fn(async () => new Response(null, { status: 204 }));
+    const sdk = createOpenCodeClient({ baseUrl: 'http://opencode.test', fetch: transport });
+    const controller = new AbortController();
+    await sdk.session.wait({ sessionID: 'child' }, { signal: controller.signal });
+    expect(transport).toHaveBeenCalledWith(expect.any(URL), expect.objectContaining({ method: 'POST', signal: controller.signal }));
+    transport.mockResolvedValue(new Response('<html>UI</html>', { headers: { 'content-type': 'text/html' } }));
+    await expect(sdk.session.wait({ sessionID: 'child' })).rejects.toThrow('runtime returned HTML');
+  });
 });
