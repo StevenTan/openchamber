@@ -1,16 +1,12 @@
 import React from "react";
 import { cn } from "@/lib/utils";
-import { OverlayScrollbar } from "./OverlayScrollbar";
 import { ScrollShadow } from "./ScrollShadow";
 
 type ScrollableOverlayProps = React.HTMLAttributes<HTMLElement> & {
-  minThumbSize?: number;
-  hideDelayMs?: number;
   as?: React.ElementType;
   outerClassName?: string;
   /** Style of the outer frame, for a size given as a value (a max height from a prop). */
   outerStyle?: React.CSSProperties;
-  scrollbarClassName?: string;
   disableHorizontal?: boolean;
   observeMutations?: boolean;
   fillContainer?: boolean;
@@ -22,9 +18,6 @@ type ScrollableOverlayProps = React.HTMLAttributes<HTMLElement> & {
   hideTopScrollShadow?: boolean;
   /** Suppress the bottom fade while retaining scroll-state tracking. */
   hideBottomScrollShadow?: boolean;
-  userIntentOnly?: boolean;
-  /** Pixels kept clear above the vertical scrollbar track. */
-  verticalTrackStart?: number;
   /** Forwarded to the inner element (e.g. textarea). */
   disabled?: boolean;
 };
@@ -36,10 +29,7 @@ export const ScrollableOverlay = React.forwardRef<HTMLElement, ScrollableOverlay
     outerStyle,
     children,
     style,
-    minThumbSize,
-    hideDelayMs,
     as: Component = "div",
-    scrollbarClassName,
     disableHorizontal = false,
     observeMutations = true,
     fillContainer = true,
@@ -48,8 +38,6 @@ export const ScrollableOverlay = React.forwardRef<HTMLElement, ScrollableOverlay
     scrollShadowSize,
     hideTopScrollShadow = false,
     hideBottomScrollShadow = false,
-    userIntentOnly = false,
-    verticalTrackStart,
     ...rest
   }, ref) => {
     const containerRef = React.useRef<HTMLElement | null>(null);
@@ -101,16 +89,6 @@ export const ScrollableOverlay = React.forwardRef<HTMLElement, ScrollableOverlay
             {children}
           </Component>
         )}
-        <OverlayScrollbar
-          containerRef={containerRef}
-          minThumbSize={minThumbSize}
-          hideDelayMs={hideDelayMs}
-          className={scrollbarClassName}
-          disableHorizontal={disableHorizontal}
-          observeMutations={observeMutations}
-          userIntentOnly={userIntentOnly}
-          verticalTrackStart={verticalTrackStart}
-        />
       </div>
     );
   }

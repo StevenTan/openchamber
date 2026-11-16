@@ -8,7 +8,6 @@ import { forceParsing, indentUnit } from '@codemirror/language';
 import { search, openSearchPanel, closeSearchPanel, searchPanelOpen, getSearchQuery } from '@codemirror/search';
 import { createPortal } from 'react-dom';
 
-import { AttachedOverlayScrollbar } from '@/components/ui/AttachedOverlayScrollbar';
 import { searchPanelSpace } from '@/lib/codemirror/searchPanelSpace';
 import { createVimModeExtensions } from '@/lib/codemirror/vimModeExtension';
 import { cn } from '@/lib/utils';
@@ -346,11 +345,6 @@ export function CodeMirrorEditor({
   // measure phase: read on every update, it forced a layout of the page on
   // each keystroke and each reconfigure.
   const gutterWidthRef = React.useRef<string | null>(null);
-  // The scrollbar frame stops above bottom panels (the vim status line), so
-  // the horizontal thumb sits at the scroller's own bottom edge.
-  const bottomPanelsHeightRef = React.useRef<string | null>(null);
-  const scrollbarFrameRef = React.useRef<HTMLDivElement | null>(null);
-  const [scroller, setScroller] = React.useState<HTMLElement | null>(null);
   const syncEditorCssVars = React.useCallback((view?: EditorView | null) => {
     const resolvedView = view ?? viewRef.current;
     if (!hostRef.current || !resolvedView) {
@@ -363,10 +357,8 @@ export function CodeMirrorEditor({
         // Hidden or detached, everything measures zero: keep the last real sizes.
         if (!measuredView.dom.isConnected || measuredView.dom.offsetParent === null) return null;
         const gutters = measuredView.dom.querySelector('.cm-gutters');
-        const bottomPanels = measuredView.dom.querySelector('.cm-panels-bottom');
         return {
           gutterWidth: gutters instanceof HTMLElement ? gutters.getBoundingClientRect().width : 0,
-          bottomPanelsHeight: bottomPanels instanceof HTMLElement ? bottomPanels.getBoundingClientRect().height : 0,
         };
       },
       write: (sizes) => {
@@ -376,11 +368,6 @@ export function CodeMirrorEditor({
         if (gutterWidthRef.current !== nextGutterWidth) {
           gutterWidthRef.current = nextGutterWidth;
           host.style.setProperty('--oc-editor-gutter-width', nextGutterWidth);
-        }
-        const nextBottomPanelsHeight = `${sizes.bottomPanelsHeight}px`;
-        if (bottomPanelsHeightRef.current !== nextBottomPanelsHeight) {
-          bottomPanelsHeightRef.current = nextBottomPanelsHeight;
-          scrollbarFrameRef.current?.style.setProperty('bottom', nextBottomPanelsHeight);
         }
       },
     });
@@ -481,7 +468,6 @@ export function CodeMirrorEditor({
       scrollSnapshotRef.current = scrolledView.scrollSnapshot();
     };
     scrolledView.scrollDOM.addEventListener('scroll', recordScroll, { passive: true });
-    setScroller(scrolledView.scrollDOM);
 
     forceParsingCompat(viewRef.current, viewRef.current.state.doc.length, 200);
     viewRef.current.requestMeasure();
@@ -499,7 +485,6 @@ export function CodeMirrorEditor({
       onViewDestroyRef.current?.();
       viewRef.current?.destroy();
       viewRef.current = null;
-      setScroller(null);
       setPortalWidgets([]);
     };
     // oxlint-disable-next-line react-hooks/exhaustive-deps
@@ -636,9 +621,6 @@ export function CodeMirrorEditor({
           className,
         )}
       />
-      <div ref={scrollbarFrameRef} className="pointer-events-none absolute inset-0">
-        <AttachedOverlayScrollbar scroller={detached ? null : scroller} />
-      </div>
       {portalWidgets.map((widget) => {
         return createPortal(widget.content, widget.container, widget.id);
       })}

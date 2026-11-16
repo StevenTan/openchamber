@@ -61,8 +61,6 @@ export const settingsDict = {
   'settings.themeImport.error.connection': 'De verbonden server is gewijzigd. Het thema is niet toegepast.',
   'settings.themeImport.error.unsupported': 'Thema-import is niet beschikbaar in VS Code.',
   'settings.themeImport.error.conflict': 'Dit geïmporteerde thema is op de server bewerkt. Het is niet overschreven.',
-  'settings.openchamber.visual.field.alwaysShowScrollbars': 'Scrollbalken altijd tonen',
-  'settings.openchamber.visual.field.alwaysShowScrollbarsHint': 'Houd scrollbalken zichtbaar, ook als de aanwijzer buiten het scrollgebied staat. Geldt alleen voor dit apparaat.',
   'settings.providers.page.openCodeGo.title': 'Gebruiksregistratie van OpenCode Go',
   'settings.providers.page.openCodeGo.description': 'Verbind het OpenCode Go-dashboard om doorlopende, wekelijkse en maandelijkse limiet te tonen.',
   'settings.providers.page.openCodeGo.workspaceId': 'Werkruimte-ID',

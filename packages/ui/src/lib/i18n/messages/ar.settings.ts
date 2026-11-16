@@ -59,8 +59,6 @@ export const settingsDict = {
   'settings.themeImport.error.connection': 'تغيّر الخادم المتصل. لم تُطبَّق السمة.',
   'settings.themeImport.error.unsupported': 'استيراد السمات غير متاح في VS Code.',
   'settings.themeImport.error.conflict': 'عُدّلت هذه السمة المستوردة على الخادم. لم تتم الكتابة فوقها.',
-  'settings.openchamber.visual.field.alwaysShowScrollbars': 'إظهار أشرطة التمرير دائمًا',
-  'settings.openchamber.visual.field.alwaysShowScrollbarsHint': 'إبقاء أشرطة التمرير ظاهرة حتى عندما يكون المؤشر خارج المنطقة القابلة للتمرير. ينطبق على هذا الجهاز فقط.',
   'settings.providers.page.openCodeGo.title': 'تتبع استخدام OpenCode Go',
   'settings.providers.page.openCodeGo.description': 'اربط لوحة تحكم OpenCode Go لعرض الحصة المتجددة والأسبوعية والشهرية.',
   'settings.providers.page.openCodeGo.workspaceId': 'معرّف مساحة العمل',

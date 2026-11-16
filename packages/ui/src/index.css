@@ -582,8 +582,7 @@ div[data-chat-input-footer="true"] {
    composites to the same pixels. The bands are later siblings of the
    scroller (ChatContainer) and follow its scroll-shadow attributes through
    `~`, so they switch in the same style pass the mask did. They sit under the
-   overlay scrollbar, the prompt navigator and the composer, none of which the mask
-   covered either. */
+   prompt navigator and the composer, which the mask did not cover either. */
 .chat-scroll-fade {
   --scroll-shadow-size: 48px;
   position: absolute;
@@ -850,28 +849,17 @@ svg.animate-spin {
   -webkit-app-region: no-drag;
 }
 
-/* Custom scrollbar styles */
-*::-webkit-scrollbar {
-  width: 10px !important;
-  height: 10px !important;
-  background: transparent;
-  -webkit-appearance: none;
+/* Native scrollbars follow the platform's visibility and interaction policy. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--surface-foreground) 6%, transparent) transparent;
 }
 
-*::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-*::-webkit-scrollbar-thumb {
-  background: var(--oc-scrollbar-thumb);
-  border-radius: 6px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-*::-webkit-scrollbar-thumb:hover {
-  background: var(--oc-scrollbar-thumb-hover);
-  background-clip: padding-box;
+*:hover, *:active {
+  scrollbar-color: light-dark(
+    color-mix(in oklab, var(--surface-foreground) 10%, transparent),
+    color-mix(in oklab, var(--surface-foreground) 12%, transparent)
+  ) transparent;
 }
 
 .dark {
@@ -880,13 +868,8 @@ svg.animate-spin {
   --oc-scrollbar-thumb-hover: oklch(0.6 0.02 80 / 0.36);
 }
 
-[data-scrollbar="chat"]::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-*::-webkit-scrollbar-corner {
-  background: transparent;
+@media (forced-colors: active) {
+  *, *:hover, *:active { scrollbar-color: auto; }
 }
 
 /* Fully hidden scrollbar for small mobile overlays (session switcher etc.)
@@ -905,62 +888,6 @@ svg.animate-spin {
 [data-scrollbar="chat"].chat-scroll,
 .chat-scroll {
   scrollbar-gutter: stable both-edges;
-}
-
-html:not(.dark) .chat-scroll {
-  color-scheme: dark;
-}
-
-[data-scrollbar="chat"]::-webkit-scrollbar {
-  width: 10px !important;
-  height: 10px !important;
-  background: transparent !important;
-  -webkit-appearance: none;
-}
-
-[data-scrollbar="chat"].chat-scroll::-webkit-scrollbar,
-.chat-scroll::-webkit-scrollbar {
-  width: 10px !important;
-  height: 10px !important;
-}
-
-[data-scrollbar="chat"]::-webkit-scrollbar-track {
-  background: transparent !important;
-}
-
-[data-scrollbar="chat"].chat-scroll::-webkit-scrollbar-track,
-.chat-scroll::-webkit-scrollbar-track {
-  background: transparent !important;
-}
-
-[data-scrollbar="chat"]::-webkit-scrollbar-thumb {
-  background: var(--oc-scrollbar-thumb) !important;
-  border-radius: 6px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-[data-scrollbar="chat"].chat-scroll::-webkit-scrollbar-thumb,
-.chat-scroll::-webkit-scrollbar-thumb {
-  background: var(--oc-scrollbar-thumb) !important;
-  border-radius: 6px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-[data-scrollbar="chat"]::-webkit-scrollbar-thumb:hover {
-  background: var(--oc-scrollbar-thumb-hover) !important;
-  background-clip: padding-box;
-}
-
-[data-scrollbar="chat"].chat-scroll::-webkit-scrollbar-thumb:hover,
-.chat-scroll::-webkit-scrollbar-thumb:hover {
-  background: var(--oc-scrollbar-thumb-hover) !important;
-  background-clip: padding-box;
-}
-
-[data-scrollbar="chat"]::-webkit-scrollbar-corner {
-  background: transparent !important;
 }
 
 /* While the user drags a column beside the chat to a new width
@@ -987,27 +914,8 @@ html:not(.dark) .chat-scroll {
   content-visibility: auto;
 }
 
-/* Hide native scrollbars for overlay targets (all browsers) */
 .overlay-scrollbar-target {
-  scrollbar-width: none !important;
-  -ms-overflow-style: none !important;
-  scrollbar-gutter: auto !important;
-}
-
-.overlay-scrollbar-target--no-gutter {
-  scrollbar-gutter: unset !important;
-}
-
-.overlay-scrollbar-target::-webkit-scrollbar {
-  width: 0 !important;
-  height: 0 !important;
-  display: none !important;
-}
-
-/* Firefox scrollbar support */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--oc-scrollbar-thumb) transparent;
+  scrollbar-gutter: stable;
 }
 
 .scrollbar-hidden {
@@ -1015,89 +923,7 @@ html:not(.dark) .chat-scroll {
 }
 
 .scrollbar-hidden::-webkit-scrollbar {
-  width: 0 !important;
-  height: 0 !important;
-}
-
-.dark * {
-  scrollbar-color: oklch(0.6 0.02 80 / 0.3) transparent;
-}
-
-/* Overlay scrollbar styling (custom thumb) */
-/* Every overlay scroller reserves the thumb's room up front, whether or not
-   its content overflows now: a list that crosses the threshold (projects
-   folding and opening, a catalog loading) must not shift its text sideways
-   when the thumb appears. */
-.overlay-scrollbar-wrapper {
-  padding-right: 6px;
-}
-
-/* A wrapper that only frames other scrollers takes none, so a nested
-   scroller's thumb stays at the edge. */
-.overlay-scrollbar-wrapper.overlay-scrollbar-wrapper--no-gutter {
-  padding-right: 0;
-}
-
-.overlay-scrollbar {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  /* Above sticky zone headers (z-20) — the thumb must never dive under
-     a stuck sidebar header while scrolling. */
-  z-index: 30;
-}
-
-.overlay-scrollbar[data-visible="true"] {
-  opacity: 1;
-}
-
-/* The thumb is drawn 4px thick (6px under the pointer) inside a 10px hit
-   area: transparent borders on its long sides take the grab, and the fill
-   stops at the padding box. */
-.overlay-scrollbar__thumb {
-  pointer-events: none;
-  position: absolute;
-  box-sizing: border-box;
-  width: 10px;
-  border: 0 solid transparent;
-  border-inline-width: 3px;
-  background: var(--oc-scrollbar-thumb);
-  background-clip: padding-box;
-  border-radius: 9999px;
-  opacity: 0.8;
-  transition: background-color 0.15s ease, opacity 0.15s ease;
-  will-change: transform;
-}
-
-.overlay-scrollbar[data-visible="true"] .overlay-scrollbar__thumb {
-  pointer-events: auto;
-}
-
-.overlay-scrollbar__thumb:hover,
-.overlay-scrollbar__thumb:active {
-  background: var(--oc-scrollbar-thumb-hover);
-  background-clip: padding-box;
-  border-inline-width: 2px;
-  opacity: 1;
-}
-
-.overlay-scrollbar__thumb--horizontal {
-  height: 10px;
-  border-inline-width: 0;
-  border-block-width: 3px;
-  margin: 0;
-}
-
-.overlay-scrollbar__thumb--horizontal:hover,
-.overlay-scrollbar__thumb--horizontal:active {
-  border-inline-width: 0;
-  border-block-width: 2px;
-}
-
-.overlay-scrollbar__thumb--vertical {
-  margin: 0;
+  display: none;
 }
 
 /* The collapsed session sidebar sliding out over the chat on hover

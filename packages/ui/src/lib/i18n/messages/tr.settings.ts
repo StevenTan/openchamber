@@ -36,8 +36,6 @@ export const settingsDict = {
   'settings.themeImport.error.connection': 'Bağlı sunucu değişti. Tema uygulanmadı.',
   'settings.themeImport.error.unsupported': 'VS Code içinde tema içe aktarma kullanılamaz.',
   'settings.themeImport.error.conflict': 'Bu içe aktarılan tema sunucuda düzenlendi. Üzerine yazılmadı.',
-  'settings.openchamber.visual.field.alwaysShowScrollbars': 'Kaydırma çubuklarını her zaman göster',
-  'settings.openchamber.visual.field.alwaysShowScrollbarsHint': 'İşaretçi kaydırılabilir alanın dışındayken bile kaydırma çubuklarını görünür tutar. Yalnızca bu cihazda geçerlidir.',
   'settings.providers.page.openCodeGo.title': 'OpenCode Go kullanım takibi',
   'settings.providers.page.openCodeGo.description': 'Kayan, haftalık ve aylık kotayı göstermek için OpenCode Go kontrol panelini bağlayın.',
   'settings.providers.page.openCodeGo.workspaceId': 'Çalışma alanı ID\'si',

@@ -148,7 +148,6 @@ const VisualSectionContent: React.FC = () => {
         'fontSize',
         'editorFontSize',
         'spacing',
-        'scrollbars',
         'inputBarOffset',
         'animatedActivityIndicators',
     ]} />;

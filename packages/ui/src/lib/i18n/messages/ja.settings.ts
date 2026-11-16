@@ -59,8 +59,6 @@ export const settingsDict = {
   'settings.themeImport.error.connection': '接続先のサーバーが変わりました。テーマは適用されていません。',
   'settings.themeImport.error.unsupported': 'VS Code 内ではテーマをインポートできません。',
   'settings.themeImport.error.conflict': 'このインポート済みテーマはサーバー上で編集されています。上書きしませんでした。',
-  'settings.openchamber.visual.field.alwaysShowScrollbars': 'スクロールバーを常に表示',
-  'settings.openchamber.visual.field.alwaysShowScrollbarsHint': 'ポインターがスクロール領域の外にあるときも、スクロールバーを表示します。このデバイスにのみ適用されます。',
   'settings.providers.page.openCodeGo.title': 'OpenCode Go 使用量追跡',
   'settings.providers.page.openCodeGo.description': 'OpenCode Go ダッシュボードを接続して、ローリング、週間、月間のクォータを表示します。',
   'settings.providers.page.openCodeGo.workspaceId': 'ワークスペース ID',

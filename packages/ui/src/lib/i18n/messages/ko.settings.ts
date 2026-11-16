@@ -59,8 +59,6 @@ export const settingsDict = {
   'settings.themeImport.error.connection': '연결된 서버가 변경되었습니다. 테마를 적용하지 않았습니다.',
   'settings.themeImport.error.unsupported': 'VS Code에서는 테마 가져오기를 사용할 수 없습니다.',
   'settings.themeImport.error.conflict': '이 가져온 테마는 서버에서 편집되었습니다. 덮어쓰지 않았습니다.',
-  'settings.openchamber.visual.field.alwaysShowScrollbars': '스크롤바 항상 표시',
-  'settings.openchamber.visual.field.alwaysShowScrollbarsHint': '포인터가 스크롤 영역 밖에 있어도 스크롤바를 표시합니다. 이 기기에만 적용됩니다.',
   'settings.providers.page.openCodeGo.title': 'OpenCode Go 사용량 추적',
   'settings.providers.page.openCodeGo.description': 'OpenCode Go 대시보드를 연결하여 롤링, 주간 및 월간 할당량을 표시합니다.',
   'settings.providers.page.openCodeGo.workspaceId': '워크스페이스 ID',

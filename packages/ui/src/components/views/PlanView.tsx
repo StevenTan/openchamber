@@ -2,7 +2,6 @@ import React from 'react';
 import { CodeMirrorEditor } from '@/components/ui/CodeMirrorEditor';
 import { SimpleMarkdownRenderer } from '@/components/chat/MarkdownRenderer';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
-import { OverlayScrollbar } from '@/components/ui/OverlayScrollbar';
 import { ScrollableOverlay } from '@/components/ui/ScrollableOverlay';
 import { ActionToolbar, type ToolbarAction } from '@/components/ui/action-toolbar';
 import { Button } from '@/components/ui/button';
@@ -1003,7 +1002,6 @@ export const PlanView: React.FC<PlanViewProps> = ({ visible = true, savedProject
                       <SimpleMarkdownRenderer content={previewContent} documentAssets={markdownDocumentAssets} className="typography-markdown-body" frontmatter="properties" enableFileReferences={false} />
                     </ErrorBoundary>
                   </div>
-                  <OverlayScrollbar containerRef={previewRef} />
                   </>
                 ) : (
                   <div className="relative h-full" ref={editorWrapperRef}>

@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import express from 'express';
 import request from 'supertest';
-import { GUEST_SCROLLBAR_CSS, GUEST_SCROLLBAR_SCRIPT } from '@openchamber/sdk';
+import { GUEST_SCROLLBAR_CSS } from '@openchamber/sdk';
 import { GUEST_UI_LOOK_CSS } from '@openchamber/sdk/ui';
 import { injectGuestDocumentStyles } from './html-styles.js';
 import { registerGuestRoutes } from './routes.js';
@@ -40,8 +40,8 @@ describe('guest document styles', () => {
     const meta = '<meta name="color-scheme" content="light dark">';
     expect(decorated.startsWith(`<!doctype html>${meta}${html.slice('<!doctype html>'.length)}`)).toBe(true);
     expect(decorated).toContain(GUEST_SCROLLBAR_CSS);
+    expect(decorated).not.toContain('data-openchamber-guest-scrollbar');
     expect(decorated).toContain('data-openchamber-guest-styles');
-    expect(decorated).toContain(`<script data-openchamber-guest-scrollbar>${GUEST_SCROLLBAR_SCRIPT}</script>`);
   });
 
   test('declares the color scheme before any authored content', () => {
@@ -72,7 +72,6 @@ describe('guest document styles', () => {
       expect(response.headers['access-control-allow-origin']).toBe('null');
       expect(response.headers['cache-control']).toBe('no-store');
       expect(response.text).toContain(GUEST_SCROLLBAR_CSS);
-      expect(response.text).toContain(GUEST_SCROLLBAR_SCRIPT);
       // The kit's look follows this app, after the authored document so it outranks the bundle's own copy.
       expect(response.text.indexOf(GUEST_UI_LOOK_CSS)).toBeGreaterThan(response.text.indexOf('</html>'));
       expect(response.text.startsWith('<!doctype html>')).toBe(true);

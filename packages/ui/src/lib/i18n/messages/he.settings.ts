@@ -59,8 +59,6 @@ export const settingsDict = {
   'settings.themeImport.error.connection': 'השרת המחובר השתנה. ערכת הנושא לא הוחלה.',
   'settings.themeImport.error.unsupported': 'ייבוא ערכות נושא אינו זמין ב-VS Code.',
   'settings.themeImport.error.conflict': 'ערכת הנושא המיובאת הזו נערכה בשרת. היא לא נדרסה.',
-  'settings.openchamber.visual.field.alwaysShowScrollbars': 'הצג תמיד פסי גלילה',
-  'settings.openchamber.visual.field.alwaysShowScrollbarsHint': 'פסי הגלילה יישארו גלויים גם כשהסמן מחוץ לאזור הנגלל. חל על המכשיר הזה בלבד.',
   'settings.providers.page.openCodeGo.title': 'מעקב שימוש ב-OpenCode Go',
   'settings.providers.page.openCodeGo.description': 'חיבור לוח הבקרה של OpenCode Go כדי להציג מכסה מתגלגלת, שבועית וחודשית.',
   'settings.providers.page.openCodeGo.workspaceId': 'מזהה סביבת עבודה',

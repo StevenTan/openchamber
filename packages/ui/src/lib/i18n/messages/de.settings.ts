@@ -59,8 +59,6 @@ export const settingsDict = {
   'settings.themeImport.error.connection': 'Der verbundene Server hat sich geändert. Das Theme wurde nicht angewendet.',
   'settings.themeImport.error.unsupported': 'Der Theme-Import ist in VS Code nicht verfügbar.',
   'settings.themeImport.error.conflict': 'Dieses importierte Theme wurde auf dem Server bearbeitet. Es wurde nicht überschrieben.',
-  'settings.openchamber.visual.field.alwaysShowScrollbars': 'Bildlaufleisten immer anzeigen',
-  'settings.openchamber.visual.field.alwaysShowScrollbarsHint': 'Bildlaufleisten bleiben sichtbar, auch wenn sich der Mauszeiger außerhalb des scrollbaren Bereichs befindet. Gilt nur auf diesem Gerät.',
   'settings.providers.page.openCodeGo.title': 'OpenCode Go Nutzungsverfolgung',
   'settings.providers.page.openCodeGo.description': 'Verbinden Sie das OpenCode Go Dashboard, um rollierenden, wöchentlichen und monatlichen Verbrauch anzuzeigen.',
   'settings.providers.page.openCodeGo.workspaceId': 'Workspace-ID',

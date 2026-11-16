@@ -4,7 +4,6 @@ import { Dialog as BaseDialog } from "@base-ui/react/dialog"
 import { cn } from "@/lib/utils"
 import { useI18n } from '@/lib/i18n'
 import { Icon } from "@/components/icon/Icon";
-import { PopupOverlayScrollbar } from "@/components/ui/AttachedOverlayScrollbar";
 import { DockedPanelSurfaceContext } from "@/hooks/usePageColors";
 import { useDeviceInfo, useTabletLayout } from "@/lib/device";
 
@@ -104,10 +103,8 @@ function DialogContent({
   const heldToTop = layerClassName?.includes('items-start') ?? false
   const bottomSheet = isMobile && !tabletLayout && !heldToTop
   const popupRef = React.useRef<HTMLDivElement | null>(null)
-  const [popup, setPopup] = React.useState<HTMLDivElement | null>(null)
   const setPopupRef = React.useCallback((node: HTMLDivElement | null) => {
     popupRef.current = node
-    setPopup(node)
     if (typeof ref === "function") ref(node)
     else if (ref) ref.current = node
   }, [ref])
@@ -166,7 +163,6 @@ function DialogContent({
           </BaseDialog.Close>
         )}
         </BaseDialog.Popup>
-        <PopupOverlayScrollbar scroller={popup} />
       </div>
     </DialogPortal>
   )

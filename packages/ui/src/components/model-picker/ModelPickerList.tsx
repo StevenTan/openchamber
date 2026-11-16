@@ -929,7 +929,7 @@ export const ModelPickerList: React.FC<ModelPickerListProps> = ({
   const blockStickyFadeInteraction = React.useCallback((
     event: React.MouseEvent<HTMLDivElement> | React.PointerEvent<HTMLDivElement>,
   ) => {
-    if ((event.target as Element).closest('[data-overlay-scrollbar-thumb], [data-model-picker-sticky-header]')) return;
+    if ((event.target as Element).closest('[data-model-picker-sticky-header]')) return;
     // Enter or Space on a focused button clicks with no pointer position (detail 0,
     // coordinates 0), which would otherwise read as a click on the fade.
     if (event.type === 'click' && event.detail === 0) return;

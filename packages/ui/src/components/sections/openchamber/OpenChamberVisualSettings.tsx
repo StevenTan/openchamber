@@ -127,7 +127,7 @@ const WEEK_START_OPTIONS: Option<'auto' | 'monday' | 'sunday'>[] = [
     },
 ];
 
-type VisibleSetting = 'theme' | 'windowControlsPosition' | 'pwaInstallName' | 'pwaOrientation' | 'mobileKeyboardMode' | 'timeFormat' | 'weekStart' | 'fontSize' | 'editorFontSize' | 'spacing' | 'scrollbars' | 'inputBarOffset' | 'animatedActivityIndicators';
+type VisibleSetting = 'theme' | 'windowControlsPosition' | 'pwaInstallName' | 'pwaOrientation' | 'mobileKeyboardMode' | 'timeFormat' | 'weekStart' | 'fontSize' | 'editorFontSize' | 'spacing' | 'inputBarOffset' | 'animatedActivityIndicators';
 
 const WINDOW_CONTROLS_POSITION_OPTIONS: Array<{ id: DesktopWindowControlsPosition; labelKey: string }> = [
     { id: 'left', labelKey: 'settings.openchamber.desktopNetwork.option.windowControlsLeft' },
@@ -162,10 +162,8 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
     const setTimeFormatPreference = useUIStore(state => state.setTimeFormatPreference);
     const weekStartPreference = useUIStore(state => state.weekStartPreference);
     const setWeekStartPreference = useUIStore(state => state.setWeekStartPreference);
-    const alwaysShowScrollbars = useUIStore(state => state.alwaysShowScrollbars === true);
     const customCssEnabled = useUIStore(state => state.customCssEnabled);
     const setCustomCssEnabled = useUIStore(state => state.setCustomCssEnabled);
-    const setAlwaysShowScrollbars = useUIStore(state => state.setAlwaysShowScrollbars);
     const showWindowControlsPosition = usesFramelessElectronChrome();
     const desktopWindowControlsPosition = useUIStore((state) => state.desktopWindowControlsPosition);
     const setDesktopWindowControlsPosition = useUIStore((state) => state.setDesktopWindowControlsPosition);
@@ -211,7 +209,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
     const hasThemeSettings = shouldShow('theme') && !isVSCode;
     const showWindowControlsPositionSetting = shouldShow('windowControlsPosition') && showWindowControlsPosition;
     const hasLocalizationSettings = shouldShow('theme') || shouldShow('timeFormat') || shouldShow('weekStart');
-    const hasLayoutSettings = shouldShow('fontSize') || shouldShow('editorFontSize') || shouldShow('spacing') || (shouldShow('scrollbars') && !hasThemeSettings) || (shouldShow('inputBarOffset') && isMobile);
+    const hasLayoutSettings = shouldShow('fontSize') || shouldShow('editorFontSize') || shouldShow('spacing') || (shouldShow('inputBarOffset') && isMobile);
     const showPwaInstallNameSetting = shouldShow('pwaInstallName') && isWebRuntime() && browserTab && !isDesktopShell() && !isVSCode;
     const showPwaOrientationSetting = shouldShow('pwaOrientation') && isWebRuntime() && !isDesktopShell() && !isVSCode;
     const showMobileKeyboardModeSetting = shouldShow('mobileKeyboardMode') && isWebRuntime() && !isDesktopShell() && !isVSCode && supportsMobileKeyboardResizeContent();
@@ -331,18 +329,6 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
         };
     }, [setMobileKeyboardMode, showMobileKeyboardModeSetting, showPwaInstallNameSetting, showPwaOrientationSetting]);
 
-    // General's "Panels and links" holds this checkbox; VS Code has no such
-    // section, so there it stays with the layout settings here.
-    const scrollbarSetting = shouldShow('scrollbars') && !hasThemeSettings ? (
-        <SettingsCheckboxRow
-            checked={alwaysShowScrollbars}
-            onChange={setAlwaysShowScrollbars}
-            label={t('settings.openchamber.visual.field.alwaysShowScrollbars')}
-            info={t('settings.openchamber.visual.field.alwaysShowScrollbarsHint')}
-            settingsItem="appearance.scrollbars-vscode"
-        />
-    ) : null;
-
     return (
         <>
                 {/* By what people come for: the theme, type and density, language,
@@ -434,7 +420,6 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                 )}
                             </SettingsTwoColumn>
                         ) : null}
-                        {scrollbarSetting}
                     </SettingsSection>
                 )}
 

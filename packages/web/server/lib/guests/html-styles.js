@@ -1,4 +1,4 @@
-import { GUEST_SCROLLBAR_CSS, GUEST_SCROLLBAR_SCRIPT } from '@openchamber/sdk';
+import { GUEST_SCROLLBAR_CSS } from '@openchamber/sdk';
 import { GUEST_UI_LOOK_CSS } from '@openchamber/sdk/ui';
 
 // The panel iframe inherits the host's dark color scheme, and a document that
@@ -16,10 +16,8 @@ const declareColorScheme = (html) => {
 
 /** Append instead of matching tags inside untrusted comments, scripts, or templates (the one
  * exception is the color-scheme meta, placed after a leading doctype; see above).
- * Browsers accept the style and script after the document; its doctype and authored CSP stay intact.
- * The script only marks scrolling elements so their scrollbars show while scrolling; an authored
- * CSP that blocks inline scripts leaves the hover-only behavior of the stylesheet.
+ * Browsers accept the style after the document; its doctype and authored CSP stay intact.
  * The UI kit's look (colours, radii, states) comes from this app's SDK: appended after the document, it follows the
  * kit's own style element in the head and wins over the copy an installed bundle was built with. Sizes stay the bundle's.
  */
-export const injectGuestDocumentStyles = (html) => `${declareColorScheme(html)}\n<style data-openchamber-guest-styles>${GUEST_SCROLLBAR_CSS}${GUEST_UI_LOOK_CSS}</style>\n<script data-openchamber-guest-scrollbar>${GUEST_SCROLLBAR_SCRIPT}</script>`;
+export const injectGuestDocumentStyles = (html) => `${declareColorScheme(html)}\n<style data-openchamber-guest-styles>${GUEST_SCROLLBAR_CSS}${GUEST_UI_LOOK_CSS}</style>`;

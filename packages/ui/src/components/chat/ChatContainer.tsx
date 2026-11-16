@@ -81,7 +81,6 @@ import { useDeviceInfo } from '@/lib/device';
 import { Button } from '@/components/ui/button';
 import { StopIcon } from '@/components/icons/StopIcon';
 import { abortCurrentOperation } from '@/sync/session-actions';
-import { OverlayScrollbar } from '@/components/ui/OverlayScrollbar';
 import { Icon } from "@/components/icon/Icon";
 import { cn, formatDirectoryName } from '@/lib/utils';
 import { useWaitingBlink } from '@/hooks/useDurationTicker';
@@ -260,13 +259,10 @@ type ChatViewportProps = {
         fallbackTimestamp?: number;
     } | null;
     scrollToBottom: () => void;
-    /** A drag on the overlay scrollbar's thumb takes the scroll from auto-follow. */
-    onScrollbarDrag: () => void;
     endPinningReleased: boolean;
     /** The user waited for this session (held or fetched); reveal it with a fade. */
     revealWaited: boolean;
     revealGate: TimelineRevealGate;
-    isProgrammaticFollowActive: boolean;
     showLoadOlderButton: boolean;
     onLoadOlder: () => void;
     turnIds: string[];
@@ -307,11 +303,9 @@ const ChatViewport = React.memo(({
     activeStreamingPhase,
     retryOverlay,
     scrollToBottom,
-    onScrollbarDrag,
     endPinningReleased,
     revealWaited,
     revealGate,
-    isProgrammaticFollowActive,
     showLoadOlderButton,
     onLoadOlder,
     turnIds,
@@ -630,14 +624,6 @@ const ChatViewport = React.memo(({
                         className="chat-scroll-fade chat-scroll-fade--end"
                         style={endFadeStyle}
                     />
-                    <OverlayScrollbar
-                        containerRef={scrollRef}
-                        disableHorizontal
-                        suppressVisibility={isProgrammaticFollowActive}
-                        userIntentOnly
-                        observeMutations={false}
-                        onThumbDragStart={onScrollbarDrag}
-                    />
                     {/* From three turns: with one or two its mark read as a stray dash. */}
                     {showPromptNavigator && promptTurnIds.length >= 3 ? (
                         <PromptNavigatorRail
@@ -674,12 +660,10 @@ const ChatViewport = React.memo(({
         && prev.activeStreamingPhase === next.activeStreamingPhase
         && prev.retryOverlay === next.retryOverlay
         && prev.scrollToBottom === next.scrollToBottom
-        && prev.onScrollbarDrag === next.onScrollbarDrag
         && prev.onListMetricsChange === next.onListMetricsChange
         && prev.endPinningReleased === next.endPinningReleased
         && prev.revealWaited === next.revealWaited
         && prev.revealGate === next.revealGate
-        && prev.isProgrammaticFollowActive === next.isProgrammaticFollowActive
         && prev.showLoadOlderButton === next.showLoadOlderButton
         && prev.onLoadOlder === next.onLoadOlder
         && prev.turnIds === next.turnIds
@@ -1959,11 +1943,9 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
             activeStreamingPhase={activeStreamingPhase}
             retryOverlay={retryOverlay}
             scrollToBottom={resumeToLatestInstant}
-            onScrollbarDrag={onManualNavigation}
             endPinningReleased={userOwnsScroll}
             revealWaited={revealWaited}
             revealGate={revealGate}
-            isProgrammaticFollowActive={isFollowingProgrammatically}
             showLoadOlderButton={showLoadOlderButton}
             onLoadOlder={handleLoadOlderClick}
             turnIds={timelineController.turnIds}

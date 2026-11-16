@@ -67,8 +67,7 @@ This folder owns runtime-independent controls and their Base UI integration, inc
 - `Textarea` offers emoji on `:` in both modes (`components/emoji/`, placed by `components/inline-picker/`); its forwarded ref is the textarea element itself.
 - A bottom sheet's list is built from `MobileSheetList`: `MobileSheetRow` for every option and action, `MobileSheetSection` for its captions, and `MobileSheetSearch` in `MobileOverlayPanel`'s `subheader`, so the field stays put while the list scrolls. The chosen row takes the selection fill and a check. The model sheet draws its own rows to the same measures, because its list is virtual.
 - On a phone `DialogContent` is a bottom sheet: `mobile.css` shapes every dialog through `data-slot`, so callers keep one markup for desktop and phone, and the layer's keyboard rider follows the whole keyboard. Tablet layouts and a dialog with `items-start` on its layer keep their centred window.
-- Every scroller a user sees draws the app's overlay scrollbar, never the native one: `ScrollableOverlay` for a scroller the caller renders, `AttachedOverlayScrollbar` for one a library creates (CodeMirror's `.cm-scroller`), `PopupOverlayScrollbar` for a popup that scrolls itself (`DialogContent`, `DropdownMenuContent`, `ContextMenuContent`, the framed `Textarea`). A new `overflow-auto` element goes through one of them. Only fallback screens after a crash keep the native bar, so they depend on nothing that may have failed.
-- `OverlayScrollbar` draws a thumb only on an axis whose computed overflow is `auto` or `scroll`: a scroller its owner switched to `hidden`, or a menu left at `visible`, overflows without scrolling and shows none.
+- Scroll containers use browser-native scrollbars with thin, theme-aware thumbs. The operating system controls their visibility and interaction. `ScrollableOverlay` owns the flex frame, scroll element and optional edge shadows; library-owned scrollers, popups and textareas keep their own native scrollbars.
 
 - Text controls keep their size floor and fit the current line height and
   font-relative vertical padding. Explicit square button sizes stay fixed.
@@ -127,9 +126,6 @@ has to be hidden: the session caches mark the hits they know, and the rest
 are listed without the tag. Hiding them, as an active-only request once
 required, would drop every hit from a session the caches have not loaded.
 
-### Why a scrolling popup gets a sibling frame and not a wrapper
-
-A dialog window and a menu are their own scroll containers: Base UI renders the popup, and callers size, pad and lay it out through its `className`. A thumb placed inside it would scroll away with the content, and wrapping the content in `ScrollableOverlay` would move every caller's padding, gap and overflow classes onto a new element. `PopupOverlayScrollbar` instead renders next to the popup in the same positioned parent and keeps a frame on the popup's `offsetTop/Left/Width/Height`. Offsets ignore the open and close scale, so the frame lands where the popup comes to rest; client rects read during the opening animation were 2% small.
 
 ### Why the height morph watches content and leaves the position to Base UI
 

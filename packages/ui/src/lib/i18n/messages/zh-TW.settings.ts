@@ -59,8 +59,6 @@ export const settingsDict = {
   'settings.themeImport.error.connection': '連線的伺服器已變更。未套用主題。',
   'settings.themeImport.error.unsupported': 'VS Code 中不支援匯入主題。',
   'settings.themeImport.error.conflict': '此匯入的主題已在伺服器上被編輯，未覆寫原檔案。',
-  'settings.openchamber.visual.field.alwaysShowScrollbars': '一律顯示捲軸',
-  'settings.openchamber.visual.field.alwaysShowScrollbarsHint': '即使指標位於可捲動區域之外，也保持捲軸可見。僅在此裝置上生效。',
   'settings.providers.page.openCodeGo.title': 'OpenCode Go 用量追蹤',
   'settings.providers.page.openCodeGo.description': '連接 OpenCode Go 控制面板以顯示滾動、每週和每月配額。',
   'settings.providers.page.openCodeGo.workspaceId': '工作區 ID',

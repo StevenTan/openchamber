@@ -51,7 +51,6 @@ import type { OpenChamberSection } from '@/components/sections/openchamber/types
 import { OpenChamberPage } from '@/components/sections/openchamber/OpenChamberPage';
 import { AboutSettings } from '@/components/sections/openchamber/AboutSettings';
 import { SettingsPageLayout } from '@/components/sections/shared/SettingsPageLayout';
-import { SettingsScrollbarTopClearanceContext } from '@/components/sections/shared/settingsScrollbarClearance';
 import {
   SETTINGS_SECTION_TITLE_CLASS,
   SettingsAvailabilityProvider,
@@ -81,7 +80,6 @@ import { MOBILE_HEADER_BUTTON_CLASS, MOBILE_HEADER_CLASS, MOBILE_HEADER_TITLE_CL
 // UI Kit: fixed split-page sidebar width
 const SETTINGS_SPLIT_SIDEBAR_WIDTH = 280;
 // The desktop close button: top-1 offset plus its h-7 height.
-const SETTINGS_CLOSE_BUTTON_CLEARANCE = 32;
 const SETTINGS_DETAIL_HISTORY_KEY = '__openchamberSettingsDetail';
 /** Pages that show one tab at a time (Chat, the Appearance theme list): open the one that holds the item. */
 const openSettingsTabFor = (itemId: string): void => {
@@ -1071,14 +1069,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
       return null;
     }
 
-    // The floating close button sits over the content's top-right corner, so
-    // the content scrollbar starts below it.
-    const scrollbarTopClearance = onClose ? SETTINGS_CLOSE_BUTTON_CLEARANCE : 0;
-    const content = (
-      <SettingsScrollbarTopClearanceContext.Provider value={scrollbarTopClearance}>
-        <ErrorBoundary>{renderPageContent(settingsSlug)}</ErrorBoundary>
-      </SettingsScrollbarTopClearanceContext.Provider>
-    );
+    const content = <ErrorBoundary>{renderPageContent(settingsSlug)}</ErrorBoundary>;
 
     if (activePageMeta.kind === 'split') {
       return (
@@ -1086,7 +1077,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
           <div className={cn('border-e', runtimeCtx.isVSCode ? 'bg-background' : 'bg-sidebar')} style={{ width: SETTINGS_SPLIT_SIDEBAR_WIDTH, minWidth: SETTINGS_SPLIT_SIDEBAR_WIDTH, borderColor: 'var(--interactive-border)' }}>
             <ErrorBoundary>{renderPageSidebar(settingsSlug, {})}</ErrorBoundary>
           </div>
-          <ScrollableOverlay outerClassName="flex-1 min-h-0" className="bg-background" disableHorizontal verticalTrackStart={scrollbarTopClearance}>
+          <ScrollableOverlay outerClassName="flex-1 min-h-0" className="bg-background" disableHorizontal>
             {content}
           </ScrollableOverlay>
         </div>
@@ -1094,7 +1085,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
     }
 
     return (
-      <ScrollableOverlay outerClassName="h-full min-h-0" className="bg-background" disableHorizontal verticalTrackStart={scrollbarTopClearance}>
+      <ScrollableOverlay outerClassName="h-full min-h-0" className="bg-background" disableHorizontal>
         {content}
       </ScrollableOverlay>
     );
@@ -1164,7 +1155,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
           )}
 
       {onClose && (
-        <div className={cn('absolute inset-e-0.5 z-50', isWindowed ? 'top-0.5' : 'top-1')}>
+        <div className={cn('absolute inset-e-4 z-50', isWindowed ? 'top-0.5' : 'top-1')}>
           <button
             type="button"
             onClick={onClose}

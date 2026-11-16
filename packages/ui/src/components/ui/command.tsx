@@ -58,17 +58,15 @@ CommandInput.displayName = "CommandInput"
 function CommandList({
   className,
   children,
-  scrollbarClassName,
   disableHorizontal,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.List> & { scrollbarClassName?: string; disableHorizontal?: boolean }) {
+}: React.ComponentProps<typeof CommandPrimitive.List> & { disableHorizontal?: boolean }) {
   return (
     <ScrollableOverlay
       as={CommandPrimitive.List}
       data-slot="command-list"
       outerClassName="max-h-[min(600px,calc(100vh-10rem))] overflow-x-hidden p-0 w-full h-full min-h-0"
       className={cn("scroll-py-1 overflow-x-hidden h-full min-h-0", className)}
-      scrollbarClassName={scrollbarClassName ?? "overlay-scrollbar--flush overlay-scrollbar--dense overlay-scrollbar--zero"}
       disableHorizontal={disableHorizontal ?? true}
       {...props}
     >

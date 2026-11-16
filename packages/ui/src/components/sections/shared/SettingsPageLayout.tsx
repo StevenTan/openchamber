@@ -5,7 +5,6 @@ import { useDeviceInfo } from '@/lib/device';
 import { useI18n } from '@/lib/i18n';
 import { getSettingsSaveState, subscribeToSettingsSaveState } from '@/lib/persistence';
 import { cn } from '@/lib/utils';
-import { SettingsScrollbarTopClearanceContext } from '@/components/sections/shared/settingsScrollbarClearance';
 import {
   SETTINGS_DESCRIPTION_CLASS,
   SETTINGS_PAGE_TITLE_CLASS,
@@ -66,7 +65,6 @@ export const SettingsPageLayout: React.FC<SettingsPageLayoutProps> = ({
   onBlurCapture,
   fillHeight = false,
 }) => {
-  const scrollbarTopClearance = React.useContext(SettingsScrollbarTopClearanceContext);
   // The phone's header row already names the page. The heading stays for
   // screen readers and as the focus target of a page that opens.
   const { isMobile } = useDeviceInfo();
@@ -78,7 +76,6 @@ export const SettingsPageLayout: React.FC<SettingsPageLayoutProps> = ({
     <ScrollableOverlay
       outerClassName={cn('h-full', outerClassName)}
       className={cn('w-full @container', fillHeight && 'flex flex-col')}
-      verticalTrackStart={scrollbarTopClearance}
     >
       <div
         className={cn(

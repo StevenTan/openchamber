@@ -59,8 +59,6 @@ export const settingsDict = {
   'settings.themeImport.error.connection': '连接的服务器已更改。未应用主题。',
   'settings.themeImport.error.unsupported': 'VS Code 中不支持导入主题。',
   'settings.themeImport.error.conflict': '此导入的主题已在服务器上被编辑，未覆盖原文件。',
-  'settings.openchamber.visual.field.alwaysShowScrollbars': '始终显示滚动条',
-  'settings.openchamber.visual.field.alwaysShowScrollbarsHint': '即使指针位于可滚动区域之外，也保持滚动条可见。仅在此设备上生效。',
   'settings.providers.page.openCodeGo.title': 'OpenCode Go 用量跟踪',
   'settings.providers.page.openCodeGo.description': '连接 OpenCode Go 控制面板以显示滚动、每周和每月配额。',
   'settings.providers.page.openCodeGo.workspaceId': '工作区 ID',

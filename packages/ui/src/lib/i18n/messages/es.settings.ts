@@ -59,8 +59,6 @@ export const settingsDict = {
   'settings.themeImport.error.connection': 'El servidor conectado ha cambiado. No se aplicó el tema.',
   'settings.themeImport.error.unsupported': 'La importación de temas no está disponible en VS Code.',
   'settings.themeImport.error.conflict': 'Este tema importado se modificó en el servidor. No se sobrescribió.',
-  'settings.openchamber.visual.field.alwaysShowScrollbars': 'Mostrar siempre las barras de desplazamiento',
-  'settings.openchamber.visual.field.alwaysShowScrollbarsHint': 'Mantén las barras de desplazamiento visibles incluso cuando el puntero esté fuera del área desplazable. Solo se aplica en este dispositivo.',
   'settings.providers.page.openCodeGo.title': 'Seguimiento de uso de OpenCode Go',
   'settings.providers.page.openCodeGo.description': 'Conecta el panel de OpenCode Go para ver las cuotas móvil, semanal y mensual.',
   'settings.providers.page.openCodeGo.workspaceId': 'ID del espacio de trabajo',

@@ -1114,7 +1114,6 @@ interface UIStore {
   notifyOnSubtasks: boolean;
   // Desktop dock badge showing the count of sessions with unseen activity (macOS).
   dockBadgeEnabled: boolean;
-  alwaysShowScrollbars: boolean;
   customCssEnabled: boolean;
 
   // Event toggles (which events trigger notifications)
@@ -1453,7 +1452,6 @@ interface UIStore {
   setSessionTabsPerWorkspace: (value: boolean) => void;
   setNotifyOnSubtasks: (value: boolean) => void;
   setDockBadgeEnabled: (value: boolean) => void;
-  setAlwaysShowScrollbars: (value: boolean) => void;
   setCustomCssEnabled: (value: boolean) => void;
   setNotifyOnCompletion: (value: boolean) => void;
   setNotifyOnPullRequests: (value: boolean) => void;
@@ -1711,7 +1709,6 @@ export const useUIStore = create<UIStore>()(
         notificationMode: 'hidden-only',
         notifyOnSubtasks: true,
         dockBadgeEnabled: true,
-        alwaysShowScrollbars: false,
         customCssEnabled: true,
 
         // Event toggles (which events trigger notifications)
@@ -3371,9 +3368,6 @@ export const useUIStore = create<UIStore>()(
         setDockBadgeEnabled: (value) => {
           set({ dockBadgeEnabled: value });
         },
-        setAlwaysShowScrollbars: (value) => {
-          set({ alwaysShowScrollbars: value });
-        },
         setCustomCssEnabled: (value) => {
           set({ customCssEnabled: value });
         },
@@ -4031,7 +4025,6 @@ export const useUIStore = create<UIStore>()(
           sessionTabsPerWorkspace: state.sessionTabsPerWorkspace,
           notifyOnSubtasks: state.notifyOnSubtasks,
           dockBadgeEnabled: state.dockBadgeEnabled,
-          alwaysShowScrollbars: state.alwaysShowScrollbars,
           customCssEnabled: state.customCssEnabled,
           notifyOnCompletion: state.notifyOnCompletion,
           notifyOnPullRequests: state.notifyOnPullRequests,

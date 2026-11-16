@@ -405,7 +405,7 @@ export const IntegrateCommitsSection: React.FC<{
                   />
                   <CommandList
                     className="h-full min-h-0"
-                    scrollbarClassName="overlay-scrollbar--flush overlay-scrollbar--dense overlay-scrollbar--zero"
+
                     disableHorizontal
                   >
                     <CommandEmpty>{t('gitView.branch.empty')}</CommandEmpty>

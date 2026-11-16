@@ -123,23 +123,6 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     isAvailable: (ctx) => ctx.isMac,
   },
   {
-    id: 'appearance.scrollbars',
-    page: 'general',
-    titleKey: 'settings.openchamber.visual.field.alwaysShowScrollbars',
-    descriptionKey: 'settings.openchamber.visual.field.alwaysShowScrollbarsHint',
-    keywords: ['scrollbar', 'scrollbars', 'scroll', 'mouse', 'wheel', 'accessibility', 'always visible'],
-    isAvailable: (ctx) => !ctx.isVSCode,
-  },
-  {
-    // VS Code has no Panels section in General, so the checkbox stays on Appearance there.
-    id: 'appearance.scrollbars-vscode',
-    page: 'appearance',
-    titleKey: 'settings.openchamber.visual.field.alwaysShowScrollbars',
-    descriptionKey: 'settings.openchamber.visual.field.alwaysShowScrollbarsHint',
-    keywords: ['scrollbar', 'scrollbars', 'scroll', 'mouse', 'wheel', 'accessibility', 'always visible'],
-    isAvailable: (ctx) => ctx.isVSCode,
-  },
-  {
     id: 'appearance.pwa-install-name',
     page: 'appearance',
     titleKey: 'settings.openchamber.visual.field.installAppName',

@@ -59,8 +59,6 @@ export const settingsDict = {
   'settings.themeImport.error.connection': 'The connected server changed. The theme was not applied.',
   'settings.themeImport.error.unsupported': 'Theme import is not available in VS Code.',
   'settings.themeImport.error.conflict': 'This imported theme was edited on the server. It was not overwritten.',
-  'settings.openchamber.visual.field.alwaysShowScrollbars': 'Always show scrollbars',
-  'settings.openchamber.visual.field.alwaysShowScrollbarsHint': 'Keep scrollbars visible even when the pointer is outside the scrollable area. Applies on this device only.',
   'settings.providers.page.openCodeGo.title': 'OpenCode Go usage tracking',
   'settings.providers.page.openCodeGo.description': 'Connect the OpenCode Go dashboard to show rolling, weekly, and monthly quota.',
   'settings.providers.page.openCodeGo.workspaceId': 'Workspace ID',

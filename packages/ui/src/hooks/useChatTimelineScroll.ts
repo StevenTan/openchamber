@@ -389,8 +389,7 @@ export const useChatTimelineScroll = ({
     // it may load older pages without disturbing the read position.
     const [isPinned, setIsPinned] = React.useState(true);
     const [isFollowingProgrammatically, setIsFollowingProgrammatically] = React.useState(false);
-    // True after a real gesture until an explicit opt back in; drives the
-    // overlay scrollbar suppression instead of the anchor's mere existence.
+    // True after a real gesture until an explicit opt back in.
     const [userOwnsScroll, setUserOwnsScroll] = React.useState(false);
     const [nearContentStart, setNearContentStart] = React.useState(true);
     const userOwnsScrollRef = React.useRef(userOwnsScroll);
@@ -1825,8 +1824,7 @@ export const useChatTimelineScroll = ({
         };
     }, [scrollNode]);
 
-    // Suppress the overlay scrollbar thumb while automatic movement owns the
-    // scroll position, so it does not jump on each correction.
+    // The live tail follows only while automatic movement owns the viewport.
     React.useEffect(() => {
         setIsFollowingProgrammatically(!showScrollButton && !userOwnsScroll);
     }, [showScrollButton, userOwnsScroll]);

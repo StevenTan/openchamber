@@ -106,22 +106,6 @@ describe('settings search', () => {
     }
   });
 
-  test('finds the scrollbar preference on every surface', () => {
-    for (const context of [runtimeCtx, { ...runtimeCtx, isDesktop: true }, { ...runtimeCtx, isVSCode: true }, { ...runtimeCtx, isMobile: true }]) {
-      const results = buildSettingsSearchResults({
-        query: 'scrollbar',
-        runtimeCtx: context,
-        t,
-        getPageTitle: (page) => page,
-      });
-      // General's Panels section holds it; VS Code has no such section and keeps it on Appearance.
-      const expected = context.isVSCode
-        ? { id: 'appearance.scrollbars-vscode', page: 'appearance' }
-        : { id: 'appearance.scrollbars', page: 'general' };
-      expect(results.find((result) => result.id === expected.id)?.page).toBe(expected.page);
-    }
-  });
-
   test('finds the provider logo wherever it can be uploaded', () => {
     for (const context of [runtimeCtx, { ...runtimeCtx, isDesktop: true }, { ...runtimeCtx, isMobile: true }, { ...runtimeCtx, isVSCode: true }]) {
       const results = buildSettingsSearchResults({

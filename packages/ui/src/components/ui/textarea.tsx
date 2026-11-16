@@ -3,12 +3,10 @@ import * as React from "react"
 import { useEmojiPicker } from "@/components/emoji/useEmojiPicker"
 import { useI18n } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
-import { PopupOverlayScrollbar } from "./AttachedOverlayScrollbar"
 import { ScrollableOverlay } from "./ScrollableOverlay"
 
 type TextareaProps = React.ComponentProps<"textarea"> & {
   outerClassName?: string;
-  scrollbarClassName?: string;
   fillContainer?: boolean;
   useScrollShadow?: boolean;
   scrollShadowSize?: number;
@@ -80,7 +78,6 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
     {
       className,
       outerClassName,
-      scrollbarClassName,
       fillContainer = false,
       useScrollShadow = false,
       scrollShadowSize,
@@ -98,11 +95,6 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
     const wrapperRef = React.useRef<HTMLDivElement>(null);
     // Every text field offers emoji on `:`; the caller's ref sees the same element.
     const fieldRef = React.useRef<HTMLTextAreaElement | null>(null);
-    const [field, setField] = React.useState<HTMLTextAreaElement | null>(null);
-    const setFieldRef = React.useCallback((node: HTMLTextAreaElement | null) => {
-      fieldRef.current = node;
-      setField(node);
-    }, []);
     React.useImperativeHandle<HTMLTextAreaElement | null, HTMLTextAreaElement | null>(ref, () => fieldRef.current);
     const emojiPicker = useEmojiPicker(fieldRef);
     const dragStateRef = React.useRef<{ startY: number; startHeight: number; minHeight: number } | null>(null);
@@ -198,7 +190,6 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
             useScrollShadow={useScrollShadow}
             scrollShadowSize={scrollShadowSize}
             outerClassName={outerClassName}
-            scrollbarClassName={scrollbarClassName}
             className={cn(
               "block w-full appearance-none resize-none bg-transparent text-foreground typography-markdown outline-none",
               "px-3 py-2 md:typography-ui-label",
@@ -243,7 +234,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
       >
         <div className="flex h-full min-h-0 flex-1 flex-col gap-2">
           <textarea
-              ref={setFieldRef}
+              ref={fieldRef}
               className={cn(
                 "overlay-scrollbar-target block w-full flex-1 min-h-0 appearance-none resize-none bg-transparent text-foreground typography-markdown outline-none",
                 "min-h-[82px] ps-3 pe-2.5 pt-2.5 md:typography-ui-label",
@@ -268,7 +259,6 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
             <ResizeHandle onResizeStart={handleResizeStart} ariaLabel={t('textarea.resizeHandleAria')} />
           </div>
         </div>
-        <PopupOverlayScrollbar scroller={field} disableHorizontal />
         {emojiPicker}
       </div>
     )

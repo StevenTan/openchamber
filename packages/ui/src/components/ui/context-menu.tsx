@@ -10,7 +10,6 @@ import {
 } from "./dropdown-menu.styles";
 import { Icon } from "@/components/icon/Icon";
 import { GlassRedrawGuard } from "./glass-redraw-guard"
-import { PopupOverlayScrollbar } from "./AttachedOverlayScrollbar";
 import { handleDropdownNavigationKey } from "./dropdown-navigation";
 import { useMenuWindowDismiss } from "./menu-window-dismiss";
 import { openContextMenuFromKeyboard } from "./contextMenuKeyboard";
@@ -55,7 +54,6 @@ type ContentProps = {
 } & Omit<React.ComponentProps<typeof BaseContextMenu.Popup>, "ref">;
 
 function ContextMenuContent({ className, positionerClassName, children, style, onKeyDown, ...props }: ContentProps) {
-  const [popup, setPopup] = React.useState<HTMLDivElement | null>(null);
   const handleKeyDown: NonNullable<React.ComponentProps<typeof BaseContextMenu.Popup>["onKeyDown"]> = (event) => {
     onKeyDown?.(event);
     handleDropdownNavigationKey(event, (navigationKey) => {
@@ -71,7 +69,6 @@ function ContextMenuContent({ className, positionerClassName, children, style, o
     <BaseContextMenu.Portal>
       <BaseContextMenu.Positioner className={cn("app-region-no-drag z-50", positionerClassName)}>
         <BaseContextMenu.Popup
-          ref={setPopup}
           data-slot="dropdown-menu-content"
           style={{
             color: "var(--surface-elevated-foreground)",
@@ -84,9 +81,6 @@ function ContextMenuContent({ className, positionerClassName, children, style, o
           {children}
           <GlassRedrawGuard />
         </BaseContextMenu.Popup>
-        {/* A menu scrolls only where its caller gave it overflow; the thumb
-            shows only then. */}
-        <PopupOverlayScrollbar scroller={popup} />
       </BaseContextMenu.Positioner>
     </BaseContextMenu.Portal>
   );

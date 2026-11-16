@@ -749,7 +749,6 @@ export const LOCAL_DEVICE_KEYS = [
   'diffFileTreeWidth',
   'showTerminalQuickKeysOnDesktop',
   'dockBadgeEnabled',
-  'alwaysShowScrollbars',
   'agentMemoryViewedAt',
   'appZoom',
 ] as const;

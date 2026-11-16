@@ -59,8 +59,6 @@ export const settingsDict = {
   'settings.themeImport.error.connection': 'Підключений сервер змінився. Тему не застосовано.',
   'settings.themeImport.error.unsupported': 'Імпорт тем недоступний у VS Code.',
   'settings.themeImport.error.conflict': 'Цю імпортовану тему було змінено на сервері. Її не перезаписано.',
-  'settings.openchamber.visual.field.alwaysShowScrollbars': 'Завжди показувати смуги прокручування',
-  'settings.openchamber.visual.field.alwaysShowScrollbarsHint': 'Залишати смуги прокручування видимими, навіть коли курсор поза областю прокручування. Лише на цьому пристрої.',
   'settings.providers.page.openCodeGo.title': 'Відстеження використання OpenCode Go',
   'settings.providers.page.openCodeGo.description': 'Підключіть панель OpenCode Go, щоб бачити ковзну, тижневу та місячну квоту.',
   'settings.providers.page.openCodeGo.workspaceId': 'ID робочого простору',

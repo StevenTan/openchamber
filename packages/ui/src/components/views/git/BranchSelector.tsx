@@ -267,7 +267,7 @@ export const BranchSelector: React.FC<BranchSelectorProps> = ({
             </div>
           ) : null}
           <CommandList
-            scrollbarClassName="overlay-scrollbar--flush overlay-scrollbar--dense overlay-scrollbar--zero"
+
             disableHorizontal
           >
             <CommandEmpty>{t('gitView.branch.empty')}</CommandEmpty>

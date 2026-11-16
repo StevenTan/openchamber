@@ -24,7 +24,6 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
-import { OverlayScrollbar } from '@/components/ui/OverlayScrollbar';
 import { ScrollableOverlay } from '@/components/ui/ScrollableOverlay';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -5164,7 +5163,6 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full', visible = t
                   </div>
                 </ErrorBoundary>
               </div>
-              <OverlayScrollbar containerRef={mdPreviewContainerRef} />
               {!isFullscreen && (
                 <>
                   <MarkdownPreviewSearch
@@ -5498,7 +5496,6 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full', visible = t
                 </div>
               </ErrorBoundary>
             </div>
-              <OverlayScrollbar containerRef={mdFullscreenPreviewContainerRef} />
               <MarkdownPreviewSearch
                 containerRef={mdFullscreenPreviewContainerRef}
                 open={mdPreviewFindOpen}

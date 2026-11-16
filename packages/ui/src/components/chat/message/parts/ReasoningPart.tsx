@@ -490,7 +490,6 @@ export const ReasoningTimelineBlock: React.FC<ReasoningTimelineBlockProps> = ({
                             className="p-0"
                             useScrollShadow
                             scrollShadowSize={36}
-                            userIntentOnly
                             data-scrollable="true"
                             onWheel={handleBoxWheel}
                             onTouchStart={handleBoxTouchStart}

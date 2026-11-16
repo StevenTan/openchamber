@@ -9,7 +9,6 @@ import { handleDropdownNavigationKey } from "./dropdown-navigation";
 import { useMenuWindowDismiss } from "./menu-window-dismiss";
 import { dropdownMenuItemClass, dropdownMenuPopupClass, dropdownMenuSeparatorClass, dropdownMenuSubTriggerClass } from "./dropdown-menu.styles";
 import { GlassRedrawGuard } from "./glass-redraw-guard"
-import { PopupOverlayScrollbar } from "./AttachedOverlayScrollbar"
 
 type AsChildProps = { asChild?: boolean };
 type AsChildRenderProps = {
@@ -172,17 +171,14 @@ function DropdownMenuContent({
   // Content that changes while the menu is open (a filtered picker list,
   // items that arrive late) eases the popup into its new height.
   const morphHeight = useHeightMorphRef();
-  const [popup, setPopup] = React.useState<HTMLDivElement | null>(null);
   // Returns its cleanup (React 19), so a caller's ref keeps its own: a
   // cleanup it returned runs, else it gets null as before.
   const setPopupRef = React.useCallback((node: HTMLDivElement | null) => {
     morphHeight(node);
-    setPopup(node);
     const cleanup = typeof ref === 'function' ? ref(node) : undefined;
     if (ref && typeof ref !== 'function') ref.current = node;
     return () => {
       morphHeight(null);
-      setPopup(null);
       if (typeof cleanup === 'function') cleanup();
       else if (typeof ref === 'function') ref(null);
       else if (ref) ref.current = null;
@@ -229,9 +225,6 @@ function DropdownMenuContent({
           {children}
           <GlassRedrawGuard />
         </BaseMenu.Popup>
-        {/* A menu scrolls only where its caller gave it overflow; the thumb
-            shows only then. */}
-        <PopupOverlayScrollbar scroller={popup} />
       </BaseMenu.Positioner>
     </BaseMenu.Portal>
   )
@@ -372,7 +365,6 @@ function DropdownMenuSubContent({
   ...props
 }: Omit<React.ComponentProps<typeof BaseMenu.Popup>, 'ref'>) {
   const portalContext = React.useContext(DropdownPortalContext);
-  const [popup, setPopup] = React.useState<HTMLDivElement | null>(null);
   const handleKeyDown: NonNullable<React.ComponentProps<typeof BaseMenu.Popup>['onKeyDown']> = (event) => {
     onKeyDown?.(event);
     handleDropdownNavigationKey(event, (navigationKey) => {
@@ -388,7 +380,6 @@ function DropdownMenuSubContent({
     <BaseMenu.Portal className="contents" container={portalContext?.portalContainer || undefined}>
       <BaseMenu.Positioner className="z-50" sideOffset={10}>
         <BaseMenu.Popup
-          ref={setPopup}
           data-slot="dropdown-menu-sub-content"
           style={{
             color: 'var(--surface-elevated-foreground)',
@@ -404,7 +395,6 @@ function DropdownMenuSubContent({
           {children}
           <GlassRedrawGuard />
         </BaseMenu.Popup>
-        <PopupOverlayScrollbar scroller={popup} />
       </BaseMenu.Positioner>
     </BaseMenu.Portal>
   )

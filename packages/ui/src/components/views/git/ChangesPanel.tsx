@@ -10,7 +10,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ScrollShadow } from '@/components/ui/ScrollShadow';
-import { OverlayScrollbar } from '@/components/ui/OverlayScrollbar';
 import { Icon } from '@/components/icon/Icon';
 import { ChangeRow } from './ChangeRow';
 import { ButtonTooltip } from '@/components/ui/action-toolbar';
@@ -596,7 +595,6 @@ export const ChangesPanel: React.FC<ChangesPanelProps> = ({
             </div>
           )}
         </ScrollShadow>
-        <OverlayScrollbar containerRef={scrollRef} disableHorizontal />
         <DelegatedTooltip containerRef={scrollRef} sideOffset={8} />
       </div>
 

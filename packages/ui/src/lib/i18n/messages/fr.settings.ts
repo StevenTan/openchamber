@@ -59,8 +59,6 @@ export const settingsDict = {
   'settings.themeImport.error.connection': 'Le serveur connecté a changé. Le thème n’a pas été appliqué.',
   'settings.themeImport.error.unsupported': 'L’importation de thèmes n’est pas disponible dans VS Code.',
   'settings.themeImport.error.conflict': 'Ce thème importé a été modifié sur le serveur. Il n’a pas été écrasé.',
-  'settings.openchamber.visual.field.alwaysShowScrollbars': 'Toujours afficher les barres de défilement',
-  'settings.openchamber.visual.field.alwaysShowScrollbarsHint': 'Gardez les barres de défilement visibles même lorsque le pointeur se trouve hors de la zone défilante. Uniquement sur cet appareil.',
   'settings.providers.page.openCodeGo.title': 'Suivi de l’utilisation d’OpenCode Go',
   'settings.providers.page.openCodeGo.description': 'Connectez le tableau de bord OpenCode Go pour afficher les quotas glissant, hebdomadaire et mensuel.',
   'settings.providers.page.openCodeGo.workspaceId': 'ID de l’espace de travail',

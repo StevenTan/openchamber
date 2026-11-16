@@ -1052,10 +1052,6 @@
       "scope": "device",
       "local": true
     },
-    "alwaysShowScrollbars": {
-      "scope": "device",
-      "local": true
-    },
     "agentMemoryViewedAt": {
       "scope": "device",
       "local": true
