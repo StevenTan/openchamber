@@ -259,7 +259,6 @@
     box-shadow: none;
     transition: border-color 140ms ease, box-shadow 140ms ease;
     &:is(:hover, :focus-within) {
-      border-color: #b8d0ff;
       box-shadow: 0 5px 10px rgb(74 111 185 / 4.5%);
     }
     & > div:has(> [data-streamdown="code-block-actions"]) { height: 36px; }
