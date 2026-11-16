@@ -1,80 +1,63 @@
 # Icon System
 
-OpenChamber uses an SVG sprite-based icon system for performance. Remixicon glyphs and explicitly registered custom glyphs are rendered via a single hidden SVG sprite injected into the DOM, referenced by `<use href="#oc-icon-name"/>`.
+`Icon` renders interface glyphs from Lucide and product/brand marks through a
+shared SVG sprite. Desktop, web, VS Code and mobile use the same sprite.
+File-type icons have their own system in `components/icons/FileTypeIcon.tsx`.
 
 ## Usage
 
 ```tsx
-import { Icon } from "@/components/icon/Icon";
+import { Icon } from '@/components/icon/Icon';
+import type { IconName } from '@/components/icon/icons';
 
-<Icon name="arrow-down-s" className="h-4 w-4" />
-<Icon name="loader-4" className="size-4 animate-spin" />
+const icon: IconName = 'search';
+<Icon name={icon} className="size-4" />;
 ```
 
-## Icon Names
+Size icons with classes; `Icon` has no `size` prop. Adjacent controls keep the
+same icon box. Glyphs inherit `currentColor` from the control's theme tokens.
+The owning button or label supplies the accessible name; decorative icons
+default to `aria-hidden`.
 
-Icons use kebab-case names based on Remixicon. To find an icon name:
+## Names and generation
 
-1. Start from the Remixicon component name: `RiArrowDownSLine`
-2. Remove `Ri` prefix → `ArrowDownSLine`
-3. Convert to kebab-case → `arrow-down-s`
+Application icon IDs are stable keys used by components, project settings and
+provider descriptors. `scripts/icons/lucide.mjs` maps IDs whose names differ
+from Lucide to the corresponding glyph. New icons can use Lucide's kebab-case
+name directly.
 
-Common suffixes:
-- `Line` is dropped; `Fill` becomes `-fill`
-- Numbers are preserved: `RiChat4Line` → `chat-4`
+1. Use `<Icon name="…" />` or a value typed as `IconName` in source.
+2. Add a mapping in `scripts/icons/lucide.mjs` when the application ID differs.
+3. Run `bun run icons:generate` and inspect the generated sprite.
+4. Check the icon at its actual control size in light and dark themes.
 
-## Adding a New Icon
+Never edit `sprite.ts` manually or import individual icon components into
+feature code. The generator reads the pinned `lucide-static` development
+dependency; the application ships only the glyphs it uses, with no runtime
+icon-library dependency or network lookup. Missing source assets fail generation.
 
-1. Use `<Icon name="new-icon-name" />` or declare a shared literal as `const icon: IconName = "new-icon-name"`.
-2. Run `bun run icons:generate` to regenerate the sprite.
-3. The script scans JSX names, typed icon constants and records, and existing `RiX` references under `packages/ui/src`.
+Lucide glyphs retain their 24×24 coordinate system, 2-unit stroke, round caps
+and joins, and explicit `fill="none"`. Filled status shapes are registered in
+`filledIconNames`. Sprite groups carry their own drawing attributes so brand
+marks and line icons can share one component without inheriting each other's
+fill behavior.
 
-If the icon doesn't exist in the sprite, the script will warn you.
+## Product and brand marks
 
-Custom product glyphs are registered in `scripts/generate-icon-sprite.mjs`. They must use the shared `24x24` viewbox and `currentColor` so they match Remixicon sizing and theme behavior. The marks of the apps "Open In" opens a project in (`app-*`) live in `scripts/icons/open-in-apps.mjs`, each taken from the app's real logo geometry with its source noted beside it; a new app gets its mark the same way, never a redrawn one.
+`preservedIconNames` identifies brand and PDF-format marks sourced from
+Remixicon; custom product/provider marks are registered in
+`scripts/generate-icon-sprite.mjs`. The applications in the Open In menu use
+their official geometry from `scripts/icons/open-in-apps.mjs`.
 
-## Sizing
+These marks use a 24×24 viewbox and `currentColor`. Preserve their identity
+instead of substituting a generic interface glyph. Lucide's license is
+distributed at `packages/web/public/licenses/lucide.txt`.
 
-The `Icon` component does not have a `size` prop. Use Tailwind classes instead:
+## Runtime contract
 
-```tsx
-<Icon name="arrow-down-s" className="h-4 w-4" />   {/* 16px */}
-<Icon name="arrow-down-s" className="size-5" />      {/* 20px */}
-<Icon name="arrow-down-s" className="h-6 w-6" />     {/* 24px */}
-```
-
-## Type Safety
-
-```tsx
-import type { IconName } from "@/components/icon/icons";
-
-const icon: IconName = "arrow-down-s"; // type-checked
-```
-
-## Architecture
-
-- `sprite.ts` — Auto-generated SVG path data, regenerated with `bun run icons:generate`
-- `Icon.tsx` — The `<Icon>` component, injects sprite on first mount
-- `icons.ts` — TypeScript type `IconName`
-
-The sprite is injected as a hidden `<svg id="openchamber-icon-sprite">` element containing `<symbol>` elements. Each `<Icon>` renders `<svg><use href="#oc-{name}"/></svg>`.
-
-## Migration from @remixicon/react
-
-Old:
-```tsx
-import { RiArrowDownSLine } from "@remixicon/react";
-<RiArrowDownSLine className="h-4 w-4" />
-```
-
-New:
-```tsx
-import { Icon } from "@/components/icon/Icon";
-<Icon name="arrow-down-s" className="h-4 w-4" />
-```
-
-If an icon is used as a component reference (not JSX):
-```tsx
-// Old: const icon = RiStackLine; return <icon />;
-// New: const icon: IconName = "stack"; return <Icon name={icon} />;
-```
+- `sprite.ts` contains generated symbol contents; `icons.ts` derives `IconName`.
+- `Icon.tsx` injects one hidden sprite and renders `<use href="#oc-ID"/>`.
+- A newly requested symbol can join an injected sprite during development.
+- `oc-icon` is the shared styling hook.
+- `DIRECTIONAL_ICONS` identifies semantic arrows and panel sides that mirror
+  in RTL. The `<use>` mirrors independently of the outer SVG's rotation.

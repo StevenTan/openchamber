@@ -745,9 +745,9 @@ div[data-chat-input-footer="true"] {
 }
 
 /* Safari/WebKit fixes for buttons and SVG icons */
-/* Remixicon puts fill="currentColor" on root SVG which WebKit renders as background */
-button svg.remixicon,
-[role="button"] svg.remixicon,
+/* Filled SVG roots can paint a background in WebKit. */
+button svg.oc-icon,
+[role="button"] svg.oc-icon,
 button svg,
 [role="button"] svg {
   background: none !important;
@@ -784,10 +784,10 @@ button svg circle,
 }
 
 /* Ensure SVG paths/shapes inherit color properly */
-button svg.remixicon path,
-button svg.remixicon circle[fill],
-[role="button"] svg.remixicon path,
-[role="button"] svg.remixicon circle[fill],
+button svg.oc-icon path,
+button svg.oc-icon circle[fill],
+[role="button"] svg.oc-icon path,
+[role="button"] svg.oc-icon circle[fill],
 button svg path,
 [role="button"] svg path {
   fill: currentColor !important;
@@ -801,7 +801,7 @@ button svg path,
  * keys) unmirrored. The flip applies before the <svg>'s own rotation, so a
  * chevron that turns a quarter turn to open needs `rtl:` to turn the other way.
  */
-svg.remixicon[data-directional]:dir(rtl) > use {
+svg.oc-icon[data-directional]:dir(rtl) > use {
   transform: matrix(-1, 0, 0, 1, 24, 0);
 }
 

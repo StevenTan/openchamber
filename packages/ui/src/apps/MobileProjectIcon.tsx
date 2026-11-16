@@ -1,5 +1,4 @@
 import React from 'react';
-import { RiFolder6Line } from '@remixicon/react';
 
 import { Icon } from '@/components/icon/Icon';
 import { useThemeSystem } from '@/contexts/useThemeSystem';
@@ -30,7 +29,7 @@ export const MobileProjectIcon: React.FC<{
   const fallbackIcon = ProjectIcon ? (
     <Icon name={ProjectIcon} className={glyphClasses} style={iconColor ? { color: iconColor } : undefined} />
   ) : (
-    <RiFolder6Line className={glyphClasses} style={iconColor ? { color: iconColor } : undefined} />
+    <Icon name="folder-6" className={glyphClasses} style={iconColor ? { color: iconColor } : undefined} />
   );
   const image = project.iconImage ? (
     <ProjectIconImage

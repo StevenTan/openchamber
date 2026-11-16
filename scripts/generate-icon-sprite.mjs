@@ -1,11 +1,10 @@
 /**
- * Generates the SVG icon sprite file from @remixicon/react bundle.
+ * Generates the shared SVG sprite from Lucide icons and product/brand marks.
  *
  * Usage: bun run scripts/generate-icon-sprite.mjs
  *
- * Reads the minified @remixicon/react bundle, extracts SVG path data
- * for all Ri* icons used in packages/ui/src, and writes
- * packages/ui/src/components/icon/sprite.ts.
+ * Application icon IDs stay stable across the UI and persisted settings.
+ * Lucide supplies interface glyphs; Remixicon supplies registered brand marks.
  */
 
 import { readFileSync, writeFileSync, readdirSync, statSync } from "node:fs"
@@ -14,11 +13,27 @@ import { fileURLToPath } from "node:url"
 
 import { glyphInner } from "./brand/geometry.mjs"
 import { openInAppGlyphs } from "./icons/open-in-apps.mjs"
+import { preservedIconNames, filledIconNames, lucideIconAliases } from "./icons/lucide.mjs"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(__dirname, "..")
 const remixPath = resolve(repoRoot, "node_modules/@remixicon/react/index.mjs")
 const outPath = resolve(repoRoot, "packages/ui/src/components/icon/sprite.ts")
+const lucideDir = resolve(repoRoot, "node_modules/lucide-static/icons")
+const lucideLicense = readFileSync(resolve(lucideDir, "../LICENSE"), "utf-8").trim()
+const lucideNames = new Set(readdirSync(lucideDir).filter((name) => name.endsWith(".svg")).map((name) => name.slice(0, -4)))
+const isLucideIcon = (name) => !preservedIconNames.has(name) && (Object.hasOwn(lucideIconAliases, name) || lucideNames.has(name))
+
+const lucideContent = (name) => {
+  const glyph = lucideIconAliases[name] ?? name
+  const svg = readFileSync(resolve(lucideDir, `${glyph}.svg`), "utf-8")
+  const [, attributes, content] = svg.match(/<svg\b([^>]*)>([\s\S]*?)<\/svg>/)
+  const drawingAttributes = attributes.match(/\b(?:fill|stroke(?:-width|-linecap|-linejoin)?)="[^"]*"/g).join(" ")
+  const styledAttributes = filledIconNames.has(name)
+    ? drawingAttributes.replace('fill="none"', 'fill="currentColor"')
+    : drawingAttributes
+  return `<g data-lucide="${glyph}" ${styledAttributes}>${content.trim().replace(/\s+/g, " ")}</g>`
+}
 
 const customIconData = new Map([
   ...openInAppGlyphs,
@@ -26,37 +41,10 @@ const customIconData = new Map([
   ["openchamber", `<g transform="scale(0.75)">${glyphInner()}</g>`],
   // OpenCode's mark (packages/identity/mark.svg in the OpenCode repository):
   // a 4:5 frame with the lower half of its opening filled, drawn as a 2px line
-  // to sit beside Remixicon's line glyphs.
+  // to sit beside Lucide's line glyphs.
   [
     "opencode",
     `<path fill="none" stroke="currentColor" stroke-width="2" d="M6 4.5h12v15H6Z"/><path fill="currentColor" d="M9 10.5h6v6H9Z"/>`,
-  ],
-  // Worktree: Remixicon has none. Its folder with the bottom-right corner cut
-  // away for an emblem, as `folder-shared` does, holding a three-node branch
-  // in 2px lines like `git-branch`.
-  [
-    "worktree",
-    `<path fill="currentColor" d="M22 11H20V7H11.5858L9.58579 5H4V19H11V21H3C2.44772 21 2 20.5523 2 20V4C2 3.44772 2.44772 3 3 3H10.4142L12.4142 5H21C21.5523 5 22 5.44772 22 6V11Z"/><path fill="none" stroke="currentColor" stroke-width="2" d="M15.5 14V21M21 14V14.5C21 16.4 19.9 17.5 18 17.5H17.5C16.4 17.5 15.5 18.4 15.5 19.5"/><circle fill="currentColor" cx="15.5" cy="14" r="2"/><circle fill="currentColor" cx="21" cy="14" r="2"/><circle fill="currentColor" cx="15.5" cy="21" r="2"/>`,
-  ],
-  // The Session card toggle: a window whose upper right corner is fenced off
-  // as a card. Drawn from the maintainer's mockup, a 2-unit stroke turned into
-  // the sprite's filled form: the frame is a rounded rectangle (radius 2 on
-  // the stroke's centre, so 3 outside and 1 inside), more rounded than
-  // `layout-left`'s, as wide as the `computer` monitor's screen and as tall as
-  // the monitor with its stand and placed as it is (x 2-22, y 3-22), so the
-  // header's icons match in optical size and its edges land on whole pixels
-  // at 16px; the fence is two straight lines, down from the top edge at x 13.5
-  // to y 13 and across to the right edge, meeting in a square corner and
-  // joining the frame square.
-  [
-    "panel-card",
-    `<path fill="currentColor" fill-rule="evenodd" d="M5 3H19A3 3 0 0 1 22 6V19A3 3 0 0 1 19 22H5A3 3 0 0 1 2 19V6A3 3 0 0 1 5 3ZM5 5A1 1 0 0 0 4 6V19A1 1 0 0 0 5 20H19A1 1 0 0 0 20 19V6A1 1 0 0 0 19 5ZM12.5 5H14.5V12H20V14H12.5Z"/>`,
-  ],
-  // The left sidebar toggle, the Session card toggle's pair: the same rounded
-  // frame, with `layout-left`'s full-height divider (x 7-9).
-  [
-    "panel-left",
-    `<path fill="currentColor" fill-rule="evenodd" d="M5 3H19A3 3 0 0 1 22 6V19A3 3 0 0 1 19 22H5A3 3 0 0 1 2 19V6A3 3 0 0 1 5 3ZM5 5A1 1 0 0 0 4 6V19A1 1 0 0 0 5 20H19A1 1 0 0 0 20 19V6A1 1 0 0 0 19 5ZM7 5H9V20H7Z"/>`,
   ],
   // Command Code — corner squares + center square (official logo geometry).
   [
@@ -202,6 +190,10 @@ const allSrcFiles = findAllSourceFiles(srcDir)
 const usedIcons = new Set()
 const usedCustomIcons = new Set()
 const addKebabIcon = (kebab) => {
+  if (isLucideIcon(kebab)) {
+    usedCustomIcons.add(kebab)
+    return true
+  }
   if (customIconData.has(kebab)) {
     usedCustomIcons.add(kebab)
     return true
@@ -400,11 +392,16 @@ for (const file of allSrcFiles) {
   }
 }
 
-console.log(`Found ${usedIcons.size} unique remixicon names used in source`)
+console.log(`Found ${usedIcons.size + usedCustomIcons.size} application icon IDs in source`)
 
 // --- Step 4: build sprite data ---
 const iconEntries = []
 for (const iconName of [...usedIcons].sort()) {
+  const spriteName = remixToSpriteName(iconName)
+  if (!preservedIconNames.has(spriteName)) {
+    iconEntries.push({ name: spriteName, content: lucideContent(spriteName) })
+    continue
+  }
   const varName = nameToVar.get(iconName)
   if (!varName) {
     console.warn(`  ⚠ Unknown icon: ${iconName}`)
@@ -425,7 +422,9 @@ for (const iconName of [...usedIcons].sort()) {
 }
 
 for (const iconName of [...usedCustomIcons].sort()) {
-  iconEntries.push({ name: iconName, content: customIconData.get(iconName) })
+  iconEntries.push({ name: iconName, content: isLucideIcon(iconName)
+    ? lucideContent(iconName)
+    : customIconData.get(iconName) })
 }
 
 // --- Step 5: write sprite.ts ---
@@ -439,6 +438,10 @@ const spriteLines = iconEntries
 
 const spriteContent = `// This file is auto-generated by scripts/generate-icon-sprite.mjs
 // Do not edit manually. Run the script to update.
+
+/*!
+${lucideLicense}
+*/
 
 export const iconSpriteData = {
 ${spriteLines.join("\n")}

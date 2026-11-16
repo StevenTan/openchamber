@@ -1,13 +1,4 @@
 import React from 'react';
-import {
-  RiArrowLeftLine,
-  RiArrowRightSLine,
-  RiCloseLine,
-  RiFolder3Fill,
-  RiFolderOpenFill,
-  RiLoader4Line,
-  RiRefreshLine,
-} from '@remixicon/react';
 
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { MobileSheetSearch } from '@/components/ui/MobileSheetList';
@@ -309,7 +300,7 @@ const MobileFilesSurfaceForRoot: React.FC<MobileFilesSurfaceProps & { root: stri
                 aria-label={t('mobile.files.refreshAria')}
                 onClick={() => void loadDirectory(route.directory)}
               >
-                <RiRefreshLine className={cn('size-4', isLoadingDirectory && 'animate-spin')} />
+                <Icon name="refresh" className={cn('size-4', isLoadingDirectory && 'animate-spin')} />
               </button>
               {canUpload ? (
                 <button
@@ -324,7 +315,7 @@ const MobileFilesSurfaceForRoot: React.FC<MobileFilesSurfaceProps & { root: stri
               ) : null}
               {onClose ? (
                 <button type="button" className={FILES_ACTION_CLASS} aria-label={t('mobile.surface.closeAria')} onClick={onClose}>
-                  <RiCloseLine className="size-4" />
+                  <Icon name="close" className="size-4" />
                 </button>
               ) : null}
             </>
@@ -337,7 +328,7 @@ const MobileFilesSurfaceForRoot: React.FC<MobileFilesSurfaceProps & { root: stri
             aria-label={t('mobile.files.backToParentAria', { name: getNameFromPath(parentDirectory) })}
             onClick={() => openDirectory(parentDirectory)}
           >
-            <RiArrowLeftLine className="size-4 shrink-0 text-muted-foreground" />
+            <Icon name="arrow-left" className="size-4 shrink-0 text-muted-foreground" />
             <span className="min-w-0 truncate typography-ui-label text-muted-foreground">{directoryLabel}</span>
           </button>
         ) : null}
@@ -393,13 +384,13 @@ const MobileFileRow: React.FC<{
       style={{ touchAction: 'manipulation' }}
     >
       {directory ? (
-        <RiFolder3Fill className="size-4 shrink-0 text-primary/80" />
+        <Icon name="folder-3-fill" className="size-4 shrink-0 text-primary/80" />
       ) : (
         <FileTypeIcon filePath={path} className="size-4 shrink-0" />
       )}
       <span className="block min-w-0 flex-1 truncate typography-ui-label text-foreground">{name}</span>
       {meta ? <span className="min-w-0 max-w-[55%] shrink truncate typography-micro text-muted-foreground" dir="auto">{meta}</span> : null}
-      {directory ? <RiArrowRightSLine className="size-4 shrink-0 text-muted-foreground" /> : null}
+      {directory ? <Icon name="arrow-right-s" className="size-4 shrink-0 text-muted-foreground" /> : null}
     </button>
   );
   // The desktop row menu's Copy path, then the extensions' file actions.
@@ -467,7 +458,7 @@ const MobileSearchResults: React.FC<{
 const MobileFilesState: React.FC<{ message: string; loading?: boolean }> = ({ message, loading = false }) => (
   <div className="flex h-full items-center justify-center px-6 text-center">
     <div className="flex max-w-sm flex-col items-center gap-2">
-      {loading ? <RiLoader4Line className="size-5 animate-spin text-muted-foreground" /> : <RiFolderOpenFill className="size-6 text-muted-foreground" />}
+      {loading ? <Icon name="loader-4" className="size-5 animate-spin text-muted-foreground" /> : <Icon name="folder-open-fill" className="size-6 text-muted-foreground" />}
       <p className="typography-ui-label font-semibold text-foreground">{message}</p>
     </div>
   </div>

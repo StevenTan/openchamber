@@ -20,7 +20,7 @@ export const ProviderIcon = React.memo(({ descriptor, variant = 'line', classNam
   if (sprite) return <Icon name={sprite} className={className} />;
   if (!descriptor.icon.path) return <Icon name={PROVIDER_FALLBACK_ICON} className={className} />;
   return (
-    <svg className={cn('remixicon', className)} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <svg className={cn('oc-icon', className)} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <path d={descriptor.icon.path} fill="currentColor" />
     </svg>
   );
