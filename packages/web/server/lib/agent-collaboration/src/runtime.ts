@@ -2,21 +2,23 @@ import { z } from "zod";
 import type { SessionApi } from "@opencode/client/promise/api";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { waitFetch } from "./wait-fetch.js";
+import { inheritContext, type InheritanceClient } from "./inherit.js";
 
 const input = z.object({ sessionID: z.string().min(1), target: z.string().min(1) }).strict();
+const inheritanceInput = z.object({ sessionID: z.string().min(1), messageID: z.string().min(1), callID: z.string().min(1), title: z.string() }).strict();
 type AssistantMessage = Extract<Awaited<ReturnType<SessionApi["context"]>>[number], { type: "assistant" }>;
 type WaitResult = { session_id: string; status: "idle"; output: string; error?: AssistantMessage["error"] };
 interface Request extends IncomingMessage { body: unknown }
 interface Response extends ServerResponse {
   status(code: number): Response;
-  json(value: WaitResult | { error: string }): Response;
+  json(value: WaitResult | { sessionID: string } | { error: string }): Response;
 }
 type Handler = (req: Request, res: Response) => Promise<Response | void>;
 type Parser = (req: Request, res: Response, next: () => void) => void;
 interface Dependencies {
   authorize(req: IncomingMessage): boolean;
   trackInflight(sessionID: string, controller: AbortController): () => void;
-  client(requestFetch: typeof fetch): { session: Pick<SessionApi, "get" | "wait" | "context"> };
+  client(requestFetch: typeof fetch): InheritanceClient & { session: Pick<SessionApi, "get" | "wait" | "context"> };
 }
 
 export function registerCollaborationRoutes(
@@ -24,6 +26,24 @@ export function registerCollaborationRoutes(
   express: { json(options: { limit: string }): Parser },
   { authorize, trackInflight, client }: Dependencies,
 ) {
+  app.post("/api/openchamber/subagent-context", express.json({ limit: "1mb" }), async (req, res) => {
+    if (!authorize(req)) return res.status(401).json({ error: "Unauthorized" });
+    const controller = new AbortController();
+    const abort = () => { if (!res.writableEnded) controller.abort(); };
+    res.once("close", abort);
+    let untrack: (() => void) | undefined;
+    try {
+      const args = inheritanceInput.parse(req.body);
+      untrack = trackInflight(args.sessionID, controller);
+      const sessionID = await inheritContext(client(waitFetch), args, controller.signal);
+      return res.json({ sessionID });
+    } catch (error) {
+      if (!res.destroyed) return res.status(error instanceof z.ZodError ? 400 : 500).json({ error: error instanceof Error ? error.message : String(error) });
+    } finally {
+      untrack?.();
+      res.off("close", abort);
+    }
+  });
   app.post("/api/openchamber/subagent-wait", express.json({ limit: "1mb" }), async (req, res) => {
     if (!authorize(req)) return res.status(401).json({ error: "Unauthorized" });
     const controller = new AbortController();

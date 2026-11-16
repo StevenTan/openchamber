@@ -11,12 +11,12 @@ interface Invocation {
   progress(update: Tool.Metadata): Promise<void>;
 }
 
-interface Followup {
-  agent: string;
+type SubagentInput = z.input<typeof subagentInput>;
+
+interface NativeSubagent {
   description: string;
-  prompt: string;
-  sessionID: string;
-  background: true;
+  input: z.core.JSONSchema.JSONSchema;
+  execute(input: SubagentInput, context: Invocation): Promise<{ content: string; metadata?: Tool.Metadata }>;
 }
 
 interface Registration<Input> {
@@ -28,13 +28,14 @@ interface Registration<Input> {
 }
 
 interface PluginContext {
-  session: Pick<SessionApi, "get" | "interrupt">;
+  session: Pick<SessionApi, "get" | "interrupt" | "remove">;
   permission: { assert(request: {
     sessionID: string; agent: string; action: string; resources: string[]; save: string[];
     source: { type: "tool"; messageID: string; id: string };
   }): Promise<void> };
   tool: { transform(fn: (editor: {
-    get(name: "subagent"): { execute(input: Followup, context: Invocation): Promise<{ content: string; metadata?: Tool.Metadata }> } | undefined;
+    get(name: "subagent"): NativeSubagent | undefined;
+    update(name: "subagent", update: (tool: NativeSubagent) => void): void;
     namespace(value: { name: string; description: string }): void;
     add<Input>(tool: Registration<Input>): void;
   }) => void): Promise<void> };
@@ -47,6 +48,15 @@ const waitResult = z.object({ session_id: z.string(), status: z.literal("idle"),
 const waitInput = z.object({
   targets: z.array(target).min(1).describe("Child session IDs. Returns when any target becomes idle."),
   timeout_ms: z.number().int().min(10000).max(3600000).default(30000).describe("Wait timeout in milliseconds. Defaults to 30000, range 10000–3600000. Prefer a longer wait over repeated polling."),
+}).strict();
+const subagentInput = z.object({
+  agent: z.string().describe("The type of specialized agent to use for this task. If the user asks for a subagent by a name that is not one of the available subagents, they most likely mean a model: pick a suitable agent and pass the name through the model parameter instead."),
+  description: z.string().describe("A short 3-5 word label for the task, displayed to the user"),
+  prompt: z.string().describe("The task for the subagent to perform"),
+  model: z.string().optional().describe("NEVER set this unless the user explicitly asks for a particular model or variant. It must be a chat model; image and decision models can't run subagents. Use providerID/modelID or providerID/modelID#variant. Do not guess the ID: look the model up with the models tool, filtering to your own provider first."),
+  sessionID: z.string().startsWith("ses").optional().describe("Send a follow-up to an existing subagent, running or finished. Omit to start a new one."),
+  background: z.boolean().optional().describe("Run the subagent in the background and return immediately. You will be notified when it completes. DO NOT sleep, poll, or proactively check on its progress."),
+  fork_turns: z.enum(["all", "none"]).default("all").describe("Parent history to inherit. Defaults to all; use none to start without parent history. Only all and none are supported. Applies when creating a new child."),
 }).strict();
 
 export default {
@@ -77,6 +87,42 @@ export default {
     await ctx.tool.transform(editor => {
       const subagent = editor.get("subagent");
       if (!subagent) return;
+      const executeSubagent = subagent.execute;
+      editor.update("subagent", tool => {
+        tool.description = [
+          "Spawns an agent in a child session to work on a specific task.",
+          "fork_turns defaults to all, inheriting the parent's recorded conversation before this call, including text from the current assistant message, completed tool results, attachments and session instructions. Use none for a fresh conversation. The child's own agent instructions apply in both modes.",
+          "Pass sessionID to continue an existing child without copying history again.",
+          "Foreground (default) returns its final response. Background mode returns immediately and delivers a completion notification.",
+        ].join("\n");
+        tool.input = z.toJSONSchema(subagentInput, { io: "input" });
+        tool.execute = async (input, context) => {
+          const { fork_turns, ...args } = subagentInput.parse(input);
+          if (args.sessionID || fork_turns === "none") return executeSubagent(args, context);
+          const signal = AbortSignal.any([context.signal, lifetime.signal]);
+          signal.throwIfAborted();
+          // Preparation settles its writes and rollback before cancellation is reported.
+          const response = await fetch(new URL("/api/openchamber/subagent-context", endpoint), {
+            method: "POST",
+            headers: { authorization: `Bearer ${process.env.OPENCHAMBER_AGENT_TOOL_TOKEN}`, "content-type": "application/json" },
+            body: JSON.stringify({ sessionID: context.sessionID, messageID: context.messageID, callID: context.id, title: args.description }),
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(z.object({ error: z.string() }).parse(result).error);
+          const { sessionID } = z.object({ sessionID: z.string() }).parse(result);
+          let admitted = false;
+          try {
+            signal.throwIfAborted();
+            return await executeSubagent({ ...args, sessionID, prompt: `You are a subagent spawned by another session.\n${args.prompt}` }, {
+              ...context, signal,
+              async progress(update) { await context.progress(update); admitted = true; },
+            });
+          } catch (error) {
+            if (!admitted) await ctx.session.remove({ sessionID });
+            throw error;
+          }
+        };
+      });
       editor.namespace({ name: "collaboration", description: "Tools for coordinating existing child agents." });
       editor.add<z.infer<typeof sendInput>>({
         name: "send_input",
@@ -87,7 +133,7 @@ export default {
           const args = sendInput.parse(input);
           const signal = AbortSignal.any([context.signal, lifetime.signal]);
           const child = await ownedChild(args.target, context, signal);
-          const result = await subagent.execute({
+          const result = await executeSubagent({
             agent: child.agent, description: child.title ?? args.target,
             prompt: args.message, sessionID: args.target, background: true,
           }, { ...context, signal });

@@ -11,7 +11,7 @@ beforeEach(() => {
   };
   authorize = vi.fn(() => true);
   untrack = vi.fn();
-  registerCollaborationRoutes({ post: (_path, _parser, callback) => { handler = callback; } }, { json: () => ({}) }, { authorize, trackInflight: () => untrack, client: () => ({ session }) });
+  registerCollaborationRoutes({ post: (path, _parser, callback) => { if (path.endsWith('subagent-wait')) handler = callback; } }, { json: () => ({}) }, { authorize, trackInflight: () => untrack, client: () => ({ session }) });
   res = Object.assign(new EventEmitter(), {
     writableEnded: false, destroyed: false, statusCode: 200,
     status(code) { this.statusCode = code; return this; },
