@@ -11,10 +11,7 @@ Examples of different commands available in this tool:
 * `open`: {"open": [{"ref_id": "turn0search0"}, {"ref_id": "https://www.openai.com", "lineno": 120}]}
 * `click`: {"click": [{"ref_id": "turn0fetch3", "id": 17}]}
 * `find`: {"find": [{"ref_id": "turn0fetch3", "pattern": "Annie Case"}]}
-* `screenshot`: {"screenshot": [{"ref_id": "turn1view0", "pageno": 0}, {"ref_id": "turn1view0", "pageno": 3}]}
 * `finance`: {"finance":[{"ticker":"AMD","type":"equity","market":"USA"}]}, {"finance":[{"ticker":"BTC","type":"crypto","market":""}]}
-* `weather`: {"weather":[{"location":"San Francisco, CA"}]}
-* `sports`: {"sports":[{"fn":"standings","league":"nfl"}, {"fn":"schedule","league":"nba","team":"GSW","date_from":"2025-02-24"}]}
 * `time`: {"time":[{"utc_offset":"+03:00"}]}
 
 ---
@@ -25,6 +22,7 @@ To use this tool efficiently:
 * Use "response_length" to control the number of results returned by this tool, omit it if you intend to pass "short" in
 * Only write required parameters; do not write empty lists or nulls where they could be omitted.
 * `search_query` must have length at most 4 in each call. If it has length > 3, response_length must be medium or long
+* If you find yourself in a situation where you accidentally call the `web.run` tool, it's best just to send an empty query: {"search_query": [{"q": ""}]}.
 
 ---
 
@@ -49,8 +47,8 @@ Below is a list of scenarios where browsing the internet MUST be used. PAY CLOSE
 
 ## Citations
 
-Results from `codex-research` include internal reference IDs such as `turn2search5`. Use
-those reference IDs only in calls to `codex-research`; do not expose them in the final
+Results from `web.run` include internal reference IDs such as `turn2search5`. Use
+those reference IDs only in calls to `web.run`; do not expose them in the final
 response.
 
 Cite sources in the final response using Markdown links:

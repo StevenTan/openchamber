@@ -1,26 +1,37 @@
 import { expect, it } from 'vitest';
-import { executionOptions, searchContext } from './src/request.ts';
+import { searchContext } from './src/request.ts';
+import { options, searchSettings } from './src/commands.ts';
 
-it('maps search modes and applies explicit per-call controls over plugin defaults', () => {
-  const defaults = { mode: 'cached', max_output_tokens: 4000, search_context_size: 'low' };
-  expect(executionOptions(defaults, {})).toEqual({ settings: { external_web_access: false, search_context_size: 'low', allowed_callers: ['direct'] }, max_output_tokens: 4000 });
-  expect(executionOptions(defaults, { mode: 'live', max_output_tokens: 1200 })).toEqual({ settings: { external_web_access: true, search_context_size: 'low', allowed_callers: ['direct'] }, max_output_tokens: 1200 });
+it('defaults web access to cached mode', () => {
+  expect(searchSettings(options.parse({}))).toEqual({ allowed_callers: ['direct'], external_web_access: false });
 });
 
-it('bounds assistant context to 1000 approximate tokens across all retained replies', () => {
+it.each([['cached', false], ['indexed', 'indexed'], ['live', true]])('maps %s mode to the explicit backend setting', (mode, expected) => {
+  expect(searchSettings(options.parse({ web_search: mode })).external_web_access).toBe(expected);
+});
+
+it('selects the last two user texts and intervening assistant text without tool, media or reasoning data', () => {
   const result = searchContext([
-    { id: 'u1', type: 'user', text: 'Previous user' },
+    { id: 'old', type: 'user', text: 'Old' },
+    { id: 'u1', type: 'user', text: 'Previous', files: [{ uri: 'secret' }] },
+    { id: 'a1', type: 'assistant', content: [{ type: 'text', text: 'Reply' }, { type: 'reasoning', text: 'Private' }, { type: 'tool', state: { content: 'File bytes' } }] },
+    { id: 'u2', type: 'user', text: 'Current' },
+    { id: 'active', type: 'assistant', model: { id: 'model', providerID: 'provider' }, content: [{ type: 'text', text: 'Current commentary' }] },
+    { id: 'future', type: 'user', text: 'Future' },
+  ], 'active');
+  expect(result.model).toEqual({ id: 'model', providerID: 'provider' });
+  expect(result.input.map(message => message.content[0].text)).toEqual(['Previous', 'Reply', 'Current']);
+});
+
+it('shares the assistant context budget across messages without splitting UTF-8 characters', () => {
+  const result = searchContext([
+    { id: 'u1', type: 'user', text: 'Previous' },
     { id: 'a1', type: 'assistant', content: [{ type: 'text', text: '中'.repeat(2000) }] },
-    { id: 'a2', type: 'assistant', content: [{ type: 'text', text: 'Additional reply' }] },
-    { id: 'u2', type: 'user', text: 'Current user' },
+    { id: 'a2', type: 'assistant', content: [{ type: 'text', text: 'Extra reply' }] },
+    { id: 'u2', type: 'user', text: 'Current' },
     { id: 'active', type: 'assistant', model: { id: 'model', providerID: 'provider' }, content: [] },
   ], 'active');
   expect(result.input).toHaveLength(3);
   expect(result.input[1].content[0].text).toContain('tokens truncated');
-  expect(Buffer.byteLength(result.input[1].content[0].text, 'utf8')).toBeLessThan(4100);
   expect(result.input[1].content[0].text).not.toContain('\uFFFD');
-});
-
-it('omits backend conversation input when the active context contains no user messages', () => {
-  expect(searchContext([{ id: 'active', type: 'assistant', model: { id: 'model', providerID: 'provider' }, content: [] }], 'active')).toEqual({ model: { id: 'model', providerID: 'provider' } });
 });

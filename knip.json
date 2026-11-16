@@ -38,7 +38,6 @@
         "server/lib/agent-command/src/runtime.ts",
         "server/lib/agent-search/src/plugin.ts",
         "server/lib/agent-search/src/markdown.d.ts",
-        "server/lib/agent-search/upstream-tests/*.test.ts",
         "server/lib/agent-question/src/runtime.ts",
         "src/mobile-main.tsx",
         "src/mini-chat-main.tsx",

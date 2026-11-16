@@ -64,7 +64,8 @@ sources; package and desktop builds generate the runtime files automatically.
 Managed Codex search tools live in `server/lib/agent-search`. The `native`
 search integration uses the configured proxy's `/alpha/search` endpoint for
 search, page opening, text lookup and link traversal. It requires a proxy that
-supports this protocol and uses the selected search model's provider API key.
+supports this protocol and uses the invoking model's provider API key. The direct
+`web.run` tool returns backend text and preserves structured results in metadata.
 
 ### Tunnel behavior notes
 
