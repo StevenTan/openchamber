@@ -950,18 +950,20 @@ export const ContextPanel: React.FC<{ zone?: ContextZone }> = ({ zone = 'right' 
 
   const isFileTabActive = activeTab?.mode === 'file';
 
-  // Cmd/Ctrl+W in the desktop app closes the strip's active tab here, as its
-  // close button does. A file shown in the editor registers from the editor,
-  // which asks first about unsaved edits; terminal tabs from the terminal's
-  // own strip.
+  // Cmd/Ctrl+W closes this zone's tab, or the zone for a single-page surface.
+  // The file editor owns its unsaved-edits prompt; the terminal owns its tabs.
   const editorClosesTab = isFileTabActive && Boolean(activeTab?.targetPath) && showsEditor;
-  const shortcutClosableTabId = isOpen && activeTab && isMultiInstanceMode && !editorClosesTab && !isTrackerBranchTab(activeTab)
+  const shortcutTargetTabId = isOpen && activeTab && !editorClosesTab && activeTab.mode !== 'terminal'
     ? activeTab.id
     : null;
+  const shortcutClosesTab = isMultiInstanceMode && !(activeTab && isTrackerBranchTab(activeTab));
   React.useEffect(() => {
-    if (!directoryKey || !shortcutClosableTabId) return;
-    return registerCloseTabTarget(() => closeContextPanelTab(directoryKey, shortcutClosableTabId), panelRef);
-  }, [closeContextPanelTab, directoryKey, shortcutClosableTabId]);
+    if (!directoryKey || !shortcutTargetTabId) return;
+    return registerCloseTabTarget(() => {
+      if (shortcutClosesTab) closeContextPanelTab(directoryKey, shortcutTargetTabId);
+      else closeContextZone(directoryKey, zone);
+    }, panelRef);
+  }, [closeContextPanelTab, closeContextZone, directoryKey, shortcutClosesTab, shortcutTargetTabId, zone]);
 
   const closeContextPanelTabs = useUIStore((state) => state.closeContextPanelTabs);
   const renderTabContextMenu = React.useCallback(

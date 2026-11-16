@@ -896,7 +896,7 @@ describe('useUIStore closeContextPanelTab surface stability', () => {
     expect(state?.tabs.map((tab) => tab.mode)).toEqual(['terminal']);
   });
 
-  test('closing the last file tab keeps the file surface on its empty editor tab', () => {
+  test('closing the last file tab closes its panel and preserves tree visibility', () => {
     useUIStore.getState().openContextPanelTab(directory, { mode: 'terminal' });
     useUIStore.getState().openContextFile(directory, '/repo/a.ts');
     useUIStore.setState({ contextEditorTreeVisible: false });
@@ -907,12 +907,9 @@ describe('useUIStore closeContextPanelTab surface stability', () => {
     useUIStore.getState().closeContextPanelTab(directory, fileTabId);
 
     const state = useUIStore.getState().contextPanelByDirectory[directory];
-    const activeTab = state?.tabs.find((tab) => tab.id === state.activeTabId);
-    expect(state?.isOpen).toBe(true);
-    expect(activeTab?.mode).toBe('file');
-    expect(activeTab?.targetPath).toBe(null);
-    expect(state?.tabs.map((tab) => tab.mode)).toEqual(['terminal', 'file']);
-    expect(useUIStore.getState().contextEditorTreeVisible).toBe(true);
+    expect(state?.isOpen).toBe(false);
+    expect(state?.tabs.map((tab) => tab.mode)).toEqual(['terminal']);
+    expect(useUIStore.getState().contextEditorTreeVisible).toBe(false);
   });
 
   test('closing the empty editor tab itself still closes the file surface', () => {
@@ -959,7 +956,7 @@ describe('useUIStore closeContextPanelTabs bulk', () => {
     expect(state?.isOpen).toBe(false);
   });
 
-  test('closing all tabs of the active file surface keeps the surface on its empty editor tab', () => {
+  test('closing all tabs of the active file surface closes its panel', () => {
     useUIStore.getState().openContextPanelTab(directory, { mode: 'terminal' });
     useUIStore.getState().openContextFile(directory, '/repo/a.ts');
     useUIStore.getState().openContextFile(directory, '/repo/b.ts');
@@ -970,12 +967,9 @@ describe('useUIStore closeContextPanelTabs bulk', () => {
     useUIStore.getState().closeContextPanelTabs(directory, fileIds);
 
     const state = useUIStore.getState().contextPanelByDirectory[directory];
-    const activeTab = state?.tabs.find((tab) => tab.id === state.activeTabId);
-    expect(state?.isOpen).toBe(true);
-    expect(activeTab?.mode).toBe('file');
-    expect(activeTab?.targetPath).toBe(null);
-    expect(state?.tabs.some((tab) => tab.mode === 'terminal')).toBe(true);
-    expect(useUIStore.getState().contextEditorTreeVisible).toBe(true);
+    expect(state?.isOpen).toBe(false);
+    expect(state?.tabs.map((tab) => tab.mode)).toEqual(['terminal']);
+    expect(useUIStore.getState().contextEditorTreeVisible).toBe(false);
   });
 
   test('closing only inactive-mode tabs leaves the active tab and panel intact', () => {
@@ -1286,16 +1280,16 @@ describe('useUIStore closeContextFile (the editor\'s Cmd/Ctrl+W)', () => {
     expect(editorOpenPaths()).toEqual(['/repo/a.ts']);
   });
 
-  test('closing the last file leaves the file surface on its tree, panel open', () => {
+  test('closing the last file closes its panel', () => {
     const store = useUIStore.getState();
     store.openContextFile('/repo', '/repo/a.ts');
 
     store.closeContextFile('/repo', '/repo/a.ts');
 
     expect(panel().tabs.some((tab) => tab.targetPath === '/repo/a.ts')).toBe(false);
-    expect(activeTab()?.mode).toBe('file');
-    expect(activeTab()?.targetPath ?? null).toBe(null);
-    expect(panel().isOpen).toBe(true);
+    expect(panel().tabs).toHaveLength(0);
+    expect(panel().activeTabId).toBe(null);
+    expect(panel().isOpen).toBe(false);
   });
 
   test('a path with no tab leaves the tabs alone and still leaves the editor\'s open files', () => {
@@ -1383,16 +1377,18 @@ describe('useUIStore workspace zones', () => {
     expect(panel()?.activeTabId).toBe('git');
   });
 
-  test('closing the last file in a moved zone falls back to the file tree there', () => {
+  test('closing the last file in a moved zone closes only that zone', () => {
     const store = useUIStore.getState();
     store.moveContextSurfaceToZone('file', 'left');
+    store.openContextSurface('/repo', 'diff');
     store.openContextFile('/repo', '/repo/a.ts');
     const fileTab = panel()?.tabs.find((tab) => tab.targetPath === '/repo/a.ts');
     store.closeContextPanelTab('/repo', fileTab?.id ?? '');
 
-    const placeholder = panel()?.tabs.find((tab) => tab.mode === 'file');
-    expect(placeholder?.targetPath).toBeNull();
-    expect(panel()?.zones.left).toMatchObject({ isOpen: true, activeTabId: placeholder?.id });
+    expect(panel()?.tabs.some((tab) => tab.mode === 'file')).toBe(false);
+    expect(panel()?.zones.left).toMatchObject({ isOpen: false, activeTabId: null });
+    expect(panel()?.isOpen).toBe(true);
+    expect(panel()?.activeTabId).toBe('diff');
   });
 
   test('one zone is expanded at a time', () => {

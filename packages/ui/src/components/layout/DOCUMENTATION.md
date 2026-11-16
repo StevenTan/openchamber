@@ -46,3 +46,8 @@ setting turned off keep the plain session title (`Header.tsx`).
   neighbour, and with nothing to close it closes the window. Web keeps the
   configurable `close_session_tab` shortcut (Alt+W by default), since the
   browser owns Cmd/Ctrl+W.
+  Context zones register their own close target: multi-tab surfaces close the
+  active tab, while single-page surfaces and the Tracker's branch tab close
+  their zone. File editors retain their unsaved-edits prompt and terminals
+  close their own active terminal tab. Clicking the chat returns the shortcut
+  to the session tabs.

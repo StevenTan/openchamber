@@ -612,7 +612,7 @@ const closeContextPanelTabs = (
 ): ContextPanelDirectoryState => {
   const closed = new Set(tabIds);
   const closedTabs = current.tabs.filter((tab) => closed.has(tab.id));
-  let nextTabs = current.tabs.filter((tab) => !closed.has(tab.id));
+  const nextTabs = current.tabs.filter((tab) => !closed.has(tab.id));
   if (nextTabs.length === current.tabs.length) {
     return current;
   }
@@ -633,17 +633,6 @@ const closeContextPanelTabs = (
     const nextSameModeTab = sameModeTabs.length > 0
       ? sameModeTabs.reduce((best, tab) => (tab.touchedAt >= best.touchedAt ? tab : best))
       : null;
-
-    // The file surface outlives its files: closing the last real file tab leaves
-    // the same empty editor placeholder the rail opens, so the surface falls
-    // back to its file tree instead of taking the whole zone down with it.
-    // Closing the placeholder itself still closes the surface.
-    if (activeMode === 'file' && !nextSameModeTab && closedTabs.some((tab) => tab.mode === 'file' && tab.targetPath)) {
-      const placeholder = createContextPanelTab({ mode: 'file' });
-      nextTabs = [...nextTabs, placeholder];
-      views[zone] = { activeTabId: placeholder.id };
-      continue;
-    }
 
     views[zone] = nextSameModeTab
       ? { activeTabId: nextSameModeTab.id }
@@ -2294,9 +2283,6 @@ export const useUIStore = create<UIStore>()(
             }
 
             const next = closeContextPanelTabs(current, normalizedTabIds, placement);
-            const fileView = getZoneView(next, zoneOfMode(placement, 'file'));
-            const activeTab = next.tabs.find((tab) => tab.id === fileView.activeTabId);
-            const returnedToTree = fileView.isOpen && activeTab?.mode === 'file' && !activeTab.targetPath;
             const byDirectory = {
               ...state.contextPanelByDirectory,
               [normalizedDirectory]: next,
@@ -2304,7 +2290,6 @@ export const useUIStore = create<UIStore>()(
 
             return {
               contextPanelByDirectory: clampContextPanelRoots(byDirectory, 20),
-              contextEditorTreeVisible: returnedToTree || state.contextEditorTreeVisible,
             };
           });
 
