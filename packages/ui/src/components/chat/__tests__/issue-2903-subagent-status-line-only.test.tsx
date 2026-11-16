@@ -246,14 +246,11 @@ describe('issue #2903 busy subagent status-line-only', () => {
     expect(hookBody).toContain('snapshotRef.current.sessionID === sessionID ? snapshotRef.current.list');
   });
 
-  test('the empty and idle branch leaves the status row to the busy path', () => {
-    // A busy session with no messages yet must fall through to the viewport so
-    // StatusRowContainer is the only thing on screen. The idle branch returns
-    // before it and must not render one of its own. The empty state itself no
-    // longer lives here: the draft surface owns it since the draft transition
-    // animation landed.
+  test('the empty idle viewport leaves the floating action to the composer', () => {
+    // The composer rider owns the floating action; an empty, idle viewport
+    // renders no action of its own.
     expect(chatContainerSource).toContain('if (sessionMessages.length === 0 && !sessionIsWorking)');
-    expect(chatContainerSource).toContain('<StatusRowContainer />');
+    expect(chatContainerSource).toContain('<ScrollToBottomButton');
 
     const emptyIdleGuard = 'if (sessionMessages.length === 0 && !sessionIsWorking)';
     const emptyIdleReturn = chatContainerSource.indexOf(emptyIdleGuard);
@@ -262,6 +259,6 @@ describe('issue #2903 busy subagent status-line-only', () => {
       emptyIdleReturn,
       emptyIdleReturn + 1600,
     );
-    expect(emptyIdleBlock).not.toContain('<StatusRowContainer />');
+    expect(emptyIdleBlock).not.toContain('<ScrollToBottomButton');
   });
 });

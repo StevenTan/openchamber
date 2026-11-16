@@ -8,15 +8,18 @@ import { fileURLToPath } from 'node:url';
  * which is what kept an idle app busy (see the `theme-system` skill, "Animation
  * Contract"). A wait that can last shows `Spinner` (`components/ui/spinner.tsx`),
  * `BusyDots` or `useWaitingBlink`, all on one shared clock. The infinite CSS
- * animations left are bounded by the user: the short `animate-spin` of a button
- * or a quick load, the diff's expand spinner, the model name that scrolls while
- * hovered. A new one fails here until it is replaced or listed with a reason.
+ * exceptions include short button waits, hover effects, and the transform-only
+ * scroll-action dots. A new one fails here until it is replaced or listed
+ * with a reason.
  */
 const ALLOWED = [
   { file: 'index.css', declaration: 'animation: webkit-spin 1s linear infinite !important;' },
   { file: 'index.css', declaration: 'animation: oc-trailing-expand-spin 0.8s linear infinite;' },
   { file: 'index.css', declaration: 'animation: marquee-scroll 5s linear infinite alternate;' },
   { file: 'components/views/PierreDiffViewer.tsx', declaration: 'animation: oc-expand-spin 0.8s linear infinite;' },
+  // Three stepped, transform-only dots in the visible working scroll action.
+  // They unmount when hidden and remain static with reduced motion.
+  { file: 'styles/fork-defaults.css', declaration: 'animation: oc-scroll-working-dot-wave 1s steps(3, end) infinite;' },
 ];
 
 const SOURCE_ROOT = fileURLToPath(new URL('..', import.meta.url));

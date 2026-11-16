@@ -293,8 +293,8 @@ The shared frame measures its height and gap as
 `--chat-floating-panel-clearance`, published through
 `state/composerInsetReaders.ts` onto the elements that read it, never on the
 chat column (inherited from the column, every resize of the frame restyled
-the whole transcript). The floating status row, the recap hint and
-`ScrollToBottomButton` translate upward by that amount, the transcript's tail
+the whole transcript). The recap hint and `ScrollToBottomButton` translate
+upward by that amount, the transcript's tail
 spacer and the end fade band grow by it (so the frame never covers the last
 rows), and the column carries `data-floating-panel` while any frame is
 mounted so the recap hint hides instead of landing over the transcript.
@@ -323,7 +323,7 @@ text grow into the band without moving the transcript; growth past 88px
 (`FLOATING_COMPOSER_GROWTH_ALLOWANCE_PX`) pushes the transcript and keeps
 about 16px between the last row and the composer. While the session works,
 the composer gets no growth allowance and the spacer never drops below the
-current height plus the full gap: the floating status row and the live end
+current height plus the full gap: the working pill and the live end
 fade sit in that gap, and a composer grown into it left the last line under
 the row. The rule and the resting
 height per column live in `state/composerTailInset.ts`; the mobile morph uses
@@ -342,14 +342,14 @@ The transcript's end fade is a band in the chat background over the
 scroller's end (`.chat-scroll-fade--end` in `index.css`; a mask on the
 scroller made the GPU recomposite the whole transcript every frame). It reads
 `--chat-composer-inset` (plus the floating-panel clearance and, while the
-session works, the status row's height) through
+session works, the working pill's height) through
 `--scroll-shadow-end-inset`, so a row that
 does reach the composer, as the newest lines of a live reply do while the
 follow glide is still catching up, dissolves above the box instead of being
 cut in half by its top edge. That inset applies only while a reply streams
 and the view follows it (`data-live-tail` on the chat column, set by
 `ChatContainer` from the timeline's `isFollowingProgrammatically`: no
-scroll-to-bottom pill and no reader gesture); at rest and while the reader scrolls history the rows slide
+reader gesture); at rest and while the reader scrolls history the rows slide
 under the composer, which is what makes the composer read as
 floating. There the end fade is longer instead (`--scroll-shadow-end-size`):
 it starts just above the box and runs to the scroller's bottom edge, so rows
@@ -1409,7 +1409,7 @@ second half. The floating composer slot (`data-composer-slot="floating"`, in
 `ChatContainer`) is pinned for the tween at the height the transcript should
 see — the new one on expand, the old one on collapse — so its
 `ResizeObserver` publishes one final inset instead of chasing frames. The
-status row, recap hint and scroll-to-end button share one zero-height anchor
+working pill and recap hint share one zero-height anchor
 on the slot's top edge (`data-composer-riders`, class `oc-composer-riders`):
 the keyboard choreography slides it as a mover and the morph moves it with the
 box's top edge through the individual `translate` property, so nothing above

@@ -49,7 +49,6 @@ import { hasActiveFormToolInCurrentTurn, recoverPendingFormWithRetry } from '@/s
 import { useIsPageWaiting } from '@/sync/global-blocking-requests';
 import { holdPendingSynthetic } from './lib/holdPendingSynthetic';
 import { toast } from '@/components/ui';
-import { StatusRowContainer } from './StatusRowContainer';
 import {
     FLOATING_COMPOSER_DEFAULT_TAIL_INSET_PX,
     FLOATING_COMPOSER_GAP_PX,
@@ -59,7 +58,6 @@ import {
 import {
     publishComposerInsets,
     registerComposerInsetReader,
-    registerFloatingPanelClearanceReader,
     withdrawComposerInsets,
 } from '@/components/chat/composer/state/composerInsetReaders';
 import { SessionErrorNotice } from '@/components/chat/SessionErrorNotice';
@@ -1330,7 +1328,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         activeTurnChangeRef.current(turnId);
     }, []);
 
-    // The composer sits below the timeline, but the status/working row floats
+    // The composer sits below the timeline, but the working pill floats
     // OVER the timeline's bottom edge; its measured height keeps the live
     // streaming line above it and reserves matching end inset in the list.
     const [statusOverlayHeight, setStatusOverlayHeight] = React.useState(0);
@@ -2008,7 +2006,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
 			ref={chatRootRef}
 			data-composer-bound
 			// A live reply can outrun the follow glide; while it streams and the
-			// view follows it (no scroll-to-bottom pill, no reader gesture), the
+			// view follows it without a reader gesture, the
 			// transcript fades out above the composer (index.css). Once the
 			// reader leaves the end, the rows slide under its glass again.
 			data-live-tail={sessionStatusForCurrent.type === 'busy' && isFollowingProgrammatically ? 'true' : undefined}
@@ -2056,36 +2054,11 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
                        when the slot resizes (see mobileComposerMorph). */
                     <div className="oc-composer-riders absolute bottom-full inset-x-0" data-composer-riders="true">
                         <ScrollToBottomButton
-                            visible={timelineController.showScrollToBottom}
+                            visible={sessionIsWorking || timelineController.showScrollToBottom}
                             working={sessionIsWorking}
                             onClick={navigation.resumeToLatest}
+                            surfaceRef={sessionIsWorking ? onStatusOverlayNode : undefined}
                         />
-                        {/* Same anchor and column as the pill, so the status
-                            row and the pill it hands off to share the exact
-                            distance from the input and the same left edge. */}
-                        <div
-                            ref={registerFloatingPanelClearanceReader}
-                            className={cn(
-                                'pointer-events-none absolute bottom-full inset-x-0 mb-2 transition-opacity duration-100',
-                                userOwnsScroll && 'opacity-0',
-                            )}
-                            style={{ transform: 'translateY(calc(-1 * var(--chat-floating-panel-clearance, 0px)))' }}
-                        >
-                            <div className="chat-input-column">
-                                {/* The glass chip itself is rendered inside
-                                    StatusRow (its root is a size container
-                                    that cannot shrink-wrap). */}
-                                <div
-                                    ref={onStatusOverlayNode}
-                                    className={cn(
-                                        '[&:not(:has(*))]:hidden',
-                                        userOwnsScroll ? 'pointer-events-none' : 'pointer-events-auto',
-                                    )}
-                                >
-                                    <StatusRowContainer />
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 )}
                 {promptReadOnly ? (
