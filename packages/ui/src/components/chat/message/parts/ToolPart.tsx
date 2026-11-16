@@ -22,6 +22,7 @@ import { opencodeClient } from '@/lib/opencode/client';
 import type { State } from '@/sync/types';
 import { useUIStore } from '@/stores/useUIStore';
 import { ScrollableOverlay } from '@/components/ui/ScrollableOverlay';
+import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui';
 import { Text } from '@/components/ui/text';
@@ -171,80 +172,6 @@ const LiveDuration: React.FC<{ start: number; end?: number; active: boolean }> =
     const now = useDurationTickerNow(active);
 
     return <>{formatDuration(start, end, now)}</>;
-};
-
-const deferredToolBodyMounts: Array<{ active: boolean; fn: () => void }> = [];
-let deferredToolBodyFrame: number | undefined;
-
-const flushDeferredToolBodyMounts = () => {
-    while (deferredToolBodyMounts.length > 0) {
-        const item = deferredToolBodyMounts.pop();
-        if (!item) {
-            break;
-        }
-        if (item.active) {
-            item.fn();
-            deferredToolBodyFrame = deferredToolBodyMounts.length > 0
-                ? window.requestAnimationFrame(flushDeferredToolBodyMounts)
-                : undefined;
-            return;
-        }
-    }
-
-    deferredToolBodyFrame = undefined;
-};
-
-const scheduleDeferredToolBodyMount = (fn: () => void) => {
-    if (typeof window === 'undefined') {
-        fn();
-        return () => undefined;
-    }
-
-    const item = { active: true, fn };
-    deferredToolBodyMounts.push(item);
-
-    if (deferredToolBodyFrame === undefined) {
-        deferredToolBodyFrame = window.requestAnimationFrame(() => {
-            deferredToolBodyFrame = window.requestAnimationFrame(flushDeferredToolBodyMounts);
-        });
-    }
-
-    return () => {
-        item.active = false;
-    };
-};
-
-const useDeferredExpandedContent = (isExpanded: boolean) => {
-    // If the tool is expanded when the row first mounts (e.g. "show tools open
-    // by default", or scrolling a default-open tool back into a virtualized
-    // view), render the body SYNCHRONOUSLY so the virtualizer measures the real
-    // height immediately. Deferring it would let the row mount short and grow a
-    // frame later, which makes the virtualizer compensate scroll and lurch the
-    // viewport past several messages on slow scroll. Only defer LATER
-    // user-initiated expansions, where instant single-item feedback isn't worth
-    // blocking the click on a heavy body render.
-    const [shouldRender, setShouldRender] = React.useState(isExpanded);
-    const mountedRef = React.useRef(false);
-
-    React.useEffect(() => {
-        if (!isExpanded) {
-            mountedRef.current = true;
-            setShouldRender(false);
-            return;
-        }
-
-        if (!mountedRef.current) {
-            mountedRef.current = true;
-            setShouldRender(true);
-            return;
-        }
-
-        return scheduleDeferredToolBodyMount(() => {
-            setShouldRender(true);
-        });
-    }, [isExpanded]);
-
-    return shouldRender;
 };
 
 const parseDiffStats = (metadata?: Metadata): { added: number; removed: number } | null => {
@@ -1832,18 +1759,7 @@ const ToolPartContent: React.FC<ToolPartProps & { header?: ToolRowHeader; subage
         }
     }, [isFinalized]);
 
-    const expandedContentRef = React.useRef<HTMLDivElement>(null);
     const [headerActionsSlot, setHeaderActionsSlot] = React.useState<HTMLSpanElement | null>(null);
-
-    React.useLayoutEffect(() => {
-        const element = expandedContentRef.current;
-        if (!element) {
-            return;
-        }
-
-        element.style.height = isExpanded ? 'auto' : '0px';
-        element.style.overflow = isExpanded ? 'visible' : 'hidden';
-    }, [isExpanded]);
 
     const time = stateWithData.time;
 
@@ -2111,13 +2027,13 @@ const ToolPartContent: React.FC<ToolPartProps & { header?: ToolRowHeader; subage
 
     const iconStyle = isError ? TOOL_ERROR_ICON_STYLE : TOOL_NORMAL_ICON_STYLE;
     const titleStyle = isError ? TOOL_ERROR_TITLE_STYLE : TOOL_NORMAL_TITLE_STYLE;
-    const shouldRenderExpandedContent = useDeferredExpandedContent(isExpanded);
     const storeDirectory = useChatTranscriptDirectory();
     const contentCompletion = useToolContentCompletion(
         part,
-        shouldRenderExpandedContent || (presentation !== null && guestToolHeaderReadsOutput(presentation)),
+        isExpanded || (presentation !== null && guestToolHeaderReadsOutput(presentation)),
         storeDirectory ?? undefined,
     );
+    const panelOpen = isExpanded && (contentCompletion.status !== 'loading' || contentCompletion.showProgress);
     // Shell and subagent rows carry their duration: live while they run, final once settled.
     // Image generation takes tens of seconds; the ticking time shows it is still at work.
     const showsDuration = isShellTool(normalizedPartTool) || isTaskTool || part.tool === 'openchamber_image';
@@ -2127,7 +2043,7 @@ const ToolPartContent: React.FC<ToolPartProps & { header?: ToolRowHeader; subage
     }
 
     return (
-        <div ref={rowRef}>
+        <Collapsible ref={rowRef} open={panelOpen}>
             {}
             <div
                 className={cn(
@@ -2338,43 +2254,37 @@ const ToolPartContent: React.FC<ToolPartProps & { header?: ToolRowHeader; subage
                 )}
             </div>
 
-            <div
-                ref={expandedContentRef}
+            <CollapsibleContent
                 aria-hidden={!isExpanded}
-                style={{
-                    height: isExpanded ? 'auto' : '0px',
-                    overflow: isExpanded ? 'visible' : 'hidden',
-                    overflowAnchor: 'none',
-                }}
+                data-disclosure-overflow=""
+                style={{ overflowAnchor: 'none' }}
             >
-                {shouldRenderExpandedContent ? (
-                    <BlockBody onToggle={() => onToggle(part.id)}>
-                        {contentCompletion.status === 'whole' ? (
-                            <ToolExpandedContent
-                                part={part}
-                                state={state}
-                                currentDirectory={currentDirectory}
-                                isExpanded={isExpanded}
-                                onShowPopup={onShowPopup}
-                                presentation={presentation}
-                                headerActionsSlot={headerActionsSlot}
-                            />
-                        ) : contentCompletion.status === 'loading' ? (
-                            contentCompletion.showProgress ? (
-                                <div className="typography-meta text-muted-foreground">
-                                    {t('chat.toolPart.content.loading')}
-                                </div>
-                            ) : null
-                        ) : (
-                            <div className="typography-meta flex items-center gap-2 text-muted-foreground">
-                                <span>{t('chat.toolPart.content.loadFailed')}</span>
-                                <QuietAction label={t('chat.toolPart.content.retry')} onClick={contentCompletion.retry} />
+                <BlockBody onToggle={() => onToggle(part.id)}>
+                    {contentCompletion.status === 'whole' ? (
+                        <ToolExpandedContent
+                            part={part}
+                            state={state}
+                            currentDirectory={currentDirectory}
+                            isExpanded={isExpanded}
+                            onShowPopup={onShowPopup}
+                            presentation={presentation}
+                            headerActionsSlot={headerActionsSlot}
+                        />
+                    ) : contentCompletion.status === 'loading' ? (
+                        contentCompletion.showProgress ? (
+                            <div className="typography-meta text-muted-foreground">
+                                {t('chat.toolPart.content.loading')}
                             </div>
-                        )}
-                    </BlockBody>
-                ) : null}
-            </div>
-        </div>
+                        ) : null
+                    ) : (
+                        <div className="typography-meta flex items-center gap-2 text-muted-foreground">
+                            <span>{t('chat.toolPart.content.loadFailed')}</span>
+                            <QuietAction label={t('chat.toolPart.content.retry')} onClick={contentCompletion.retry} />
+                        </div>
+                    )}
+                </BlockBody>
+            </CollapsibleContent>
+        </Collapsible>
     );
 };
 

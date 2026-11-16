@@ -9,7 +9,7 @@
   overscroll-behavior: contain;
 }
 
-:root.desktop-runtime :is(.overlay-scrollbar-container.flex-1, .overflow-y-auto, .cm-scroller, textarea) {
+:root.desktop-runtime :is(.overlay-scrollbar-container.flex-1, .overflow-y-auto, .cm-scroller, textarea):not(.tool-output-surface) {
   overscroll-behavior-y: contain;
 }
 

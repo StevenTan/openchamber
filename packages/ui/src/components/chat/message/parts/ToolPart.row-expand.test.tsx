@@ -9,6 +9,8 @@ import type { ToolPart as ToolPartData } from '@/lib/opencode/model';
 import { SyncProvider } from '@/sync/sync-context';
 import { I18nProvider } from '@/lib/i18n';
 import { onRowExpand } from '@/components/chat/lib/scroll/timelineScrollIntent';
+import { ThemeSystemContext, type ThemeContextValue } from '@/contexts/theme-system-context';
+import { getDefaultTheme } from '@/lib/theme/themes';
 
 // Bun does not implement Vite's worker asset-query imports.
 plugin({
@@ -22,6 +24,27 @@ plugin({
 });
 
 const { default: ToolPart } = await import('./ToolPart');
+
+const unsupportedThemeChange = (): never => { throw new Error('Theme changes are unsupported in this fixture'); };
+const theme = getDefaultTheme(false);
+const themeContext: ThemeContextValue = {
+  currentTheme: theme,
+  availableThemes: [theme],
+  setTheme: unsupportedThemeChange,
+  customThemesLoading: false,
+  reloadCustomThemes: unsupportedThemeChange,
+  importTheme: unsupportedThemeChange,
+  deleteImportedTheme: unsupportedThemeChange,
+  customThemeIds: [],
+  isSystemPreference: false,
+  setSystemPreference: unsupportedThemeChange,
+  themeMode: 'light',
+  setThemeMode: unsupportedThemeChange,
+  lightThemeId: theme.metadata.id,
+  darkThemeId: getDefaultTheme(true).metadata.id,
+  setLightThemePreference: unsupportedThemeChange,
+  setDarkThemePreference: unsupportedThemeChange,
+};
 
 const part: ToolPartData = {
   id: 'prt_shell', sessionID: 'ses_shell', messageID: 'msg_shell',
@@ -95,7 +118,9 @@ test('opening a tool row tells the timeline before the row grows; closing it doe
       root.render(
         <SyncProvider sdk={sdk} directory="">
           <I18nProvider>
-            <Row onToggled={() => { events.push('toggle'); }} />
+            <ThemeSystemContext.Provider value={themeContext}>
+              <Row onToggled={() => { events.push('toggle'); }} />
+            </ThemeSystemContext.Provider>
           </I18nProvider>
         </SyncProvider>,
       );

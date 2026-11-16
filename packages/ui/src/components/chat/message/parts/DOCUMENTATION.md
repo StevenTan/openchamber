@@ -6,6 +6,10 @@ The snapshot keeps closing content visible without retaining hidden tools or
 animating the list's measurements. Reduced motion and unsupported browsers
 apply disclosure immediately. Expandable tool headers share `DisclosureChevron`
 and the measured-height Base UI panel transition.
+Panel contents stay mounted through closing and unmount when the transition
+finishes. A shelled result opens its panel once content or progress is visible.
+Tool output scrolls locally while it has room; at either vertical edge, native
+scroll chaining continues through the chat viewport.
 
 This folder contains renderers for chat message parts (text, tools, reasoning, placeholders) and shared tool presentation helpers.
 
