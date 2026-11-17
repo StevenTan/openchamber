@@ -4,6 +4,7 @@ import { isVSCodeRuntime } from '@/lib/desktop';
 import { normalizePath } from '@/lib/pathNormalization';
 import { getBtwOriginalSessionID, isBtwSession, wasPromotedBtwSession } from '@/lib/sessionBtwMetadata';
 import { getOriginalSessionID, isReviewSession } from '@/lib/sessionReviewMetadata';
+import { getSideChat } from '@/lib/sessionSideChatMetadata';
 
 /**
  * Which session a sidebar row nests under.
@@ -11,8 +12,8 @@ import { getOriginalSessionID, isReviewSession } from '@/lib/sessionReviewMetada
  * A subagent nests under the run that spawned it (`parentID`, OpenCode's own
  * lineage). A side session of another one in the same folder nests under that
  * one too, so the work they share reads as one entry: an auto-review under the
- * session it reviews, and a `/btw` side conversation (promoted or not) under
- * the session it was typed into. A plain fork stays a root: it usually takes
+ * session it reviews, and a `/btw` side conversation (promoted or not) or saved
+ * side chat under its source session. A plain fork stays a root: it usually takes
  * the task another way, so it is a work of its own. A session another session's agent
  * started through the openchamber tool is the user's own conversation and
  * stays a root; its first message links back to the sender instead.
@@ -36,7 +37,7 @@ const getSessionOriginId = (session: Session): string | null => {
   if (isBtwSession(session) || wasPromotedBtwSession(session)) {
     return getBtwOriginalSessionID(session) ?? (session.fork?.sessionID?.trim() || null);
   }
-  return null;
+  return getSideChat(session)?.parentSessionID ?? null;
 };
 
 // A present marker is enough: a fork inherits its source's marker and is still

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
-import { normalizeContextPanelDirectoryKey } from '@/stores/useUIStore';
+import { normalizeContextPanelDirectoryKey, usePanelWorkspaceApi } from '@/stores/useUIStore';
 import { watchZoneFit, type SidebarFoldReason } from './zoneFitWatch';
 
 /**
@@ -9,6 +9,7 @@ import { watchZoneFit, type SidebarFoldReason } from './zoneFitWatch';
  * React, so it re-renders nothing either.
  */
 export const ZoneFitArbiter: React.FC = () => {
+  const workspace = usePanelWorkspaceApi();
   const effectiveDirectory = useEffectiveDirectory();
   const directoryKey = effectiveDirectory ? normalizeContextPanelDirectoryKey(effectiveDirectory) : '';
 
@@ -22,11 +23,12 @@ export const ZoneFitArbiter: React.FC = () => {
   React.useEffect(() => {
     if (!directoryKey) return undefined;
     return watchZoneFit({
+      store: workspace,
       directoryKey,
       folded: sidebarFoldedByRef,
       readRowWidth: () => document.querySelector<HTMLElement>('[data-workspace-row]')?.clientWidth,
     });
-  }, [directoryKey]);
+  }, [directoryKey, workspace]);
 
   return null;
 };

@@ -131,7 +131,7 @@ export const CONTEXT_SURFACES: readonly ContextSurfaceDescriptor[] = [
     mode: 'chat',
     icon: 'chat-4',
     labelKey: 'contextPanel.mode.chat',
-    availability: 'has-content',
+    availability: 'always',
   },
 ];
 

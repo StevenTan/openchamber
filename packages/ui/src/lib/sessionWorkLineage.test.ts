@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { Session } from '@/lib/opencode/model';
 import { resolveSessionNestingParentId } from './sessionWorkLineage';
+import { sideChatMetadata, withSideChatSaved } from './sessionSideChatMetadata';
 
 // SAFETY: lineage reads only ids, folders, parents, forks, archive time and metadata.
 const session = (id: string, extra: Partial<Session> = {}): Session => ({
@@ -53,5 +54,13 @@ describe('resolveSessionNestingParentId', () => {
     expect(resolve(lane, all)).toBeNull();
     expect(resolve(a, all)).toBeNull();
     expect(resolve(b, all)).toBeNull();
+  });
+
+  test('a saved side chat stays nested under its source, including after metadata reload', () => {
+    const saved = session('side', { metadata: JSON.parse(JSON.stringify(withSideChatSaved(sideChatMetadata(root.id, null)))) });
+    const nested = session('nested', { metadata: withSideChatSaved(sideChatMetadata(saved.id, null)) });
+    const all = [root, saved, nested];
+    expect(resolve(saved, all)).toBe(root.id);
+    expect(resolve(nested, all)).toBe(saved.id);
   });
 });

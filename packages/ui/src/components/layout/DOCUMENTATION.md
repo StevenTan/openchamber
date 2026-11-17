@@ -3,6 +3,23 @@
 This file covers the header's session tabs. The tab store, its scopes and
 seeding are owned by `stores/DOCUMENTATION.md` (`useSessionTabsStore`).
 
+## Displayed session workspace
+
+`WorkspaceSession` supplies one displayed selection to the main chat, context
+zones, rail and fit arbiter. Session-list navigation publishes its selection
+immediately; the displayed workspace uses `useShownSessionSelection` to keep
+the previous workspace while the target's messages load, then commits its
+session, resource directory, draft and panel owner together. Pinned chats and
+standalone runtimes own that same presentation policy within their column.
+
+### Why panels follow the displayed selection
+
+The transcript can retain its previous session during a deferred render or
+message load. Its panel geometry and actions must retain the same owner until
+that render commits, so outgoing text keeps its width and visible controls
+act on the workspace on screen. The fit arbiter captures this owner's store;
+background panel and browser resources keep their own mounted identity.
+
 ## Header session tabs
 
 `SessionTabsStrip.tsx` is the header's horizontal working set of sessions, in
@@ -51,3 +68,6 @@ setting turned off keep the plain session title (`Header.tsx`).
   their zone. File editors retain their unsaved-edits prompt and terminals
   close their own active terminal tab. Clicking the chat returns the shortcut
   to the session tabs.
+  Temporary side-chat tabs confirm permanent session deletion through
+  `SideChatCloseConfirmDialog`, including shortcut and batch closures. Saved
+  chats close without deletion. Hiding a context zone retains its tabs.

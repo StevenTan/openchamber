@@ -1115,7 +1115,7 @@ Rules:
 8. A stream gap (reconnect, transport switch, or `server.connected` outside the boot window) advances the loader's history epoch. A cached transcript confirmed before that epoch still renders at once when opened, and its tail (30 records) refreshes in the background; prefetch never does this. A tail that does not reach the cached records is read back until it joins them, or until the cold-navigation window is full, in which case the window replaces the cache so no hole is left behind it. After a gap the tail joins only through the gap anchor: the newest record the transcript held when the first gap since its confirmation happened. Records that arrived by live events after the gap may sit past a hole, so holding one of them is not a join; a stale transcript without an anchor (its load was still running at the gap) takes a fresh window. A refresh without a gap joins through any record cached before it started. A successful read confirms the transcript at the epoch it started in; a failed one keeps the cached records and the stale mark, so the next open tries again. A tail refresh repeats the inbox read so items enqueued during the gap reappear.
 9. The ref-stable loader is disposed only after the current task when its provider unmounts. This lets React Strict Mode's development setup → cleanup → setup probe retain a usable loader for child effects, while real disposal still invalidates the preceding lifecycle's work.
 10. Transcript arrays are chronological by `message.time.created`. Within one millisecond a `synthetic` record sorts before any other role, then message ID breaks the tie deterministically: composer context is admitted right before its prompt, often in the same millisecond, while the prompt's ID is minted earlier on the client. Sends mint context IDs before the prompt ID and show those synthetic records optimistically with the prompt's timestamp, so the context renders on the prompt from the first frame and the server records reconcile in place. Optimistic records carry the client's clock, so a page that returns the server's copy of one replaces the client's copy outright, unless a live event already did; otherwise a remote client whose clock runs ahead keeps its prompt sorted after the reply. Message IDs are identity and reconciliation keys, not chronology: OpenCode's fixed-width sortable timestamp prefix rolls over, so a newer `msg_000...` can follow an older `msg_fff...`. Fetch, pagination, materialization, optimistic insertion, events, reconnect inspection, rendering, and revert/undo/redo must preserve this contract.
-11. Session-scoped ArrowUp and ArrowDown recall merges the visible transcript's user prompts (`useUserMessageHistory`) with the persisted input-history bucket for runtime + normalized directory + session identity. Revert markers hide prompts from the transcript source only; the persisted bucket still recalls them. Global scope reads the persisted runtime bucket alone.
+11. Session-scoped ArrowUp and ArrowDown recall merges the visible transcript's user prompts (`useUserMessageHistory`) with the persisted input-history bucket for runtime + normalized directory + session identity. Transcript and recall share the side-chat boundary projection, so inherited prompts stay outside the current chat's history, including after save and pagination. Revert markers hide prompts from the transcript source only; the persisted bucket still recalls them. Global scope reads the persisted runtime bucket alone.
 12. Part arrays preserve authoritative response/event order. Part IDs are identity keys and have the same rollover limitation; identity lookup/removal must not require a part array to be lexically ID-sorted.
 
 Pages the loader reads ask for finished tool results as shells
@@ -1612,10 +1612,13 @@ by one coalesced microtask. Plain `subscribeRegistry` stays synchronous:
 
 The sidebar click publishes `currentSessionId`/`currentSessionDirectory`
 synchronously, and the message fetch starts before that publication so the
-request is on the wire while React renders. `ChatContainer` consumes a
-`useDeferredValue` copy of the selection: the first commit paints the cheap
-reactions (active row, URL, tabs) and the timeline for the new session renders
-in a transition behind it. Selection *policy* inside `ChatContainer` (auto-
+request is on the wire while React renders. `useShownSessionSelection` owns
+the loading hold and deferred selection. On desktop, `WorkspaceSession`
+applies that selection to the main chat and every context zone together;
+pinned chats and standalone runtimes apply it within `ChatContainer`. The
+first commit paints the navigation feedback (active row, URL, tabs), while
+the new workspace renders in a transition. Selection *policy* inside
+`ChatContainer` (auto-
 opening a draft when nothing is selected) reads the live store value, because
 the deferred one still names the previous session for one commit. A selection
 arriving from nothing (a draft just submitted, an empty chat) is not deferred:
@@ -1639,13 +1642,11 @@ after it settles, and a row the mouse rests on or keyboard focus reaches for
 180ms (`useSessionHoverPrefetch`), so most switches are warm. Both share one
 queue with a concurrency cap; VS Code does neither.
 
-The column changes as one. The composer and the status chip above it read
-the session the timeline shows (`components/chat/chatColumnSession.ts`), not
-the live selection: read live, they re-shaped a commit ahead of the swap
-(a taller draft, chips, a working chip) and the outgoing timeline, pinned to
-its end, jumped before it was replaced. The reveal effect below runs once per
-gate for the same reason — `revealWaited` flips for the outgoing session at
-the click, and re-running on it hid that timeline before the next one mounted.
+The displayed desktop workspace carries the session, directory, draft and
+panel owner as one snapshot. Inside a chat column the composer and its status
+chip read the session the timeline shows (`components/chat/chatColumnSession.ts`).
+The reveal effect runs once per gate: navigation feedback alone must not hide
+the outgoing timeline or change the geometry of its composer and panels.
 
 The timeline's first paint for a session is atomic. `ChatContainer` owns a
 `TimelineRevealGate` per session key (`components/chat/timelineRevealGate.ts`).
@@ -1660,7 +1661,10 @@ The timeline root stays at
 opacity 0 until every hold releases (capped at 250ms) and the content height
 has held still for two frames, then fades in once as a whole. The gate stops
 accepting holds after the opening commit so rows mounting during scroll never
-hide the timeline. Once the lazy markdown
+hide the timeline. A restored message-list entry whose first paint completed
+is shown directly. Its readiness cache follows the message-list pool's same
+membership and capacity, including entries whose initial reveal is pending;
+a runtime or directory change invalidates that entry's readiness. Once the lazy markdown
 module has loaded, `MarkdownRenderer` mounts it synchronously instead of
 through `Suspense`: a suspended boundary shows its fallback for a tick and
 React then throttles later-resolving boundaries by ~300ms, which staggered
@@ -1819,6 +1823,31 @@ independently of animation frames across all chat runtimes.
 
 ### Pinned chat columns
 
+The Chat rail entry and tab-strip plus create temporary side conversations
+through `createSideChat`, without changing the main selection. A side chat
+forks its source chat column after that session's last completed answer; a parent without a
+completed answer starts an empty side chat. Text selection can initialize its
+persisted composer draft. Its panel owner is the host main session; its
+transcript and API requests use the side session's own directory.
+Session metadata keeps the inherited message boundary separately from the
+temporary flag. The transcript projects only messages after that boundary,
+including across pagination and reloads; the provider receives the inherited
+history as reference context. Temporary chats stay out of session lists.
+Closing their tab confirms deletion, while hiding the panel or switching the main
+session retains them. Save as session clears the temporary flag and keeps the
+tab and history boundary. Parent metadata links children by individual session
+ID keys, so concurrent additions and removals merge independently. Temporary
+cleanup deletes temporary side chats and retains saved ones. Saved side chats
+nest under their source session through `sessionWorkLineage`; sidebar tree
+actions include them through the existing descendant rules. Save and close actions for one side chat
+commit in invocation order. Failed deletion retains the tab for retry.
+The close confirmation lists the complete temporary descendant set and bounds
+cleanup to those IDs. Confirmed deletion clears matching chat tabs across
+workspaces in the runtime. A saved descendant retains its own subtree.
+`PanelWorkspaceOwnerContext` and the chat-column session context carry these
+separate identities. Background columns retain drafts and streaming, and only
+the foreground workspace contributes external viewed ownership.
+
 A chat opened in the side panel ("Open in side panel" or Shift-click on a
 sidebar row, a subtask, a review session) is a second `ChatContainer` in the same app, pinned to its session
 (`pinnedSession`). It used to be an iframe that booted a whole second app per
@@ -1827,8 +1856,9 @@ and changes only through its own navigation (open a subtask in place, return
 to the parent), never the main chat's selection or draft.
 
 Everything inside a chat reads its session through `chatColumnSession.ts`:
-`useChatSessionSelection()` is the column's session inside a column and the
-live selection elsewhere (it does not subscribe to the selection inside one),
+`useChatSessionSelection()` is the column's session inside a column, the
+displayed selection inside a workspace, and the live selection elsewhere
+(a column does not subscribe to the main selection),
 `useEffectiveDirectory` resolves the column's session, and
 `useChatColumnActions()` routes what a chat does on its own behalf: open a
 session, open the timeline dialog, focus its composer. App-wide state the main

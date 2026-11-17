@@ -1,4 +1,9 @@
-import { create } from 'zustand';
+import { create, useStore, type StoreApi } from 'zustand';
+import { useContext } from 'react';
+import { getPanelWorkspaceOwner, sessionPanelOwner, PanelWorkspaceOwnerContext, subscribePanelWorkspaceOwner } from '@/lib/workspace/panelOwner';
+import { getRuntimeKey, subscribeRuntimeEndpointChanged } from '@/lib/runtime-switch';
+import { toast } from 'sonner';
+import { formatMessage, useI18nStore } from '@/lib/i18n';
 import { DEFAULT_SESSION_GOAL_MAX_AUTO_TURNS, isSessionGoalMaxAutoTurns } from '@/lib/sessionGoalTurnLimit';
 import { z } from 'zod';
 import { devtools, persist } from 'zustand/middleware';
@@ -14,7 +19,7 @@ import { getStoredMobileKeyboardMode, type MobileKeyboardMode } from '@/lib/mobi
 import type { TerminalShell } from '@/lib/api/types';
 import type { PermissionMode } from './utils/permissionAutoAccept';
 import { directoryMayHaveActiveProjectAction, useTerminalStore } from '@/stores/useTerminalStore';
-import { useFilesViewTabsStore } from './useFilesViewTabsStore';
+import { getFilesViewTabsStore, adoptLegacyFilesViewTabs, deleteFilesViewTabsWorkspace } from './useFilesViewTabsStore';
 import { rebaseMovedPath } from '@/lib/filePathMoves';
 import { isVSCodeRuntime } from '@/lib/desktop';
 import { noteBrowserTabOpenedWithAddress, requestBrowserTabLoad } from '@/lib/browser/devServerWait';
@@ -40,6 +45,7 @@ import {
   type MovedZoneViews,
 } from '@/lib/workspace/zones';
 import { sanitizeWorkStatusSectionOrder, type WorkStatusPanelSectionId } from '@/components/chat/work-status/sections';
+import { confirmSideChatClose } from '@/components/layout/sideChatCloseConfirmation';
 
 export type PendingDiffScope = 'working' | 'staged' | 'turn' | 'branch' | 'commit' | 'pr';
 export type { ContextPanelMode };
@@ -107,6 +113,7 @@ type ContextPanelTab = {
       and leave another session's alone. */
   ownerSessionId: string | null;
   touchedAt: number;
+  discardOnClose?: boolean;
 };
 
 type ContextPanelTabDescriptor = {
@@ -121,6 +128,7 @@ type ContextPanelTabDescriptor = {
   diffScope?: PendingDiffScope | null;
   preview?: boolean;
   ownerSessionId?: string | null;
+  discardOnClose?: boolean;
 };
 
 type ContextPanelDirectoryState = {
@@ -273,7 +281,7 @@ const normalizeContextTargetDirectory = (value: string | null | undefined): stri
 // the app moving to that project. Every other mode works in the panel's own
 // directory.
 const contextPanelModeKeepsTargetDirectory = (mode: ContextPanelMode): boolean => {
-  return mode === 'terminal' || mode === 'chat' || mode === 'pr' || mode === 'diff' || mode === 'walkthrough';
+  return mode === 'terminal' || mode === 'chat' || mode === 'pr' || mode === 'diff' || mode === 'walkthrough' || mode === 'browser';
 };
 
 /**
@@ -355,7 +363,7 @@ const createContextPanelTab = (descriptor: ContextPanelTabDescriptor): ContextPa
     normalizedTargetPath,
     descriptor.dedupeKey,
   );
-  return {
+  const tab: ContextPanelTab = {
     id: buildContextPanelTabID(descriptor.mode, dedupeKey),
     mode: descriptor.mode,
     targetPath: normalizedTargetPath,
@@ -371,6 +379,8 @@ const createContextPanelTab = (descriptor: ContextPanelTabDescriptor): ContextPa
     ownerSessionId: normalizeBrowserTabOwner(descriptor.mode, descriptor.ownerSessionId),
     touchedAt: Date.now(),
   };
+  if (descriptor.mode === 'chat' && descriptor.discardOnClose) tab.discardOnClose = true;
+  return tab;
 };
 
 /**
@@ -396,7 +406,7 @@ const clampContextPanelTabs = (
     const modeTabs = tabs.filter((tab) => tab.mode === mode);
     const removable = [...modeTabs]
       .sort((a, b) => a.touchedAt - b.touchedAt)
-      .filter((tab) => tab.id !== activeTabId && !isTrackerBranchTab(tab));
+      .filter((tab) => tab.id !== activeTabId && !isTrackerBranchTab(tab) && !tab.discardOnClose);
     // Never drop the tab being opened or looked at; if that leaves the mode one
     // over its budget, one extra tab beats losing the one in use.
     for (const tab of removable.slice(0, count - maxTabsPerMode)) removeSet.add(tab.id);
@@ -432,6 +442,7 @@ const sanitizeContextPanelTabs = (tabs: unknown): ContextPanelTab[] => {
       preview?: unknown;
       ownerSessionId?: unknown;
       touchedAt?: unknown;
+      discardOnClose?: unknown;
     };
 
     // Legacy 'preview' tabs are converted to 'browser' by the v14 migration;
@@ -462,7 +473,7 @@ const sanitizeContextPanelTabs = (tabs: unknown): ContextPanelTab[] => {
     }
 
     seen.add(id);
-    result.push({
+    const tab: ContextPanelTab = {
       id,
       mode: candidate.mode,
       targetPath,
@@ -481,7 +492,9 @@ const sanitizeContextPanelTabs = (tabs: unknown): ContextPanelTab[] => {
       touchedAt: typeof candidate.touchedAt === 'number' && Number.isFinite(candidate.touchedAt)
         ? candidate.touchedAt
         : Date.now(),
-    });
+    };
+    if (candidate.mode === 'chat' && candidate.discardOnClose === true) tab.discardOnClose = true;
+    result.push(tab);
   }
 
   return result;
@@ -565,8 +578,9 @@ const upsertContextPanelTab = (
     ? baseTabs.map((tab, index) => (index === replacedPreviewIndex ? nextTab : tab))
     : existingIndex === -1
     ? [...baseTabs, nextTab]
-    : baseTabs.map((tab, index) => (index === existingIndex
-      ? {
+    : baseTabs.map((tab, index) => {
+        if (index !== existingIndex) return tab;
+        const updated = {
           ...tab,
           mode: nextTab.mode,
           targetPath: nextTab.targetPath || tab.targetPath,
@@ -580,8 +594,10 @@ const upsertContextPanelTab = (
           // Reopening a preview as a preview keeps it one; any other open pins it.
           preview: tab.preview && nextTab.preview,
           touchedAt: Date.now(),
-        }
-      : tab));
+        };
+        if (nextTab.discardOnClose) updated.discardOnClose = true;
+        return updated;
+      });
 
   // A background upsert (an agent working a page) keeps the panel exactly as
   // the user left it: closed stays closed, and whatever tab they were on
@@ -864,6 +880,16 @@ interface UIStore {
   sidebarFoldedForExpandedZone: boolean;
   sidebarWidth: number;
   contextPanelByDirectory: Record<string, ContextPanelDirectoryState>;
+  panelWorkspaces: Record<string, PanelWorkspaceState>;
+  panelWorkspaceAliases: Record<string, string>;
+  panelWorkspaceOwnerId: string;
+  contextTerminalTabs: Record<string, {
+    tabIds: string[];
+    activeTabId: string | null;
+    serverSessionIds?: Record<string, string>;
+    legacyAdoptionPending?: boolean;
+  }>;
+  contextPanelHostDirectory: string | null;
   contextRailOrder: string[];
   /** Surface ids the user hid from the context rail; stored as the hidden set
       so surfaces added later appear for everyone. */
@@ -1542,10 +1568,621 @@ const openFileTab = (state: UIStore, directory: string, filePath: string, previe
   const alreadyOpen = tabs.some((tab) => tab.mode === 'file' && tab.targetPath === filePath);
   state.openContextPanelTab(directory, { mode: 'file', targetPath: filePath, preview });
   if (replacedPreviewPath && !alreadyOpen) {
-    useFilesViewTabsStore.getState().removeOpenPath(directory, replacedPreviewPath);
+    getFilesViewTabsStore(state.isMobile || isVSCodeRuntime() ? undefined : state.panelWorkspaceOwnerId).getState().removeOpenPath(directory, replacedPreviewPath);
   }
 };
 
+
+const PANEL_WORKSPACE_FIELDS = ['contextPanelByDirectory', 'contextEditorTreeVisible', 'contextEditorVisible', 'pendingDiffFile', 'pendingDiffStaged', 'pendingDiffScope', 'pendingTurnDiffFile', 'pendingFileNavigation', 'pendingFileFocusPath', 'contextTerminalTabs', 'contextPanelHostDirectory'] as const;
+type PanelWorkspaceState = Pick<UIStore, typeof PANEL_WORKSPACE_FIELDS[number]>;
+type PanelActionName = 'toggleContextEditorTree' | 'toggleContextEditor' | 'openContextSurface' | 'openContextPanelTab' | 'openTrackerItem' | 'openContextDiff' | 'openContextFile' | 'openContextFileAtLine' | 'openContextOverview' | 'openContextPreview' | 'openAgentBrowserTab' | 'openNewContextBrowserTab' | 'openContextBrowser' | 'setContextPanelTabTargetPath' | 'moveContextFilePaths' | 'setActiveContextPanelTab' | 'reorderContextPanelTabs' | 'pinContextPanelTab' | 'closeContextPanelTab' | 'closeContextFile' | 'closeContextPanelTabs' | 'closeContextPanel' | 'closeContextZone' | 'toggleContextPanelExpanded' | 'setPendingDiffFile' | 'setPendingTurnDiffFile' | 'setPendingFileNavigation' | 'setPendingFileFocusPath' | 'navigateToDiff' | 'consumePendingDiffFile';
+type PanelSetter = (update: Partial<UIStore> | ((state: UIStore) => Partial<UIStore>)) => void;
+function createPanelActions(set: PanelSetter, get: () => UIStore): Pick<UIStore, PanelActionName> {
+  const panelRoot = (directory: string): string => normalizeDirectoryPath((get().contextPanelHostDirectory ?? directory).trim());
+  const browserKey = (key: string): string => {
+    const prefix = `${get().panelWorkspaceOwnerId}\u0000`;
+    return key.startsWith(prefix) ? key : `${prefix}${key}`;
+  };
+  return {
+        // The editor and the tree can each be hidden, never both at once:
+        // hiding one while the other is hidden brings the other back.
+        toggleContextEditorTree: () => {
+          set((state) => (state.contextEditorTreeVisible && !state.contextEditorVisible
+            ? { contextEditorTreeVisible: false, contextEditorVisible: true }
+            : { contextEditorTreeVisible: !state.contextEditorTreeVisible }));
+        },
+
+        toggleContextEditor: () => {
+          set((state) => (state.contextEditorVisible && !state.contextEditorTreeVisible
+            ? { contextEditorVisible: false, contextEditorTreeVisible: true }
+            : { contextEditorVisible: !state.contextEditorVisible }));
+        },
+
+        // Rail entry point: activates the most recent tab of the requested
+        // mode, opens a fresh singleton tab when none exists, and toggles the
+        // panel closed when the requested mode is already active and visible.
+        openContextSurface: (directory, mode) => {
+          const normalizedDirectory = panelRoot(directory);
+          if (!normalizedDirectory) {
+            return;
+          }
+
+          const state = get();
+          const placement = state.contextSurfaceZones;
+          const panelState = state.contextPanelByDirectory[normalizedDirectory];
+          const tabs = panelState?.tabs ?? [];
+          const zone = zoneOfMode(placement, mode);
+          const zoneView = panelState ? getZoneView(panelState, zone) : null;
+          const activeTabId = resolveZoneActiveTabId(tabs, placement, zone, zoneView?.activeTabId ?? null);
+          const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null;
+          const clearTerminalTarget = () => {
+            if (mode === 'terminal') {
+              const terminalTab = tabs.find((tab) => tab.mode === 'terminal') ?? null;
+              const targetDirectory = terminalTab?.targetDirectory ?? null;
+              if (targetDirectory) {
+                const targetState = useTerminalStore.getState().getDirectoryState(targetDirectory);
+                if (directoryMayHaveActiveProjectAction(targetState)) {
+                  return;
+                }
+              }
+              state.openContextPanelTab(normalizedDirectory, { mode: 'terminal', targetDirectory: null }, { reveal: false });
+            }
+          };
+
+          if (zoneView?.isOpen && activeTab?.mode === mode) {
+            clearTerminalTarget();
+            state.closeContextZone(normalizedDirectory, zone);
+            return;
+          }
+
+          // A hidden tree stays hidden while a file is open, so the editor
+          // shows alone. With no file open the tree is all the surface has,
+          // and it comes back.
+          if (mode === 'file' && !state.contextEditorTreeVisible
+            && !tabs.some((tab) => tab.mode === 'file' && tab.targetPath)) {
+            set({ contextEditorTreeVisible: true });
+          }
+
+          const tabsOfMode = tabs.filter((tab) => tab.mode === mode);
+          if (tabsOfMode.length > 0) {
+            clearTerminalTarget();
+            // `>=` so equal timestamps (same-millisecond opens) resolve to the
+            // later tab in insertion order.
+            const mostRecent = tabsOfMode.reduce((best, tab) => (tab.touchedAt >= best.touchedAt ? tab : best));
+            // The rail's Changes and walkthrough are this project's: a pull
+            // request of another project opened from the Tracker gives way.
+            if ((mode === 'diff' || mode === 'walkthrough') && mostRecent.targetDirectory) {
+              state.openContextPanelTab(normalizedDirectory, {
+                mode,
+                targetPath: mostRecent.targetPath,
+                stagedDiff: mostRecent.stagedDiff,
+                diffScope: mostRecent.diffScope,
+                targetDirectory: null,
+              });
+              return;
+            }
+            state.setActiveContextPanelTab(normalizedDirectory, mostRecent.id);
+            return;
+          }
+
+          // Content-driven modes need a payload (a session to split); the rail
+          // renders them disabled until content exists. 'file' opens an empty
+          // editor whose embedded tree picks the first file.
+          if (mode === 'chat') {
+            return;
+          }
+
+          state.openContextPanelTab(normalizedDirectory, { mode });
+        },
+
+        openContextPanelTab: (directory, tab, options) => {
+          const normalizedDirectory = panelRoot(directory);
+          if (!normalizedDirectory) {
+            return;
+          }
+
+          if (tab.mode === 'browser') {
+            tab = { ...tab, dedupeKey: browserKey(normalizeContextPanelTabDedupeKey(tab.mode, tab.targetPath ?? null, tab.dedupeKey)) };
+          }
+          // Working in the panel's own directory is the default, stored as no target.
+          const nextTab = tab.mode !== 'chat' && contextPanelModeKeepsTargetDirectory(tab.mode)
+            ? {
+                ...tab,
+                targetDirectory: normalizeContextTargetDirectory(tab.targetDirectory === undefined ? directory : tab.targetDirectory) === normalizedDirectory
+                  ? null
+                  : normalizeContextTargetDirectory(tab.targetDirectory === undefined ? directory : tab.targetDirectory),
+              }
+            : tab;
+
+          // Revealing a real file shows it, even if the editor was hidden.
+          const showsFile = nextTab.mode === 'file' && Boolean(nextTab.targetPath) && options?.reveal !== false;
+
+          set((state) => {
+            const prev = state.contextPanelByDirectory[normalizedDirectory];
+            const current = touchContextPanelState(prev, state.contextSurfaceZones);
+            const byDirectory = {
+              ...state.contextPanelByDirectory,
+              [normalizedDirectory]: upsertContextPanelTab(current, nextTab, state.contextSurfaceZones, options),
+            };
+
+            return {
+              contextPanelByDirectory: clampContextPanelRoots(byDirectory, 20),
+              contextEditorVisible: showsFile || state.contextEditorVisible,
+            };
+          });
+        },
+
+        openTrackerItem: (directory, item) => {
+          const normalizedDirectory = panelRoot(directory);
+          const url = item.url.trim();
+          if (!normalizedDirectory || !url) {
+            return null;
+          }
+
+          const dedupeKey = `tracker:${item.key}`;
+          const targetDirectory = normalizeContextTargetDirectory(item.targetDirectory);
+          set((state) => {
+            const placement = state.contextSurfaceZones;
+            const current = touchContextPanelState(state.contextPanelByDirectory[normalizedDirectory], placement);
+            // An item never shows without the branch's own tab beside it.
+            const withBranch = current.tabs.some(isTrackerBranchTab)
+              ? current
+              : upsertContextPanelTab(current, { mode: 'pr' }, placement, { reveal: false });
+            const byDirectory = {
+              ...state.contextPanelByDirectory,
+              [normalizedDirectory]: upsertContextPanelTab(withBranch, {
+                mode: 'pr',
+                targetPath: url,
+                dedupeKey,
+                label: item.label,
+                targetDirectory: targetDirectory === normalizedDirectory ? null : targetDirectory,
+              }, placement),
+            };
+            return { contextPanelByDirectory: clampContextPanelRoots(byDirectory, 20) };
+          });
+          return buildContextPanelTabID('pr', dedupeKey);
+        },
+
+        openContextDiff: (directory, filePath, staged = false, scope = null) => {
+          const normalizedDirectory = panelRoot(directory);
+          const normalizedFilePath = (filePath || '').trim();
+          if (!normalizedDirectory || !normalizedFilePath) {
+            return;
+          }
+
+          const diffScope = normalizePendingDiffScope(scope) ?? (staged ? 'staged' : 'working');
+
+          get().openContextPanelTab(directory, {
+            mode: 'diff',
+            targetPath: normalizedFilePath,
+            stagedDiff: diffScope === 'staged',
+            diffScope,
+          });
+        },
+
+        openContextFile: (directory, filePath, options) => {
+          const normalizedDirectory = panelRoot(directory);
+          const normalizedFilePath = normalizeContextTargetPath(filePath);
+          if (!normalizedDirectory || !normalizedFilePath) {
+            return;
+          }
+
+          openFileTab(get(), normalizedDirectory, normalizedFilePath, options?.preview === true);
+          get().setPendingFileFocusPath(normalizedFilePath);
+          get().setPendingFileNavigation(null);
+          if (options?.expanded) {
+            const zone = zoneOfMode(get().contextSurfaceZones, 'file');
+            const panel = get().contextPanelByDirectory[normalizedDirectory];
+            if (panel && !getZoneView(panel, zone).expanded) {
+              get().toggleContextPanelExpanded(normalizedDirectory, zone);
+            }
+          }
+        },
+
+        openContextFileAtLine: (directory, filePath, line, column, options) => {
+          const normalizedDirectory = panelRoot(directory);
+          const normalizedFilePath = normalizeContextTargetPath(filePath);
+          const normalizedLine = Number.isFinite(line) ? Math.max(1, Math.trunc(line)) : 1;
+          const normalizedColumn = Number.isFinite(column) ? Math.max(1, Math.trunc(column as number)) : 1;
+          if (!normalizedDirectory || !normalizedFilePath) {
+            return;
+          }
+
+          openFileTab(get(), normalizedDirectory, normalizedFilePath, options?.preview === true);
+          get().setPendingFileFocusPath(null);
+          get().setPendingFileNavigation({
+            path: normalizedFilePath,
+            line: normalizedLine,
+            column: normalizedColumn,
+          });
+        },
+
+        openContextOverview: (directory) => {
+          const normalizedDirectory = panelRoot(directory);
+          if (!normalizedDirectory) {
+            return;
+          }
+
+          get().openContextPanelTab(directory, { mode: 'context' });
+        },
+
+        openContextPreview: (directory, url) => {
+          const normalizedDirectory = panelRoot(directory);
+          const normalizedUrl = (url || '').trim();
+          if (!normalizedDirectory || !normalizedUrl || isVSCodeRuntime()) {
+            return;
+          }
+
+          noteBrowserTabAddressRequested(get().contextPanelByDirectory, normalizedDirectory, browserKey(normalizedUrl), normalizedUrl);
+          // No stored label: a browser tab is named after wherever it has
+          // navigated to, which the panel derives from targetPath.
+          get().openContextPanelTab(directory, {
+            mode: 'browser',
+            targetPath: normalizedUrl,
+            dedupeKey: normalizedUrl,
+            label: null,
+          });
+        },
+        // An agent's page gets its own tab in the background: never the tab
+        // the user is on, never an existing tab that happens to show the same
+        // address, and the panel stays as the user left it.
+        openAgentBrowserTab: (directory, url, ownerSessionId) => {
+          const normalizedDirectory = panelRoot(directory);
+          if (!normalizedDirectory || isVSCodeRuntime()) return null;
+          browserTabSequence += 1;
+          const dedupeKey = browserKey(`browser:agent:${Date.now()}-${browserTabSequence}`);
+          if (url.trim()) noteBrowserTabAddressRequested(get().contextPanelByDirectory, normalizedDirectory, dedupeKey, url.trim());
+          get().openContextPanelTab(directory, {
+            mode: 'browser',
+            targetPath: url.trim(),
+            dedupeKey,
+            label: null,
+            ownerSessionId,
+          }, { reveal: false });
+          return buildContextPanelTabID('browser', dedupeKey);
+        },
+        // Always a new tab, never the existing one: the whole point of asking
+        // for one is to keep what is already open.
+        openNewContextBrowserTab: (directory) => {
+          const normalizedDirectory = panelRoot(directory);
+          if (!normalizedDirectory || isVSCodeRuntime()) return;
+          browserTabSequence += 1;
+          get().openContextPanelTab(directory, {
+            mode: 'browser',
+            targetPath: '',
+            dedupeKey: `browser:new:${Date.now()}-${browserTabSequence}`,
+            label: null,
+          });
+        },
+        openContextBrowser: (directory, url = '', options) => {
+          const normalizedDirectory = panelRoot(directory);
+          if (!normalizedDirectory || isVSCodeRuntime()) return;
+          const targetUrl = typeof url === 'string' && url.trim().length > 0 ? url.trim() : '';
+          if (targetUrl) noteBrowserTabAddressRequested(get().contextPanelByDirectory, normalizedDirectory, browserKey(targetUrl), targetUrl);
+          get().openContextPanelTab(directory, {
+            mode: 'browser',
+            targetPath: targetUrl,
+            dedupeKey: targetUrl || 'browser',
+            label: null,
+          }, options);
+        },
+
+        setContextPanelTabTargetPath: (directory, tabID, targetPath) => {
+          const normalizedDirectory = panelRoot(directory);
+          const normalizedTabID = (tabID || '').trim();
+          if (!normalizedDirectory || !normalizedTabID) return;
+          set((state) => {
+            const current = state.contextPanelByDirectory[normalizedDirectory];
+            if (!current) return state;
+            return {
+              contextPanelByDirectory: {
+                ...state.contextPanelByDirectory,
+                [normalizedDirectory]: setContextPanelTabTargetPath(current, normalizedTabID, targetPath),
+              },
+            };
+          });
+        },
+
+        moveContextFilePaths: (directory, fromPath, toPath, filesRoot = directory) => {
+          const normalizedDirectory = panelRoot(directory);
+          const normalizedFrom = normalizeContextTargetPath(fromPath);
+          const normalizedTo = normalizeContextTargetPath(toPath);
+          if (!normalizedDirectory || !normalizedFrom || !normalizedTo || normalizedFrom === normalizedTo) return;
+          set((state) => {
+            const current = state.contextPanelByDirectory[normalizedDirectory];
+            if (!current) return state;
+            const next = moveContextPanelFileTabs(current, normalizedFrom, normalizedTo);
+            if (next === current) return state;
+            return {
+              contextPanelByDirectory: {
+                ...state.contextPanelByDirectory,
+                [normalizedDirectory]: next,
+              },
+            };
+          });
+          getFilesViewTabsStore(get().isMobile || isVSCodeRuntime() ? undefined : get().panelWorkspaceOwnerId).getState().movePaths(normalizeDirectoryPath(filesRoot.trim()), normalizedFrom, normalizedTo);
+        },
+
+        setActiveContextPanelTab: (directory, tabID) => {
+          const normalizedDirectory = panelRoot(directory);
+          const normalizedTabID = (tabID || '').trim();
+          if (!normalizedDirectory || !normalizedTabID) {
+            return;
+          }
+
+          set((state) => {
+            const prev = state.contextPanelByDirectory[normalizedDirectory];
+            const current = touchContextPanelState(prev, state.contextSurfaceZones);
+            const targetTab = current.tabs.find((tab) => tab.id === normalizedTabID);
+            if (!targetTab) {
+              return state;
+            }
+
+            // Picking a file tab shows its editor, even if the editor was hidden.
+            const showsFile = targetTab.mode === 'file' && Boolean(targetTab.targetPath);
+            const zone = zoneOfMode(state.contextSurfaceZones, targetTab.mode);
+            const view = getZoneView(current, zone);
+
+            if (view.activeTabId === normalizedTabID && view.isOpen) {
+              return showsFile ? { contextEditorVisible: true } : state;
+            }
+
+            const byDirectory = {
+              ...state.contextPanelByDirectory,
+              [normalizedDirectory]: withZoneView({
+                ...current,
+                touchedAt: Date.now(),
+                tabs: current.tabs.map((tab) => (tab.id === normalizedTabID
+                  ? { ...tab, touchedAt: Date.now() }
+                  : tab)),
+              }, zone, { isOpen: true, activeTabId: normalizedTabID }),
+            };
+
+            return {
+              contextPanelByDirectory: clampContextPanelRoots(byDirectory, 20),
+              contextEditorVisible: showsFile || state.contextEditorVisible,
+            };
+          });
+        },
+
+        reorderContextPanelTabs: (directory, activeTabID, overTabID) => {
+          const normalizedDirectory = panelRoot(directory);
+          const normalizedActiveTabID = (activeTabID || '').trim();
+          const normalizedOverTabID = (overTabID || '').trim();
+          if (!normalizedDirectory || !normalizedActiveTabID || !normalizedOverTabID) {
+            return;
+          }
+
+          set((state) => {
+            const prev = state.contextPanelByDirectory[normalizedDirectory];
+            const current = touchContextPanelState(prev, state.contextSurfaceZones);
+            if (!current.tabs.some((tab) => tab.id === normalizedActiveTabID) || !current.tabs.some((tab) => tab.id === normalizedOverTabID)) {
+              return state;
+            }
+
+            const next = reorderContextPanelTabs(current, normalizedActiveTabID, normalizedOverTabID);
+            if (next.tabs === current.tabs) {
+              return state;
+            }
+
+            const byDirectory = {
+              ...state.contextPanelByDirectory,
+              [normalizedDirectory]: next,
+            };
+
+            return { contextPanelByDirectory: clampContextPanelRoots(byDirectory, 20) };
+          });
+        },
+
+        pinContextPanelTab: (directory, tabID) => {
+          const normalizedDirectory = panelRoot(directory);
+          if (!normalizedDirectory) return;
+          set((state) => {
+            const current = state.contextPanelByDirectory[normalizedDirectory];
+            if (!current?.tabs.some((tab) => tab.id === tabID && tab.preview)) return state;
+            return {
+              contextPanelByDirectory: {
+                ...state.contextPanelByDirectory,
+                [normalizedDirectory]: {
+                  ...current,
+                  tabs: current.tabs.map((tab) => (tab.id === tabID ? { ...tab, preview: false } : tab)),
+                },
+              },
+            };
+          });
+        },
+
+        closeContextPanelTab: (directory, tabID) => {
+          get().closeContextPanelTabs(directory, [tabID]);
+        },
+
+        closeContextFile: (directory, filePath) => {
+          const normalizedDirectory = panelRoot(directory);
+          const normalizedFilePath = normalizeContextTargetPath(filePath);
+          if (!normalizedDirectory || !normalizedFilePath) {
+            return;
+          }
+          const tab = get().contextPanelByDirectory[normalizedDirectory]?.tabs
+            .find((candidate) => candidate.mode === 'file' && candidate.targetPath === normalizedFilePath);
+          if (tab) {
+            get().closeContextPanelTabs(normalizedDirectory, [tab.id]);
+            return;
+          }
+          // No tab shows it (the strip was already out of step): the editor's
+          // own open files still drop it.
+          getFilesViewTabsStore(get().isMobile || isVSCodeRuntime() ? undefined : get().panelWorkspaceOwnerId).getState().removeOpenPath(normalizedDirectory, normalizedFilePath);
+        },
+
+        closeContextPanelTabs: (directory, tabIds) => {
+          const normalizedDirectory = panelRoot(directory);
+          // The Tracker's branch tab stays: closing every item leaves it.
+          const branchTabIds = new Set((get().contextPanelByDirectory[normalizedDirectory]?.tabs ?? [])
+            .filter(isTrackerBranchTab)
+            .map((tab) => tab.id));
+          const normalizedTabIds = (tabIds ?? [])
+            .map((id) => (id || '').trim())
+            .filter((id) => id.length > 0 && !branchTabIds.has(id));
+          if (!normalizedDirectory || normalizedTabIds.length === 0) {
+            return;
+          }
+
+          const closedTabs = normalizedTabIds
+            .map((id) => get().contextPanelByDirectory[normalizedDirectory]?.tabs.find((tab) => tab.id === id))
+            .filter((tab): tab is ContextPanelTab => Boolean(tab));
+
+          const commitClose = (tabs: typeof closedTabs) => {
+            const closingIds = tabs.map((tab) => tab.id);
+            set((state) => {
+              const placement = state.contextSurfaceZones;
+              const prev = state.contextPanelByDirectory[normalizedDirectory];
+              const current = touchContextPanelState(prev, placement);
+              if (!current.tabs.some((tab) => closingIds.includes(tab.id))) {
+                return state;
+              }
+
+              const next = closeContextPanelTabs(current, closingIds, placement);
+              const byDirectory = {
+                ...state.contextPanelByDirectory,
+                [normalizedDirectory]: next,
+              };
+
+              return {
+                contextPanelByDirectory: clampContextPanelRoots(byDirectory, 20),
+              };
+            });
+
+            // Keep the editor's own open-file state in sync so closed files do not
+            // resurrect when the editor surface reopens.
+            for (const tab of tabs) {
+              if (tab.mode === 'file' && tab.targetPath) {
+                getFilesViewTabsStore(get().isMobile || isVSCodeRuntime() ? undefined : get().panelWorkspaceOwnerId).getState().removeOpenPath(normalizedDirectory, tab.targetPath);
+              }
+            }
+          };
+          if (!closedTabs.some((tab) => tab.mode === 'chat' && tab.discardOnClose)) {
+            commitClose(closedTabs);
+            return;
+          }
+          const runtime = getRuntimeKey();
+          void import('@/lib/sideChats').then(async ({ discardSideChat, getSideChatsForClose }) => {
+            const candidates = await Promise.all(closedTabs.map(async (tab) => {
+              try {
+                const sessions = tab.mode === 'chat' && tab.discardOnClose && tab.dedupeKey.startsWith('session:')
+                  ? await getSideChatsForClose(tab.dedupeKey.slice('session:'.length), tab.targetDirectory ?? normalizedDirectory, runtime)
+                  : [];
+                return { tab, sessions };
+              } catch (error) {
+                if (getRuntimeKey() === runtime) toast.error(formatMessage(useI18nStore.getState().dictionary, 'contextPanel.chat.closeFailed'), {
+                  description: error instanceof Error ? error.message : String(error),
+                });
+                return null;
+              }
+            }));
+            if (getRuntimeKey() !== runtime) return;
+            const temporary = [...new Map(candidates.flatMap((candidate) => candidate?.sessions ?? []).map((session) => [session.id, session])).values()];
+            if (temporary.length && !await confirmSideChatClose(temporary)) return;
+            if (getRuntimeKey() !== runtime) return;
+            const confirmedSessionIDs = new Set(temporary.map((session) => session.id));
+            const results = await Promise.all(candidates.map(async (candidate) => {
+              if (!candidate) return null;
+              const { tab } = candidate;
+              if (tab.mode !== 'chat' || !tab.discardOnClose || !tab.dedupeKey.startsWith('session:')) return tab;
+              try {
+                await discardSideChat(tab.dedupeKey.slice('session:'.length), tab.targetDirectory ?? normalizedDirectory, runtime, confirmedSessionIDs);
+                return tab;
+              } catch (error) {
+                if (getRuntimeKey() === runtime) toast.error(formatMessage(useI18nStore.getState().dictionary, 'contextPanel.chat.closeFailed'), {
+                  description: error instanceof Error ? error.message : String(error),
+                });
+                return null;
+              }
+            }));
+            if (getRuntimeKey() === runtime) commitClose(results.filter((tab): tab is ContextPanelTab => tab !== null));
+          });
+        },
+
+        closeContextPanel: (directory) => {
+          get().closeContextZone(directory, 'right');
+        },
+
+        closeContextZone: (directory, zone) => {
+          const normalizedDirectory = panelRoot(directory);
+          if (!normalizedDirectory) {
+            return;
+          }
+
+          set((state) => {
+            const prev = state.contextPanelByDirectory[normalizedDirectory];
+            if (!prev || !getZoneView(prev, zone).isOpen) {
+              return state;
+            }
+
+            const byDirectory = {
+              ...state.contextPanelByDirectory,
+              [normalizedDirectory]: withZoneView(touchContextPanelState(prev, state.contextSurfaceZones), zone, { isOpen: false }),
+            };
+
+            return { contextPanelByDirectory: clampContextPanelRoots(byDirectory, 20) };
+          });
+        },
+
+        toggleContextPanelExpanded: (directory, zone = 'right') => {
+          const normalizedDirectory = panelRoot(directory);
+          if (!normalizedDirectory) {
+            return;
+          }
+
+          set((state) => {
+            const prev = state.contextPanelByDirectory[normalizedDirectory];
+            const current = touchContextPanelState(prev, state.contextSurfaceZones);
+            const expanded = !getZoneView(current, zone).expanded;
+            let next = current;
+            for (const other of CONTEXT_ZONES) {
+              next = withZoneView(next, other, { expanded: other === zone ? expanded : false });
+            }
+            const byDirectory = {
+              ...state.contextPanelByDirectory,
+              [normalizedDirectory]: next,
+            };
+
+            return { contextPanelByDirectory: clampContextPanelRoots(byDirectory, 20) };
+          });
+        },
+
+        setPendingDiffFile: (filePath, staged = false, scope = null) => {
+          set({
+            pendingDiffFile: filePath,
+            pendingDiffStaged: filePath ? staged : false,
+            pendingDiffScope: filePath ? scope : null,
+          });
+        },
+
+        setPendingTurnDiffFile: (request) => {
+          set({ pendingTurnDiffFile: request });
+        },
+
+        setPendingFileNavigation: (navigation) => {
+          set({ pendingFileNavigation: navigation });
+        },
+
+        setPendingFileFocusPath: (path) => {
+          set({ pendingFileFocusPath: path });
+        },
+
+        navigateToDiff: (filePath, staged = false, scope = null) => {
+          set({ pendingDiffFile: filePath, pendingDiffStaged: staged, pendingDiffScope: scope });
+        },
+
+        consumePendingDiffFile: () => {
+          const { pendingDiffFile } = get();
+          if (pendingDiffFile) {
+            set({ pendingDiffFile: null, pendingDiffStaged: false, pendingDiffScope: null });
+          }
+          return pendingDiffFile;
+        },
+
+  };
+}
 /** What the selection menu's thumb-up says when the user set no text of their own. */
 export const DEFAULT_SELECTION_APPROVAL_TEXT = 'Sounds good';
 export const DEFAULT_EDITOR_FONT_SIZE = 16;
@@ -1554,10 +2191,14 @@ export const DEFAULT_SPACING_SCALE = 110;
 /** The Files tree beside the editor: narrow enough that the code beside it does not wrap. */
 export const DEFAULT_CONTEXT_EDITOR_TREE_WIDTH = 208;
 
-export const useUIStore = create<UIStore>()(
+const useGlobalUIStore = create<UIStore>()(
   devtools(
     persist(
       (set, get) => ({
+        ...createPanelActions(
+          (update) => getPanelWorkspaceUI(getPanelWorkspaceOwner()).setState(update),
+          () => getPanelWorkspaceUI(getPanelWorkspaceOwner()).getState(),
+        ),
 
         theme: 'system',
         runOverviewKey: null,
@@ -1566,6 +2207,11 @@ export const useUIStore = create<UIStore>()(
         sidebarFoldedForExpandedZone: false,
         sidebarWidth: LEFT_SIDEBAR_DEFAULT_WIDTH,
         contextPanelByDirectory: {},
+        panelWorkspaces: {},
+        panelWorkspaceAliases: {},
+        panelWorkspaceOwnerId: '',
+        contextTerminalTabs: {},
+        contextPanelHostDirectory: null,
         contextRailOrder: [],
         contextRailHiddenSurfaces: [],
         mobileWorkspaceTabOrder: [],
@@ -1815,24 +2461,8 @@ export const useUIStore = create<UIStore>()(
         },
 
         setContextRailOrder: (order) => {
-          const sanitized = Array.isArray(order)
-            ? order.filter((id, index) => typeof id === 'string' && id.trim() !== '' && order.indexOf(id) === index)
-            : [];
+          const sanitized = order.filter((id, index) => id.trim() !== '' && order.indexOf(id) === index);
           set({ contextRailOrder: sanitized });
-        },
-
-        // The editor and the tree can each be hidden, never both at once:
-        // hiding one while the other is hidden brings the other back.
-        toggleContextEditorTree: () => {
-          set((state) => (state.contextEditorTreeVisible && !state.contextEditorVisible
-            ? { contextEditorTreeVisible: false, contextEditorVisible: true }
-            : { contextEditorTreeVisible: !state.contextEditorTreeVisible }));
-        },
-
-        toggleContextEditor: () => {
-          set((state) => (state.contextEditorVisible && !state.contextEditorTreeVisible
-            ? { contextEditorVisible: false, contextEditorTreeVisible: true }
-            : { contextEditorVisible: !state.contextEditorVisible }));
         },
 
         setContextEditorTreeWidth: (width) => {
@@ -1840,511 +2470,6 @@ export const useUIStore = create<UIStore>()(
             return;
           }
           set({ contextEditorTreeWidth: clampContextEditorTreeWidth(width) });
-        },
-
-        // Rail entry point: activates the most recent tab of the requested
-        // mode, opens a fresh singleton tab when none exists, and toggles the
-        // panel closed when the requested mode is already active and visible.
-        openContextSurface: (directory, mode) => {
-          const normalizedDirectory = normalizeDirectoryPath((directory || '').trim());
-          if (!normalizedDirectory) {
-            return;
-          }
-
-          const state = get();
-          const placement = state.contextSurfaceZones;
-          const panelState = state.contextPanelByDirectory[normalizedDirectory];
-          const tabs = panelState?.tabs ?? [];
-          const zone = zoneOfMode(placement, mode);
-          const zoneView = panelState ? getZoneView(panelState, zone) : null;
-          const activeTabId = resolveZoneActiveTabId(tabs, placement, zone, zoneView?.activeTabId ?? null);
-          const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null;
-          const clearTerminalTarget = () => {
-            if (mode === 'terminal') {
-              const terminalTab = tabs.find((tab) => tab.mode === 'terminal') ?? null;
-              const targetDirectory = terminalTab?.targetDirectory ?? null;
-              if (targetDirectory) {
-                const targetState = useTerminalStore.getState().getDirectoryState(targetDirectory);
-                if (directoryMayHaveActiveProjectAction(targetState)) {
-                  return;
-                }
-              }
-              state.openContextPanelTab(normalizedDirectory, { mode: 'terminal', targetDirectory: null }, { reveal: false });
-            }
-          };
-
-          if (zoneView?.isOpen && activeTab?.mode === mode) {
-            clearTerminalTarget();
-            state.closeContextZone(normalizedDirectory, zone);
-            return;
-          }
-
-          // A hidden tree stays hidden while a file is open, so the editor
-          // shows alone. With no file open the tree is all the surface has,
-          // and it comes back.
-          if (mode === 'file' && !state.contextEditorTreeVisible
-            && !tabs.some((tab) => tab.mode === 'file' && tab.targetPath)) {
-            set({ contextEditorTreeVisible: true });
-          }
-
-          const tabsOfMode = tabs.filter((tab) => tab.mode === mode);
-          if (tabsOfMode.length > 0) {
-            clearTerminalTarget();
-            // `>=` so equal timestamps (same-millisecond opens) resolve to the
-            // later tab in insertion order.
-            const mostRecent = tabsOfMode.reduce((best, tab) => (tab.touchedAt >= best.touchedAt ? tab : best));
-            // The rail's Changes and walkthrough are this project's: a pull
-            // request of another project opened from the Tracker gives way.
-            if ((mode === 'diff' || mode === 'walkthrough') && mostRecent.targetDirectory) {
-              state.openContextPanelTab(normalizedDirectory, {
-                mode,
-                targetPath: mostRecent.targetPath,
-                stagedDiff: mostRecent.stagedDiff,
-                diffScope: mostRecent.diffScope,
-                targetDirectory: null,
-              });
-              return;
-            }
-            state.setActiveContextPanelTab(normalizedDirectory, mostRecent.id);
-            return;
-          }
-
-          // Content-driven modes need a payload (a session to split); the rail
-          // renders them disabled until content exists. 'file' opens an empty
-          // editor whose embedded tree picks the first file.
-          if (mode === 'chat') {
-            return;
-          }
-
-          state.openContextPanelTab(normalizedDirectory, { mode });
-        },
-
-        openContextPanelTab: (directory, tab, options) => {
-          const normalizedDirectory = normalizeDirectoryPath((directory || '').trim());
-          if (!normalizedDirectory) {
-            return;
-          }
-
-          // Working in the panel's own directory is the default, stored as no target.
-          const nextTab = tab.mode !== 'chat' && contextPanelModeKeepsTargetDirectory(tab.mode)
-            ? {
-                ...tab,
-                targetDirectory: normalizeContextTargetDirectory(tab.targetDirectory) === normalizedDirectory
-                  ? null
-                  : normalizeContextTargetDirectory(tab.targetDirectory),
-              }
-            : tab;
-
-          // Revealing a real file shows it, even if the editor was hidden.
-          const showsFile = nextTab.mode === 'file' && Boolean(nextTab.targetPath) && options?.reveal !== false;
-
-          set((state) => {
-            const prev = state.contextPanelByDirectory[normalizedDirectory];
-            const current = touchContextPanelState(prev, state.contextSurfaceZones);
-            const byDirectory = {
-              ...state.contextPanelByDirectory,
-              [normalizedDirectory]: upsertContextPanelTab(current, nextTab, state.contextSurfaceZones, options),
-            };
-
-            return {
-              contextPanelByDirectory: clampContextPanelRoots(byDirectory, 20),
-              contextEditorVisible: showsFile || state.contextEditorVisible,
-            };
-          });
-        },
-
-        openTrackerItem: (directory, item) => {
-          const normalizedDirectory = normalizeDirectoryPath((directory || '').trim());
-          const url = item.url.trim();
-          if (!normalizedDirectory || !url) {
-            return null;
-          }
-
-          const dedupeKey = `tracker:${item.key}`;
-          const targetDirectory = normalizeContextTargetDirectory(item.targetDirectory);
-          set((state) => {
-            const placement = state.contextSurfaceZones;
-            const current = touchContextPanelState(state.contextPanelByDirectory[normalizedDirectory], placement);
-            // An item never shows without the branch's own tab beside it.
-            const withBranch = current.tabs.some(isTrackerBranchTab)
-              ? current
-              : upsertContextPanelTab(current, { mode: 'pr' }, placement, { reveal: false });
-            const byDirectory = {
-              ...state.contextPanelByDirectory,
-              [normalizedDirectory]: upsertContextPanelTab(withBranch, {
-                mode: 'pr',
-                targetPath: url,
-                dedupeKey,
-                label: item.label,
-                targetDirectory: targetDirectory === normalizedDirectory ? null : targetDirectory,
-              }, placement),
-            };
-            return { contextPanelByDirectory: clampContextPanelRoots(byDirectory, 20) };
-          });
-          return buildContextPanelTabID('pr', dedupeKey);
-        },
-
-        openContextDiff: (directory, filePath, staged = false, scope = null) => {
-          const normalizedDirectory = normalizeDirectoryPath((directory || '').trim());
-          const normalizedFilePath = (filePath || '').trim();
-          if (!normalizedDirectory || !normalizedFilePath) {
-            return;
-          }
-
-          const diffScope = normalizePendingDiffScope(scope) ?? (staged ? 'staged' : 'working');
-
-          get().openContextPanelTab(normalizedDirectory, {
-            mode: 'diff',
-            targetPath: normalizedFilePath,
-            stagedDiff: diffScope === 'staged',
-            diffScope,
-          });
-        },
-
-        openContextFile: (directory, filePath, options) => {
-          const normalizedDirectory = normalizeDirectoryPath((directory || '').trim());
-          const normalizedFilePath = normalizeContextTargetPath(filePath);
-          if (!normalizedDirectory || !normalizedFilePath) {
-            return;
-          }
-
-          openFileTab(get(), normalizedDirectory, normalizedFilePath, options?.preview === true);
-          get().setPendingFileFocusPath(normalizedFilePath);
-          get().setPendingFileNavigation(null);
-          if (options?.expanded) {
-            const zone = zoneOfMode(get().contextSurfaceZones, 'file');
-            const panel = get().contextPanelByDirectory[normalizedDirectory];
-            if (panel && !getZoneView(panel, zone).expanded) {
-              get().toggleContextPanelExpanded(normalizedDirectory, zone);
-            }
-          }
-        },
-
-        openContextFileAtLine: (directory, filePath, line, column, options) => {
-          const normalizedDirectory = normalizeDirectoryPath((directory || '').trim());
-          const normalizedFilePath = normalizeContextTargetPath(filePath);
-          const normalizedLine = Number.isFinite(line) ? Math.max(1, Math.trunc(line)) : 1;
-          const normalizedColumn = Number.isFinite(column) ? Math.max(1, Math.trunc(column as number)) : 1;
-          if (!normalizedDirectory || !normalizedFilePath) {
-            return;
-          }
-
-          openFileTab(get(), normalizedDirectory, normalizedFilePath, options?.preview === true);
-          get().setPendingFileFocusPath(null);
-          get().setPendingFileNavigation({
-            path: normalizedFilePath,
-            line: normalizedLine,
-            column: normalizedColumn,
-          });
-        },
-
-        openContextOverview: (directory) => {
-          const normalizedDirectory = normalizeDirectoryPath((directory || '').trim());
-          if (!normalizedDirectory) {
-            return;
-          }
-
-          get().openContextPanelTab(normalizedDirectory, { mode: 'context' });
-        },
-
-        openContextPreview: (directory, url) => {
-          const normalizedDirectory = normalizeDirectoryPath((directory || '').trim());
-          const normalizedUrl = (url || '').trim();
-          if (!normalizedDirectory || !normalizedUrl || isVSCodeRuntime()) {
-            return;
-          }
-
-          noteBrowserTabAddressRequested(get().contextPanelByDirectory, normalizedDirectory, normalizedUrl, normalizedUrl);
-          // No stored label: a browser tab is named after wherever it has
-          // navigated to, which the panel derives from targetPath.
-          get().openContextPanelTab(normalizedDirectory, {
-            mode: 'browser',
-            targetPath: normalizedUrl,
-            dedupeKey: normalizedUrl,
-            label: null,
-          });
-        },
-        // An agent's page gets its own tab in the background: never the tab
-        // the user is on, never an existing tab that happens to show the same
-        // address, and the panel stays as the user left it.
-        openAgentBrowserTab: (directory, url, ownerSessionId) => {
-          const normalizedDirectory = normalizeDirectoryPath((directory || '').trim());
-          if (!normalizedDirectory || isVSCodeRuntime()) return null;
-          browserTabSequence += 1;
-          const dedupeKey = `browser:agent:${Date.now()}-${browserTabSequence}`;
-          if (url.trim()) noteBrowserTabAddressRequested(get().contextPanelByDirectory, normalizedDirectory, dedupeKey, url.trim());
-          get().openContextPanelTab(normalizedDirectory, {
-            mode: 'browser',
-            targetPath: url.trim(),
-            dedupeKey,
-            label: null,
-            ownerSessionId,
-          }, { reveal: false });
-          return buildContextPanelTabID('browser', dedupeKey);
-        },
-        // Always a new tab, never the existing one: the whole point of asking
-        // for one is to keep what is already open.
-        openNewContextBrowserTab: (directory) => {
-          const normalizedDirectory = normalizeDirectoryPath((directory || '').trim());
-          if (!normalizedDirectory || isVSCodeRuntime()) return;
-          browserTabSequence += 1;
-          get().openContextPanelTab(normalizedDirectory, {
-            mode: 'browser',
-            targetPath: '',
-            dedupeKey: `browser:new:${Date.now()}-${browserTabSequence}`,
-            label: null,
-          });
-        },
-        openContextBrowser: (directory, url = '', options) => {
-          const normalizedDirectory = normalizeDirectoryPath((directory || '').trim());
-          if (!normalizedDirectory || isVSCodeRuntime()) return;
-          const targetUrl = typeof url === 'string' && url.trim().length > 0 ? url.trim() : '';
-          if (targetUrl) noteBrowserTabAddressRequested(get().contextPanelByDirectory, normalizedDirectory, targetUrl, targetUrl);
-          get().openContextPanelTab(normalizedDirectory, {
-            mode: 'browser',
-            targetPath: targetUrl,
-            dedupeKey: targetUrl || 'browser',
-            label: null,
-          }, options);
-        },
-
-        setContextPanelTabTargetPath: (directory, tabID, targetPath) => {
-          const normalizedDirectory = normalizeDirectoryPath((directory || '').trim());
-          const normalizedTabID = (tabID || '').trim();
-          if (!normalizedDirectory || !normalizedTabID) return;
-          set((state) => {
-            const current = state.contextPanelByDirectory[normalizedDirectory];
-            if (!current) return state;
-            return {
-              contextPanelByDirectory: {
-                ...state.contextPanelByDirectory,
-                [normalizedDirectory]: setContextPanelTabTargetPath(current, normalizedTabID, targetPath),
-              },
-            };
-          });
-        },
-
-        moveContextFilePaths: (directory, fromPath, toPath, filesRoot = directory) => {
-          const normalizedDirectory = normalizeDirectoryPath((directory || '').trim());
-          const normalizedFrom = normalizeContextTargetPath(fromPath);
-          const normalizedTo = normalizeContextTargetPath(toPath);
-          if (!normalizedDirectory || !normalizedFrom || !normalizedTo || normalizedFrom === normalizedTo) return;
-          set((state) => {
-            const current = state.contextPanelByDirectory[normalizedDirectory];
-            if (!current) return state;
-            const next = moveContextPanelFileTabs(current, normalizedFrom, normalizedTo);
-            if (next === current) return state;
-            return {
-              contextPanelByDirectory: {
-                ...state.contextPanelByDirectory,
-                [normalizedDirectory]: next,
-              },
-            };
-          });
-          useFilesViewTabsStore.getState().movePaths(normalizeDirectoryPath(filesRoot.trim()), normalizedFrom, normalizedTo);
-        },
-
-        setActiveContextPanelTab: (directory, tabID) => {
-          const normalizedDirectory = normalizeDirectoryPath((directory || '').trim());
-          const normalizedTabID = (tabID || '').trim();
-          if (!normalizedDirectory || !normalizedTabID) {
-            return;
-          }
-
-          set((state) => {
-            const prev = state.contextPanelByDirectory[normalizedDirectory];
-            const current = touchContextPanelState(prev, state.contextSurfaceZones);
-            const targetTab = current.tabs.find((tab) => tab.id === normalizedTabID);
-            if (!targetTab) {
-              return state;
-            }
-
-            // Picking a file tab shows its editor, even if the editor was hidden.
-            const showsFile = targetTab.mode === 'file' && Boolean(targetTab.targetPath);
-            const zone = zoneOfMode(state.contextSurfaceZones, targetTab.mode);
-            const view = getZoneView(current, zone);
-
-            if (view.activeTabId === normalizedTabID && view.isOpen) {
-              return showsFile ? { contextEditorVisible: true } : state;
-            }
-
-            const byDirectory = {
-              ...state.contextPanelByDirectory,
-              [normalizedDirectory]: withZoneView({
-                ...current,
-                touchedAt: Date.now(),
-                tabs: current.tabs.map((tab) => (tab.id === normalizedTabID
-                  ? { ...tab, touchedAt: Date.now() }
-                  : tab)),
-              }, zone, { isOpen: true, activeTabId: normalizedTabID }),
-            };
-
-            return {
-              contextPanelByDirectory: clampContextPanelRoots(byDirectory, 20),
-              contextEditorVisible: showsFile || state.contextEditorVisible,
-            };
-          });
-        },
-
-        reorderContextPanelTabs: (directory, activeTabID, overTabID) => {
-          const normalizedDirectory = normalizeDirectoryPath((directory || '').trim());
-          const normalizedActiveTabID = (activeTabID || '').trim();
-          const normalizedOverTabID = (overTabID || '').trim();
-          if (!normalizedDirectory || !normalizedActiveTabID || !normalizedOverTabID) {
-            return;
-          }
-
-          set((state) => {
-            const prev = state.contextPanelByDirectory[normalizedDirectory];
-            const current = touchContextPanelState(prev, state.contextSurfaceZones);
-            if (!current.tabs.some((tab) => tab.id === normalizedActiveTabID) || !current.tabs.some((tab) => tab.id === normalizedOverTabID)) {
-              return state;
-            }
-
-            const next = reorderContextPanelTabs(current, normalizedActiveTabID, normalizedOverTabID);
-            if (next.tabs === current.tabs) {
-              return state;
-            }
-
-            const byDirectory = {
-              ...state.contextPanelByDirectory,
-              [normalizedDirectory]: next,
-            };
-
-            return { contextPanelByDirectory: clampContextPanelRoots(byDirectory, 20) };
-          });
-        },
-
-        pinContextPanelTab: (directory, tabID) => {
-          const normalizedDirectory = normalizeDirectoryPath((directory || '').trim());
-          if (!normalizedDirectory) return;
-          set((state) => {
-            const current = state.contextPanelByDirectory[normalizedDirectory];
-            if (!current?.tabs.some((tab) => tab.id === tabID && tab.preview)) return state;
-            return {
-              contextPanelByDirectory: {
-                ...state.contextPanelByDirectory,
-                [normalizedDirectory]: {
-                  ...current,
-                  tabs: current.tabs.map((tab) => (tab.id === tabID ? { ...tab, preview: false } : tab)),
-                },
-              },
-            };
-          });
-        },
-
-        closeContextPanelTab: (directory, tabID) => {
-          get().closeContextPanelTabs(directory, [tabID]);
-        },
-
-        closeContextFile: (directory, filePath) => {
-          const normalizedDirectory = normalizeDirectoryPath((directory || '').trim());
-          const normalizedFilePath = normalizeContextTargetPath(filePath);
-          if (!normalizedDirectory || !normalizedFilePath) {
-            return;
-          }
-          const tab = get().contextPanelByDirectory[normalizedDirectory]?.tabs
-            .find((candidate) => candidate.mode === 'file' && candidate.targetPath === normalizedFilePath);
-          if (tab) {
-            get().closeContextPanelTabs(normalizedDirectory, [tab.id]);
-            return;
-          }
-          // No tab shows it (the strip was already out of step): the editor's
-          // own open files still drop it.
-          useFilesViewTabsStore.getState().removeOpenPath(normalizedDirectory, normalizedFilePath);
-        },
-
-        closeContextPanelTabs: (directory, tabIds) => {
-          const normalizedDirectory = normalizeDirectoryPath((directory || '').trim());
-          // The Tracker's branch tab stays: closing every item leaves it.
-          const branchTabIds = new Set((get().contextPanelByDirectory[normalizedDirectory]?.tabs ?? [])
-            .filter(isTrackerBranchTab)
-            .map((tab) => tab.id));
-          const normalizedTabIds = (tabIds ?? [])
-            .map((id) => (id || '').trim())
-            .filter((id) => id.length > 0 && !branchTabIds.has(id));
-          if (!normalizedDirectory || normalizedTabIds.length === 0) {
-            return;
-          }
-
-          const closedTabs = normalizedTabIds
-            .map((id) => get().contextPanelByDirectory[normalizedDirectory]?.tabs.find((tab) => tab.id === id))
-            .filter((tab): tab is ContextPanelTab => Boolean(tab));
-
-          set((state) => {
-            const placement = state.contextSurfaceZones;
-            const prev = state.contextPanelByDirectory[normalizedDirectory];
-            const current = touchContextPanelState(prev, placement);
-            if (!current.tabs.some((tab) => normalizedTabIds.includes(tab.id))) {
-              return state;
-            }
-
-            const next = closeContextPanelTabs(current, normalizedTabIds, placement);
-            const byDirectory = {
-              ...state.contextPanelByDirectory,
-              [normalizedDirectory]: next,
-            };
-
-            return {
-              contextPanelByDirectory: clampContextPanelRoots(byDirectory, 20),
-            };
-          });
-
-          // Keep the editor's own open-file state in sync so closed files do not
-          // resurrect when the editor surface reopens.
-          for (const tab of closedTabs) {
-            if (tab.mode === 'file' && tab.targetPath) {
-              useFilesViewTabsStore.getState().removeOpenPath(normalizedDirectory, tab.targetPath);
-            }
-          }
-        },
-
-        closeContextPanel: (directory) => {
-          get().closeContextZone(directory, 'right');
-        },
-
-        closeContextZone: (directory, zone) => {
-          const normalizedDirectory = normalizeDirectoryPath((directory || '').trim());
-          if (!normalizedDirectory) {
-            return;
-          }
-
-          set((state) => {
-            const prev = state.contextPanelByDirectory[normalizedDirectory];
-            if (!prev || !getZoneView(prev, zone).isOpen) {
-              return state;
-            }
-
-            const byDirectory = {
-              ...state.contextPanelByDirectory,
-              [normalizedDirectory]: withZoneView(touchContextPanelState(prev, state.contextSurfaceZones), zone, { isOpen: false }),
-            };
-
-            return { contextPanelByDirectory: clampContextPanelRoots(byDirectory, 20) };
-          });
-        },
-
-        toggleContextPanelExpanded: (directory, zone = 'right') => {
-          const normalizedDirectory = normalizeDirectoryPath((directory || '').trim());
-          if (!normalizedDirectory) {
-            return;
-          }
-
-          set((state) => {
-            const prev = state.contextPanelByDirectory[normalizedDirectory];
-            const current = touchContextPanelState(prev, state.contextSurfaceZones);
-            const expanded = !getZoneView(current, zone).expanded;
-            let next = current;
-            for (const other of CONTEXT_ZONES) {
-              next = withZoneView(next, other, { expanded: other === zone ? expanded : false });
-            }
-            const byDirectory = {
-              ...state.contextPanelByDirectory,
-              [normalizedDirectory]: next,
-            };
-
-            return { contextPanelByDirectory: clampContextPanelRoots(byDirectory, 20) };
-          });
         },
 
         setContextZoneSize: (zone, size) => {
@@ -2377,7 +2502,12 @@ export const useUIStore = create<UIStore>()(
               byDirectory[directory] = carrySurfaceToZone(panel, mode, from, zone, placement);
             }
 
-            return { contextSurfaceZones: placement, contextPanelByDirectory: byDirectory };
+            const panelWorkspaces = Object.fromEntries(Object.entries(state.panelWorkspaces).map(([owner, workspace]) => [owner, {
+              ...workspace,
+              contextPanelByDirectory: Object.fromEntries(Object.entries(workspace.contextPanelByDirectory).map(([directory, panel]) =>
+                [directory, carrySurfaceToZone(panel, mode, from, zone, placement)])),
+            }]));
+            return { contextSurfaceZones: placement, contextPanelByDirectory: byDirectory, panelWorkspaces };
           });
         },
 
@@ -2508,38 +2638,6 @@ export const useUIStore = create<UIStore>()(
             return;
           }
           set({ isSessionDropdownOpen: open });
-        },
-
-        setPendingDiffFile: (filePath, staged = false, scope = null) => {
-          set({
-            pendingDiffFile: filePath,
-            pendingDiffStaged: filePath ? staged : false,
-            pendingDiffScope: filePath ? scope : null,
-          });
-        },
-
-        setPendingTurnDiffFile: (request) => {
-          set({ pendingTurnDiffFile: request });
-        },
-
-        setPendingFileNavigation: (navigation) => {
-          set({ pendingFileNavigation: navigation });
-        },
-
-        setPendingFileFocusPath: (path) => {
-          set({ pendingFileFocusPath: path });
-        },
-
-        navigateToDiff: (filePath, staged = false, scope = null) => {
-          set({ pendingDiffFile: filePath, pendingDiffStaged: staged, pendingDiffScope: scope });
-        },
-
-        consumePendingDiffFile: () => {
-          const { pendingDiffFile } = get();
-          if (pendingDiffFile) {
-            set({ pendingDiffFile: null, pendingDiffStaged: false, pendingDiffScope: null });
-          }
-          return pendingDiffFile;
         },
 
         setIsMobile: (isMobile) => {
@@ -3451,9 +3549,12 @@ export const useUIStore = create<UIStore>()(
           set({ agentWorkflowToolEnabled: value });
           if (value) return;
           // Off hides workflows (`selectWorkflowsShown`), so an open Workflows tab closes too.
-          for (const [directory, panel] of Object.entries(get().contextPanelByDirectory)) {
-            const workflowTabIds = panel.tabs.filter((tab) => tab.mode === 'workflows').map((tab) => tab.id);
-            if (workflowTabIds.length > 0) get().closeContextPanelTabs(directory, workflowTabIds);
+          for (const owner of Object.keys(get().panelWorkspaces)) {
+            const workspace = getPanelWorkspaceUI(owner).getState();
+            for (const [directory, panel] of Object.entries(workspace.contextPanelByDirectory)) {
+              const workflowTabIds = panel.tabs.filter((tab) => tab.mode === 'workflows').map((tab) => tab.id);
+              if (workflowTabIds.length > 0) workspace.closeContextPanelTabs(directory, workflowTabIds);
+            }
           }
         },
         setAgentMemoryFeatureAvailable: (value) => {
@@ -3612,7 +3713,7 @@ export const useUIStore = create<UIStore>()(
       {
         name: 'ui-store',
         storage: createDeferredSafeJSONStorage(),
-        version: 30,
+        version: 31,
         migrate: (persistedState, version) => {
           if (!persistedState || typeof persistedState !== 'object') {
             return persistedState;
@@ -3921,6 +4022,11 @@ export const useUIStore = create<UIStore>()(
           sidebarFoldedForExpandedZone: state.sidebarFoldedForExpandedZone,
           sidebarWidth: state.sidebarWidth,
           contextPanelByDirectory: withoutForeignComparisons(state.contextPanelByDirectory),
+          panelWorkspaceAliases: state.panelWorkspaceAliases,
+          panelWorkspaces: Object.fromEntries(Object.entries(state.panelWorkspaces).map(([owner, workspace]) => [owner, {
+            ...workspace, contextPanelByDirectory: withoutForeignComparisons(workspace.contextPanelByDirectory),
+            pendingDiffFile: null, pendingDiffStaged: false, pendingDiffScope: null, pendingTurnDiffFile: null, pendingFileNavigation: null, pendingFileFocusPath: null,
+          }])),
           contextRailOrder: state.contextRailOrder,
           contextRailHiddenSurfaces: state.contextRailHiddenSurfaces,
           mobileWorkspaceTabOrder: state.mobileWorkspaceTabOrder,
@@ -4094,3 +4200,224 @@ export const useUIStore = create<UIStore>()(
     }
   )
 );
+
+const EMPTY_PANEL_WORKSPACE: PanelWorkspaceState = {
+  contextPanelByDirectory: {},
+  contextTerminalTabs: {},
+  contextPanelHostDirectory: null,
+  contextEditorTreeVisible: true,
+  contextEditorVisible: true,
+  pendingDiffFile: null,
+  pendingDiffStaged: false,
+  pendingDiffScope: null,
+  pendingTurnDiffFile: null,
+  pendingFileNavigation: null,
+  pendingFileFocusPath: null,
+};
+
+const workspaceFields = new Set<string>(PANEL_WORKSPACE_FIELDS);
+const workspaceApis = new Map<string, StoreApi<UIStore>>();
+
+/** Panel actions capture their owner. Resource directories remain ordinary paths. */
+export function getPanelWorkspaceUI(owner: string): StoreApi<UIStore> {
+  const canonical = useGlobalUIStore.getState().panelWorkspaceAliases[owner] ?? owner;
+  const existing = workspaceApis.get(canonical);
+  if (existing) return existing;
+
+  let previousRoot: UIStore | undefined;
+  let snapshot: UIStore;
+  const getState = (): UIStore => {
+    const root = useGlobalUIStore.getState();
+    if (root !== previousRoot) {
+      previousRoot = root;
+      snapshot = { ...root, ...(root.panelWorkspaces[canonical] ?? EMPTY_PANEL_WORKSPACE), ...actions, panelWorkspaceOwnerId: canonical };
+    }
+    return snapshot;
+  };
+  const set: PanelSetter = (update) => {
+    const current = getState();
+    const value = update instanceof Function ? update(current) : update;
+    if (value === current) return;
+    const scoped = Object.fromEntries(Object.entries(value).filter(([key]) => workspaceFields.has(key)));
+    const shared = Object.fromEntries(Object.entries(value).filter(([key]) => !workspaceFields.has(key)));
+    useGlobalUIStore.setState((root) => {
+      const next: Partial<UIStore> = { ...shared };
+      if (Object.keys(scoped).length) {
+        next.panelWorkspaces = {
+          ...(value.panelWorkspaces ?? root.panelWorkspaces),
+          [canonical]: { ...(value.panelWorkspaces?.[canonical] ?? root.panelWorkspaces[canonical] ?? EMPTY_PANEL_WORKSPACE), ...scoped },
+        };
+      }
+      return next;
+    });
+  };
+  const actions = createPanelActions(set, getState);
+  const api: StoreApi<UIStore> = {
+    getState,
+    getInitialState: getState,
+    setState: (update) => set(update),
+    subscribe: (listener) => {
+      let previous = getState();
+      return useGlobalUIStore.subscribe(() => {
+        const next = getState();
+        const before = previous;
+        previous = next;
+        listener(next, before);
+      });
+    },
+  };
+  workspaceApis.set(canonical, api);
+  return api;
+}
+
+const mainWorkspaceApi: StoreApi<UIStore> = {
+  getState: () => getPanelWorkspaceUI(getPanelWorkspaceOwner()).getState(),
+  getInitialState: () => ({ ...useGlobalUIStore.getInitialState(), ...EMPTY_PANEL_WORKSPACE }),
+  setState: (update) => getPanelWorkspaceUI(getPanelWorkspaceOwner()).setState(update),
+  subscribe: (listener) => {
+    let previous = mainWorkspaceApi.getState();
+    const changed = () => {
+      const next = mainWorkspaceApi.getState();
+      if (next === previous) return;
+      const before = previous;
+      previous = next;
+      listener(next, before);
+    };
+    const root = useGlobalUIStore.subscribe(changed);
+    const selection = subscribePanelWorkspaceOwner(changed);
+    const runtime = subscribeRuntimeEndpointChanged(changed);
+    return () => { root(); selection(); runtime(); };
+  },
+};
+
+export const useUIStore = Object.assign(
+  function useUIStore<T>(selector: (state: UIStore) => T): T {
+    const owner = useContext(PanelWorkspaceOwnerContext);
+    return useStore(owner ? getPanelWorkspaceUI(owner) : mainWorkspaceApi, selector);
+  },
+  mainWorkspaceApi,
+  { persist: useGlobalUIStore.persist },
+);
+
+export const usePanelWorkspaceApi = (): StoreApi<UIStore> =>
+  getPanelWorkspaceUI(useUIStore((state) => state.panelWorkspaceOwnerId));
+
+export function setPanelWorkspaceDirectory(owner: string, directory: string): void {
+  const api = getPanelWorkspaceUI(owner);
+  const state = api.getState();
+  const previous = state.contextPanelHostDirectory;
+  if (previous === directory) return;
+  const panels = { ...state.contextPanelByDirectory };
+  if (previous && panels[previous]) {
+    panels[directory] = panels[previous];
+    delete panels[previous];
+  }
+  api.setState({ contextPanelHostDirectory: directory, contextPanelByDirectory: panels });
+}
+
+export function adoptLegacyPanelWorkspace(owner: string, directory: string): void {
+  const root = useGlobalUIStore.getState();
+  const panel = root.contextPanelByDirectory[directory];
+  if (!panel) return;
+  const { [directory]: legacy, ...remaining } = root.contextPanelByDirectory;
+  const api = getPanelWorkspaceUI(owner);
+  const remapped = new Map<string, string>();
+  const tabs = legacy.tabs.map((tab) => {
+    if (tab.mode !== 'browser') return tab;
+    const dedupeKey = `${api.getState().panelWorkspaceOwnerId}\u0000${tab.dedupeKey}`;
+    const id = buildContextPanelTabID('browser', dedupeKey);
+    remapped.set(tab.id, id);
+    return { ...tab, id, dedupeKey };
+  });
+  let adopted = { ...legacy, tabs };
+  for (const zone of CONTEXT_ZONES) {
+    const view = getZoneView(adopted, zone);
+    const activeTabId = view.activeTabId ? remapped.get(view.activeTabId) : undefined;
+    if (activeTabId) adopted = withZoneView(adopted, zone, { activeTabId });
+  }
+  if (!api.getState().contextPanelByDirectory[directory]) {
+    const contextTerminalTabs = { ...api.getState().contextTerminalTabs };
+    for (const tab of adopted.tabs) {
+      if (tab.mode !== 'terminal') continue;
+      const resourceDirectory = tab.targetDirectory ?? directory;
+      if (contextTerminalTabs[resourceDirectory]) continue;
+      const terminals = useTerminalStore.getState().getDirectoryState(resourceDirectory);
+      contextTerminalTabs[resourceDirectory] = {
+        tabIds: terminals?.tabs.map((terminal) => terminal.id) ?? [],
+        activeTabId: terminals?.activeTabId ?? null,
+        serverSessionIds: Object.fromEntries(terminals?.tabs.flatMap((terminal) => terminal.terminalSessionId ? [[terminal.id, terminal.terminalSessionId]] : []) ?? []),
+        legacyAdoptionPending: true,
+      };
+    }
+    api.setState({
+      contextPanelByDirectory: { ...api.getState().contextPanelByDirectory, [directory]: adopted },
+      contextTerminalTabs,
+      contextEditorTreeVisible: root.contextEditorTreeVisible,
+      contextEditorVisible: root.contextEditorVisible,
+    });
+  }
+  useGlobalUIStore.setState({ contextPanelByDirectory: remaining });
+  adoptLegacyFilesViewTabs(owner, directory);
+}
+
+export function adoptDraftPanelWorkspace(draftOwner: string, sessionOwner: string): void {
+  const root = useGlobalUIStore.getState();
+  if (root.panelWorkspaceAliases[sessionOwner]) return;
+  useGlobalUIStore.setState({ panelWorkspaceAliases: { ...root.panelWorkspaceAliases, [sessionOwner]: draftOwner } });
+}
+
+export function deletePanelWorkspace(owner: string): void {
+  const root = useGlobalUIStore.getState();
+  const canonical = root.panelWorkspaceAliases[owner] ?? owner;
+  const workspaces = Object.fromEntries(Object.entries(root.panelWorkspaces).map(([host, workspace]) => {
+    const runtime = JSON.parse(host)[0];
+    const contextPanelByDirectory = Object.fromEntries(Object.entries(workspace.contextPanelByDirectory).map(([directory, panel]) => {
+      const ids = panel.tabs.filter((tab) => tab.mode === 'chat' && tab.dedupeKey.startsWith('session:') && sessionPanelOwner(tab.dedupeKey.slice('session:'.length), runtime) === owner).map((tab) => tab.id);
+      return [directory, ids.length ? closeContextPanelTabs(panel, ids, root.contextSurfaceZones) : panel];
+    }));
+    return [host, { ...workspace, contextPanelByDirectory }];
+  }));
+  delete workspaces[canonical];
+  const aliases = Object.fromEntries(Object.entries(root.panelWorkspaceAliases).filter(([key, value]) => key !== owner && value !== canonical));
+  workspaceApis.delete(canonical);
+  deleteFilesViewTabsWorkspace(canonical);
+  useGlobalUIStore.setState({ panelWorkspaces: workspaces, panelWorkspaceAliases: aliases });
+}
+
+/** The displayed main session owns its resources; a side chat uses the workspace holding its tab. */
+export function panelOwnerForSession(sessionId: string, displayedOwner: string): string {
+  const root = useGlobalUIStore.getState();
+  const runtime = getRuntimeKey();
+  const key = sessionPanelOwner(sessionId, runtime);
+  const ownWorkspace = root.panelWorkspaceAliases[key] ?? key;
+  const displayedWorkspace = root.panelWorkspaceAliases[displayedOwner] ?? displayedOwner;
+  if (ownWorkspace === displayedWorkspace) return ownWorkspace;
+  let owner = ownWorkspace;
+  let touchedAt = -Infinity;
+  for (const [host, workspace] of Object.entries(root.panelWorkspaces)) {
+    if (JSON.parse(host)[0] !== runtime) continue;
+    for (const panel of Object.values(workspace.contextPanelByDirectory)) {
+      for (const tab of panel.tabs) {
+        if (tab.mode !== 'chat' || tab.dedupeKey !== `session:${sessionId}`) continue;
+        if (host === displayedWorkspace) return host;
+        if (tab.touchedAt > touchedAt) {
+          owner = host;
+          touchedAt = tab.touchedAt;
+        }
+      }
+    }
+  }
+  return owner;
+}
+
+export function forgetPanelWorkspaceLayouts(): void {
+  const root = useGlobalUIStore.getState();
+  for (const owner of Object.keys(root.panelWorkspaces)) {
+    const ui = getPanelWorkspaceUI(owner).getState();
+    getFilesViewTabsStore(owner).setState({ byRoot: {}, runtimeSnapshots: {} });
+    for (const directory of Object.keys(ui.contextPanelByDirectory)) {
+      for (const zone of CONTEXT_ZONES) ui.closeContextZone(directory, zone);
+    }
+  }
+  useGlobalUIStore.setState({ contextPanelByDirectory: {} });
+}

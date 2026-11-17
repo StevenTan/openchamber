@@ -33,13 +33,13 @@ describe('getVisibleContextRailSurfaces', () => {
     expect(getVisibleContextRailSurfaces({ ...baseOptions, isVSCode: true }).some((s) => s.id === 'browser')).toBe(false);
   });
 
-  test('hides content-driven surfaces until a matching tab exists', () => {
+  test('the chat surface opens a side conversation from the rail', () => {
     const chat = CONTEXT_SURFACES.find((surface) => surface.id === 'chat');
     if (!chat) {
       throw new Error('chat surface missing from registry');
     }
-    expect(chat.availability).toBe('has-content');
-    expect(getVisibleContextRailSurfaces(baseOptions).some((s) => s.id === 'chat')).toBe(false);
+    expect(chat.availability).toBe('always');
+    expect(getVisibleContextRailSurfaces(baseOptions).some((s) => s.id === 'chat')).toBe(true);
     expect(getVisibleContextRailSurfaces({ ...baseOptions, tabs: [{ mode: chat.mode }] }).some((s) => s.id === 'chat')).toBe(true);
   });
 
@@ -61,7 +61,7 @@ describe('getVisibleContextRailSurfaces', () => {
       railOrder: ['notes', 'git', 'editor', 'pr', 'terminal', 'context'],
     });
     expect(surfaces.map((surface) => surface.id)).toEqual([
-      'notes',
+      'notes', 'chat',
       'git', 'pr', 'diff', 'walkthrough',
       'editor', 'terminal', 'browser',
       'context',

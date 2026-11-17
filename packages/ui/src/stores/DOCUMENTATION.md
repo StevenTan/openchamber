@@ -283,12 +283,50 @@ Examples:
 - `useFeatureFlagsStore.ts`
 - `useUpdateStore.ts`
 
-These stores coordinate visible app state, navigation, selected context-panel tabs, dialogs, and lightweight feature flags. Context surfaces open in zones around the chat (`lib/surfaces/DOCUMENTATION.md`, Zones): `contextSurfaceZones` is the per-device placement, and each `contextPanelByDirectory` entry keeps the right zone in its top-level `isOpen`/`expanded`/`activeTabId` and the left and bottom zones in `zones`. Store version 24 added them; older state loads with everything on the right. `useUIStore.activeSurface` selects the primary mobile view and the few desktop views that are promoted out of the context panel. It is not a desktop tab selection. A browser tab opened by an agent (`openAgentBrowserTab`) is created in the calling session's directory and persists that session as `ownerSessionId`; tabs the user opens, and tabs saved before owners existed, have none. Agent browser actions use it to keep sessions out of each other's tabs (`packages/web/server/lib/browser-control/DOCUMENTATION.md`). Opening a new browser tab with an address (`openContextPreview`, `openContextBrowser`, `openAgentBrowserTab`) notes it, keyed by directory and tab id, in the session-only set in `lib/browser/devServerWait.ts`; the tab's first mount reads and forgets it. Only a noted tab waits for its dev server on the first load. A tab restored from saved state, or remounted later, loads once and shows the failure. A waiting tab retries after a pause that grows from 0.5 s to 4 s within its 40 s wait. While it is out of sight (another tab in front, the panel closed, another project on screen, the window hidden) it holds the retry and retries when shown again; a tab the agent opened or has acted on keeps retrying out of sight. When those openers hit a tab that already exists, they send it a session-only load request instead. A mounted tab that shows a failure, or has not shown a page yet, loads the address the way a typed one loads, wait included, so a failure from launch does not stay up once a project action starts the server; a tab showing a working page ignores the request and is only focused, keeping what the person had on it.
+`useUIStore` combines device preferences with a panel workspace owned by the
+main session or saved draft and namespaced by runtime. `panelWorkspaces` stores
+tabs, zone visibility, editor visibility, pending navigation and terminal
+references. `contextPanelByDirectory` inside a workspace uses actual resource
+directories. The right zone uses `isOpen`/`expanded`/`activeTabId`; the other
+zones use `zones`. Placement and pixel dimensions stay device preferences.
 
-Context-panel session chats render in this app as a chat column pinned to
-their session (`ChatView` `pinnedSession`, see the sync documentation's
-*Pinned chat columns*). Only the active chat tab is mounted while the panel is
-open; switching tabs opens the other session like a session switch.
+Outside a panel, the hook and `getState()` address the main selection.
+`PanelWorkspaceOwnerContext` pins nested panels and side chats to their host;
+`getPanelWorkspaceUI(owner)` captures that address for asynchronous operations.
+Draft materialization aliases the session to the existing draft workspace.
+Legacy directory panels are claimed once by the first selected owner of that
+directory. Confirmed session deletion clears its workspace and its chat tabs
+across host workspaces in that runtime; archive retains its workspace.
+`activeSurface` selects mobile pages and promoted desktop pages.
+
+Agent file and browser opens resolve through `panelOwnerForSession`. The
+displayed main session uses its own workspace. A side chat uses the displayed
+workspace holding its tab, or its most recently touched host when in the
+background. Tab membership is the authority, including restored tabs and
+hidden zones; closing the last matching tab leaves the chat's own workspace.
+Only workspaces in the active runtime participate.
+
+Docked file navigation uses `getFilesViewTabsStore(owner)` with real roots;
+standalone mobile and VS Code navigation uses the default store.
+`useWorkspaceTerminalStore` projects ordered resource references, including
+server PTY IDs for discovery after reload or runtime changes. Fresh workspaces
+create their own shell. A migrated legacy terminal panel can import directory
+resources once, on its first successful server reconciliation.
+
+A browser tab opened by an agent (`openAgentBrowserTab`) belongs to the calling session's host workspace and persists the actor as `ownerSessionId`; tabs the user opens, and tabs saved before owners existed, have none. Agent browser actions use it to keep sessions out of each other's tabs (`packages/web/server/lib/browser-control/DOCUMENTATION.md`). Opening a new browser tab with an address (`openContextPreview`, `openContextBrowser`, `openAgentBrowserTab`) notes it, keyed by directory and tab id, in the session-only set in `lib/browser/devServerWait.ts`; the tab's first mount reads and forgets it. Only a noted tab waits for its dev server on the first load. A tab restored from saved state, or remounted later, loads once and shows the failure. A waiting tab retries after a pause that grows from 0.5 s to 4 s within its 40 s wait. While it is out of sight (another tab in front, the panel closed, another project on screen, the window hidden) it holds the retry and retries when shown again; a tab the agent opened or has acted on keeps retrying out of sight. When those openers hit a tab that already exists, they send it a session-only load request instead. A mounted tab that shows a failure, or has not shown a page yet, loads the address the way a typed one loads, wait included, so a failure from launch does not stay up once a project action starts the server; a tab showing a working page ignores the request and is only focused, keeping what the person had on it.
+
+Context-panel chats use the existing pinned `ChatView` and independent composer
+drafts. New side chats inherit the source chat column's completed history,
+with main navigation preserved. The Chat rail uses the displayed main
+workspace as its source. Ask in side chat attaches the selected text as a
+quote draft before opening its tab. Closing temporary chat tabs
+asks for confirmation before deleting their sessions; cancelling keeps the
+whole requested group of tabs open. The confirmation includes temporary
+descendants; deletion is bounded to those confirmed session IDs. Saved chats
+and their temporary children remain alive when their temporary parent closes.
+Saved chats only close their tabs.
+Only the visible workspace marks its side chat viewed.
+
 
 `useDirectoryStore.ts` resolves the home directory when the module loads and
 again on every runtime switch; only the newest resolution commits. On a

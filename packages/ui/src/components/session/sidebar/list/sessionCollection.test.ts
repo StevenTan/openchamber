@@ -2,6 +2,7 @@ import { ensureChatsRootDirectory } from '@/lib/chatDirectories';
 import { opencodeClient } from '@/lib/opencode/client';
 import { describe, expect, test } from 'bun:test';
 import type { Session } from '@/lib/opencode/model';
+import { sideChatMetadata, withSideChatSaved } from '@/lib/sessionSideChatMetadata';
 import {
   buildActiveSessionNode,
   buildSidebarSessionProjection,
@@ -342,3 +343,21 @@ opencodeClient.getFilesystemHomeInfo = async () => ({
 });
 await ensureChatsRootDirectory();
 opencodeClient.getFilesystemHomeInfo = originalHomeInfo;
+
+test('saved side chats join their parent tree while temporary side chats remain hidden', () => {
+  const parent = session('parent', '/workspace');
+  const saved = { ...session('saved', '/workspace'), metadata: withSideChatSaved(sideChatMetadata(parent.id, null)) };
+  const temporary = { ...session('temporary', '/workspace'), metadata: sideChatMetadata(parent.id, null) };
+  const projection = buildSidebarSessionProjection({
+    globalActiveSessions: [parent, saved, temporary],
+    liveSessions: [],
+    knownDirectories: new Set(['/workspace']),
+    isVSCode: false,
+    pinnedSessionIds: new Set(),
+    sessionOrderRanks: new Map(),
+  });
+  expect(projection.childrenMap.get(parent.id)?.map((child) => child.id)).toEqual([saved.id]);
+  expect(getDescendantIds(projection.childrenMap, parent.id)).toEqual([saved.id]);
+  expect(buildActiveSessionNode(projection.childrenMap, parent).children.map((node) => node.session.id)).toEqual([saved.id]);
+  expect(projection.orderedSessions.some((entry) => entry.id === temporary.id)).toBe(false);
+});

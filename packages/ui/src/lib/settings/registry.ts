@@ -721,6 +721,8 @@ export const LOCAL_DEVICE_KEYS = [
   'sidebarFoldedForExpandedZone',
   'sidebarWidth',
   'contextPanelByDirectory',
+  'panelWorkspaces',
+  'panelWorkspaceAliases',
   'contextZoneSizes',
   'contextZoneExpandedChatSizes',
   'contextRailOrder',

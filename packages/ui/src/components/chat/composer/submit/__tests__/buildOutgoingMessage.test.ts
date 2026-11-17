@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import type { AttachedFile } from '@/stores/types/sessionTypes';
 import type { InlineCommentDraft } from '@/stores/useInlineCommentDraftStore';
 import { CONTEXT_METADATA_KEY, contextPayloadFromDraft } from '@/lib/messages/contextParts';
+import { chatQuoteDraft } from '@/lib/chatQuoteDraft';
 import type { QueuedContextPart, QueuedMessage } from '@/stores/messageQueueStore';
 import {
     buildComposerContext,
@@ -627,4 +628,14 @@ describe('expandCommentSnippets', () => {
         });
         expect(kept).toBe(original);
     });
+});
+
+test('a cross-conversation selection is quote context alongside the typed question', () => {
+    const quote = '**Discover tools**: use `search(...)`.\n\n```ts\nsearch("tools")\n```';
+    const draft: InlineCommentDraft = { ...chatQuoteDraft(quote), id: 'quote', sessionKey: 'destination', createdAt: 1 };
+    const result = buildOutgoingMessage(input({ composerText: 'What does this mean?', inlineComments: [draft] }), deps());
+    expect(result.primaryText).toBe('What does this mean?');
+    expect(result.additionalParts).toHaveLength(1);
+    expect(result.additionalParts[0].metadata?.[CONTEXT_METADATA_KEY]).toEqual({ kind: 'chat-quote', quote, text: '' });
+    expect(result.additionalParts[0].synthetic).toBe(true);
 });

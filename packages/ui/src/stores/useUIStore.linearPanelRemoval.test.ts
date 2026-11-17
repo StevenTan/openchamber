@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { useUIStore } from './useUIStore';
+import { adoptLegacyPanelWorkspace, useUIStore } from './useUIStore';
 
 const originalOptions = useUIStore.persist.getOptions();
 const originalState = useUIStore.getState();
@@ -28,6 +28,7 @@ describe('Linear rail panel removal', () => {
       removeItem: () => undefined,
     } });
     await useUIStore.persist.rehydrate();
+    adoptLegacyPanelWorkspace(useUIStore.getState().panelWorkspaceOwnerId, '/repo');
     const state = Object.keys(useUIStore.getState());
     expect(state.filter((key) => key.startsWith('linearIssueList'))).toEqual([]);
     expect(useUIStore.getState().contextPanelByDirectory['/repo']?.tabs.map((tab) => tab.mode)).toEqual(['diff']);

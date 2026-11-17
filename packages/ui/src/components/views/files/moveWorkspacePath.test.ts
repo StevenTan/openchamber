@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 import { FilesystemError } from '@/lib/api/files-errors';
 import type { FilesAPI } from '@/lib/api/types';
 import { isFilePathMoveInFlight, subscribeToFilePathMoves } from '@/lib/filePathMoves';
-import { useFilesViewTabsStore } from '@/stores/useFilesViewTabsStore';
+import { getFilesViewTabsStore } from '@/stores/useFilesViewTabsStore';
 import { useUIStore } from '@/stores/useUIStore';
 
 import { moveWorkspacePath } from './moveWorkspacePath';
@@ -22,9 +22,9 @@ const fileTabPaths = () => (useUIStore.getState().contextPanelByDirectory['/repo
 describe('moveWorkspacePath', () => {
   beforeEach(() => {
     useUIStore.setState({ contextPanelByDirectory: {} });
-    useFilesViewTabsStore.setState({ byRoot: {} });
+    getFilesViewTabsStore(useUIStore.getState().panelWorkspaceOwnerId).setState({ byRoot: {} });
     useUIStore.getState().openContextFile('/repo', '/repo/src/a.ts');
-    useFilesViewTabsStore.getState().setSelectedPath('/repo', '/repo/src/a.ts');
+    getFilesViewTabsStore(useUIStore.getState().panelWorkspaceOwnerId).getState().setSelectedPath('/repo', '/repo/src/a.ts');
   });
 
   test('holds saves during the request, then tells the editor and moves the tabs', async () => {
@@ -48,7 +48,7 @@ describe('moveWorkspacePath', () => {
     expect(isFilePathMoveInFlight('/repo/src/a.ts')).toBe(false);
     expect(notified).toEqual([{ from: '/repo/src/a.ts', to: '/repo/lib/a.ts' }]);
     expect(fileTabPaths()).toEqual(['/repo/lib/a.ts']);
-    expect(useFilesViewTabsStore.getState().byRoot['/repo']?.selectedPath).toBe('/repo/lib/a.ts');
+    expect(getFilesViewTabsStore(useUIStore.getState().panelWorkspaceOwnerId).getState().byRoot['/repo']?.selectedPath).toBe('/repo/lib/a.ts');
   });
 
   test('reports a name conflict and leaves tabs and the editor alone', async () => {

@@ -1,3 +1,4 @@
+import { useNewSideChat } from '@/components/session/useNewSideChat';
 import React from 'react';
 import { TooltipLabelWithShortcut } from '@/components/ui/action-toolbar';
 import {
@@ -203,6 +204,7 @@ const trackerRailIcon = (descriptor: SourceControlProviderDescriptor | null): Ra
 };
 
 export const ContextPanelRail: React.FC = () => {
+  const sideChat = useNewSideChat();
   const { t } = useI18n();
   const effectiveDirectory = useEffectiveDirectory();
   const directoryKey = effectiveDirectory ? normalizeContextPanelDirectoryKey(effectiveDirectory) : '';
@@ -511,7 +513,11 @@ export const ContextPanelRail: React.FC = () => {
                 showOrderNumber={revealNumbers}
                 onSelect={(selected) => {
                   if (isPluginContextPanelMode(selected.mode)) clearGuestBadge(pluginIdFromMode(selected.mode));
-                  openContextSurface(directoryKey, selected.mode);
+                  if (selected.mode === 'chat' && !tabs.some((tab) => tab.mode === 'chat')) {
+                    void sideChat.create();
+                  } else {
+                    openContextSurface(directoryKey, selected.mode);
+                  }
                 }}
               />
             );

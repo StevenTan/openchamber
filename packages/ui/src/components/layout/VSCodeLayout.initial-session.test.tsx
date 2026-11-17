@@ -54,7 +54,12 @@ const display = create(() => ({ showArchivedSessions: false, toggleArchivedSessi
 const runtime = { vscode: { executeCommand: async () => {} } };
 mock.module('@/stores/useProjectsStore', () => ({ useProjectsStore: projects }));
 mock.module('@/stores/useSessionDisplayStore', () => ({ useSessionDisplayStore: display }));
-mock.module('@/stores/useUIStore', () => ({ useUIStore: ui }));
+mock.module('@/stores/useUIStore', () => ({
+  useUIStore: ui,
+  getPanelWorkspaceUI: (owner: string) => ({ getState: () => ({ ...ui.getState(), panelWorkspaceOwnerId: owner }) }),
+  deletePanelWorkspace: noOp,
+  adoptDraftPanelWorkspace: noOp,
+}));
 const { useConfigStore } = await import('@/stores/useConfigStore');
 useConfigStore.setState({ isInitialized: true });
 const activation = spyOn(useConfigStore.getState(), 'activateDirectory').mockResolvedValue(undefined);

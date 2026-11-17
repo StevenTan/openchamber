@@ -208,7 +208,7 @@ export type SyntheticContextPart = {
 
 type PendingBtwComposerRequest = {
   parentSessionId: string
-  text: string
+  quote: string
 }
 
 export type VSCodeActiveEditorFile = {
@@ -239,6 +239,9 @@ export type InputState = {
     files: Array<{ url: string; mimeType: string; filename: string }>
   } | null
   consumePendingComposerRestore: (target: ChatDraftIdentity | null) => InputState["pendingComposerRestore"]
+  pendingComposerFocus: ChatDraftIdentity | null
+  requestComposerFocus: (target: ChatDraftIdentity) => void
+  consumeComposerFocus: (target: ChatDraftIdentity | null) => boolean
   pendingInputText: string | null
   pendingInputMode: PendingInputMode
   /**
@@ -324,6 +327,14 @@ export const useInputStore = create<InputState>()((set, get) => ({
     if (!pending || !target || getChatDraftIdentityKey(pending.target) !== getChatDraftIdentityKey(target)) return null
     set({ pendingComposerRestore: null })
     return pending
+  },
+  pendingComposerFocus: null,
+  requestComposerFocus: (target) => set({ pendingComposerFocus: target }),
+  consumeComposerFocus: (target) => {
+    const pending = get().pendingComposerFocus
+    if (!pending || !target || getChatDraftIdentityKey(pending) !== getChatDraftIdentityKey(target)) return false
+    set({ pendingComposerFocus: null })
+    return true
   },
   pendingInputText: null,
   pendingInputMode: "replace",
@@ -645,5 +656,6 @@ export const useDraftAttachedFiles = (target: ChatDraftIdentity | null | undefin
 }
 
 subscribeChatDraftDeletion((identity) => {
+  useInputStore.getState().consumeComposerFocus(identity)
   useInputStore.getState().setAttachedFiles([], identity)
 })

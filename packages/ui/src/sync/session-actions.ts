@@ -53,6 +53,7 @@ import {
 } from "@/lib/sessionReviewMetadata"
 import { withContextObligatoryMessage, type ContextObligatoryMessage } from "@/lib/contextObligatoryMessages"
 import { getBtwOriginalSessionID, getBtwSessionID, isBtwSession, withoutBtwSessionLink } from "@/lib/sessionBtwMetadata"
+import { getSideChatSessionIDs, isTemporarySideChat } from "@/lib/sessionSideChatMetadata"
 import { type LinkedIssue } from "@/lib/linkedIssues"
 import { withSessionWorkClosed, withSessionWorkState, type SessionWork } from "@/lib/sessionWorkMetadata"
 import { isPinnedMetadata, withSessionPinned } from "@/lib/sessionPins"
@@ -1429,6 +1430,7 @@ async function cleanupReviewMetadataBeforeDelete(
   sessionId: string,
   directory?: string | null,
   expectedRuntimeKey?: string,
+  temporarySideChatIDs?: ReadonlySet<string>,
 ): Promise<void> {
   if (isStaleRuntime(expectedRuntimeKey)) return
   let session: Session
@@ -1438,6 +1440,15 @@ async function cleanupReviewMetadataBeforeDelete(
     return
   }
   if (isStaleRuntime(expectedRuntimeKey)) return
+
+  const sideChatIDs = getSideChatSessionIDs(session);
+  if (sideChatIDs.length) {
+    const { discardSideChat } = await import('@/lib/sideChats');
+    const ids = temporarySideChatIDs ? sideChatIDs.filter((id) => temporarySideChatIDs.has(id)) : sideChatIDs;
+    const results = await Promise.allSettled(ids.map((id) => discardSideChat(id, directory ?? session.directory, expectedRuntimeKey ?? getRuntimeKey(), temporarySideChatIDs)));
+    const failures = results.filter((result) => result.status === 'rejected');
+    if (failures.length) throw new AggregateError(failures.map((result) => result.reason), 'Could not clean up temporary side chats');
+  }
 
   const unlinkParent = async (originalSessionID: string, unlink: (metadata: SessionMetadataRecord) => SessionMetadataRecord) => {
     try {
@@ -1687,6 +1698,8 @@ export type DeleteSessionOptions = {
    * confirmation spans a runtime switch.
    */
   expectedRuntimeKey?: string
+  /** Bound descendant cleanup to the temporary chats included in the user's confirmation. */
+  temporarySideChatIDs?: ReadonlySet<string>
 }
 
 /**
@@ -1710,7 +1723,7 @@ export async function deleteSession(sessionId: string, options?: DeleteSessionOp
   const sessionDirectory = getSessionDirectory(sessionId)
   const chatDirectoryCleanup = planChatDirectoryCleanup(sessionId, getGlobalSessionSnapshot(sessionId), sessionDirectory)
   try {
-    await cleanupReviewMetadataBeforeDelete(sessionId, sessionDirectory, expectedRuntimeKey)
+    await cleanupReviewMetadataBeforeDelete(sessionId, sessionDirectory, expectedRuntimeKey, options?.temporarySideChatIDs)
     if (isStaleRuntime(expectedRuntimeKey)) return false
     const deleted = await opencodeClient.deleteSession(sessionId, sessionDirectory)
     if (isStaleRuntime(expectedRuntimeKey)) return false
@@ -1912,7 +1925,7 @@ export async function archiveSessions(
  * path instead of the server batch.
  */
 function hasLinkedSessionCleanup(session: Session): boolean {
-  return isReviewSession(session) || isBtwSession(session) || Boolean(getBtwSessionID(session))
+  return isReviewSession(session) || isBtwSession(session) || Boolean(getBtwSessionID(session)) || isTemporarySideChat(session) || getSideChatSessionIDs(session).length > 0
 }
 
 /**

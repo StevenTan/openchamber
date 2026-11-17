@@ -22,7 +22,7 @@ const source = readFileSync(join(__dirname, '..', 'ContextPanel.tsx'), 'utf-8');
 
 // Every zone frame shares the aside, so the left and bottom zones clip the same way.
 const slotElement = (): string => {
-  const start = source.indexOf("data-right-slot={zone === 'right' ? '' : undefined}");
+  const start = source.indexOf("data-right-slot={workspaceActive && zone === 'right' ? '' : undefined}");
   expect(start).toBeGreaterThan(-1);
   const end = source.indexOf('style={panelStyle}', start);
   expect(end).toBeGreaterThan(start);

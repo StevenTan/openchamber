@@ -459,7 +459,9 @@ nests under it. Nesting is display lineage (`lib/sessionWorkLineage.ts`,
 `resolveSessionNestingParentId`): a subagent under its run (`parentID`), and
 under the session it grew out of an auto-review (`originalSessionID`), and a
 `/btw` side conversation, promoted or not (`originalSessionID`, after
-promotion `fork.sessionID`). A plain fork stays a root: it usually takes the
+promotion `fork.sessionID`), and a saved side chat (`sideChat.parentSessionID`).
+Saved side chats follow the existing descendant rules for sidebar tree actions.
+A plain fork stays a root: it usually takes the
 task another way, so it is a work of its own (maintainer decision 2026-10-26).
 A session another session's agent
 started through the openchamber tool stays a root: it is the user's own

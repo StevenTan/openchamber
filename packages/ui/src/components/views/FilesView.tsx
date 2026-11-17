@@ -1,3 +1,4 @@
+import { usePanelWorkspaceApi } from '@/stores/useUIStore';
 import React from 'react';
 import { readAssetBlob } from '@/lib/runtime-asset';
 import { runtimeFetch } from '@/lib/runtime-fetch';
@@ -93,7 +94,7 @@ import { isLintedJsonPath, jsonSyntaxLint } from '@/lib/codemirror/jsonSyntaxLin
 import { stickyScope } from '@/lib/codemirror/stickyScope';
 import { useThemeSystem } from '@/contexts/useThemeSystem';
 import { normalizeContextPanelDirectoryKey, useUIStore } from '@/stores/useUIStore';
-import { useFilesViewTabsStore } from '@/stores/useFilesViewTabsStore';
+import { useFilesViewTabsApi, useFilesViewTabsStore } from '@/stores/useFilesViewTabsStore';
 import { useEffectiveGitDirectory, useGitStatus, useGitStore } from '@/stores/useGitStore';
 import { DirectoryRequests } from './files/directoryRequests';
 import { gitBaselineTarget } from './files/gitBaselineTarget';
@@ -908,6 +909,8 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full', visible = t
   );
 
   const EMPTY_PATHS: string[] = React.useMemo(() => [], []);
+  const filesTabsApi = useFilesViewTabsApi();
+  const panelUI = usePanelWorkspaceApi();
   const openPaths = useFilesViewTabsStore((state) => (root ? (state.byRoot[root]?.openPaths ?? EMPTY_PATHS) : EMPTY_PATHS));
   const selectedPath = useFilesViewTabsStore((state) => (root ? (state.byRoot[root]?.selectedPath ?? null) : null));
   const expandedPaths = useFilesViewTabsStore((state) => (root ? (state.byRoot[root]?.expandedPaths ?? EMPTY_PATHS) : EMPTY_PATHS));
@@ -1037,7 +1040,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full', visible = t
   // The path the open-file poll saw missing since its last load; only that
   // observation lets the poll reload a failed file once it is back.
   const missingSeenPathRef = React.useRef<string | null>(null);
-  const filePositionKey = JSON.stringify([getRuntimeKey(), root, editorDocumentPath]);
+  const filePositionKey = JSON.stringify([panelUI.getState().panelWorkspaceOwnerId, root, editorDocumentPath]);
 
   const [draftContent, setDraftContent] = React.useState('');
   const [isSaving, setIsSaving] = React.useState(false);
@@ -1608,7 +1611,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full', visible = t
 
       // Open tabs and the editor, unsaved edits included, follow the new name.
       try {
-        const result = await moveWorkspacePath(files, { tabs: panelRoot, files: root }, oldPath, newPath);
+        const result = await moveWorkspacePath(files, { tabs: panelRoot, files: root, workspaceOwner: panelUI.getState().panelWorkspaceOwnerId }, oldPath, newPath);
         if (result === 'moved') {
           toast.success(t('sidebarFilesTree.toast.renamedSuccessfully'));
           await refreshDirectory(parentDir);
@@ -1667,7 +1670,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full', visible = t
     }
 
     done();
-  }, [activeDialog, dialogData, dialogInputValue, files, panelRoot, refreshDirectory, isMobile, removeOpenPathsByPrefix, root, selectedFile?.path, setSelectedPath, t]);
+  }, [activeDialog, dialogData, dialogInputValue, files, panelRoot, refreshDirectory, isMobile, removeOpenPathsByPrefix, root, selectedFile?.path, setSelectedPath, t, panelUI]);
 
   React.useEffect(() => {
     if (!currentDirectory) {
@@ -2053,7 +2056,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full', visible = t
     const requestScope = fileScopeRef.current;
     const isCurrentLoad = () => {
       if (!root || getRuntimeKey() !== requestRuntime || fileScopeRef.current !== requestScope) return false;
-      const rootState = useFilesViewTabsStore.getState().byRoot[root];
+      const rootState = filesTabsApi.getState().byRoot[root];
       const currentPath = rootState?.selectedPath ?? rootState?.openPaths[0] ?? null;
       return activeFileLoadIdRef.current === loadId && currentPath === node.path;
     };
@@ -2210,7 +2213,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full', visible = t
           setFileLoading(false);
         }
       });
-  }, [applyLoadedTextContent, expandPaths, isMobile, loadDirectory, readFile, readFileStat, root, runtime.isDesktop, searchQuery, setSelectedPath, t]);
+  }, [applyLoadedTextContent, expandPaths, isMobile, loadDirectory, readFile, readFileStat, root, runtime.isDesktop, searchQuery, setSelectedPath, t, filesTabsApi]);
 
   const ensurePathVisible = React.useCallback(async (targetPath: string, includeTarget: boolean) => {
     if (!visible || !root) {
@@ -2654,13 +2657,13 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full', visible = t
     const normalized = normalizePath(dirPath);
     if (!root) return;
 
-    const expanded = useFilesViewTabsStore.getState().byRoot[root]?.expandedPaths.includes(normalized) ?? false;
+    const expanded = filesTabsApi.getState().byRoot[root]?.expandedPaths.includes(normalized) ?? false;
     toggleWithMotion(dirPath, expanded, () => toggleExpandedPath(root, normalized));
 
     if (!loadedDirsRef.current.has(normalized)) {
       await loadDirectory(normalized);
     }
-  }, [loadDirectory, root, toggleExpandedPath, toggleWithMotion]);
+  }, [loadDirectory, root, toggleExpandedPath, toggleWithMotion, filesTabsApi]);
 
   const fileRowPermissions = React.useMemo(
     () => ({ canRename, canCreateFile, canCreateFolder, canDelete, canReveal }),
@@ -2789,10 +2792,10 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full', visible = t
     // Opened like a single click in the tree: one preview tab follows the steps.
     const toNeighbor = (node: FileNode): ImageNeighbor => ({
       name: node.name,
-      open: () => useUIStore.getState().openContextFile(panelRoot, node.path, { preview: true }),
+      open: () => panelUI.getState().openContextFile(panelRoot, node.path, { preview: true }),
     });
     return { previous: toNeighbor(neighbors.previous), next: toNeighbor(neighbors.next) };
-  }, [imageFolderHasSelected, imageFolderListing, panelRoot, selectedFilePath]);
+  }, [imageFolderHasSelected, imageFolderListing, panelRoot, selectedFilePath, panelUI]);
   const pendingNavigationTargetPath = React.useMemo(
     () => normalizePath(pendingFileNavigation?.path ?? ''),
     [pendingFileNavigation?.path],
@@ -3099,7 +3102,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full', visible = t
       pendingDrawioPreviewFrameRef.current = requestAnimationFrame(() => {
         pendingDrawioPreviewFrameRef.current = requestAnimationFrame(() => {
           pendingDrawioPreviewFrameRef.current = null;
-          if (root && pathAtToggle && useFilesViewTabsStore.getState().byRoot[root]?.selectedPath !== pathAtToggle) {
+          if (root && pathAtToggle && filesTabsApi.getState().byRoot[root]?.selectedPath !== pathAtToggle) {
             return;
           }
           setDrawioRemountNonce((value) => value + 1);
@@ -3108,7 +3111,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full', visible = t
       });
       return;
     }
-  }, [draftContent, fileContent, root, selectedFile?.path]);
+  }, [draftContent, fileContent, root, selectedFile?.path, filesTabsApi]);
 
   const saveCanvasViewMode = React.useCallback((mode: PreviewViewMode) => {
     const selectedPath = selectedFile?.path;
@@ -3149,13 +3152,13 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full', visible = t
     }
     pendingCanvasPreviewFrameRef.current = requestAnimationFrame(() => {
       pendingCanvasPreviewFrameRef.current = null;
-      if (root && pathAtToggle && useFilesViewTabsStore.getState().byRoot[root]?.selectedPath !== pathAtToggle) {
+      if (root && pathAtToggle && filesTabsApi.getState().byRoot[root]?.selectedPath !== pathAtToggle) {
         return;
       }
       setCanvasRemountNonce((value) => value + 1);
       setCanvasViewMode('preview');
     });
-  }, [canMountCanvas, fileContent, guestFileEditor, root, selectedFile?.path, t]);
+  }, [canMountCanvas, fileContent, guestFileEditor, root, selectedFile?.path, t, filesTabsApi]);
 
   const saveDiagramXml = React.useCallback(async (path: string, xml: string) => {
     if (!files.writeFile || xml === diagramSavedXmlRef.current) {
@@ -3678,7 +3681,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full', visible = t
   pinPreviewOnEditRef.current = () => {
     if (!selectedFile?.path || !panelRoot) return;
     const directoryKey = normalizeContextPanelDirectoryKey(panelRoot);
-    const state = useUIStore.getState();
+    const state = panelUI.getState();
     const previewTab = state.contextPanelByDirectory[directoryKey]?.tabs
       .find((tab) => tab.preview && tab.targetPath === selectedFile.path);
     if (previewTab) state.pinContextPanelTab(directoryKey, previewTab.id);
@@ -3707,7 +3710,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full', visible = t
       }
     }).then((resolution) => {
       if (resolution.status === 'found') {
-        useUIStore.getState().openContextFile(panelRoot, resolution.path);
+        panelUI.getState().openContextFile(panelRoot, resolution.path);
         return;
       }
       toast.error(resolution.status === 'missing'
@@ -4270,8 +4273,8 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full', visible = t
   // consumes the same pending focus path.
   const openLinkedFile = React.useCallback((absolutePath: string) => {
     if (!panelRoot) return;
-    useUIStore.getState().openContextFile(panelRoot, absolutePath);
-  }, [panelRoot]);
+    panelUI.getState().openContextFile(panelRoot, absolutePath);
+  }, [panelRoot, panelUI]);
   const markdownLocalAssetsActive = isMarkdown && mdViewMode === 'preview' && !fileLoading;
   const markdownColorScheme = currentTheme.metadata.variant === 'light' ? 'light' : 'dark';
   const markdownDocumentAssets = useMarkdownLocalAssets({
@@ -4853,8 +4856,8 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full', visible = t
   ) : null;
 
   const openExcalidrawExtensionCard = React.useCallback(() => {
-    useUIStore.getState().openSettingsAt('integrations', 'integrations.extensions.excalidraw');
-  }, []);
+    panelUI.getState().openSettingsAt('integrations', 'integrations.extensions.excalidraw');
+  }, [panelUI]);
 
   // Above the scroller, so an editor opened far down the file is on screen.
   // The fullscreen overlay shows it instead while it is open: one editor at a time.

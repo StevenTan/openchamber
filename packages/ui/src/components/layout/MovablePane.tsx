@@ -1,7 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import type { ContextZone } from '@/lib/workspace/zones';
-import { useZoneHostsStore } from './zoneHosts';
+import { useZoneHostsApi, useZoneHostsStore } from './zoneHosts';
 
 type HostParent = HTMLElement & { moveBefore?: (node: Node, child: Node | null) => void };
 
@@ -18,6 +18,7 @@ type HostParent = HTMLElement & { moveBefore?: (node: Node, child: Node | null) 
  * by the zone body as if it were a direct child.
  */
 export const MovablePane: React.FC<{ zone: ContextZone; children: React.ReactNode }> = ({ zone, children }) => {
+  const hosts = useZoneHostsApi();
   const [node] = React.useState(() => {
     const element = document.createElement('div');
     element.style.display = 'contents';
@@ -28,7 +29,7 @@ export const MovablePane: React.FC<{ zone: ContextZone; children: React.ReactNod
   React.useLayoutEffect(() => {
     // The frame registers its body from a ref, earlier in the same commit, so
     // a pane lands in its final zone on first attach.
-    const parent: HostParent | null = host ?? useZoneHostsStore.getState().body[zone];
+    const parent: HostParent | null = host ?? hosts.getState().body[zone];
     if (!parent) {
       node.remove();
       return;
@@ -43,7 +44,7 @@ export const MovablePane: React.FC<{ zone: ContextZone; children: React.ReactNod
     if (focused instanceof HTMLElement && node.contains(focused) && document.activeElement !== focused) {
       focused.focus({ preventScroll: true });
     }
-  }, [host, node, zone]);
+  }, [host, node, zone, hosts]);
 
   React.useLayoutEffect(() => () => node.remove(), [node]);
 

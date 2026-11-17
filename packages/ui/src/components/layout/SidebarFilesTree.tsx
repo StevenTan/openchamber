@@ -1,3 +1,4 @@
+import { usePanelWorkspaceApi } from '@/stores/useUIStore';
 import React from 'react';
 import { defaultRangeExtractor, measureElement, useVirtualizer, type Range } from '@tanstack/react-virtual';
 import { getRuntimeKey } from '@/lib/runtime-switch';
@@ -44,7 +45,7 @@ import { SpacePreparing } from '@/components/session/spaces/SpacePreparing';
 import { guestActionsWhere, type GuestActionEntry } from '@/lib/guests/actions';
 import { runGuestAction } from '@/lib/guests/run-action';
 import { useFileSearchStore } from '@/stores/useFileSearchStore';
-import { useFilesViewTabsStore } from '@/stores/useFilesViewTabsStore';
+import { useFilesViewTabsApi, useFilesViewTabsStore } from '@/stores/useFilesViewTabsStore';
 import { useUIStore } from '@/stores/useUIStore';
 import { useGitStatus, useGitStore } from '@/stores/useGitStore';
 import { DirectoryRequests } from '@/components/views/files/directoryRequests';
@@ -801,6 +802,8 @@ const SidebarFilesTreeContent: React.FC<{ visible: boolean; currentDirectory: st
 
   const EMPTY_PATHS: string[] = React.useMemo(() => [], []);
   const EMPTY_CONTEXT_TABS: Array<{ mode: string; targetPath: string | null }> = React.useMemo(() => [], []);
+  const filesTabsApi = useFilesViewTabsApi();
+  const panelUI = usePanelWorkspaceApi();
   const expandedPaths = useFilesViewTabsStore((state) => (root ? (state.byRoot[root]?.expandedPaths ?? EMPTY_PATHS) : EMPTY_PATHS));
   const expandedPathSet = React.useMemo(() => new Set(expandedPaths), [expandedPaths]);
   const selectedPath = useFilesViewTabsStore((state) => (root ? (state.byRoot[root]?.selectedPath ?? null) : null));
@@ -928,7 +931,7 @@ const SidebarFilesTreeContent: React.FC<{ visible: boolean; currentDirectory: st
       // cached children visible while re-fetching so the tree stays expanded
       // and does not flash/collapse. Read expanded paths from the store at
       // call time so this callback stays stable when directories are toggled.
-      const currentExpanded = useFilesViewTabsStore.getState().byRoot[root]?.expandedPaths ?? [];
+      const currentExpanded = filesTabsApi.getState().byRoot[root]?.expandedPaths ?? [];
       const normalizedExpanded = currentExpanded
         .map((p) => normalizePath(p))
         .filter((normalized): normalized is string =>
@@ -971,7 +974,7 @@ const SidebarFilesTreeContent: React.FC<{ visible: boolean; currentDirectory: st
         refreshAbortRef.current = null;
       }
     }
-  }, [directoryRequests, loadDirectory, root]);
+  }, [directoryRequests, loadDirectory, root, filesTabsApi]);
 
   /**
    * Incrementally refresh a single directory without nuking the rest of the
@@ -1047,7 +1050,7 @@ const SidebarFilesTreeContent: React.FC<{ visible: boolean; currentDirectory: st
   const applyFileTreeChanges = React.useCallback(({ directories }: FileTreeChangeBatch) => {
     if (!root) return;
     const expanded = new Set(
-      (useFilesViewTabsStore.getState().byRoot[root]?.expandedPaths ?? []).map((path) => normalizePath(path)),
+      (filesTabsApi.getState().byRoot[root]?.expandedPaths ?? []).map((path) => normalizePath(path)),
     );
     const rootPrefix = root === '/' ? '/' : `${root}/`;
     const isOnScreen = (dir: string): boolean => {
@@ -1082,7 +1085,7 @@ const SidebarFilesTreeContent: React.FC<{ visible: boolean; currentDirectory: st
         await Promise.all(queue.slice(i, i + 3).map((dir) => loadDirectory(dir, undefined, true)));
       }
     })();
-  }, [loadDirectory, root]);
+  }, [loadDirectory, root, filesTabsApi]);
 
   useFileTreeChanges({ root, active: visible, whileInactive: 'drop', onChanges: applyFileTreeChanges });
 
@@ -1260,7 +1263,7 @@ const SidebarFilesTreeContent: React.FC<{ visible: boolean; currentDirectory: st
     const normalized = normalizePath(dirPath);
     if (!root) return;
 
-    const expanded = useFilesViewTabsStore.getState().byRoot[root]?.expandedPaths.includes(normalized) ?? false;
+    const expanded = filesTabsApi.getState().byRoot[root]?.expandedPaths.includes(normalized) ?? false;
     toggleWithMotion(dirPath, expanded, () => {
       const mountedPaths = Array.from(treeListRef.current?.querySelectorAll<HTMLElement>('[data-tree-disclosure-path]') ?? [], (row) => row.dataset.treeDisclosurePath ?? '');
       setSlidingRowPaths(expanded ? null : mountedPaths.slice(mountedPaths.indexOf(dirPath) + 1));
@@ -1269,7 +1272,7 @@ const SidebarFilesTreeContent: React.FC<{ visible: boolean; currentDirectory: st
     if (!loadedDirsRef.current.has(normalized)) {
       await loadDirectory(normalized);
     }
-  }, [loadDirectory, root, toggleExpandedPath, toggleWithMotion]);
+  }, [loadDirectory, root, toggleExpandedPath, toggleWithMotion, filesTabsApi]);
 
   const {
     canUpload,
@@ -1303,7 +1306,7 @@ const SidebarFilesTreeContent: React.FC<{ visible: boolean; currentDirectory: st
 
   const moveEntry = React.useCallback(async (source: FileTreeEntry, targetDirectory: string) => {
     const toPath = getFileTreeMovedPath(source, targetDirectory);
-    const result = await moveWorkspacePath(files, { tabs: panelRoot, files: root }, source.path, toPath);
+    const result = await moveWorkspacePath(files, { tabs: panelRoot, files: root, workspaceOwner: panelUI.getState().panelWorkspaceOwnerId }, source.path, toPath);
     if (result === 'conflict') {
       toast.error(t('sidebarFilesTree.toast.nameTaken', {
         name: toPath.slice(toPath.lastIndexOf('/') + 1),
@@ -1320,7 +1323,7 @@ const SidebarFilesTreeContent: React.FC<{ visible: boolean; currentDirectory: st
       refreshDirectory(getParentPath(source.path)),
       refreshDirectory(targetDirectory),
     ]).catch(() => undefined);
-  }, [expandPath, files, panelRoot, refreshDirectory, root, t]);
+  }, [expandPath, files, panelRoot, refreshDirectory, root, t, panelUI]);
 
   const handleMoveDrop = React.useCallback((source: FileTreeEntry, targetDirectory: string) => {
     if (useUIStore.getState().confirmFileTreeMove) {
@@ -1464,7 +1467,7 @@ const SidebarFilesTreeContent: React.FC<{ visible: boolean; currentDirectory: st
 
       // Open tabs and the editor, unsaved edits included, follow the new name.
       try {
-        const result = await moveWorkspacePath(files, { tabs: panelRoot, files: root }, oldPath, newPath);
+        const result = await moveWorkspacePath(files, { tabs: panelRoot, files: root, workspaceOwner: panelUI.getState().panelWorkspaceOwnerId }, oldPath, newPath);
         if (result === 'moved') {
           toast.success(t('sidebarFilesTree.toast.renamedSuccessfully'));
           await refreshDirectory(parentDir);
@@ -1511,7 +1514,7 @@ const SidebarFilesTreeContent: React.FC<{ visible: boolean; currentDirectory: st
     }
 
     done();
-  }, [activeDialog, dialogData, dialogInputValue, files, panelRoot, refreshDirectory, removeOpenPathsByPrefix, root, selectedPath, setSelectedPath, t]);
+  }, [activeDialog, dialogData, dialogInputValue, files, panelRoot, refreshDirectory, removeOpenPathsByPrefix, root, selectedPath, setSelectedPath, t, panelUI]);
 
   // --- Tree rendering (matching FilesView with indent guides) ---
 

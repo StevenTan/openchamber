@@ -1,6 +1,7 @@
 import type { Message, Part } from "@/lib/opencode/model"
 import type { State } from './types';
 import { messagesBefore } from './message-ordering';
+import { getSideChat, sideChatMessages } from '@/lib/sessionSideChatMetadata';
 
 type UserMessageHistoryRecord = {
   message: Message;
@@ -53,7 +54,7 @@ const areRecordsEqual = (left: UserMessageHistoryRecord[], right: UserMessageHis
 
 /**
  * The user's prompts in a session, oldest first, limited to what the visible
- * transcript shows: messages at or after a revert marker are excluded. Returns
+ * transcript shows: inherited messages and messages at or after a revert marker are excluded. Returns
  * the previous snapshot when nothing relevant changed so subscribers can skip
  * work on assistant-only updates.
  */
@@ -70,7 +71,8 @@ export const buildUserMessageHistorySnapshot = (
   const session = state.session.find((candidate) => candidate.id === sessionID);
   const revertMessageID = session?.revert?.messageID;
   const records: UserMessageHistoryRecord[] = [];
-  for (const message of messagesBefore(messages, revertMessageID)) {
+  const ownMessages = sideChatMessages(messagesBefore(messages, revertMessageID), getSideChat(session)?.boundary ?? null, (message) => message);
+  for (const message of ownMessages) {
     if (message.role !== 'user') {
       continue;
     }

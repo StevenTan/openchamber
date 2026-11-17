@@ -1,11 +1,12 @@
 import React from 'react';
 
 type SessionSelection = { sessionId: string | null; directory: string | null };
+const SESSION_SWITCH_HOLD_MS = 400;
 
 /**
- * The selection the chat column renders: a deferred copy of `target`, so a
- * session switch paints its cheap reactions first while the previous
- * conversation stays on screen (sync/DOCUMENTATION.md, "Session switch commit").
+ * The selection a workspace or standalone column renders. A missing session
+ * snapshot keeps the previous selection for up to 400 ms; a ready selection
+ * commits in a deferred render so list navigation stays responsive.
  *
  * A selection arriving from nothing is taken at once. Leaving a draft or an
  * empty chat has no conversation to keep, and a deferred null beside the draft
@@ -20,8 +21,32 @@ type SessionSelection = { sessionId: string | null; directory: string | null };
  * and a deferred old directory had the chat find it missing there and read
  * it back into the directory it left.
  */
-export const useShownSessionSelection = <T extends SessionSelection>(target: T): T => {
-    const deferred = React.useDeferredValue(target);
-    if (deferred.sessionId === target.sessionId) return target;
-    return deferred.sessionId === null && target.sessionId !== null ? target : deferred;
+export const useShownSessionSelection = <T extends SessionSelection>(
+    target: T,
+    { renderable = true, materializedSessionId }: { renderable?: boolean; materializedSessionId?: string | null } = {},
+) => {
+    const shownRef = React.useRef(target);
+    const [expiredHold, setExpiredHold] = React.useState<string | null>(null);
+    const hold = Boolean(target.sessionId) && !renderable
+        && target.sessionId !== materializedSessionId
+        && shownRef.current.sessionId !== null
+        && shownRef.current.sessionId !== target.sessionId
+        && expiredHold !== target.sessionId;
+    React.useEffect(() => {
+        if (!hold) return;
+        const timer = window.setTimeout(() => setExpiredHold(target.sessionId), SESSION_SWITCH_HOLD_MS);
+        return () => window.clearTimeout(timer);
+    }, [hold, target.sessionId]);
+    const lastTarget = React.useRef<string | null | undefined>(undefined);
+    const waited = React.useRef<string | null>(null);
+    if (lastTarget.current !== target.sessionId) {
+        lastTarget.current = target.sessionId;
+        waited.current = target.sessionId && !renderable ? target.sessionId : null;
+    }
+    const next = hold ? shownRef.current : target;
+    const deferred = React.useDeferredValue(next);
+    const selection = deferred.sessionId === next.sessionId || (deferred.sessionId === null && next.sessionId !== null)
+        ? next : deferred;
+    shownRef.current = selection;
+    return { selection, revealWaited: Boolean(selection.sessionId) && selection.sessionId === waited.current };
 };

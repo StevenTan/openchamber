@@ -1,3 +1,4 @@
+import { usePanelWorkspaceApi } from '@/stores/useUIStore';
 import { isIMECompositionEvent } from '@/lib/ime';
 import React from 'react';
 import { z } from 'zod';
@@ -216,6 +217,7 @@ const revealStageForCapture = (stage: HTMLElement | null): (() => void) => {
 
 const WebviewBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory: tabsDirectory, siteDirectory: directory, tabID, ownerSessionId, visible }) => {
   const { t } = useI18n();
+  const panelUI = usePanelWorkspaceApi();
   const { currentTheme } = useThemeSystem();
   const webviewRef = React.useRef<WebviewElement | null>(null);
   // Tracked in state as well as a ref: effects that attach listeners must re-run
@@ -864,11 +866,11 @@ const WebviewBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory: tab
         return;
       }
       if (request.data.webContentsId !== ownId) return;
-      useUIStore.getState().openContextBrowser(tabDirectory, request.data.url, { reveal: !request.data.background });
+      panelUI.getState().openContextBrowser(tabDirectory, request.data.url, { reveal: !request.data.background });
     };
     window.addEventListener(BROWSER_OPEN_TAB_EVENT, onOpenTab);
     return () => window.removeEventListener(BROWSER_OPEN_TAB_EVENT, onOpenTab);
-  }, [tabDirectory, webviewElement]);
+  }, [tabDirectory, webviewElement, panelUI]);
 
   const applyZoom = React.useCallback((level: number) => {
     const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, level));

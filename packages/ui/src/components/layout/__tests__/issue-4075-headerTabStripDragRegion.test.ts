@@ -34,7 +34,7 @@ const NO_DRAG = 'app-region-no-drag';
 
 describe('issue #4075 header tab-strip whitespace stays draggable', () => {
   test('the header root is still the window drag region', () => {
-    expect(headerSource).toContain('app-region-drag relative flex h-12 select-none items-center');
+    expect(headerSource).toContain('app-region-drag relative flex min-h-12 shrink-0 select-none items-center');
   });
 
   // The two regressing containers. Either one re-acquiring no-drag kills

@@ -158,7 +158,7 @@ const SERVER_TAIL_PAGE_SIZE = 10;
  * Insert the fork into its directory child store so the sidebar picks it up
  * immediately, mirroring `forkFromMessage` in session-actions.
  */
-function insertForkIntoDirectoryStore(session: Session, directory: string): void {
+export function insertForkIntoDirectoryStore(session: Session, directory: string): void {
   // `getChild` normalizes the key: OpenCode returns native Windows paths
   // (`C:\repo`) while child stores are keyed by `C:/repo`. OpenCode 2.x
   // publishes no `session.created` for a fork, so a missed insert here leaves
@@ -181,7 +181,7 @@ function insertForkIntoDirectoryStore(session: Session, directory: string): void
  * still the newest thing on the server, so the whole transcript is the answer's.
  * An answer the server does not list cannot bound the fork, so it fails.
  */
-async function serverCutAfterAnswer(
+export async function serverCutAfterAnswer(
   sessionID: string,
   answerID: string,
   directory: string,

@@ -80,7 +80,10 @@ mock.module("zustand", () => {
 
     return store
   }
-  return { create: (initializer?: Parameters<typeof build>[0]) => (initializer ? build(initializer) : build) }
+  return {
+    create: (initializer?: Parameters<typeof build>[0]) => (initializer ? build(initializer) : build),
+    useStore: <State, Selected>(api: { getState: () => State }, selector: (state: State) => Selected): Selected => selector(api.getState()),
+  }
 })
 
 const deferredStorage: Storage = {

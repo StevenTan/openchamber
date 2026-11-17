@@ -2,6 +2,7 @@ import React from 'react';
 import { ChatContainer } from '@/components/chat/ChatContainer';
 import { ChatErrorBoundary } from '@/components/chat/ChatErrorBoundary';
 import { useSessionUIStore } from '@/sync/session-ui-store';
+import { DisplayedWorkspaceContext } from '@/lib/workspace/panelOwner';
 
 type ChatViewProps = {
     active?: boolean;
@@ -15,10 +16,11 @@ export const ChatView: React.FC<ChatViewProps> = ({
     readOnly = false,
     pinnedSession,
 }) => {
-    const currentSessionId = useSessionUIStore((state) => (pinnedSession ? null : state.currentSessionId));
+    const workspace = React.useContext(DisplayedWorkspaceContext);
+    const currentSessionId = useSessionUIStore((state) => (pinnedSession || workspace ? null : state.currentSessionId));
 
     return (
-        <ChatErrorBoundary sessionId={pinnedSession?.sessionId ?? currentSessionId ?? undefined}>
+        <ChatErrorBoundary sessionId={pinnedSession?.sessionId ?? workspace?.sessionId ?? currentSessionId ?? undefined}>
             <ChatContainer
                 active={active}
                 readOnly={readOnly}

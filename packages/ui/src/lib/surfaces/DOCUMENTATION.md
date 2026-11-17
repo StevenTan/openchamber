@@ -95,7 +95,7 @@ keep the full height). The chat is always the centre and cannot move.
   who never moves anything sees the single right panel as before.
 - Each zone works like the right panel always has: the rail switches what it
   shows, multi-instance surfaces list their instances in its strip, and it
-  closes, expands (one zone at a time) and resizes on its own. Per directory,
+  closes, expands (one zone at a time) and resizes on its own. Within each main session workspace,
   the right zone keeps the panel's original top-level fields and the other two
   live in `zones`; read them through `getZoneView` / `resolveZoneActiveTab`,
   which never return a tab whose surface is placed elsewhere.
@@ -108,9 +108,11 @@ keep the full height). The chat is always the centre and cannot move.
   measured once at drag start; the layout changes once, on drop
   (`moveContextSurfaceToZone`). A surface that was on screen stays on screen
   in its new zone, in every project; one that was not is opened by the drop.
-- Keep-alive surfaces mount once in `ContextSurfacePanes` and are portalled
-  into the body of their zone (`MovablePane`), so a move keeps the editor's
-  unsaved text and undo, the terminal session and the walkthrough's place. An
+- Each visited workspace keeps its zone frames and resource panes mounted.
+  Switching main sessions changes ancestor opacity and interaction while the
+  zone bodies remain in place, preserving unsaved editors and browser guests.
+  A workspace's panes portal into its own zone hosts (`MovablePane`), keeping
+  editor undo, terminal sessions and walkthrough position. An
   Electron webview reloads whenever its element moves, so a browser tab
   reloads when its surface moves to another zone; nothing else moves it.
 - In a narrow window the chat keeps 320 px: a side zone that opens without
@@ -302,9 +304,9 @@ chat/palette go through the `openContext*` actions in `useUIStore`.
 - Multi-instance and session-holding surfaces (file/editor, diff, browser,
   terminal) are keep-alive panes in `ContextSurfacePanes.tsx`. Switching these
   surfaces must not reset their state (open tabs, xterm session, scroll
-  positions). Chat tab records stay open, but only the active chat tab's
-  pinned chat column is mounted while the panel is open. A selected chat
-  restores its state from the session stores. A closed panel mounts no chat.
+  positions). Each workspace mounts its selected pinned chat while its chat
+  zone is open; only the foreground workspace marks it viewed. Chat drafts
+  restore from the session stores. Closing the chat zone unmounts its column.
   Surfaces rendered by the zone (git, the Tracker, notes, context) remount on
   every switch, the Tracker on every switch between its tabs too. These
   surfaces must restore their state from stores or snapshots.

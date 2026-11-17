@@ -103,7 +103,8 @@ import { useInputStore, type SyntheticContextPart } from "./input-store"
 import { useSessionGoalArmStore } from "@/stores/useSessionGoalArmStore"
 import type { QueuedMessageGoal } from "@/stores/messageQueueStore"
 import { sessionGoalIntro, setSessionGoal } from "@/lib/sessionGoalActions"
-import { useUIStore } from "@/stores/useUIStore"
+import { useUIStore, adoptDraftPanelWorkspace, getPanelWorkspaceUI } from "@/stores/useUIStore"
+import { bindPanelOwnerSelection, draftPanelOwner, sessionPanelOwner } from "@/lib/workspace/panelOwner"
 import { useSelectionStore } from "./selection-store"
 import { getViewportSessionMemory, useViewportStore, viewportSessionKey } from "./viewport-store"
 import { useSessionWorktreeStore } from "./session-worktree-store"
@@ -1561,6 +1562,9 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       directoryHint = directory
     }
     const materializedDraftSessionId = id && options?.transition === "submitted-draft" ? id : null
+    if (materializedDraftSessionId) {
+      adoptDraftPanelWorkspace(draftPanelOwner(get().newSessionDraft), sessionPanelOwner(materializedDraftSessionId))
+    }
     // Publish the transition identity before closing the draft. Those are two
     // separate store updates, and ChatContainer must never observe a closed
     // draft with the previous transition identity.
@@ -2289,6 +2293,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
         // the chat can switch to it and show the message at once; the server
         // creates the session under this id while the message is on screen.
         const sessionId = descendingId("ses")
+        adoptDraftPanelWorkspace(draftPanelOwner(draft, capturedRuntimeKey), sessionPanelOwner(sessionId, capturedRuntimeKey))
         const draftAgent = saveDraftSessionSelection(sessionId, selection)
         openPendingSessionTranscript(sessionId, sessionDirectory)
         get().setCurrentSession(sessionId, sessionDirectory, { transition: "submitted-draft" })
@@ -2950,6 +2955,11 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
 // changed but the content is identical (e.g., re-discovery that found the
 // same worktrees).
 const lastPersistedWorktreeSerializedByRuntime = new Map<string, string>()
+bindPanelOwnerSelection(() => {
+  const { currentSessionId, newSessionDraft } = useSessionUIStore.getState()
+  const owner = currentSessionId ? sessionPanelOwner(currentSessionId) : draftPanelOwner(newSessionDraft)
+  return getPanelWorkspaceUI(owner).getState().panelWorkspaceOwnerId
+}, useSessionUIStore.subscribe)
 useSessionUIStore.subscribe((state, prev) => {
   if (state.availableWorktreesByProject !== prev.availableWorktreesByProject) {
     const runtimeKey = runtimeMemoryKey()

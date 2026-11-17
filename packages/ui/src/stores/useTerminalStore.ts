@@ -80,7 +80,7 @@ type ReconcileServerSessionsOptions = {
   startedActionMutationRevisions?: TerminalActionMutationRevisions;
 };
 
-interface TerminalStore {
+export interface TerminalStore {
   sessions: Map<string, DirectoryTerminalState>;
   buffers: Map<string, TerminalBuffer>;
   actionMutationRevisions: Map<string, number>;

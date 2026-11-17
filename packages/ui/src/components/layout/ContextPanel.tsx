@@ -1,3 +1,6 @@
+import { useNewSideChat } from '@/components/session/useNewSideChat';
+import { usePanelWorkspaceMounts } from './panelWorkspaceMounts';
+import { PanelWorkspaceActiveContext, PanelWorkspaceDirectoryContext, PanelWorkspaceOwnerContext, PanelWorkspaceDraftRequestContext } from '@/lib/workspace/panelOwner';
 import React from 'react';
 import { TooltipLabelWithShortcut } from '@/components/ui/action-toolbar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -60,6 +63,8 @@ import { ContextPanelHeaderSlotProvider } from './contextPanelHeaderSlot';
 import { CLOSED_ZONE_VIEW, CONTEXT_ZONE_DEFAULT_WIDTH, getZoneView, isZoneShown, resolveZoneActiveTab, sideZoneWidth, type ContextZone } from '@/lib/workspace/zones';
 import { registerCloseTabTarget } from '@/lib/closeTabTarget';
 import { useClosingZoneTab } from './useClosingZoneTab';
+import { SaveSideChatButton } from '@/components/session/SaveSideChatButton';
+import { isTemporarySideChat } from '@/lib/sessionSideChatMetadata';
 import { ZoneMoveMenuItems } from './ZoneMoveMenuItems';
 import { beginZoneDrag, cancelZoneDrag, finishZoneDrag, startZoneDragGesture, updateZoneDrag } from './zoneDrag';
 import { setZoneBody, setZoneHeaderSlot } from './zoneHosts';
@@ -376,6 +381,25 @@ const useSessionTitleMap = (sessionIDs: readonly string[]): ReadonlyMap<string, 
   );
 };
 
+const useTemporaryChatIds = (sessionIDs: readonly string[]): ReadonlySet<string> => {
+  const childStores = useChildStoreManager();
+  const snapshot = React.useRef<ReadonlySet<string>>(new Set());
+  return React.useSyncExternalStore(
+    React.useCallback((notify) => sessionIDs.length ? childStores.subscribeAllSelected((state) => state.session, notify) : () => {}, [childStores, sessionIDs.length]),
+    React.useCallback(() => {
+      const wanted = new Set(sessionIDs);
+      const next = new Set<string>();
+      for (const store of childStores.children.values()) {
+        for (const session of store.getState().session) {
+          if (wanted.has(session.id) && isTemporarySideChat(session)) next.add(session.id);
+        }
+      }
+      if (next.size !== snapshot.current.size || [...next].some((id) => !snapshot.current.has(id))) snapshot.current = next;
+      return snapshot.current;
+    }, [childStores, sessionIDs]),
+  );
+};
+
 
 const truncateTabLabel = (value: string, maxChars: number): string => {
   if (value.length <= maxChars) {
@@ -451,6 +475,35 @@ const maxPanelHeight = (availableHeight: number | null): number => {
  * surfaces are portalled into its body from `ContextSurfacePanes`.
  */
 export const ContextPanel: React.FC<{ zone?: ContextZone }> = ({ zone = 'right' }) => {
+  const owner = useUIStore((state) => state.panelWorkspaceOwnerId);
+  const directory = useEffectiveDirectory() ?? '';
+  const mounted = usePanelWorkspaceMounts((state) => state.entries);
+  const draftRequestId = React.useContext(PanelWorkspaceDraftRequestContext) ?? null;
+  const workspaces = mounted.some((workspace) => workspace.owner === owner)
+    ? mounted : [...mounted, { owner, directory, draftRequestId }];
+  return workspaces.map((workspace) => {
+    const active = workspace.owner === owner;
+    return (
+      <PanelWorkspaceOwnerContext.Provider key={workspace.owner} value={workspace.owner}>
+        <PanelWorkspaceDirectoryContext.Provider value={active ? directory : workspace.directory}>
+          <PanelWorkspaceDraftRequestContext.Provider value={active ? draftRequestId : workspace.draftRequestId}>
+            <PanelWorkspaceActiveContext.Provider value={active}>
+              <div aria-hidden={!active || undefined} inert={!active}
+                className={active ? 'contents' : 'pointer-events-none fixed inset-0 -z-10 opacity-0'}>
+                <WorkspaceContextPanel zone={zone} />
+              </div>
+            </PanelWorkspaceActiveContext.Provider>
+          </PanelWorkspaceDraftRequestContext.Provider>
+        </PanelWorkspaceDirectoryContext.Provider>
+      </PanelWorkspaceOwnerContext.Provider>
+    );
+  });
+};
+
+const WorkspaceContextPanel: React.FC<{ zone: ContextZone }> = ({ zone }) => {
+  const workspaceActive = React.useContext(PanelWorkspaceActiveContext);
+  const workspaceOwner = useUIStore((state) => state.panelWorkspaceOwnerId);
+  const sideChat = useNewSideChat();
   const geometry = ZONE_GEOMETRY[zone];
   const layoutAnimationMs = useLayoutAnimationMs();
   const isVertical = geometry.axis === 'y';
@@ -488,11 +541,11 @@ export const ContextPanel: React.FC<{ zone?: ContextZone }> = ({ zone = 'right' 
   const [headerSlotEl, setHeaderSlotEl] = React.useState<HTMLDivElement | null>(null);
   const registerHeaderSlot = React.useCallback((element: HTMLDivElement | null) => {
     setHeaderSlotEl(element);
-    setZoneHeaderSlot(zone, element);
-  }, [zone]);
+    setZoneHeaderSlot(zone, element, workspaceOwner);
+  }, [zone, workspaceOwner]);
   const registerBody = React.useCallback((element: HTMLDivElement | null) => {
-    setZoneBody(zone, element);
-  }, [zone]);
+    setZoneBody(zone, element, workspaceOwner);
+  }, [zone, workspaceOwner]);
 
   const tabs = React.useMemo(() => panelState?.tabs ?? [], [panelState?.tabs]);
   // This zone's tab: one of its own surfaces, never one placed elsewhere.
@@ -621,6 +674,7 @@ export const ContextPanel: React.FC<{ zone?: ContextZone }> = ({ zone = 'right' 
     return ids;
   }, [showsChatTabs, tabs]);
   const sessionTitleById = useSessionTitleMap(chatSessionIDs);
+  const temporaryChatIds = useTemporaryChatIds(chatSessionIDs);
 
   const [isResizing, setIsResizing] = React.useState(false);
   const startPointerRef = React.useRef(0);
@@ -632,8 +686,9 @@ export const ContextPanel: React.FC<{ zone?: ContextZone }> = ({ zone = 'right' 
   const wasOpenRef = React.useRef(false);
 
   React.useLayoutEffect(() => {
+    if (!workspaceActive) return;
     const parent = isVertical
-      ? panelRef.current?.parentElement
+      ? panelRef.current?.parentElement?.parentElement
       : panelRef.current?.closest<HTMLElement>('[data-workspace-row]');
     if (!parent || typeof ResizeObserver === 'undefined') {
       return;
@@ -653,7 +708,7 @@ export const ContextPanel: React.FC<{ zone?: ContextZone }> = ({ zone = 'right' 
       observer.disconnect();
       cancelWhenLayoutSettled(applyAreaSize);
     };
-  }, [applyAreaSize, isVertical]);
+  }, [applyAreaSize, isVertical, workspaceActive]);
 
   // Opening, expanding, a surface wanting another size, the other side
   // opening or closing, or the session sidebar folding or unfolding beside
@@ -668,6 +723,7 @@ export const ContextPanel: React.FC<{ zone?: ContextZone }> = ({ zone = 'right' 
   }, [applyAreaSize, desiredSize, isExpanded, isOpen, otherSideReserved, sidebarOpen]);
 
   React.useEffect(() => {
+    if (!workspaceActive) return;
     if (!isOpen || wasOpenRef.current) {
       wasOpenRef.current = isOpen;
       return;
@@ -684,7 +740,7 @@ export const ContextPanel: React.FC<{ zone?: ContextZone }> = ({ zone = 'right' 
 
     wasOpenRef.current = true;
     return () => window.cancelAnimationFrame(frame);
-  }, [isOpen]);
+  }, [isOpen, workspaceActive]);
 
   // The zone follows the pointer exactly: the size is written once per frame,
   // with the size transition off, and the drag holds the layout animation
@@ -753,7 +809,7 @@ export const ContextPanel: React.FC<{ zone?: ContextZone }> = ({ zone = 'right' 
     // would drop under its minimum next to the card; the card yields to a
     // panel released wider than it fits beside.
     const available = isVertical
-      ? panelRef.current?.parentElement?.clientHeight
+      ? panelRef.current?.parentElement?.parentElement?.clientHeight
       : (panelRef.current?.closest<HTMLElement>('[data-workspace-row]')?.clientWidth ?? 0) - otherSideRef.current
         - (cardBesidePanel ? WORK_STATUS_COLUMN_WIDTH : 0);
     resizeAvailableSizeRef.current = available && available > 0 ? available : null;
@@ -915,18 +971,18 @@ export const ContextPanel: React.FC<{ zone?: ContextZone }> = ({ zone = 'right' 
         labelFolder: tab.mode === 'file' ? fileFolders.get(tabPathLabel) : undefined,
         icon: getTabIcon(tab, faviconByOrigin, tab.id === activeTabId, isOpen),
         title: tabPathLabel ? `${rawLabel}: ${tabPathLabel}` : rawLabel,
-        closeLabel: t('contextPanel.tab.closeTabAria', { label }),
+        closeLabel: t(temporaryChatIds.has(getSessionIDFromDedupeKey(tab.dedupeKey) ?? '') ? 'contextPanel.chat.discardAria' : 'contextPanel.tab.closeTabAria', { label }),
         closeShortcut: tab.id === activeTabId && isDesktopShell() ? formatShortcutForDisplay('mod+w', '') : undefined,
         closable: !branchTab,
         preview: tab.preview,
       };
     });
-  }, [activeModeTabs, activeTabId, effectiveDirectory, faviconByOrigin, isOpen, sessionTitleById, t, tabT, trackerBranch]);
+  }, [activeModeTabs, activeTabId, effectiveDirectory, faviconByOrigin, isOpen, sessionTitleById, temporaryChatIds, t, tabT, trackerBranch]);
 
   const activeNonChatContent = activeTab?.mode === 'context'
         ? <ContextPanelHeaderSlotProvider value={headerSlotEl}><ContextPanelContent /></ContextPanelHeaderSlotProvider>
         : activeTab?.mode === 'git'
-            ? <React.Suspense fallback={null}><ContextPanelHeaderSlotProvider value={headerSlotEl}><GitView isActive={isOpen} /></ContextPanelHeaderSlotProvider></React.Suspense>
+            ? <React.Suspense fallback={null}><ContextPanelHeaderSlotProvider value={headerSlotEl}><GitView isActive={workspaceActive && isOpen} /></ContextPanelHeaderSlotProvider></React.Suspense>
             : activeTab?.mode === 'pr'
                 ? (activeTab.targetPath
                     ? (
@@ -938,12 +994,12 @@ export const ContextPanel: React.FC<{ zone?: ContextZone }> = ({ zone = 'right' 
                         panelDirectory={effectiveDirectory}
                         tabId={activeTab.id}
                         foreign={Boolean(activeTab.targetDirectory)}
-                        visible={isOpen}
+                        visible={workspaceActive && isOpen}
                       />
                     )
                     : <PullRequestView />)
             : activeTab?.mode === 'notes'
-                ? <ContextPanelHeaderSlotProvider value={headerSlotEl}><ProjectContextPanel visible={isOpen} /></ContextPanelHeaderSlotProvider>
+                ? <ContextPanelHeaderSlotProvider value={headerSlotEl}><ProjectContextPanel visible={workspaceActive && isOpen} /></ContextPanelHeaderSlotProvider>
             : activeTab?.mode === 'workflows'
                 ? <ContextPanelHeaderSlotProvider value={headerSlotEl}><WorkflowsPanel directory={effectiveDirectory || null} /></ContextPanelHeaderSlotProvider>
         : null;
@@ -953,7 +1009,7 @@ export const ContextPanel: React.FC<{ zone?: ContextZone }> = ({ zone = 'right' 
   // Cmd/Ctrl+W closes this zone's tab, or the zone for a single-page surface.
   // The file editor owns its unsaved-edits prompt; the terminal owns its tabs.
   const editorClosesTab = isFileTabActive && Boolean(activeTab?.targetPath) && showsEditor;
-  const shortcutTargetTabId = isOpen && activeTab && !editorClosesTab && activeTab.mode !== 'terminal'
+  const shortcutTargetTabId = workspaceActive && isOpen && activeTab && !editorClosesTab && activeTab.mode !== 'terminal'
     ? activeTab.id
     : null;
   const shortcutClosesTab = isMultiInstanceMode && !(activeTab && isTrackerBranchTab(activeTab));
@@ -1121,6 +1177,20 @@ export const ContextPanel: React.FC<{ zone?: ContextZone }> = ({ zone = 'right' 
         </>
       )}
       <div className="flex h-10 shrink-0 items-center gap-1 self-start px-1.5">
+        {activeTab?.mode === 'chat' && getSessionIDFromDedupeKey(activeTab.dedupeKey) ? (
+          <SaveSideChatButton sessionID={getSessionIDFromDedupeKey(activeTab.dedupeKey)!} directory={activeTab.targetDirectory ?? directoryKey} />
+        ) : null}
+        {activeTab?.mode === 'chat' ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0" disabled={sideChat.pending}
+                aria-label={t('contextPanel.chat.newTab')} onClick={() => { void sideChat.create(); }}>
+                <Icon name="add" className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={6}>{t('contextPanel.chat.newTab')}</TooltipContent>
+          </Tooltip>
+        ) : null}
         {activeTab?.mode === 'browser' ? (
           <Tooltip>
           <TooltipTrigger asChild>
@@ -1245,8 +1315,8 @@ export const ContextPanel: React.FC<{ zone?: ContextZone }> = ({ zone = 'right' 
     animationKeyRef.current = animationKey;
     // A drag already put the zone at its stored size: nothing moves.
     const draggedSize = sizeFromDragRef.current;
-    if (!coverChanged && !draggedSize) beginLayoutAnimation(layoutAnimationMs);
-  }, [animationKey, coverChanged, layoutAnimationMs]);
+    if (workspaceActive && !coverChanged && !draggedSize) beginLayoutAnimation(layoutAnimationMs);
+  }, [animationKey, coverChanged, layoutAnimationMs, workspaceActive]);
   // Only the commit that stores a drag's size counts as one: a drag released
   // where it started stores nothing, and the next change must still animate.
   React.useLayoutEffect(() => {
@@ -1287,9 +1357,9 @@ export const ContextPanel: React.FC<{ zone?: ContextZone }> = ({ zone = 'right' 
   return (
     <aside
       ref={panelRef}
-      data-context-panel="true"
-      data-context-zone={zone}
-      data-right-slot={zone === 'right' ? '' : undefined}
+      data-context-panel={workspaceActive ? 'true' : undefined}
+      data-context-zone={workspaceActive ? zone : undefined}
+      data-right-slot={workspaceActive && zone === 'right' ? '' : undefined}
       data-context-panel-open={isOpen ? 'true' : 'false'}
       tabIndex={-1}
       className={cn(
@@ -1324,7 +1394,7 @@ export const ContextPanel: React.FC<{ zone?: ContextZone }> = ({ zone = 'right' 
           panel. Closed, the slot is the card's column, so both anchors put the
           card in the same place and switching between them moves nothing. */}
       {zone === 'right' ? (
-        <div ref={setWorkStatusHost} className={cn('absolute inset-y-0 z-0 flex', cardBesidePanel ? 'inset-s-0' : 'inset-e-0', chatCovered && 'invisible')} />
+        <div ref={workspaceActive ? setWorkStatusHost : null} className={cn('absolute inset-y-0 z-0 flex', cardBesidePanel ? 'inset-s-0' : 'inset-e-0', chatCovered && 'invisible')} />
       ) : null}
       {isOpen && (
         // In the gutter facing the chat, along the card's edge. Nothing paints

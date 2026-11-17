@@ -8,6 +8,7 @@ export type SidebarFoldReason = Side | 'expanded';
 type UIState = ReturnType<typeof useUIStore.getState>;
 
 type ZoneFitWatch = {
+  store?: Pick<typeof useUIStore, 'getState' | 'subscribe'>;
   directoryKey: string;
   /** What was folded and why, kept across calls so a project switch can undo it. */
   folded: { current: SidebarFoldReason | null };
@@ -23,7 +24,7 @@ type ZoneFitWatch = {
  * folds the sidebar too and gives it back on collapse. Returns the
  * unsubscribe.
  */
-export const watchZoneFit = ({ directoryKey, folded, readRowWidth }: ZoneFitWatch): (() => void) => {
+export const watchZoneFit = ({ directoryKey, folded, readRowWidth, store = useUIStore }: ZoneFitWatch): (() => void) => {
   const sidesShown = (state: UIState) => {
     const panel = state.contextPanelByDirectory[directoryKey];
     return {
@@ -46,25 +47,25 @@ export const watchZoneFit = ({ directoryKey, folded, readRowWidth }: ZoneFitWatc
 
   let displaced: { side: Side; by: Side; tabId: string } | null = null;
   let settingSidebar = false;
-  let previous = sidesShown(useUIStore.getState());
-  let previousExpanded = anyZoneExpanded(useUIStore.getState());
+  let previous = sidesShown(store.getState());
+  let previousExpanded = anyZoneExpanded(store.getState());
 
   const setFoldReason = (reason: SidebarFoldReason | null) => {
     folded.current = reason;
-    useUIStore.getState().setSidebarFoldedForExpandedZone(reason === 'expanded');
+    store.getState().setSidebarFoldedForExpandedZone(reason === 'expanded');
   };
   const setSidebar = (open: boolean) => {
     settingSidebar = true;
-    useUIStore.getState().setSidebarOpen(open);
+    store.getState().setSidebarOpen(open);
     settingSidebar = false;
   };
   const unfoldSidebar = () => {
     setFoldReason(null);
-    if (!useUIStore.getState().isSidebarOpen) setSidebar(true);
+    if (!store.getState().isSidebarOpen) setSidebar(true);
   };
 
   // A fold for an expanded zone saved before a restart.
-  if (!folded.current && useUIStore.getState().sidebarFoldedForExpandedZone) {
+  if (!folded.current && store.getState().sidebarFoldedForExpandedZone) {
     folded.current = 'expanded';
   }
   // The project switched to may not show what the sidebar folded for: the
@@ -74,7 +75,7 @@ export const watchZoneFit = ({ directoryKey, folded, readRowWidth }: ZoneFitWatc
     unfoldSidebar();
   }
   // A zone shown expanded there takes the sidebar's room.
-  if (!folded.current && previousExpanded && useUIStore.getState().isSidebarOpen) {
+  if (!folded.current && previousExpanded && store.getState().isSidebarOpen) {
     setFoldReason('expanded');
     setSidebar(false);
   }
@@ -124,10 +125,10 @@ export const watchZoneFit = ({ directoryKey, folded, readRowWidth }: ZoneFitWatc
         unfoldSidebar();
       }
     }
-    if (restore) useUIStore.getState().setActiveContextPanelTab(directoryKey, restore.tabId);
+    if (restore) store.getState().setActiveContextPanelTab(directoryKey, restore.tabId);
   };
 
-  return useUIStore.subscribe((state, prevState) => {
+  return store.subscribe((state, prevState) => {
     // The user's own sidebar toggle is theirs to keep.
     if (state.isSidebarOpen !== prevState.isSidebarOpen && !settingSidebar) setFoldReason(null);
     const shown = sidesShown(state);

@@ -1,3 +1,5 @@
+import { usePanelWorkspaceMounts } from './panelWorkspaceMounts';
+import { wasBrowserTabOpenedWithAddress } from '@/lib/browser/devServerWait';
 import React from 'react';
 
 import { TerminalView } from '@/components/views/TerminalView';
@@ -27,7 +29,8 @@ import {
   type ContextZone,
 } from '@/lib/workspace/zones';
 import { useFilesViewTabsStore } from '@/stores/useFilesViewTabsStore';
-import { clampContextEditorTreeWidth, normalizeContextPanelDirectoryKey, useUIStore, type PendingDiffScope } from '@/stores/useUIStore';
+import { adoptLegacyPanelWorkspace, getPanelWorkspaceUI, panelOwnerForSession, setPanelWorkspaceDirectory, clampContextEditorTreeWidth, normalizeContextPanelDirectoryKey, useUIStore, type PendingDiffScope } from '@/stores/useUIStore';
+import { PanelWorkspaceActiveContext, PanelWorkspaceDirectoryContext, PanelWorkspaceOwnerContext, PanelWorkspaceDraftRequestContext } from '@/lib/workspace/panelOwner';
 import { markSessionViewed } from '@/sync/notification-store';
 import { setExternallyViewedSession } from '@/sync/sync-context';
 import { ContextPanelHeaderSlotProvider } from './contextPanelHeaderSlot';
@@ -43,6 +46,7 @@ import { useClosingZoneTab } from './useClosingZoneTab';
 import { isZoneExposed, ZoneInteractiveContext } from './zoneInteractiveContext';
 import { PauseClock } from '@/components/ui/pause-clock';
 import { DockedPanelSurfaceContext } from '@/hooks/usePageColors';
+import { SideChatCloseConfirmDialog } from './SideChatCloseConfirmDialog';
 
 // Heavy views stay on-demand (same as MainLayout): importing DiffView/FilesView
 // or the walkthrough statically pulls the CodeMirror and @pierre/diffs stacks
@@ -52,12 +56,16 @@ const DiffView = lazyWithChunkRecovery(() => import('@/components/views/DiffView
 const FilesView = lazyWithChunkRecovery(() => import('@/components/views/FilesView').then((m) => ({ default: m.FilesView })));
 const GuestPanelContent = React.lazy(() => import('./GuestPanelContent').then((module) => ({ default: module.GuestPanelContent })));
 
+type BrowserRecency = { recent: readonly string[]; setRecent: React.Dispatch<React.SetStateAction<readonly string[]>> };
+const BrowserRecencyContext = React.createContext<BrowserRecency | null>(null);
+
 /** A browser tab with the project it belongs to, which may not be the one on screen. */
 type PanelBrowserTab = {
   directory: string;
   id: string;
   targetPath: string | null;
   ownerSessionId: string | null;
+  targetDirectory: string | null;
 };
 
 /** One browser tab across projects: the same id in another project is another tab. */
@@ -202,14 +210,15 @@ const ZonePane: React.FC<{
   className?: string;
   children: React.ReactNode;
 }> = ({ zone, isOpen, interactive, hidden, className, children }) => {
+  const active = React.useContext(PanelWorkspaceActiveContext);
   // A closed zone keeps its panes mounted at opacity 0; their spinners,
   // blinks and counters stand still until it opens again.
   return (
     <MovablePane zone={zone}>
       <div className={className}>
         <DockedPanelSurfaceContext.Provider value>
-          <ZoneInteractiveContext.Provider value={interactive}>
-            <PauseClock paused={!isOpen || hidden}>{children}</PauseClock>
+          <ZoneInteractiveContext.Provider value={active && interactive}>
+            <PauseClock paused={!active || !isOpen || hidden}>{children}</PauseClock>
           </ZoneInteractiveContext.Provider>
         </DockedPanelSurfaceContext.Provider>
       </div>
@@ -228,6 +237,71 @@ const ZonePane: React.FC<{
  * to run before the panes attach and the settle step queues behind them.
  */
 export const ContextSurfacePanes: React.FC = () => {
+  const owner = useUIStore((state) => state.panelWorkspaceOwnerId);
+  const [recent, setRecent] = React.useState<readonly string[]>([]);
+  const recency = React.useMemo(() => ({ recent, setRecent }), [recent]);
+  const records = useUIStore((state) => state.panelWorkspaces);
+  const directory = useEffectiveDirectory() ?? '';
+  const workspaces = usePanelWorkspaceMounts((state) => state.entries);
+  const setWorkspaces = usePanelWorkspaceMounts((state) => state.update);
+  const draftRequestId = React.useContext(PanelWorkspaceDraftRequestContext) ?? null;
+  React.useLayoutEffect(() => {
+    if (directory) {
+      const normalized = normalizeContextPanelDirectoryKey(directory);
+      setPanelWorkspaceDirectory(owner, normalized);
+      adoptLegacyPanelWorkspace(owner, normalized);
+    }
+    setWorkspaces((current) => {
+      const runtime = JSON.parse(owner)[0];
+      const retained = current.filter((workspace) => workspace.owner === owner || (records[workspace.owner] && JSON.parse(workspace.owner)[0] === runtime));
+      const background = Object.entries(records).flatMap(([key, workspace]) => {
+        if (JSON.parse(key)[0] !== runtime || retained.some((entry) => entry.owner === key)) return [];
+        const directoryEntry = Object.entries(workspace.contextPanelByDirectory).find(([, panel]) => panel.tabs.some((tab) => tab.mode === 'browser' && tab.ownerSessionId));
+        return directoryEntry ? [{ owner: key, directory: directoryEntry[0], draftRequestId: null }] : [];
+      });
+      const existing = retained.find((workspace) => workspace.owner === owner);
+      if (existing?.directory === directory && existing.draftRequestId === draftRequestId && retained.length === current.length && !background.length) return current;
+      return existing
+        ? [...retained.map((workspace) => workspace.owner === owner ? { owner, directory, draftRequestId } : workspace), ...background]
+        : [...retained, ...background, { owner, directory, draftRequestId }];
+    });
+  }, [owner, directory, records, draftRequestId, setWorkspaces]);
+  React.useEffect(() => registerBrowserOpener((url, context) => {
+    const targetOwner = context.sessionId ? panelOwnerForSession(context.sessionId, owner) : owner;
+    const targetDirectory = context.directory ? normalizeContextPanelDirectoryKey(context.directory) : directory;
+    return targetDirectory ? getPanelWorkspaceUI(targetOwner).getState().openAgentBrowserTab(targetDirectory, url, context.sessionId) : null;
+  }), [directory, owner]);
+  React.useEffect(() => registerBrowserCloser((targetDirectory, tabId) => {
+    for (const key of Object.keys(useUIStore.getState().panelWorkspaces)) {
+      const state = getPanelWorkspaceUI(key).getState();
+      if (!state.contextPanelByDirectory[targetDirectory]?.tabs.some((tab) => tab.id === tabId && tab.mode === 'browser')) continue;
+      state.closeContextPanelTab(targetDirectory, tabId);
+      return true;
+    }
+    return false;
+  }), []);
+  React.useEffect(() => subscribeOpenchamberEvents((event) => {
+    if (event.type !== 'file-open-request') return;
+    const targetDirectory = event.directory ?? directory;
+    if (!targetDirectory) return;
+    const targetOwner = event.sessionId ? panelOwnerForSession(event.sessionId, owner) : owner;
+    getPanelWorkspaceUI(targetOwner).getState().openContextFile(targetDirectory, event.path);
+  }), [directory, owner]);
+  return <BrowserRecencyContext.Provider value={recency}><SideChatCloseConfirmDialog />{workspaces.map((workspace) => (
+    <PanelWorkspaceOwnerContext.Provider key={workspace.owner} value={workspace.owner}>
+      <PanelWorkspaceDirectoryContext.Provider value={workspace.directory}>
+        <PanelWorkspaceActiveContext.Provider value={workspace.owner === owner}>
+          <PanelWorkspaceDraftRequestContext.Provider value={workspace.draftRequestId}>
+            <WorkspaceSurfacePanes />
+          </PanelWorkspaceDraftRequestContext.Provider>
+        </PanelWorkspaceActiveContext.Provider>
+      </PanelWorkspaceDirectoryContext.Provider>
+    </PanelWorkspaceOwnerContext.Provider>
+  ))}</BrowserRecencyContext.Provider>;
+};
+
+const WorkspaceSurfacePanes: React.FC = () => {
+  const workspaceActive = React.useContext(PanelWorkspaceActiveContext);
   const { t } = useI18n();
   const effectiveDirectory = useEffectiveDirectory() ?? '';
   const directoryKey = React.useMemo(
@@ -246,8 +320,6 @@ export const ContextSurfacePanes: React.FC = () => {
   const closeContextPanelTab = useUIStore((state) => state.closeContextPanelTab);
   const closeContextFile = useUIStore((state) => state.closeContextFile);
   const openContextPanelTab = useUIStore((state) => state.openContextPanelTab);
-  const openAgentBrowserTab = useUIStore((state) => state.openAgentBrowserTab);
-  const openContextFile = useUIStore((state) => state.openContextFile);
   const contextEditorTreeVisible = useUIStore((state) => state.contextEditorTreeVisible);
   const contextEditorVisible = useUIStore((state) => state.contextEditorVisible);
   const fileTreeSide = useUIStore((state) => state.fileTreeSide);
@@ -285,7 +357,7 @@ export const ContextSurfacePanes: React.FC = () => {
     right: useOpenUntilSettled(zones.right.isOpen),
     bottom: useOpenUntilSettled(zones.bottom.isOpen),
   };
-  const contentHidden = (zone: ContextZone): boolean => !settledShown[zone];
+  const contentHidden = (zone: ContextZone): boolean => !workspaceActive || !settledShown[zone];
   // When the frame lifts its card's `inert` (ContextPanel, the same rule);
   // surfaces that focus themselves wait for it.
   const settledOpen = {
@@ -317,56 +389,25 @@ export const ContextSurfacePanes: React.FC = () => {
   // Chromium process. An agent's tab stays loaded until it is closed; the
   // user's own tabs, in every project together, keep their page only while
   // among the `liveBrowserTabLimit` most recently used (`liveTabs.ts`).
-  const [recentBrowserTabs, setRecentBrowserTabs] = React.useState<readonly string[]>([]);
+  const browserRecency = React.useContext(BrowserRecencyContext);
+  if (!browserRecency) throw new Error('Panel browser recency provider is missing');
+  const { recent: recentBrowserTabs, setRecent: setRecentBrowserTabs } = browserRecency;
+  const allWorkspaces = useUIStore((state) => state.panelWorkspaces);
   const wakeBrowserTab = React.useCallback((directory: string, tabId: string) => {
     setRecentBrowserTabs((current) => touchRecentBrowserTab(current, browserTabRenderKey(directory, tabId)));
-  }, []);
+  }, [setRecentBrowserTabs]);
   const liveBrowserTabLimit = useUIStore((state) => state.liveBrowserTabLimit);
 
-  // Lets an agent's browser.open create its own tab; the id goes back to the
-  // agent so it keeps working there. Registered here because opening a tab is panel state, not
-  // something the browser view itself can do before it exists. Background on
-  // purpose: an agent working a page must not pop the panel open or steal the
-  // active tab while the user reads something else, and that includes taking
-  // a screenshot of it. The tab appears in the strip of the calling session's
-  // project, which is not always the project on screen, and belongs to that
-  // session.
-  React.useEffect(() => registerBrowserOpener((url, context) => {
-    const directory = context.directory ? normalizeContextPanelDirectoryKey(context.directory) : directoryKey;
-    if (!directory) return null;
-    const tabId = openAgentBrowserTab(directory, url, context.sessionId);
-    if (tabId) wakeBrowserTab(directory, tabId);
-    return tabId;
-  }), [directoryKey, openAgentBrowserTab, wakeBrowserTab]);
-  // Lets an agent close a tab it opened. controlClient has already checked the
-  // tab belongs to the calling session; this only performs the panel close, so
-  // the strip, the zone, and the webview process all settle the way a click on
-  // the tab's own close button does.
-  React.useEffect(() => registerBrowserCloser((directory, tabId) => {
-    const tabs = useUIStore.getState().contextPanelByDirectory[directory]?.tabs;
-    if (!tabs?.some((tab) => tab.id === tabId && tab.mode === 'browser')) return false;
-    closeContextPanelTab(directory, tabId);
-    return true;
-  }), [closeContextPanelTab]);
-  // The agent asked for a file to be shown. It opens in front of whatever tab
-  // the user had, on purpose: the agent is pointing at a result, and the prior
-  // tab is one click away.
-  React.useEffect(() => subscribeOpenchamberEvents((event) => {
-    if (event.type !== 'file-open-request') return;
-    const directory = event.directory ?? effectiveDirectory;
-    if (!directory) return;
-    openContextFile(directory, event.path);
-  }), [effectiveDirectory, openContextFile]);
   // The agent asked for a saved plan to be shown: it opens in place in the
   // Project knowledge panel, as a click in its Plans list does, in the strip
   // of the asking session's project.
-  React.useEffect(() => subscribeOpenchamberEvents((event) => {
+  React.useEffect(() => workspaceActive ? subscribeOpenchamberEvents((event) => {
     if (event.type !== 'plan-open-request') return;
     const directory = event.directory ?? effectiveDirectory;
     const projectRef = resolvePlanRequestOwner(directory, event.projectId);
     if (!directory || !projectRef) return;
     useUIStore.getState().openProjectKnowledgePlan(directory, resolveProjectContextId(projectRef), event.planId);
-  }), [effectiveDirectory]);
+  }) : undefined, [effectiveDirectory, workspaceActive]);
 
   // Tells agent browser control which project is on screen and which browser
   // tab the user last had in front of them there; a session without a tab of
@@ -375,8 +416,8 @@ export const ContextSurfacePanes: React.FC = () => {
   const storedBrowserTab = storedZones[browserZone.zone].activeTab;
   const shownBrowserTabId = storedBrowserTab?.mode === 'browser' ? storedBrowserTab.id : null;
   React.useEffect(() => {
-    setShownBrowserTab(directoryKey, shownBrowserTabId);
-  }, [directoryKey, shownBrowserTabId]);
+    if (workspaceActive) setShownBrowserTab(directoryKey, shownBrowserTabId);
+  }, [directoryKey, shownBrowserTabId, workspaceActive]);
 
   const fileActiveTab = storedZones[fileZone.zone].activeTab;
   React.useEffect(() => {
@@ -420,7 +461,7 @@ export const ContextSurfacePanes: React.FC = () => {
   );
 
   React.useEffect(() => {
-    if (!activeChatDirectory || !activeChatSessionID || typeof window === 'undefined') {
+    if (!workspaceActive || !activeChatDirectory || !activeChatSessionID || typeof window === 'undefined') {
       return;
     }
 
@@ -447,7 +488,7 @@ export const ContextSurfacePanes: React.FC = () => {
       document.removeEventListener('visibilitychange', markActiveChatViewed);
       setExternallyViewedSession(activeChatDirectory, activeChatSessionID, false);
     };
-  }, [activeChatDirectory, activeChatSessionID]);
+  }, [activeChatDirectory, activeChatSessionID, workspaceActive]);
 
   const diffActiveTab = diffZone.activeTab;
   const handleDiffScopeChange = React.useCallback((nextScope: PendingDiffScope) => {
@@ -464,7 +505,7 @@ export const ContextSurfacePanes: React.FC = () => {
     });
   }, [diffActiveTab, directoryKey, openContextPanelTab]);
 
-  const visibleBrowserTabId = browserZone.isOpen && browserZone.activeTab?.mode === 'browser' ? browserZone.activeTab.id : null;
+  const visibleBrowserTabId = workspaceActive && browserZone.isOpen && browserZone.activeTab?.mode === 'browser' ? browserZone.activeTab.id : null;
   React.useEffect(() => {
     if (visibleBrowserTabId && directoryKey) wakeBrowserTab(directoryKey, visibleBrowserTabId);
   }, [directoryKey, visibleBrowserTabId, wakeBrowserTab]);
@@ -478,30 +519,38 @@ export const ContextSurfacePanes: React.FC = () => {
   const { loadedBrowserTabs, sleepingBrowserTabs } = React.useMemo(() => {
     const recent = new Set(recentBrowserTabs);
     const openUserTabs = new Set<string>();
-    for (const [directory, directoryState] of Object.entries(contextPanelByDirectory)) {
-      for (const tab of directoryState.tabs) {
-        if (tab.mode === 'browser' && tab.ownerSessionId === null) openUserTabs.add(browserTabRenderKey(directory, tab.id));
+    for (const workspace of Object.values(allWorkspaces)) {
+      for (const [directory, directoryState] of Object.entries(workspace.contextPanelByDirectory)) {
+        for (const tab of directoryState.tabs) {
+          if (tab.mode === 'browser' && tab.ownerSessionId === null) openUserTabs.add(browserTabRenderKey(directory, tab.id));
+        }
       }
     }
     const liveUserTabs = pickLiveBrowserTabs(recentBrowserTabs, openUserTabs, liveBrowserTabLimit);
     const loaded: PanelBrowserTab[] = [];
     const sleeping: PanelBrowserTab[] = [];
     for (const [directory, directoryState] of Object.entries(contextPanelByDirectory)) {
-      const isShownDirectory = directory === directoryKey;
+      const isShownDirectory = workspaceActive && directory === directoryKey;
       for (const tab of directoryState.tabs) {
         if (tab.mode !== 'browser') continue;
         const key = browserTabRenderKey(directory, tab.id);
         const isUserTab = tab.ownerSessionId === null;
         const isLoaded = (isShownDirectory && tab.id === visibleBrowserTabId)
-          || (isUserTab ? liveUserTabs.has(key) : recent.has(key));
+          || (isUserTab ? liveUserTabs.has(key) : recent.has(key) || wasBrowserTabOpenedWithAddress(directory, tab.id));
         if (!isLoaded && !isShownDirectory && isUserTab) continue;
-        const entry = { directory, id: tab.id, targetPath: tab.targetPath, ownerSessionId: tab.ownerSessionId };
+        const entry = { directory, id: tab.id, targetPath: tab.targetPath, ownerSessionId: tab.ownerSessionId, targetDirectory: tab.targetDirectory };
         (isLoaded ? loaded : sleeping).push(entry);
       }
     }
     loaded.sort((a, b) => (browserTabRenderKey(a.directory, a.id) < browserTabRenderKey(b.directory, b.id) ? -1 : 1));
     return { loadedBrowserTabs: loaded, sleepingBrowserTabs: sleeping };
-  }, [contextPanelByDirectory, directoryKey, liveBrowserTabLimit, recentBrowserTabs, visibleBrowserTabId]);
+  }, [contextPanelByDirectory, directoryKey, liveBrowserTabLimit, recentBrowserTabs, visibleBrowserTabId, workspaceActive, allWorkspaces]);
+  React.useEffect(() => {
+    setRecentBrowserTabs((current) => {
+      const missing = loadedBrowserTabs.filter((tab) => tab.ownerSessionId && !current.includes(browserTabRenderKey(tab.directory, tab.id)));
+      return missing.length ? [...current, ...missing.map((tab) => browserTabRenderKey(tab.directory, tab.id))] : current;
+    });
+  }, [loadedBrowserTabs, setRecentBrowserTabs]);
   React.useEffect(() => {
     // Only a Chromium host mounts views that agents can drive, so only it may
     // offer to wake a tab; anywhere else a claimed action could never run.
@@ -548,7 +597,7 @@ export const ContextSurfacePanes: React.FC = () => {
   }, [directoryKey, t, terminalZoneOfPlacement]);
 
   // The header slot goes to the pane on screen in its zone only.
-  const headerSlotFor = (zone: ContextZone, active: boolean): HTMLElement | null => (active ? headerSlots[zone] : null);
+  const headerSlotFor = (zone: ContextZone, active: boolean): HTMLElement | null => (workspaceActive && active ? headerSlots[zone] : null);
 
 
   // A tab restored from the last run starts its page the first time it shows:
@@ -590,7 +639,7 @@ export const ContextSurfacePanes: React.FC = () => {
               )}
             </div>
           ) : null}
-          {spacePreparing ? null : <EditorTreeColumn visible={contextEditorTreeVisible} active={fileZone.isOpen && isFileTabActive} fill={!showsEditor} side={fileTreeSide} />}
+          {spacePreparing ? null : <EditorTreeColumn visible={contextEditorTreeVisible} active={workspaceActive && fileZone.isOpen && isFileTabActive} fill={!showsEditor} side={fileTreeSide} />}
         </ZonePane>
       ) : null}
       {chatActiveTab && activeChatSessionID && activeChatPinnedSession ? (
@@ -612,7 +661,7 @@ export const ContextSurfacePanes: React.FC = () => {
       {loadedBrowserTabs.map((tab) => {
         const shown = tab.directory === directoryKey && browserZone.activeTab?.id === tab.id;
         // A tab of the draft on screen browses the space it waits for once the space runs.
-        const siteDirectory = tab.directory === directoryKey ? draftSpaceDirectory ?? tab.directory : tab.directory;
+        const siteDirectory = tab.targetDirectory ?? (tab.directory === directoryKey ? draftSpaceDirectory ?? tab.directory : tab.directory);
         return (
           <ZonePane
             // Keyed by the directory as well: a tab of the next directory with the
@@ -640,7 +689,7 @@ export const ContextSurfacePanes: React.FC = () => {
                   siteDirectory={siteDirectory}
                   tabID={tab.id}
                   ownerSessionId={tab.ownerSessionId}
-                  visible={shown && browserZone.isOpen}
+                  visible={workspaceActive && shown && browserZone.isOpen}
                 />
               )}
               </PauseClock>
@@ -663,7 +712,7 @@ export const ContextSurfacePanes: React.FC = () => {
               <ContextPanelHeaderSlotProvider value={headerSlotFor(diffZone.zone, active)}>
                 {spacePreparing && !tab.targetDirectory ? <SpacePreparing /> : <DiffView
                   directory={tab.targetDirectory ?? draftSpaceDirectory}
-                  visible={diffZone.isOpen && active}
+                  visible={workspaceActive && diffZone.isOpen && active}
                   hideStackedFileSidebar
                   stackedDefaultCollapsedAll
                   pinSelectedFileHeaderToTopOnNavigate
@@ -689,7 +738,7 @@ export const ContextSurfacePanes: React.FC = () => {
           <ContextPanelHeaderSlotProvider value={headerSlotFor(terminalZone.zone, terminalZone.activeTab?.mode === 'terminal')}>
             <ZoneSurfaceDragContext.Provider value={terminalDragOut}>
               <TerminalView
-                visible={terminalZone.isOpen && terminalZone.activeTab?.mode === 'terminal'}
+                visible={workspaceActive && terminalZone.isOpen && terminalZone.activeTab?.mode === 'terminal'}
                 directory={terminalTab.targetDirectory}
                 onLastTabClosed={() => { if (directoryKey) closeContextPanelTab(directoryKey, terminalTab.id); }}
               />
@@ -707,7 +756,7 @@ export const ContextSurfacePanes: React.FC = () => {
         >
           <React.Suspense fallback={null}>
             <ContextPanelHeaderSlotProvider value={headerSlotFor(walkthroughZone.zone, walkthroughZone.activeTab?.mode === 'walkthrough')}>
-              <WalkthroughView directory={walkthroughTab.targetDirectory ?? effectiveDirectory} visible={walkthroughZone.isOpen && walkthroughZone.activeTab?.mode === 'walkthrough'} />
+              <WalkthroughView directory={walkthroughTab.targetDirectory ?? effectiveDirectory} visible={workspaceActive && walkthroughZone.isOpen && walkthroughZone.activeTab?.mode === 'walkthrough'} />
             </ContextPanelHeaderSlotProvider>
           </React.Suspense>
         </ZonePane>

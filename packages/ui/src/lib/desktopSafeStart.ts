@@ -1,6 +1,5 @@
 import { useFilesViewTabsStore } from '@/stores/useFilesViewTabsStore';
-import { useUIStore } from '@/stores/useUIStore';
-import { CONTEXT_ZONES } from '@/lib/workspace/zones';
+import { forgetPanelWorkspaceLayouts } from '@/stores/useUIStore';
 
 declare global {
   interface Window {
@@ -20,8 +19,5 @@ export const isDesktopSafeStart = (): boolean => globalThis.window?.__OPENCHAMBE
 export const forgetLayoutForSafeStart = (): void => {
   useFilesViewTabsStore.setState({ byRoot: {}, runtimeSnapshots: {} });
 
-  const ui = useUIStore.getState();
-  for (const directory of Object.keys(ui.contextPanelByDirectory)) {
-    for (const zone of CONTEXT_ZONES) ui.closeContextZone(directory, zone);
-  }
+  forgetPanelWorkspaceLayouts();
 };

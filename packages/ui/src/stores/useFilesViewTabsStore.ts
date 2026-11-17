@@ -1,4 +1,6 @@
-import { create } from 'zustand';
+import { create, useStore } from 'zustand';
+import { useContext } from 'react';
+import { PanelWorkspaceOwnerContext } from '@/lib/workspace/panelOwner';
 import { devtools, persist } from 'zustand/middleware';
 
 import { createDeferredSafeJSONStorage } from './utils/safeStorage';
@@ -178,7 +180,7 @@ const touchRoot = (prev: RootTabsState | undefined): RootTabsState => {
   return { openPaths: [], selectedPath: null, expandedPaths: [], touchedAt: Date.now() };
 };
 
-export const useFilesViewTabsStore = create<FilesViewTabsStore>()(
+const createFilesViewTabsStore = (storageName: string) => create<FilesViewTabsStore>()(
   devtools(
     persist(
       (set, get) => ({
@@ -565,7 +567,7 @@ export const useFilesViewTabsStore = create<FilesViewTabsStore>()(
         },
       }),
       {
-        name: 'files-view-tabs-store',
+        name: storageName,
         version: 3,
         storage: createDeferredSafeJSONStorage(),
         migrate: (persistedState, version) => {
@@ -607,4 +609,58 @@ export const useFilesViewTabsStore = create<FilesViewTabsStore>()(
     ),
     { name: 'files-view-tabs-store' }
   )
+);
+
+const workspaceStores = new Map<string, ReturnType<typeof createFilesViewTabsStore>>();
+let legacyStore: ReturnType<typeof createFilesViewTabsStore> | undefined;
+
+export function adoptLegacyFilesViewTabs(owner: string, directory: string): void {
+  legacyStore ??= createFilesViewTabsStore('files-view-tabs-store');
+  const legacy = legacyStore.getState();
+  const root = legacy.byRoot[directory];
+  if (!root) return;
+  const target = getFilesViewTabsStore(owner);
+  if (!target.getState().byRoot[directory]) target.setState((state) => ({ byRoot: { ...state.byRoot, [directory]: root } }));
+  const { [directory]: _adopted, ...remaining } = legacy.byRoot;
+  legacyStore.setState({ byRoot: remaining });
+}
+
+export function deleteFilesViewTabsWorkspace(owner: string): void {
+  getFilesViewTabsStore(owner).persist.clearStorage();
+  workspaceStores.delete(owner);
+}
+export const getFilesViewTabsStore = (owner?: string) => {
+  if (owner === undefined) {
+    legacyStore ??= createFilesViewTabsStore('files-view-tabs-store');
+    return legacyStore;
+  }
+  let store = workspaceStores.get(owner);
+  if (!store) {
+    store = createFilesViewTabsStore(`files-view-tabs-workspace:${owner}`);
+    workspaceStores.set(owner, store);
+  }
+  return store;
+};
+
+export const useFilesViewTabsApi = () => {
+  const pinnedOwner = useContext(PanelWorkspaceOwnerContext);
+  return getFilesViewTabsStore(pinnedOwner ?? undefined);
+};
+
+export const useFilesViewTabsStore = Object.assign(
+  function useFilesViewTabsStore<T>(selector: (state: FilesViewTabsStore) => T): T {
+    return useStore(useFilesViewTabsApi(), selector);
+  },
+  {
+    getState: () => getFilesViewTabsStore().getState(),
+    // SAFETY: The callback forwards the underlying store's overloaded update argument unchanged.
+    setState: ((update) => getFilesViewTabsStore().setState(update)) as ReturnType<typeof createFilesViewTabsStore>['setState'],
+    getInitialState: () => getFilesViewTabsStore().getInitialState(),
+    // SAFETY: The callback forwards the underlying store's listener with the same state contract.
+    subscribe: ((listener) => getFilesViewTabsStore().subscribe(listener)) as ReturnType<typeof createFilesViewTabsStore>['subscribe'],
+    persist: {
+      rehydrate: () => getFilesViewTabsStore().persist.rehydrate(),
+      clearStorage: () => getFilesViewTabsStore().persist.clearStorage(),
+    },
+  },
 );

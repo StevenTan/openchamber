@@ -1,3 +1,4 @@
+import { useNewSideChat } from '@/components/session/useNewSideChat';
 import React from 'react';
 import { createChatDraftIdentity } from '@/lib/chatDraftPersistence';
 import { createPortal, flushSync } from 'react-dom';
@@ -28,7 +29,6 @@ import {
     useMobileCommentComposerController,
     useMobileCommentDraft,
 } from '../composer/comment/MobileCommentComposerContext';
-import { appendWithLineBreaks } from '../composer/text';
 import { SelectionApprovalButton } from './SelectionApprovalButton';
 import { GUEST_ITEM_MESSAGE_TEXT_MAX } from '@openchamber/sdk';
 import { GuestIcon } from '@/components/layout/GuestRailIcon';
@@ -183,6 +183,7 @@ const TextSelectionMenuImpl: React.FC<TextSelectionMenuProps> = ({ containerRef,
   const setPendingInputText = useInputStore((state) => state.setPendingInputText);
   const requestBtwComposer = useInputStore((state) => state.requestBtwComposer);
   const isMobile = useUIStore((state) => state.isMobile);
+  const sideChat = useNewSideChat();
   const shortcutOverrides = useUIStore((state) => state.shortcutOverrides);
   const projects = useProjectsStore((state) => state.projects);
   const availableWorktreesByProject = useSessionUIStore((state) => state.availableWorktreesByProject);
@@ -653,11 +654,19 @@ const TextSelectionMenuImpl: React.FC<TextSelectionMenuProps> = ({ containerRef,
     addMarkdownToChat(selectedTextMarkdown);
   }, [addMarkdownToChat, selectedTextMarkdown]);
 
+  const handleAskInSideChat = React.useCallback(() => {
+    const directory = effectiveDirectory ?? currentSessionDirectory;
+    if (!directory || !selectedTextMarkdown.trim()) return;
+    void sideChat.create({ text: selectedTextMarkdown, directory });
+    hideMenu();
+    window.getSelection()?.removeAllRanges();
+  }, [sideChat, effectiveDirectory, currentSessionDirectory, selectedTextMarkdown, hideMenu]);
+
   const handleAskOpenChamber = React.useCallback(() => {
     if (!currentSessionId || !selectedTextMarkdown) return;
     requestBtwComposer({
       parentSessionId: currentSessionId,
-      text: appendWithLineBreaks('', wrapMarkdownSelectionForChat(selectedTextMarkdown)),
+      quote: selectedTextMarkdown,
     });
     hideMenu();
     window.getSelection()?.removeAllRanges();
@@ -1128,6 +1137,14 @@ const TextSelectionMenuImpl: React.FC<TextSelectionMenuProps> = ({ containerRef,
           {currentSessionId ? (
             <>
               <div className="mx-0.5 h-5 w-px shrink-0 bg-[var(--interactive-border)]" />
+              {!isVSCodeRuntime() ? (
+                <HoverTooltip label={t('chat.textSelection.actions.askInSideChat')}>
+                  <button type="button" onClick={handleAskInSideChat} disabled={sideChat.pending}
+                    className="rounded-full px-3.5 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-[var(--interactive-hover)]">
+                    {t('chat.textSelection.actions.askInSideChat')}
+                  </button>
+                </HoverTooltip>
+              ) : null}
               <HoverTooltip label={t('chat.textSelection.title.askOpenChamber')}>
                 <button
                   onClick={handleAskOpenChamber}

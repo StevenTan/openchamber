@@ -1,4 +1,7 @@
-import { create } from 'zustand';
+import { create, useStore } from 'zustand';
+import { useContext } from 'react';
+import { useUIStore } from '@/stores/useUIStore';
+import { PanelWorkspaceOwnerContext, getPanelWorkspaceOwner } from '@/lib/workspace/panelOwner';
 import type { ContextZone } from '@/lib/workspace/zones';
 
 /**
@@ -19,17 +22,38 @@ type ZoneHostsState = {
 
 const EMPTY = { left: null, right: null, bottom: null } satisfies ZoneElements;
 
-export const useZoneHostsStore = create<ZoneHostsState>(() => ({
+const createZoneHostsStore = () => create<ZoneHostsState>(() => ({
   body: EMPTY,
   headerSlot: EMPTY,
 }));
 
-const setElement = (key: 'body' | 'headerSlot', zone: ContextZone, element: HTMLElement | null): void => {
-  const current = useZoneHostsStore.getState()[key];
+const setElement = (key: 'body' | 'headerSlot', zone: ContextZone, element: HTMLElement | null, owner = getPanelWorkspaceOwner()): void => {
+  const store = getZoneHostsStore(owner);
+  const current = store.getState()[key];
   if (current[zone] === element) return;
-  useZoneHostsStore.setState({ [key]: { ...current, [zone]: element } });
+  store.setState({ [key]: { ...current, [zone]: element } });
 };
 
-export const setZoneBody = (zone: ContextZone, element: HTMLElement | null): void => setElement('body', zone, element);
+export const setZoneBody = (zone: ContextZone, element: HTMLElement | null, owner?: string): void => setElement('body', zone, element, owner);
 
-export const setZoneHeaderSlot = (zone: ContextZone, element: HTMLElement | null): void => setElement('headerSlot', zone, element);
+export const setZoneHeaderSlot = (zone: ContextZone, element: HTMLElement | null, owner?: string): void => setElement('headerSlot', zone, element, owner);
+
+const stores = new Map<string, ReturnType<typeof createZoneHostsStore>>();
+const getZoneHostsStore = (owner = getPanelWorkspaceOwner()) => {
+  let store = stores.get(owner);
+  if (!store) { store = createZoneHostsStore(); stores.set(owner, store); }
+  return store;
+};
+export const useZoneHostsApi = () => {
+  const pinned = useContext(PanelWorkspaceOwnerContext);
+  const owner = useUIStore((state) => state.panelWorkspaceOwnerId);
+  return getZoneHostsStore(pinned ?? owner);
+};
+export const useZoneHostsStore = Object.assign(
+  function useZoneHostsStore<T>(selector: (state: ZoneHostsState) => T): T { return useStore(useZoneHostsApi(), selector); },
+  {
+    getState: () => getZoneHostsStore().getState(),
+    // SAFETY: The forwarding callback accepts the underlying store's overloaded update argument.
+    setState: ((update) => getZoneHostsStore().setState(update)) as ReturnType<typeof createZoneHostsStore>['setState'],
+  },
+);

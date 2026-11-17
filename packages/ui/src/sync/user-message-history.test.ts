@@ -1,8 +1,9 @@
 import { describe, expect, test } from 'bun:test';
-import type { Message, Part } from '@/lib/opencode/model';
+import type { Message, Part, Session, Metadata } from '@/lib/opencode/model';
 import type { State } from './types';
 
 import { EMPTY_USER_MESSAGE_HISTORY_SNAPSHOT, buildUserMessageHistorySnapshot } from './user-message-history';
+import { sideChatMetadata, withSideChatSaved } from '@/lib/sessionSideChatMetadata';
 
 const message = (id: string, role: 'user' | 'assistant', created = 1): Message => ({
   id,
@@ -22,6 +23,12 @@ const state = (partial: Partial<State>): Pick<State, 'session' | 'message' | 'pa
   message: {},
   part: {},
   ...partial,
+});
+
+const session = (metadata: Metadata): Session => ({
+  id: 'ses_1', projectID: 'project', directory: '/repo', title: 'Session', cost: 0,
+  tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+  time: { created: 1, updated: 1 }, metadata,
 });
 
 describe('buildUserMessageHistorySnapshot', () => {
@@ -111,5 +118,40 @@ describe('buildUserMessageHistorySnapshot', () => {
     );
 
     expect(snapshot.history.map((prompt) => prompt.text)).toEqual(['kept']);
+  });
+
+  test('temporary and saved side chats recall only their own prompts', () => {
+    const inherited = message('inherited', 'user', 10);
+    const answer = message('answer', 'assistant', 20);
+    const own = message('own', 'user', 30);
+    const metadata = sideChatMetadata('parent', { id: answer.id, created: 20, synthetic: false });
+    for (const value of [metadata, withSideChatSaved(metadata)]) {
+      const snapshot = buildUserMessageHistorySnapshot(state({
+        session: [session(value)],
+        message: { ses_1: [inherited, answer, own] },
+        part: { inherited: [textPart('p1', 'parent question')], own: [textPart('p2', 'side question')] },
+      }), 'ses_1');
+      expect(snapshot.history.map((prompt) => prompt.text)).toEqual(['side question']);
+    }
+  });
+
+  test('a paged transcript excludes inherited prompts without loading the boundary', () => {
+    const inherited = message('msg_ffffff', 'user', 10);
+    const own = message('msg_000000', 'user', 30);
+    const snapshot = buildUserMessageHistorySnapshot(state({
+      session: [session(sideChatMetadata('parent', { id: 'boundary', created: 20, synthetic: false }))],
+      message: { ses_1: [inherited, own] },
+      part: { [inherited.id]: [textPart('p1', 'parent')], [own.id]: [textPart('p2', 'side')] },
+    }), 'ses_1');
+    expect(snapshot.history.map((prompt) => prompt.text)).toEqual(['side']);
+  });
+
+  test('an inherited boundary arriving with session metadata updates recall without changing messages', () => {
+    const inherited = message('inherited', 'user', 10);
+    const current = state({ message: { ses_1: [inherited] }, part: { inherited: [textPart('p', 'parent')] } });
+    const previous = buildUserMessageHistorySnapshot(current, 'ses_1');
+    const filtered = buildUserMessageHistorySnapshot({ ...current, session: [session(sideChatMetadata('parent', { id: 'boundary', created: 20, synthetic: false }))] }, 'ses_1', previous);
+    expect(previous.history).toHaveLength(1);
+    expect(filtered.history).toEqual([]);
   });
 });

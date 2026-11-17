@@ -25,7 +25,7 @@ beforeEach(() => {
 
 describe('issue #3175 browser capture while the agent works in the background', () => {
   test('an agent browser.open creates the tab without revealing the panel', () => {
-    expect(contextPanelSource).toContain('openAgentBrowserTab(directory, url, context.sessionId)');
+    expect(contextPanelSource).toContain('getPanelWorkspaceUI(targetOwner).getState().openAgentBrowserTab(targetDirectory, url, context.sessionId)');
 
     useUIStore.getState().openAgentBrowserTab(DIRECTORY, 'https://example.com', 'ses_1');
 

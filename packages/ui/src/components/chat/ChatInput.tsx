@@ -318,7 +318,10 @@ import {
     mapInputHistoryEntriesToValues,
     mergeSessionInputHistory,
 } from './inputHistory';
-import { useScopedForms, useScopedBlockingPermissions, useUserMessageHistory } from '@/sync/sync-context';
+import { useScopedForms, useScopedBlockingPermissions, useUserMessageHistory, useSessionSelector } from '@/sync/sync-context';
+import { getSideChat, SIDE_CHAT_CONTEXT } from '@/lib/sessionSideChatMetadata';
+import { chatQuoteDraft } from '@/lib/chatQuoteDraft';
+import { useZoneInteractive } from '@/components/layout/zoneInteractiveContext';
 import { changeRequestCopy } from '@/lib/source-control/changeRequestCopy';
 
 // Lazy like in ChatMessage: a static import would pull the @pierre/diffs and
@@ -632,6 +635,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     // transcript — there is no way to delete a message part — so it has to say
     // they no longer apply.
     const isPromotedBtwSession = btwPanel.parentPromoted;
+    const isSideChat = useSessionSelector(currentSessionId, trustDirectory ?? undefined, (session) => Boolean(getSideChat(session)));
     const activeRuntimeKey = getRuntimeKey();
     const isNewChatDraft = useSessionUIStore((s) => (
         !columnPinned && !currentSessionId && Boolean(s.newSessionDraft?.open) && s.newSessionDraft.target === 'chat'
@@ -645,8 +649,13 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         ),
         [activeRuntimeKey, btwComposerSessionId, currentDirectory, currentSessionDirectoryForSync, currentSessionId, isBtwActive, isNewChatDraft, workDraftKey],
     );
-    const claimAttachmentSlot = React.useCallback(() => {
-        useInputStore.getState().selectAttachmentDraft(chatDraftIdentity);
+    const claimComposer = React.useCallback(() => {
+        const input = useInputStore.getState();
+        const requested = input.pendingComposerFocus;
+        if (requested && (!chatDraftIdentity || getChatDraftIdentityKey(requested) !== getChatDraftIdentityKey(chatDraftIdentity))) {
+            useInputStore.setState({ pendingComposerFocus: null });
+        }
+        input.selectAttachmentDraft(chatDraftIdentity);
     }, [chatDraftIdentity]);
     const newSessionDraft = useSessionUIStore((s) => s.newSessionDraft);
     // The new-session draft is the main chat's; a pinned composer is never on it.
@@ -1512,7 +1521,10 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     ));
     // Session scope also reads the visible transcript, so sessions older than
     // the persisted history still recall their prompts.
-    const transcriptPrompts = useUserMessageHistory((isBtwActive ? btwSessionId : currentSessionId) ?? '');
+    const transcriptPrompts = useUserMessageHistory(
+        (isBtwActive ? btwSessionId : currentSessionId) ?? '',
+        (isBtwActive ? btwDirectory : null) ?? currentSessionDirectoryForSync ?? currentDirectory ?? undefined,
+    );
     const historyValues = React.useMemo(
         () => (inputHistoryScope === 'session'
             ? mergeSessionInputHistory(transcriptPrompts, inputHistoryEntries)
@@ -1657,12 +1669,15 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             );
             return;
         }
-        if (!chatDraftIdentity) return;
+        if (!inlineDraftTarget) return;
         const consumed = consumePendingBtwComposerRequest(currentSessionId);
         if (!consumed) return;
-        restoreDraft(chatDraftIdentity, consumed.text, new Set());
+        if (!useInlineCommentDraftStore.getState().addDraft(inlineDraftTarget, chatQuoteDraft(consumed.quote))) {
+            toast.error(t('inlineComment.toast.noRoom'));
+            return;
+        }
         queueMicrotask(() => focusColumnInput());
-    }, [btwSessionId, chatDraftIdentity, consumePendingBtwComposerRequest, currentSessionId, focusColumnInput, isBtwActive, pendingBtwComposerRequest, restoreDraft]);
+    }, [btwSessionId, consumePendingBtwComposerRequest, currentSessionId, focusColumnInput, inlineDraftTarget, isBtwActive, pendingBtwComposerRequest, t]);
 
     // Focus textarea when new session draft is opened
     const prevNewSessionDraftOpenRef = React.useRef(newSessionDraftOpen);
@@ -1713,6 +1728,18 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     // useComposerDraft: on a draft switch the incoming draft loads first and
     // the pending text lands on top of it.
     const focusComposer = React.useCallback(() => composerRef.current?.focus(), []);
+    const zoneInteractive = useZoneInteractive();
+    const pendingComposerFocus = useInputStore((state) => state.pendingComposerFocus);
+    React.useEffect(() => {
+        if (!active || !zoneInteractive || !pendingComposerFocus) return;
+        let cancelled = false;
+        queueMicrotask(() => {
+            if (!cancelled && useInputStore.getState().consumeComposerFocus(chatDraftIdentity)) {
+                composerRef.current?.focus({ preventScroll: true });
+            }
+        });
+        return () => { cancelled = true; };
+    }, [active, chatDraftIdentity, pendingComposerFocus, zoneInteractive]);
     // A command picked in the command palette is no shell command.
     const leaveShellMode = React.useCallback(() => setInputMode('normal'), []);
     usePendingComposerText({
@@ -2540,6 +2567,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             inlineComments: expandedDrafts,
             syntheticTexts: [
                 ...buildBtwSyntheticTexts({ isBtwActive, isPromotedBtwSession }),
+                ...(!isBtwActive && isSideChat ? [SIDE_CHAT_CONTEXT] : []),
                 ...(syntheticParts?.map((part) => part.text) ?? []),
             ],
             references: isBtwActive ? [] : linkedReferencesToSend.map(toContextReference).concat(
@@ -5106,9 +5134,9 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             // Whichever composer the user works in holds the selected
             // attachment slot, so its paste, drop, picker and remove act on
             // its own files when a second chat is open beside it.
-            onPointerDownCapture={claimAttachmentSlot}
-            onFocusCapture={claimAttachmentSlot}
-            onDragEnterCapture={claimAttachmentSlot}
+            onPointerDownCapture={claimComposer}
+            onFocusCapture={claimComposer}
+            onDragEnterCapture={claimComposer}
             onKeyDownCapture={(event) => {
                 if (!isBtwActive || event.key !== 'Escape' || isIMECompositionEvent(event) || hasOpenDropdown()) return;
                 if (!(event.target instanceof Element) || !event.target.closest('[data-chat-input-footer]')) return;

@@ -33,7 +33,7 @@ afterEach(() => {
 const renderShown = (steps: Selection[]): Selection[] => {
   const rendered: Selection[] = [];
   const Probe = ({ target }: { target: Selection }) => {
-    const { sessionId, directory } = useShownSessionSelection(target);
+    const { sessionId, directory } = useShownSessionSelection(target).selection;
     rendered.push({ sessionId, directory });
     return null;
   };
@@ -75,4 +75,37 @@ test('a session moved to another directory renders there at once', () => {
   // The move already emptied the old directory's store; a commit still naming
   // it had the chat read the session back into the directory it left.
   expect(rendered.slice(1).every((shown) => shown.sessionId === 'ses_a' && shown.directory === '/repo')).toBe(true);
+});
+
+test('loading keeps the complete displayed workspace until its target is renderable', () => {
+    type Workspace = Selection & { owner: string; draft: string };
+    const a: Workspace = { sessionId: 'ses_a', directory: '/a', owner: 'owner-a', draft: 'draft-a' };
+    const b: Workspace = { sessionId: 'ses_b', directory: '/b', owner: 'owner-b', draft: 'draft-b' };
+    const rendered: Array<{ selection: Workspace; revealWaited: boolean }> = [];
+    const Probe = ({ target, ready }: { target: Workspace; ready: boolean }) => {
+        rendered.push(useShownSessionSelection(target, { renderable: ready }));
+        return null;
+    };
+    act(() => root.render(<Probe target={a} ready />));
+    act(() => root.render(<Probe target={b} ready={false} />));
+    expect(rendered.every(({ selection }) => selection === a)).toBe(true);
+    act(() => root.render(<Probe target={b} ready />));
+    expect(rendered.at(-1)).toEqual({ selection: b, revealWaited: true });
+    expect(rendered.every(({ selection }) => selection === a || selection === b)).toBe(true);
+});
+
+test('a ready selection supersedes a pending session without displaying its workspace', () => {
+    const rendered: Selection[] = [];
+    const Probe = ({ target, ready }: { target: Selection; ready: boolean }) => {
+        rendered.push(useShownSessionSelection(target, { renderable: ready }).selection);
+        return null;
+    };
+    const a = { sessionId: 'ses_a', directory: '/a' };
+    const b = { sessionId: 'ses_b', directory: '/b' };
+    const c = { sessionId: 'ses_c', directory: '/c' };
+    act(() => root.render(<Probe target={a} ready />));
+    act(() => root.render(<Probe target={b} ready={false} />));
+    act(() => root.render(<Probe target={c} ready />));
+    expect(rendered).not.toContain(b);
+    expect(rendered.at(-1)).toBe(c);
 });

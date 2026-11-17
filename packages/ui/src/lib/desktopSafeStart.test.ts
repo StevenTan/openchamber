@@ -65,6 +65,6 @@ describe('forgetLayoutForSafeStart', () => {
 
     expect(getSafeStorage().getItem('files-view-tabs-store')).not.toContain('/repo/huge');
     const savedUi = JSON.parse(getSafeStorage().getItem('ui-store') ?? '{}');
-    expect(savedUi.state.contextPanelByDirectory['/repo'].isOpen).toBe(false);
+    expect(savedUi.state.panelWorkspaces[useUIStore.getState().panelWorkspaceOwnerId].contextPanelByDirectory['/repo'].isOpen).toBe(false);
   });
 });

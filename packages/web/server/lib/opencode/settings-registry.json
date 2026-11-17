@@ -940,6 +940,14 @@
       "scope": "device",
       "local": true
     },
+    "panelWorkspaces": {
+      "scope": "device",
+      "local": true
+    },
+    "panelWorkspaceAliases": {
+      "scope": "device",
+      "local": true
+    },
     "contextZoneSizes": {
       "scope": "device",
       "local": true

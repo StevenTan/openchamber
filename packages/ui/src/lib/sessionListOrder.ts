@@ -1,5 +1,6 @@
 import type { Session } from '@/lib/opencode/model';
 import { isBtwSession } from '@/lib/sessionBtwMetadata';
+import { isTemporarySideChat } from '@/lib/sessionSideChatMetadata';
 import { useGlobalSessionsStore } from '@/stores/useGlobalSessionsStore';
 import { useSessionPinnedStore } from '@/stores/useSessionPinnedStore';
 import { EMPTY_SESSION_ORDER_RANKS, orderSessionsByLifecycleScopes, useSessionOrderingStore } from '@/sync/session-ordering';
@@ -14,7 +15,7 @@ export const orderVisibleRootSessions = (
   pinnedIds: Set<string>,
   ranks: ReadonlyMap<string, number>,
 ): Session[] => orderSessionsByLifecycleScopes(
-  activeSessions.filter((session) => !isBtwSession(session) && !session.parentID),
+  activeSessions.filter((session) => !isBtwSession(session) && !isTemporarySideChat(session) && !session.parentID),
   pinnedIds,
   ranks,
 );

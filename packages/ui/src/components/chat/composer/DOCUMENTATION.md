@@ -392,9 +392,18 @@ whatever was stacked above. This holds for the floating panels and the
 context-chip preview. The box, the mobile pill and the dictation overlay are
 opaque and keep their shadow on a wrapper all the same.
 
+New side chats address a focus request to their runtime, directory and session.
+The matching composer consumes it once its zone accepts input, after the opening
+animation lifts `inert` and the editor's mount effects settle. Interacting with
+another composer cancels the request. The request does not change the editor's text.
+
 Context chips (review comments, quotes, annotations, terminal selections, PR
 context) sit in the attachment row inside the box, shaped like file and linked
-reference chips. Their preview cannot open inside the box, which clips its
+reference chips. Asking about a selection in a side chat or through By the way
+attaches a `chat-quote` draft to that destination's composer. The selected
+Markdown is context; the editor retains the user's question. Cross-conversation
+quotes carry no local message navigation target because their source is outside
+the destination's visible transcript. Their preview cannot open inside the box, which clips its
 contents, so `ComposerContextChips` portals it into a
 positioned host outside the box: the autocomplete wrapper on desktop, the
 dictation host on mobile. The preview opens above that host, at the menu level

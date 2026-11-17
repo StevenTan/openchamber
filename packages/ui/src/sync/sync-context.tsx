@@ -155,6 +155,7 @@ import { notifyWatchedFileChanged, renewWatchedFiles } from "@/lib/watchedFiles"
 import { listGlobalSessionPages, splitGlobalSessionsByArchived, type GlobalSessionRecord, type SessionPageLister } from "@/stores/globalSessions"
 import { areRequestArraysReferentiallyEqual, collectScopedBlockingRequests, computeSubtreeIds } from "./scoped-blocking-requests"
 import { EMPTY_USER_MESSAGE_HISTORY_SNAPSHOT, buildUserMessageHistorySnapshot, type TranscriptPrompt, type UserMessageHistorySnapshot } from "./user-message-history"
+import { getSideChat } from '@/lib/sessionSideChatMetadata';
 import {
   EMPTY_SESSION_MESSAGE_LOAD_STATE,
   SessionMessageLoader,
@@ -4772,7 +4773,16 @@ export function useUserMessageHistory(sessionID: string, directory?: string): Tr
     })
     const unsubscribeSession = store.subscribe((state, previous) => {
       if (state.session === previous.session) return
-      if (getSessionRevertMessageID(state.session, sessionID) !== getSessionRevertMessageID(previous.session, sessionID)) notify()
+      const nextMatch = Binary.search(state.session, sessionID, (session) => session.id)
+      const previousMatch = Binary.search(previous.session, sessionID, (session) => session.id)
+      const nextSession = nextMatch.found ? state.session[nextMatch.index] : undefined
+      const previousSession = previousMatch.found ? previous.session[previousMatch.index] : undefined
+      const nextBoundary = getSideChat(nextSession)?.boundary
+      const previousBoundary = getSideChat(previousSession)?.boundary
+      if (nextSession?.revert?.messageID !== previousSession?.revert?.messageID
+        || nextBoundary?.id !== previousBoundary?.id
+        || nextBoundary?.created !== previousBoundary?.created
+        || nextBoundary?.synthetic !== previousBoundary?.synthetic) notify()
     })
     return () => {
       unsubscribeMessages()

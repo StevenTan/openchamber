@@ -2,6 +2,7 @@ import React from 'react';
 import { useUIStore } from '@/stores/useUIStore';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { focusChatInput } from './composer/editor/dom';
+import { DisplayedWorkspaceContext } from '@/lib/workspace/panelOwner';
 
 /**
  * The session the chat column is showing — the deferred selection the
@@ -22,17 +23,21 @@ export const useChatColumnSession = (): ChatColumnSession | null => React.useCon
 
 /**
  * The session a chat component acts on: its column's when it renders inside
- * one, the app's selection elsewhere. Outside a column it reads the live
- * selection; inside one it never subscribes to it, so a pinned column (the
- * side panel) does not re-render when the main chat switches sessions.
+ * one, the displayed workspace around it, or the app's selection outside a
+ * workspace. A column never subscribes to the main selection, so a pinned
+ * column does not re-render when the main chat switches sessions.
  */
 export const useChatSessionSelection = (): ChatColumnSession => {
   const column = useChatColumnSession();
-  const liveSessionId = useSessionUIStore((state) => (column ? null : state.currentSessionId));
-  const liveDirectory = useSessionUIStore((state) => (column ? null : state.currentSessionDirectory));
+  const workspace = React.useContext(DisplayedWorkspaceContext);
+  const selection = column ?? workspace;
+  const liveSessionId = useSessionUIStore((state) => (selection ? null : state.currentSessionId));
+  const liveDirectory = useSessionUIStore((state) => (selection ? null : state.currentSessionDirectory));
+  const sessionId = selection ? selection.sessionId : liveSessionId;
+  const directory = selection ? selection.directory : liveDirectory;
   return React.useMemo(
-    () => column ?? { sessionId: liveSessionId, directory: liveDirectory },
-    [column, liveDirectory, liveSessionId],
+    () => ({ sessionId, directory }),
+    [sessionId, directory],
   );
 };
 

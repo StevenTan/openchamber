@@ -641,14 +641,14 @@ describe("input-store BTW composer requests", () => {
     })
     useInputStore.getState().requestBtwComposer({
       parentSessionId: "parent-1",
-      text: "> selected text",
+      quote: "selected text",
     })
 
     expect(useInputStore.getState().consumePendingBtwComposerRequest("parent-2")).toBeNull()
     expect(useInputStore.getState().pendingInputText).toBe("normal draft")
     expect(useInputStore.getState().consumePendingBtwComposerRequest("parent-1")).toEqual({
       parentSessionId: "parent-1",
-      text: "> selected text",
+      quote: "selected text",
     })
     expect(useInputStore.getState().consumePendingBtwComposerRequest("parent-1")).toBeNull()
     expect(useInputStore.getState().pendingInputText).toBe("normal draft")
@@ -741,4 +741,19 @@ describe("input-store draft submit", () => {
     expect(useInputStore.getState().consumePendingDraftSubmit(null)).toBeNull()
     expect(useInputStore.getState().pendingDraftSubmit).toBeNull()
   })
+})
+
+test("composer focus is consumed once by the addressed runtime, directory and session", () => {
+  const target = { runtimeKey: "focus-runtime", directory: "/project", sessionId: "side" }
+  const store = useInputStore.getState()
+  store.requestComposerFocus(target)
+  for (const other of [
+    { ...target, runtimeKey: "another-runtime" },
+    { ...target, directory: "/another-project" },
+    { ...target, sessionId: "main" },
+  ]) expect(store.consumeComposerFocus(other)).toBe(false)
+  expect(useInputStore.getState().pendingComposerFocus).toEqual(target)
+  expect(store.consumeComposerFocus(target)).toBe(true)
+  expect(store.consumeComposerFocus(target)).toBe(false)
+  expect(useInputStore.getState().pendingComposerFocus).toBeNull()
 })

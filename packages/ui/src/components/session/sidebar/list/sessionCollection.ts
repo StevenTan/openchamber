@@ -14,6 +14,7 @@ import { isChatDirectoryPath } from '@/lib/chatDirectories';
 import { isVSCodeWithoutWorkspace } from '@/lib/vscodeBootstrap';
 import { isSpaceDirectory } from '@/lib/spaces/space-route';
 import { isBtwSession } from '@/lib/sessionBtwMetadata';
+import { isTemporarySideChat } from '@/lib/sessionSideChatMetadata';
 import { resolveSessionNestingParentId } from '@/lib/sessionWorkLineage';
 import type { GlobalSessionStructure } from '@/stores/globalSessionStructure';
 import { countSyncPerformance } from '@/sync/performance-diagnostics';
@@ -47,7 +48,7 @@ export const partitionSidebarSessions = (
   const chatSessions: Session[] = [];
   const excludeChats = isVSCode && !isVSCodeWithoutWorkspace();
   for (const session of sessions) {
-    if (isBtwSession(session)) continue;
+    if (isBtwSession(session) || isTemporarySideChat(session)) continue;
     if (isChatDirectoryPath(session.directory)) {
       if (excludeChats) continue;
       chatSessions.push(session);

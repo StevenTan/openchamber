@@ -39,6 +39,8 @@ import {
 import { getSelectedProjectActionId, setSelectedProjectActionId } from '@/lib/projectActionSelection';
 import { observeTerminalSessions } from '@/lib/terminalSessionObserver';
 import type { TerminalTab } from '@/stores/useTerminalStore';
+import { usePanelWorkspaceApi } from '@/stores/useUIStore';
+import { attachWorkspaceTerminalTab } from '@/stores/useWorkspaceTerminalStore';
 
 type UrlWatchEntry = {
   hostDirectory: string;
@@ -135,6 +137,7 @@ export const useProjectActionsRunner = ({
   directory,
   allowMobile = false,
 }: ProjectActionsRunnerOptions): ProjectActionsRunner => {
+  const panelUI = usePanelWorkspaceApi();
   const { t } = useI18n();
   const { currentTheme } = useThemeSystem();
   const { terminal, runtime, git } = useRuntimeAPIs();
@@ -388,12 +391,13 @@ export const useProjectActionsRunner = ({
     }
   }, [clearExecutionUi, closeTrackedSubscription, watchedTerminalDirectories]);
 
-  const revealProjectActionTerminal = React.useCallback((hostDirectory: string, executionDirectory: string) => {
-    useUIStore.getState().openContextPanelTab(hostDirectory, {
+  const revealProjectActionTerminal = React.useCallback((hostDirectory: string, executionDirectory: string, tabId: string) => {
+    attachWorkspaceTerminalTab(panelUI.getState().panelWorkspaceOwnerId, executionDirectory, tabId);
+    panelUI.getState().openContextPanelTab(hostDirectory, {
       mode: 'terminal',
       targetDirectory: executionDirectory === hostDirectory ? null : executionDirectory,
     });
-  }, []);
+  }, [panelUI]);
 
   const autoDiscoverAction = React.useMemo<OpenChamberProjectAction>(() => ({
     id: AUTO_DISCOVER_ACTION_ID,
@@ -870,7 +874,7 @@ export const useProjectActionsRunner = ({
       }
 
       if (revealTerminal && launchContextHostDirectory) {
-        revealProjectActionTerminal(launchContextHostDirectory, executionDirectory);
+        revealProjectActionTerminal(launchContextHostDirectory, executionDirectory, tabId);
       }
 
       urlWatchByRunKeyRef.current[key] = {
@@ -959,7 +963,7 @@ export const useProjectActionsRunner = ({
             return next;
           });
           useTerminalStore.getState().setActiveTab(executionDirectory, tabId);
-          revealProjectActionTerminal(watch.hostDirectory, executionDirectory);
+          revealProjectActionTerminal(watch.hostDirectory, executionDirectory, tabId);
         }, AUTO_DISCOVER_PREVIEW_WAIT_TIMEOUT_MS);
       }
 

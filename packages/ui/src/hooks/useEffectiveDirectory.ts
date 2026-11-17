@@ -8,6 +8,9 @@ import { getAllSyncSessionMap } from '@/sync/sync-refs';
 import { useDirectoryStore } from '@/stores/useDirectoryStore';
 import { getChatsRoot } from '@/lib/chatDirectories';
 import { useChatsRoot } from '@/hooks/useChatsRoot';
+import { useContext } from 'react';
+import { useChatColumnSession } from '@/components/chat/chatColumnSession';
+import { PanelWorkspaceDirectoryContext } from '@/lib/workspace/panelOwner';
 
 type EffectiveDirectoryInputs = {
     currentSessionId: string | null;
@@ -76,6 +79,8 @@ const pickEffectiveDirectory = ({
  * even when a draft session is being created.
  */
 export const useEffectiveDirectory = (): string | undefined => {
+    const panelDirectory = useContext(PanelWorkspaceDirectoryContext);
+    const column = useChatColumnSession();
     // Inside a chat column the session is the column's: a chat pinned in the
     // side panel resolves its own session's directory, not the main chat's.
     const { sessionId: currentSessionId, directory: selectedDirectory } = useChatSessionSelection();
@@ -86,7 +91,7 @@ export const useEffectiveDirectory = (): string | undefined => {
     const fallbackDirectory = useDirectoryStore((s) => s.currentDirectory);
     const chatsRoot = useChatsRoot();
 
-    return pickEffectiveDirectory({
+    return panelDirectory && !column ? panelDirectory : pickEffectiveDirectory({
         currentSessionId,
         newSessionDraft,
         currentSessionDirectory,

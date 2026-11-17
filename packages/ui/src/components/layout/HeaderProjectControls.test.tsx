@@ -22,8 +22,11 @@ const detectedDevServer: MockedDetectedDevServer = { command: null, previewUrlHi
 const mockedDeviceInfo = { isMobile: false, isTablet: false, hasTouchOnlyPointer: false };
 let effectiveDirectory = '/repo';
 const projectSetupReads: Array<{ id: string; path: string }> = [];
+const contextTerminalTabs: Record<string, { tabIds: string[]; activeTabId: string | null }> = {};
 
 const uiState = {
+  panelWorkspaceOwnerId: 'header-project-controls',
+  contextTerminalTabs,
   terminalShell: 'zsh',
   terminalLoginShells: ['zsh'],
   setSettingsPage: () => undefined,
@@ -151,7 +154,17 @@ mock.module('@/lib/device', () => ({ useDeviceInfo: () => mockedDeviceInfo }));
 // Modules under test import other desktop helpers too; keep the real ones.
 const desktop = await import('@/lib/desktop');
 mock.module('@/lib/desktop', () => ({ ...desktop, isDesktopShell: () => false }));
-mock.module('@/stores/useUIStore', () => ({ useUIStore: useUiStoreMock }));
+const workspaceUI = {
+  getState: () => uiState,
+  setState: (update: Partial<typeof uiState> | ((state: typeof uiState) => Partial<typeof uiState>)) => Object.assign(uiState, update instanceof Function ? update(uiState) : update),
+};
+mock.module('@/stores/useUIStore', () => ({
+  useUIStore: useUiStoreMock,
+  getPanelWorkspaceUI: () => workspaceUI,
+  usePanelWorkspaceApi: () => workspaceUI,
+  deletePanelWorkspace: () => undefined,
+  adoptDraftPanelWorkspace: () => undefined,
+}));
 mock.module('@/contexts/useThemeSystem', () => ({ useThemeSystem: () => ({ currentTheme: { metadata: { variant: 'dark' }, colors: { surface: { background: '#000' }, syntax: { base: { foreground: '#fff' } } } } }) }));
 mock.module('@/stores/useDesktopSshStore', () => ({ useDesktopSshStore: useDesktopSshStoreMock }));
 mock.module('@/lib/url', () => ({ openExternalUrl: async (url: string) => { openExternalCalls.push(url); } }));

@@ -28,10 +28,8 @@ import ChatEmptyState from './ChatEmptyState';
 import { useGlobalSyncStore } from '@/sync/global-sync-store';
 import MessageList, { type MessageListHandle } from './MessageList';
 import { createTimelineRevealGate, type TimelineRevealGate } from './timelineRevealGate';
+import { DisplayedWorkspaceContext } from '@/lib/workspace/panelOwner';
 
-// How long the previous timeline stays on screen while a session that is not
-// in memory loads, before the skeleton takes over.
-const SESSION_SWITCH_HOLD_MS = 400;
 // End inset reserved for the status row that floats over the timeline's
 // bottom edge (its tallest resting height plus the mb-2 gap).
 const STATUS_OVERLAY_RESERVED_HEIGHT = 40;
@@ -85,6 +83,7 @@ import { Icon } from "@/components/icon/Icon";
 import { cn, formatDirectoryName } from '@/lib/utils';
 import { useWaitingBlink } from '@/hooks/useDurationTicker';
 import { useProjectsStore } from '@/stores/useProjectsStore';
+import { getSideChat, sideChatMessages } from '@/lib/sessionSideChatMetadata';
 
 // New sync system imports
 import { useSessionUIStore } from '@/sync/session-ui-store';
@@ -470,9 +469,20 @@ const ChatViewport = React.memo(({
     // the new one arrives.
     const revealWaitedRef = React.useRef(revealWaited);
     revealWaitedRef.current = revealWaited;
+    const retainedRevealsRef = React.useRef<Array<{ sessionId: string; sessionKey: string; ready: boolean }>>([]);
     React.useLayoutEffect(() => {
         const root = timelineRootRef.current;
         if (!root || !showingTranscript) return;
+        // Match the message-list pool's membership, including an opening
+        // session whose first paint has not finished yet.
+        const cached = retainedRevealsRef.current.find((entry) => entry.sessionId === currentSessionId);
+        const entry = cached?.sessionKey === currentSessionKey ? cached : { sessionId: currentSessionId, sessionKey: currentSessionKey, ready: false };
+        retainedRevealsRef.current = [entry, ...retainedRevealsRef.current.filter((item) => item.sessionId !== currentSessionId)].slice(0, retainedTimelines());
+        if (entry.ready) {
+            revealGate.close();
+            root.removeAttribute('data-timeline-reveal');
+            return;
+        }
         root.setAttribute('data-timeline-reveal', 'pending');
         let finished = false;
         let timer: number | null = null;
@@ -508,6 +518,7 @@ const ChatViewport = React.memo(({
                     frame = window.requestAnimationFrame(settle);
                     return;
                 }
+                entry.ready = true;
                 if (!fade) {
                     root.removeAttribute('data-timeline-reveal');
                     return;
@@ -553,7 +564,7 @@ const ChatViewport = React.memo(({
             if (fadeTimer !== null) window.clearTimeout(fadeTimer);
             revealGate.onEmpty = null;
         };
-    }, [revealGate, scrollRef, showingTranscript]);
+    }, [currentSessionId, currentSessionKey, revealGate, scrollRef, showingTranscript]);
 
     const scrollContainerProps = React.useMemo(() => ({
         className: 'absolute inset-0 overflow-y-auto overflow-x-hidden z-0 chat-scroll overlay-scrollbar-target',
@@ -840,6 +851,8 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     pinnedSession,
 }) => {
     const pinned = pinnedSession !== undefined;
+    const workspace = React.useContext(DisplayedWorkspaceContext);
+    const mainWorkspace = pinned ? null : workspace;
     const autoOpenDraft = autoOpenDraftProp && !pinned;
     const { t } = useI18n();
     // A pinned column starts on its session and moves only through its own
@@ -850,13 +863,9 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         setPinnedOrigin(pinnedSession);
         setPinnedSelection(pinnedSession);
     }
-    // Session UI state. The selection is published synchronously by the
-    // sidebar click, but the chat swaps its content on a deferred copy: the
-    // first commit paints the cheap reactions (active row, URL, tab) while the
-    // timeline for the new session renders in an interruptible transition
-    // behind it. Both fields travel as one value so the key, the message
-    // subscription, and the loader target never mix an old directory with a
-    // new session id. A pinned column does not subscribe to the selection.
+    // Live selection drives main-column navigation policy. Presentation comes
+    // from the shared workspace on desktop and the column's deferred selection
+    // elsewhere. A pinned column owns its navigation independently.
     const globalSessionId = useSessionUIStore((s) => (pinned ? null : s.currentSessionId));
     const globalSessionDirectory = useSessionUIStore((s) => (pinned ? null : s.currentSessionDirectory));
     const pinnedSessionDirectory = usePinnedSessionDirectory(pinned ? pinnedSelection : null);
@@ -864,46 +873,20 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     const liveSessionDirectory = pinned ? pinnedSessionDirectory : globalSessionDirectory;
     const materializedDraftSessionId = useSessionUIStore((s) => (pinned ? null : s.materializedDraftSessionId));
     const liveSelection = React.useMemo(
-        () => ({ sessionId: liveSessionId, directory: liveSessionDirectory }),
-        [liveSessionId, liveSessionDirectory],
+        () => ({ sessionId: mainWorkspace ? null : liveSessionId, directory: mainWorkspace ? null : liveSessionDirectory }),
+        [mainWorkspace, liveSessionId, liveSessionDirectory],
     );
-    // A session whose messages are not in memory yet keeps the previous
-    // timeline on screen while they load, instead of flashing a skeleton
-    // between two conversations. The hold ends when the session becomes
-    // renderable or after SESSION_SWITCH_HOLD_MS, whichever comes first, and
-    // never applies when nothing was shown before or when the session was just
-    // created from a draft.
-    const liveSessionRenderable = useSessionRenderable(liveSessionId ?? '', liveSessionDirectory ?? undefined);
-    const shownSelectionRef = React.useRef(liveSelection);
-    const [expiredHoldSessionId, setExpiredHoldSessionId] = React.useState<string | null>(null);
-    const holdPreviousTimeline = Boolean(liveSessionId)
-        && !liveSessionRenderable
-        && liveSessionId !== materializedDraftSessionId
-        && shownSelectionRef.current.sessionId !== null
-        && shownSelectionRef.current.sessionId !== liveSessionId
-        && expiredHoldSessionId !== liveSessionId;
-    React.useEffect(() => {
-        if (!holdPreviousTimeline || !liveSessionId) return;
-        const timer = window.setTimeout(() => setExpiredHoldSessionId(liveSessionId), SESSION_SWITCH_HOLD_MS);
-        return () => window.clearTimeout(timer);
-    }, [holdPreviousTimeline, liveSessionId]);
-    // A session the user waited for (not in memory at the click) fades in; one
-    // that was ready appears in the same frame. Decided once per selection so
-    // a later, warm visit to the same session is instant again.
-    const lastLiveSessionIdRef = React.useRef<string | null | undefined>(undefined);
-    const waitedSessionIdRef = React.useRef<string | null>(null);
-    if (liveSessionId !== lastLiveSessionIdRef.current) {
-        lastLiveSessionIdRef.current = liveSessionId;
-        waitedSessionIdRef.current = liveSessionId && !liveSessionRenderable ? liveSessionId : null;
-    }
-    const targetSelection = holdPreviousTimeline ? shownSelectionRef.current : liveSelection;
-    const { sessionId: currentSessionId, directory: currentSessionDirectory } = useShownSessionSelection(targetSelection);
-    shownSelectionRef.current = { sessionId: currentSessionId, directory: currentSessionDirectory };
-    const revealWaited = Boolean(currentSessionId) && currentSessionId === waitedSessionIdRef.current;
+    // Desktop main chat follows its workspace's committed selection. Pinned
+    // columns and standalone runtimes own the same presentation policy here.
+    const liveSessionRenderable = useSessionRenderable(liveSelection.sessionId ?? '', liveSelection.directory ?? undefined);
+    const localPresentation = useShownSessionSelection(liveSelection, { renderable: liveSessionRenderable, materializedSessionId: materializedDraftSessionId });
+    const { sessionId: currentSessionId, directory: currentSessionDirectory } = mainWorkspace ?? localPresentation.selection;
+    const revealWaited = mainWorkspace?.revealWaited ?? localPresentation.revealWaited;
 
     const clearMaterializedDraftSession = useSessionUIStore((s) => s.clearMaterializedDraftSession);
     const openNewSessionDraft = useSessionUIStore((s) => s.openNewSessionDraft);
-    const newSessionDraft = useSessionUIStore((s) => s.newSessionDraft);
+    const liveDraft = useSessionUIStore((s) => mainWorkspace ? null : s.newSessionDraft);
+    const newSessionDraft = mainWorkspace?.draft ?? liveDraft;
 
     // Sync actions
     const sync = useSync();
@@ -1008,10 +991,15 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         suspendPartUpdates: Boolean(suspendedMessageId),
         suspendPartUpdatesForMessageId: suspendedMessageId,
     });
+    const currentSession = useSession(currentSessionId, effectiveSessionDirectory);
+    const sideChatMetadata = currentSession?.metadata;
+    const sideChat = React.useMemo(() => getSideChat({ metadata: sideChatMetadata }), [sideChatMetadata]);
+    const ownMessageRecords = React.useMemo(() => sideChatMessages(sessionMessageRecords, sideChat?.boundary ?? null, (record) => record.info), [sessionMessageRecords, sideChat]);
+    const inheritedBoundaryReached = ownMessageRecords.length < sessionMessageRecords.length;
     const sessionMessages = React.useMemo(() => {
         if (!currentSessionId) return EMPTY_MESSAGES;
-        return isPageWaiting ? holdPendingSynthetic(sessionMessageRecords) : sessionMessageRecords;
-    }, [currentSessionId, isPageWaiting, sessionMessageRecords]);
+        return isPageWaiting ? holdPendingSynthetic(ownMessageRecords) : ownMessageRecords;
+    }, [currentSessionId, isPageWaiting, ownMessageRecords]);
     const authSessionExpired = useAuthSessionStore((store) => store.state !== 'ok');
     const wasAuthExpiredRef = React.useRef(false);
     const sessionMessageLoadState = useSessionMessageLoadState(
@@ -1151,10 +1139,10 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         if (!currentSessionId) return null;
         return {
             limit: sessionMessages.length,
-            complete: sessionMessageLoadState.complete || !sessionMessageLoadState.cursor,
+            complete: inheritedBoundaryReached || sessionMessageLoadState.complete || !sessionMessageLoadState.cursor,
             loading: sessionMessageLoadState.status === 'loading',
         };
-    }, [currentSessionId, sessionMessageLoadState.complete, sessionMessageLoadState.cursor, sessionMessageLoadState.status, sessionMessages.length]);
+    }, [currentSessionId, inheritedBoundaryReached, sessionMessageLoadState.complete, sessionMessageLoadState.cursor, sessionMessageLoadState.status, sessionMessages.length]);
 
     const { isMobile } = useDeviceInfo();
     const isVSCode = isVSCodeRuntime();
@@ -1237,7 +1225,6 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     }, [pinned, setWorkStatusPanelVisible, showWorkStatusPanel]);
     const messageListRef = React.useRef<MessageListHandle | null>(null);
 
-    const currentSession = useSession(currentSessionId, effectiveSessionDirectory);
     const parentSession = useParentSession(currentSessionId, effectiveSessionDirectory);
 
     // A pinned column hides "Return to parent" on the session it was opened

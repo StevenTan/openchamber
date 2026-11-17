@@ -39,6 +39,7 @@ import { setChatCovered } from './rightSlot';
 import { ChatView } from '@/components/views/ChatView';
 import { DiagnosticDialogAvailableContext } from '@/lib/diagnostics/dialog-availability';
 import { registerCloseTabTarget } from '@/lib/closeTabTarget';
+import { WorkspaceSession } from './WorkspaceSession';
 
 const loadSettingsWindow = () => import('@/components/views/SettingsWindow').then(m => m.SettingsWindow);
 
@@ -224,6 +225,7 @@ export const MainLayout: React.FC = () => {
                     <LeftSidebar isMobile={isMobile} />
                     <div className="relative flex flex-1 min-w-0 flex-col overflow-hidden bg-background" data-page-scroll-lock="true">
                         <Header />
+                        <WorkspaceSession>
                         <div className="relative flex flex-1 min-h-0 overflow-hidden bg-background" data-page-scroll-lock="true">
                             <div className="relative flex flex-1 min-w-0 flex-col overflow-hidden bg-background" data-page-scroll-lock="true">
                                 <div className="relative flex flex-1 min-h-0 overflow-hidden" data-page-scroll-lock="true" data-workspace-row="true">
@@ -275,6 +277,7 @@ export const MainLayout: React.FC = () => {
                             </div>
                             <ErrorBoundary><GuestHosts /></ErrorBoundary>
                         </div>
+                        </WorkspaceSession>
                     </div>
                 </div>
 
