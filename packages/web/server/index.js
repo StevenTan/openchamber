@@ -363,11 +363,8 @@ const sanitizeModelRefs = (...args) => settingsNormalizationRuntime.sanitizeMode
 const sanitizeSkillCatalogs = (...args) => settingsNormalizationRuntime.sanitizeSkillCatalogs(...args);
 const sanitizeProjects = (...args) => settingsNormalizationRuntime.sanitizeProjects(...args);
 
-// Every OpenChamber-owned file and folder hangs off one root: the default
-// `~/.config/openchamber`, or `OPENCHAMBER_DATA_DIR` when set. The user
-// folders (`projects/`, `themes/`, `speech-models/`) are copied into a custom
-// root once at startup (`migrateLegacyUserDirs`), because they used to ignore
-// the variable.
+// Configuration and runtime data use `~/.config/openchamber` or the explicit
+// OPENCHAMBER_DATA_DIR. Managed chat workspaces have a separate default root.
 const OPENCHAMBER_DEFAULT_CONFIG_ROOT = path.join(os.homedir(), '.config', 'openchamber');
 const OPENCHAMBER_USER_CONFIG_ROOT = process.env.OPENCHAMBER_DATA_DIR
   ? path.resolve(process.env.OPENCHAMBER_DATA_DIR)
@@ -378,7 +375,9 @@ const OPENCHAMBER_PROJECTS_CONFIG_DIR = path.join(OPENCHAMBER_USER_CONFIG_ROOT, 
 // OpenCode server runs as a separate user that cannot traverse $HOME.
 const OPENCHAMBER_CHATS_DIR = process.env.OPENCHAMBER_CHATS_DIR && process.env.OPENCHAMBER_CHATS_DIR.trim()
   ? path.resolve(process.env.OPENCHAMBER_CHATS_DIR.trim())
-  : path.join(OPENCHAMBER_USER_CONFIG_ROOT, 'chats');
+  : process.env.OPENCHAMBER_DATA_DIR
+    ? path.join(OPENCHAMBER_USER_CONFIG_ROOT, 'chats')
+    : path.join(os.homedir(), 'Documents', 'OpenChamber');
 
 const MAX_THEME_JSON_BYTES = 512 * 1024;
 
@@ -2006,7 +2005,9 @@ const waitForAgentPresence = (...args) => openCodeLifecycleRuntime.waitForAgentP
 const refreshOpenCodeAfterConfigChange = (...args) => openCodeLifecycleRuntime.refreshOpenCodeAfterConfigChange(...args);
 const startHealthMonitoring = () => openCodeLifecycleRuntime.startHealthMonitoring(HEALTH_CHECK_INTERVAL);
 const triggerHealthCheck = () => openCodeLifecycleRuntime.triggerHealthCheck();
-const scheduledChatsScope = createChatsScope(OPENCHAMBER_CHATS_DIR);
+const scheduledChatsScope = createChatsScope(OPENCHAMBER_CHATS_DIR, {
+  legacyRoot: process.env.OPENCHAMBER_CHATS_DIR?.trim() ? undefined : path.join(OPENCHAMBER_USER_CONFIG_ROOT, 'chats'),
+});
 // Git routes fill this bridge after the scheduler is created.
 const scheduledWorktreeBridge = createUnregisteredScheduledWorktreeBridge();
 const scheduledTasksRuntime = createScheduledTasksRuntime({

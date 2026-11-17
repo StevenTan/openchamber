@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { opencodeClient } from '@/lib/opencode/client';
 import { switchRuntimeEndpoint } from '@/lib/runtime-switch';
-import { captureChatDirectoryCleanup, createChatDirectory, deleteChatDirectory, ensureChatsRootDirectory, getChatsRoot, getChatsRootFromDirectory, isChatDirectoryForHome, isChatDirectoryPath, subscribeChatsRoot, warmChatsRootDirectory } from './chatDirectories';
+import { captureChatDirectoryCleanup, createChatDirectory, deleteChatDirectory, ensureChatsRootDirectory, getChatsRoot, getChatsRootFromDirectory, getKnownChatsRoots, isChatDirectoryForHome, isChatDirectoryPath, subscribeChatsRoot, warmChatsRootDirectory } from './chatDirectories';
 import { getRuntimeKey } from './runtime-switch';
 
 let runtime = 0;
@@ -48,6 +48,13 @@ describe('server-owned chat directories', () => {
     expect(isChatDirectoryPath('/srv/chats-other/session-a')).toBe(false);
     expect(getChatsRootFromDirectory('/srv/chats/day/session-a')).toBe('/srv/chats');
     expect(isChatDirectoryForHome('/other/.config/openchamber/chats/session-a', '/home/user')).toBe(false);
+  });
+
+  test('exposes configured and legacy folder scopes without requiring any sessions', async () => {
+    home.mockResolvedValue({ home: '/home/user', chatsRoot: '/home/user/Documents/OpenChamber' });
+    expect(getKnownChatsRoots()).toEqual([]);
+    await ensureChatsRootDirectory();
+    expect(getKnownChatsRoots()).toEqual(['/home/user/Documents/OpenChamber', '/home/user/.config/openchamber/chats']);
   });
 
   for (const mode of ['current', 'captured']) {

@@ -16,6 +16,9 @@ kept at this root in `types.ts` and `utils.tsx`.
 - `recent/` owns the In work and timeline row projections and session
   locations (the name predates the removal of Recent).
 - `folders/` owns folder DnD, bulk actions, archived folders, and folder UI.
+- Chats reads folder scopes from both the configured and legacy managed roots,
+  including empty folders. Both roots share the `openchamber:chats` folder owner
+  for drag/drop authority; persisted folder scope keys keep their original paths.
 - `sessionSidebarRowModel.ts` owns the ordered, mode-neutral projection for
   Chats, In work, projects, groups, folders, sessions, status notices, empty
   states, and reveal controls. `SessionSidebarRows.tsx` is the shared desktop

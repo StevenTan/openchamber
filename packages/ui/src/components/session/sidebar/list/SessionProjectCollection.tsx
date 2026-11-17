@@ -50,7 +50,7 @@ import { resolveSidebarGrouping, useSessionDisplayStore } from '@/stores/useSess
 import { holdOrder, rankByLatestActivity } from './projectSort';
 import type { DeleteSessionConfirmState } from '../sessions/useSessionActions';
 import { useExpandedParents } from '../sessions/useExpandedParents';
-import { getChatsRootFromDirectory, isChatDirectoryPath } from '@/lib/chatDirectories';
+import { CHAT_DRAFT_PROJECT_ID, getChatsRootFromDirectory, getKnownChatsRoots, isChatDirectoryPath } from '@/lib/chatDirectories';
 import { useChatsRoot } from '@/hooks/useChatsRoot';
 import { isVSCodeWithoutWorkspace } from '@/lib/vscodeBootstrap';
 import { isCapacitorApp } from '@/lib/platform';
@@ -394,6 +394,7 @@ const VisibleSessionProjects: React.FC<SessionProjectCollectionProps> = ({ topol
     if (!chatsRoot) return null;
     const folderScopes = Array.from(new Set([
       chatsRoot,
+      ...getKnownChatsRoots(),
       ...collection.chatSessions.map((session) => normalizePath(session.directory ?? null)).filter(Boolean),
     ])).filter((directory): directory is string => Boolean(directory))
       .map((directory) => ({ scopeKey: directory, directory }));
@@ -448,9 +449,10 @@ const VisibleSessionProjects: React.FC<SessionProjectCollectionProps> = ({ topol
       : section
   )), [source, view.showInlineArchived]);
   const getFolderScopesForProject = React.useCallback((projectId: string) => {
+    if (projectId === CHAT_DRAFT_PROJECT_ID) return chatGroup?.folderScopes ?? [];
     const section = flatSectionsForRender.find((entry) => entry.project.id === projectId);
     return section?.groups.find((group) => !group.isArchivedBucket)?.folderScopes ?? [];
-  }, [flatSectionsForRender]);
+  }, [chatGroup, flatSectionsForRender]);
   useArchivedAutoFolders({
     enabled: true,
     normalizedProjects: topology.projects,

@@ -2,6 +2,7 @@ import React from 'react';
 import { toast } from '@/components/ui';
 import { useI18n } from '@/lib/i18n';
 import { useKeybinds } from '@/hooks/useKeybind';
+import { CHAT_DRAFT_PROJECT_ID } from '@/lib/chatDirectories';
 import type { Session } from '@/lib/opencode/model';
 import { isSessionInWork } from '@/lib/sessionWorkMetadata';
 import { takeSessionActionFailure } from '@/sync/session-action-failures';
@@ -186,9 +187,10 @@ export const useSidebarBulkActions = (args: Args) => {
   // The project root's folders, first in project order: a worktree's own
   // folders hold only that worktree's sessions.
   const bulkScopeFolders = React.useMemo(() => {
+    if (derivedSelectionScope === CHAT_DRAFT_PROJECT_ID) return selectionFolderScopes.flatMap((scope) => foldersMap[scope] ?? []);
     const rootScope = selectionFolderScopes[0];
     return rootScope ? foldersMap[rootScope] ?? [] : [];
-  }, [foldersMap, selectionFolderScopes]);
+  }, [derivedSelectionScope, foldersMap, selectionFolderScopes]);
 
   const resolveFolderScope = React.useCallback((folderId: string): string | null => {
     for (const scope of selectionFolderScopes) {

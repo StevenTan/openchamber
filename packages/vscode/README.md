@@ -25,7 +25,7 @@ Plus everything from the shared OpenChamber UI: branchable timeline, smart tool 
 ## Commands
 
 With no folder open, new sessions start in Chats. Each chat has its own directory
-under `~/.config/openchamber/chats`. Open a workspace folder to use project sessions.
+under `~/Documents/OpenChamber`. Open a workspace folder to use project sessions.
 
 | Command | Description |
 |---------|-------------|

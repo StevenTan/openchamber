@@ -208,7 +208,8 @@ Provider authentication, capabilities, issues, change requests, contributor dest
 
 With no workspace folder, sidebar and editor drafts use the shared managed Chats
 creation flow. The filesystem home bridge names the host's
-`~/.config/openchamber/chats` root and its canonical path when it exists.
+`~/Documents/OpenChamber` root and its canonical path when it exists, plus the
+canonical `~/.config/openchamber/chats` alias for existing chats.
 Reading home does not create directories. Empty-window directory bootstrap
 creates the shared root before publishing it as ready for OpenCode reads; a
 failed root allocation leaves bootstrap retryable. The draft owner allocates

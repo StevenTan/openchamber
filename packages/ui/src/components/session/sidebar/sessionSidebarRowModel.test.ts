@@ -9,7 +9,7 @@ import { buildMultiRunIndex } from '@/lib/multirun/runs';
 import { withMultiRunMembership } from '@/lib/multirun/identity';
 import { getPinnedSessionKey } from '@/lib/sessionPins';
 import { getRuntimeKey } from '@/lib/runtime-switch';
-import { ensureChatsRootDirectory } from '@/lib/chatDirectories';
+import { CHAT_DRAFT_PROJECT_ID, ensureChatsRootDirectory, getKnownChatsRoots } from '@/lib/chatDirectories';
 import { opencodeClient } from '@/lib/opencode/client';
 
 const timelineItem = (id: string, overrides: Partial<SessionSidebarActivityItem> = {}): SessionSidebarActivityItem => ({
@@ -154,7 +154,7 @@ describe('buildSessionSidebarRowModel', () => {
 
     const model = buildSessionSidebarRowModel(input);
 
-    expect(model.folderOwnerKeyBySessionId.get('chat')).toBe('/home/.config/openchamber/chats');
+    expect(model.folderOwnerKeyBySessionId.get('chat')).toBe(CHAT_DRAFT_PROJECT_ID);
   });
 
   test('does not give an outside child the managed Chat parent owner', () => {
@@ -173,7 +173,7 @@ describe('buildSessionSidebarRowModel', () => {
     const model = buildSessionSidebarRowModel(input);
     const childRow = model.rows.find((row) => row.kind === 'session' && row.node.session.id === 'outside-child');
 
-    expect(model.folderOwnerKeyBySessionId.get('chat-parent')).toBe('/home/.config/openchamber/chats');
+    expect(model.folderOwnerKeyBySessionId.get('chat-parent')).toBe(CHAT_DRAFT_PROJECT_ID);
     expect(model.folderOwnerKeyBySessionId.has('outside-child')).toBe(false);
     expect(childRow).toMatchObject({ ownerProjectId: null, ownerKey: null, selectionScopeKey: null });
   });
@@ -1098,11 +1098,35 @@ describe('buildSessionSidebarRowModel', () => {
 const originalHomeInfo = opencodeClient.getFilesystemHomeInfo;
 opencodeClient.getFilesystemHomeInfo = async () => ({
   home: '/home',
-  canonicalChatsRoot: '/home/.config/openchamber/chats',
+  chatsRoot: '/home/Documents/OpenChamber',
+  canonicalChatsRoot: '/home/Documents/OpenChamber',
   canonicalLegacyChatsRoot: '/home/.config/openchamber/chats',
 });
 await ensureChatsRootDirectory();
 opencodeClient.getFilesystemHomeInfo = originalHomeInfo;
+
+test('Chats folders retain legacy memberships and share filing authority across roots', () => {
+  const [configured, legacy] = getKnownChatsRoots();
+  const existing = node('existing-chat');
+  existing.session.directory = `${legacy}/day/session-a`;
+  const current = node('current-chat');
+  current.session.directory = `${configured}/day/session-b`;
+  const input = args([]);
+  input.chatGroup = group([existing, current], {
+    id: 'managed-chats', directory: configured, folderScopeKey: configured,
+    folderScopes: getKnownChatsRoots().map((scopeKey) => ({ scopeKey, directory: scopeKey })),
+  });
+  input.foldersMap = { [legacy]: [
+    { id: 'legacy-folder', name: 'Saved folder', createdAt: 1, sessionIds: ['existing-chat'] },
+    { id: 'empty-folder', name: 'Empty folder', createdAt: 1, sessionIds: [] },
+  ] };
+  input.folderAuthorityByOwner = new Map([[CHAT_DRAFT_PROJECT_ID, { scopeKeys: getKnownChatsRoots(), complete: true }]]);
+  const model = buildSessionSidebarRowModel(input);
+  expect(model.rows.filter((row) => row.kind === 'folder-header').map((row) => row.folder.id)).toEqual(['legacy-folder', 'empty-folder']);
+  expect(model.folderOwnerKeyBySessionId.get('existing-chat')).toBe(CHAT_DRAFT_PROJECT_ID);
+  expect(model.folderOwnerKeyBySessionId.get('current-chat')).toBe(CHAT_DRAFT_PROJECT_ID);
+  expect(model.folderDropTargets.find((target) => target.folderId === 'legacy-folder')).toMatchObject({ ownerKey: CHAT_DRAFT_PROJECT_ID, enabled: true });
+});
 
 describe('the Pages section', () => {
   const pages = [{ id: 'source-board', open: false }, { id: 'scheduled', open: true }, { id: 'archive', open: false }, { id: 'guest:notes', open: false }];

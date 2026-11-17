@@ -4,23 +4,24 @@ import path from 'node:path';
 import { createProjectIdFromPath } from '../projects/project-id.js';
 
 // The id the UI already uses for the chats list (CHAT_DRAFT_PROJECT_ID). It is
-// not a valid file name on Windows, so tasks are stored under the chats root's
+// not a valid file name on Windows, so tasks are stored under the scope's
 // path id instead and this id only exists at the API edge.
 export const CHATS_SCOPE_PUBLIC_ID = 'openchamber:chats';
 
 /**
  * Chats have no project checkout: every chat owns a fresh directory under the
  * managed chats root. A scheduled task in the chats scope therefore stores its
- * definition under the root and opens a new chat directory for each run.
+ * definition under a stable path id and opens a new chat directory for each run.
  */
-export const createChatsScope = (chatsRoot) => {
+export const createChatsScope = (chatsRoot, { legacyRoot } = {}) => {
   const root = path.resolve(chatsRoot);
-  const id = createProjectIdFromPath(root);
+  const id = createProjectIdFromPath(legacyRoot || root);
+  const roots = legacyRoot ? [root, path.resolve(legacyRoot)] : [root];
 
-  const contains = (directory) => {
-    const relative = path.relative(root, path.resolve(directory));
+  const contains = (directory) => roots.some((chatRoot) => {
+    const relative = path.relative(chatRoot, path.resolve(directory));
     return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
-  };
+  });
 
   // Same layout the UI uses for a new chat: <root>/<yyyy-mm-dd>/session-<uuid>.
   const createChatDirectory = async (now = new Date()) => {

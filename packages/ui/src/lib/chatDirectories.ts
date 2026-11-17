@@ -57,6 +57,11 @@ export function getChatsRoot(): string | null {
   return cachedRoots()?.configured ?? null;
 }
 
+export function getKnownChatsRoots(): string[] {
+  const roots = cachedRoots();
+  return roots ? [...new Set([roots.configured, roots.legacy])] : [];
+}
+
 /** Notifies once the server names a chats root for a runtime. */
 export function subscribeChatsRoot(listener: () => void): () => void {
   chatsRootListeners.add(listener);

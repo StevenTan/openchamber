@@ -371,6 +371,20 @@ describe('scheduled-task service chats scope', () => {
     await expect(service.resolveProjectID({ directory: `${chatsScope.root}-other/session-a` })).rejects.toMatchObject({ statusCode: 404 });
   });
 
+  it('keeps task storage and existing chat membership when new chats use a separate root', async () => {
+    const scope = createChatsScope('/home/user/Documents/OpenChamber', { legacyRoot: chatsScope.root });
+    const { service, scheduledTasksRuntime } = createService({ chatsScope: scope });
+
+    expect(scope.root).toBe('/home/user/Documents/OpenChamber');
+    expect(scope.id).toBe(chatsScope.id);
+    await service.list(CHATS_SCOPE_PUBLIC_ID);
+    expect(scheduledTasksRuntime.syncProject).toHaveBeenCalledWith(chatsScope.id);
+    for (const root of [scope.root, chatsScope.root]) {
+      await expect(service.resolveProjectID({ directory: `${root}/day/session-a` })).resolves.toBe(chatsScope.id);
+      await expect(service.resolveProjectID({ directory: `${root}-other/session-a` })).rejects.toMatchObject({ statusCode: 404 });
+    }
+  });
+
   it('rejects the chats id when the server has no chats scope', async () => {
     const { service } = createService();
 

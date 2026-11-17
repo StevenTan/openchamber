@@ -35,11 +35,15 @@ describe('managed Chats home', () => {
     const home = await fs.mkdtemp(path.join(os.tmpdir(), 'vscode-chats-'));
     const homedir = spyOn(os, 'homedir').mockReturnValue(home);
     try {
-      const root = path.join(home, '.config', 'openchamber', 'chats');
+      const root = path.join(home, 'Documents', 'OpenChamber');
+      const legacyRoot = path.join(home, '.config', 'openchamber', 'chats');
       await fs.mkdir(root, { recursive: true });
+      await fs.mkdir(legacyRoot, { recursive: true });
+      await fs.writeFile(path.join(legacyRoot, 'existing.txt'), 'existing chat');
       const result = await handleFsBridgeMessage({ id: 'home', type: 'api:fs/home' }, deps);
-      expect(result).toMatchObject({ success: true, data: { home, chatsRoot: root, canonicalChatsRoot: await fs.realpath(root) } });
+      expect(result).toMatchObject({ success: true, data: { home, chatsRoot: root, canonicalChatsRoot: await fs.realpath(root), canonicalLegacyChatsRoot: await fs.realpath(legacyRoot) } });
       expect((await fs.stat(root)).isDirectory()).toBe(true);
+      expect(await fs.readFile(path.join(legacyRoot, 'existing.txt'), 'utf8')).toBe('existing chat');
       expect(await handleFsBridgeMessage({ id: 'home', type: 'api:fs/home' }, deps)).toEqual(result);
     } finally {
       homedir.mockRestore();
@@ -51,7 +55,7 @@ describe('managed Chats home', () => {
     const home = await fs.mkdtemp(path.join(os.tmpdir(), 'vscode-chats-'));
     const homedir = spyOn(os, 'homedir').mockReturnValue(home);
     try {
-      const root = path.join(home, '.config', 'openchamber', 'chats');
+      const root = path.join(home, 'Documents', 'OpenChamber');
       expect(await handleFsBridgeMessage({ id: 'home', type: 'api:fs/home' }, deps))
         .toMatchObject({ success: true, data: { home, chatsRoot: root } });
       await expect(fs.stat(root)).rejects.toThrow();
@@ -68,8 +72,8 @@ describe('managed Chats home', () => {
     const home = await fs.mkdtemp(path.join(os.tmpdir(), 'vscode-chats-'));
     const homedir = spyOn(os, 'homedir').mockReturnValue(home);
     try {
-      await fs.writeFile(path.join(home, '.config'), 'not a directory');
-      const root = path.join(home, '.config', 'openchamber', 'chats');
+      await fs.writeFile(path.join(home, 'Documents'), 'not a directory');
+      const root = path.join(home, 'Documents', 'OpenChamber');
       expect(await handleFsBridgeMessage({ id: 'home', type: 'api:fs/home' }, deps))
         .toMatchObject({ success: true, data: { home, chatsRoot: root } });
       await expect(handleFsBridgeMessage({ id: 'mkdir', type: 'api:fs:mkdir', payload: { path: path.join(root, 'day', 'session-a') } }, deps)).rejects.toThrow();

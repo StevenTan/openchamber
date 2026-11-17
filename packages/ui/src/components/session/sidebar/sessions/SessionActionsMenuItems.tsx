@@ -11,7 +11,7 @@ import { copyTextToClipboard } from '@/lib/clipboard';
 import { canUseElectronDesktopIPC, getMiniChatRuntimeArgs, invokeDesktop, isVSCodeRuntime } from '@/lib/desktop';
 import { guestSessionActions, type GuestActionEntry } from '@/lib/guests/actions';
 import { runGuestSessionAction } from '@/lib/guests/session-action';
-import { getChatsRootFromDirectory } from '@/lib/chatDirectories';
+import { getChatsRootFromDirectory, getKnownChatsRoots } from '@/lib/chatDirectories';
 import { useI18n } from '@/lib/i18n';
 import { getMultiRunIdentity } from '@/lib/multirun/identity';
 import { useMultiRunMemberIds } from '@/lib/multirun/useMultiRuns';
@@ -349,7 +349,7 @@ export function SessionActionsMenuItems({
     if (workScope) pushScope(workScope);
     else if (projectRoot) pushScope(projectRoot);
     else {
-      pushScope(getChatsRootFromDirectory(sessionDirectory));
+      if (getChatsRootFromDirectory(sessionDirectory)) getKnownChatsRoots().forEach(pushScope);
       pushScope(sessionDirectory);
     }
     const offeredScopes = [...scopes];

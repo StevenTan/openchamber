@@ -17,9 +17,10 @@ scheduled like one more project, with three differences:
 
 - **Identity.** The UI and the routes address the scope as `openchamber:chats`
   (the UI's `CHAT_DRAFT_PROJECT_ID`). A colon is not a valid Windows file name,
-  so tasks are stored under the chats root's path id
-  (`createProjectIdFromPath(<chats root>)`, the same id agent memory uses for
-  chats). The service maps the public id to the storage id on the way in, and
+  so tasks are stored under a path id. The default scope uses
+  `createProjectIdFromPath(<config root>/chats)` as its stable storage id,
+  independently of where new chat directories are created. An explicit
+  `OPENCHAMBER_CHATS_DIR` uses that root's path id. The service maps the public id to the storage id on the way in, and
   `openchamber:scheduled-task-ran` events map it back on the way out.
 - **One new chat per run.** A project run works in the project path. A chats run
   creates `<chats root>/<yyyy-mm-dd>/session-<uuid>`, the layout the UI uses for
@@ -38,8 +39,12 @@ scheduled like one more project, with three differences:
   subdirectory session schedules for the project it belongs to; anything
   still unmatched fails as not-found.
 
-The chats root is `OPENCHAMBER_CHATS_DIR` (default `<config root>/chats`). The
-VS Code extension has no chats, so its UI does not offer the scope.
+The chats root defaults to `~/Documents/OpenChamber`. `OPENCHAMBER_DATA_DIR`
+places it under `<data dir>/chats`; `OPENCHAMBER_CHATS_DIR` takes precedence.
+The default scope also recognizes existing chats under `<config root>/chats`.
+`createChatsScope` accepts `legacyRoot` to retain that root's storage id and
+directory membership while creating new chats under `chatsRoot`. The
+VS Code extension has no scheduled-task runtime, so its UI does not offer the scope.
 
 ## Cross-instance occurrence claiming
 

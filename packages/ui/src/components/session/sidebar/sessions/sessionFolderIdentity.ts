@@ -1,4 +1,4 @@
-import { getChatsRootFromDirectory } from '@/lib/chatDirectories';
+import { CHAT_DRAFT_PROJECT_ID, getChatsRootFromDirectory } from '@/lib/chatDirectories';
 import type { SessionGroup, SessionGroupFolderScope } from '../types';
 import { normalizePath } from '../utils';
 import type { Session } from '@/lib/opencode/model';
@@ -17,7 +17,7 @@ export const getSessionFolderDropId = (scopeKey: string, folderId: string): stri
 export const getSessionFolderOwnerKey = (
   projectId: string | null | undefined,
   directory: string | null | undefined,
-): string | null => projectId ?? getChatsRootFromDirectory(directory) ?? normalizePath(directory ?? null);
+): string | null => projectId ?? (getChatsRootFromDirectory(directory) ? CHAT_DRAFT_PROJECT_ID : normalizePath(directory ?? null));
 
 export const getAuthoritativeSessionFolderOwnerKey = (
   session: Session,

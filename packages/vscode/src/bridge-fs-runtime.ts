@@ -210,12 +210,16 @@ export async function handleFsBridgeMessage(
 
     case 'api:fs/home': {
       const home = os.homedir();
-      const chatsRoot = path.join(home, '.config', 'openchamber', 'chats');
-      const canonicalChatsRoot = await fs.promises.realpath(chatsRoot).catch(() => undefined);
+      const chatsRoot = path.join(home, 'Documents', 'OpenChamber');
+      const [canonicalChatsRoot, canonicalLegacyChatsRoot] = await Promise.all([
+        fs.promises.realpath(chatsRoot).catch(() => undefined),
+        fs.promises.realpath(path.join(home, '.config', 'openchamber', 'chats')).catch(() => undefined),
+      ]);
       return { id, type, success: true, data: {
         home: deps.normalizeFsPath(home),
         chatsRoot: deps.normalizeFsPath(chatsRoot),
         ...(canonicalChatsRoot ? { canonicalChatsRoot: deps.normalizeFsPath(canonicalChatsRoot) } : {}),
+        canonicalLegacyChatsRoot: canonicalLegacyChatsRoot && deps.normalizeFsPath(canonicalLegacyChatsRoot),
       } };
     }
 
