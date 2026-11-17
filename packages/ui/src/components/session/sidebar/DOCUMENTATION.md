@@ -1209,6 +1209,7 @@ rest it is as quiet as the button was.
 - The sidebar does not subscribe its whole tree to the cross-directory live-session aggregate. Global create/structural/lifecycle snapshots drive rendered session metadata; the cached sync index only fills sessions not yet present globally and provides refresh fallback data. Row activity continues to come from the session-keyed live status index.
 - Session selection does not invalidate the sidebar orchestration component. Each mounted row selects only whether its own session ID is active, while parent expansion, project selection memory, and neighbor prefetch run in small effect-only subscribers.
 - Parent expansion is exclusively manual. Selecting or navigating to a subsession never expands its parent automatically. Project/worktree and `recent` trees use independent persisted context keys and receive separate stable projections, so expansion changes in one context neither invalidate nor change the other. The persisted storage key remains `v3`; older state mixed contexts and is not migrated into this contract.
+- Command-clicking a session row with listed children toggles its expansion without selecting the session. The title and row background share this action; explicit multi-selection mode keeps priority. Double-clicking while Command is held does not start renaming.
 - `SessionTreeItem` is memoized with a comparator over the props it actually
   reads: the row list re-renders on every virtualizer frame while scrolling and
   on every model rebuild, spreading a shared props bag and a fresh

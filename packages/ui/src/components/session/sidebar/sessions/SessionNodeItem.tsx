@@ -942,6 +942,11 @@ function SessionNodeItemComponent(props: SessionNodeItemProps): React.ReactNode 
       toggleRowSelected(session.id, selectionScopeKey, collectNodeDescendantIds(node), sessionRowKey);
       return;
     }
+    if (event?.metaKey && hasChildren) {
+      event.preventDefault();
+      toggleParent(expansionKey);
+      return;
+    }
     if (event?.shiftKey && !isVSCode && sessionDirectory) {
       handleOpenInSidePanel();
       return;
@@ -1295,6 +1300,7 @@ function SessionNodeItemComponent(props: SessionNodeItemProps): React.ReactNode 
  	                    onClick={(event) => handleRowSelect(event)}
                     onDoubleClick={(e) => {
                       e.stopPropagation();
+                      if (e.metaKey) return;
                       handleSessionDoubleClick(session.id, sessionTitle);
                     }}
                     className={cn(
