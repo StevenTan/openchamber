@@ -289,6 +289,8 @@ tabs, zone visibility, editor visibility, pending navigation and terminal
 references. `contextPanelByDirectory` inside a workspace uses actual resource
 directories. The right zone uses `isOpen`/`expanded`/`activeTabId`; the other
 zones use `zones`. Placement and pixel dimensions stay device preferences.
+New panel workspaces show the editor with the file tree collapsed. File opens
+preserve the workspace's chosen tree visibility.
 
 Outside a panel, the hook and `getState()` address the main selection.
 `PanelWorkspaceOwnerContext` pins nested panels and side chats to their host;

@@ -26,8 +26,8 @@ describe('session panel workspaces', () => {
     expect(b.getState().contextPanelByDirectory[directory].tabs.map((tab) => tab.targetPath)).toEqual([`${directory}/b.ts`]);
     expect(a.getState().contextPanelByDirectory[directory].isOpen).toBe(true);
     expect(b.getState().contextPanelByDirectory[directory].isOpen).toBe(false);
-    expect(a.getState().contextEditorTreeVisible).toBe(false);
-    expect(b.getState().contextEditorTreeVisible).toBe(true);
+    expect(a.getState().contextEditorTreeVisible).toBe(true);
+    expect(b.getState().contextEditorTreeVisible).toBe(false);
     expect(a.getState().pendingFileNavigation?.line).toBe(12);
     expect(b.getState().pendingFileNavigation).toBeNull();
   });
