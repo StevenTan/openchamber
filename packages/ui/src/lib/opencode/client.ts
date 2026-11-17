@@ -2454,13 +2454,17 @@ class OpencodeService {
   async writeOpenCodeTempFiles(
     directory: string | null | undefined,
     files: Array<{ filename: string; bytes: Uint8Array }>,
+    runtimeKey: string = getRuntimeKey(),
   ): Promise<Array<{ filename: string; path: string } | { filename: string; error: Error }>> {
+    this.assertRuntimeUnchanged(runtimeKey)
     const client = this.clientFor(directory)
     const info = await call("server.info", () => client.server.info())
+    this.assertRuntimeUnchanged(runtimeKey)
     const folderName = Array.from(crypto.getRandomValues(new Uint8Array(8)), (byte) => byte.toString(16).padStart(2, "0")).join("")
     const folder = `${info.paths.tmp.replace(/[\\/]+$/, "")}/openchamber/${folderName}`
     const results: Array<{ filename: string; path: string } | { filename: string; error: Error }> = []
     for (const { filename, bytes } of files) {
+      this.assertRuntimeUnchanged(runtimeKey)
       try {
         const written = await call("file.write", () => client.experimental.file.write({ path: `${folder}/${filename}`, payload: bytes }))
         results.push({ filename, path: written.data.path })

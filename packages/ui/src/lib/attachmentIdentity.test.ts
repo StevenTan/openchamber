@@ -12,6 +12,11 @@ describe('attachmentWireName', () => {
     expect(attachmentWireName({ filename: 'report.xlsx' })).toBe('report.xlsx');
     expect(attachmentWireName({ filename: 'report.xlsx', agentPath: undefined })).toBe('report.xlsx');
   });
+
+  test('captured editor selections use valid filenames for saved copies', () => {
+    expect(attachmentWireName({ filename: '/repo/src/code.ts:12-18', vscodeSource: 'selection' })).toBe('code.ts-12-18');
+    expect(attachmentWireName({ filename: 'C:\\repo\\code.ts:12-18', vscodeSource: 'selection' })).toBe('code.ts-12-18');
+  });
 });
 
 describe('attachmentBasename', () => {

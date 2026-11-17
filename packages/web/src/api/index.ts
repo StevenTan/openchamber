@@ -1,5 +1,5 @@
 import type { RuntimeAPIs } from '@openchamber/ui/lib/api/types';
-import { createDesktopClipboardAPI, createDesktopThemeFileAPI, createDesktopZoomAPI } from '@openchamber/ui/lib/desktop';
+import { createDesktopClipboardAPI, createDesktopThemeFileAPI, createDesktopZoomAPI, createDesktopFileThumbnailsAPI } from '@openchamber/ui/lib/desktop';
 import {
   createRuntimeUrlResolver,
   getRuntimeUrlResolver,
@@ -42,6 +42,7 @@ export const createWebAPIs = (options: WebAPIsOptions = {}): RuntimeAPIs => {
     clipboard: createDesktopClipboardAPI(),
     themeFiles: createDesktopThemeFileAPI(),
     zoom: createDesktopZoomAPI(),
+    fileThumbnails: createDesktopFileThumbnailsAPI(),
   runtime: { platform: 'web', isDesktop: false, isVSCode: false, label: 'web' },
   terminal: createWebTerminalAPI(),
   git: createWebGitAPI(),

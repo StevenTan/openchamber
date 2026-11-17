@@ -3,10 +3,7 @@ import { describe, expect, mock, test } from 'bun:test';
 import {
     assignImageAttachmentFilenames,
     buildAttachmentCitationText,
-    buildImagePathCitationText,
     findAttachmentCitationRanges,
-    findImagePathCitationNames,
-    imageSaveModeForModel,
     isGenericImageFilename,
     nextPastedContextFilename,
     prepareImageToSave,
@@ -71,59 +68,22 @@ describe('attachment citations', () => {
         expect(nextPastedContextFilename(['PASTED-CONTEXT-2.TXT'])).toBe('pasted-context-1.txt');
     });
 
-    test('cites saved images by path as markdown links', () => {
-        expect(buildImagePathCitationText([
-            { filename: 'image-1.png', path: '/tmp/opencode/openchamber/ab12/image-1.png' },
-            { filename: 'shot.png', path: 'C:\\Users\\Jo Doe\\AppData\\Local\\Temp\\opencode\\openchamber\\ab12\\shot.png' },
-            { filename: 'x.png', path: '/tmp/a (1)/x.png' },
-        ])).toBe(
-            '[image-1.png](/tmp/opencode/openchamber/ab12/image-1.png) '
-            + '[shot.png](<C:/Users/Jo Doe/AppData/Local/Temp/opencode/openchamber/ab12/shot.png>) '
-            + '[x.png](</tmp/a (1)/x.png>)',
-        );
-    });
-
-    test('finds the names of links already in the draft', () => {
-        const draft = 'see [image-1.png](/tmp/x/image-1.png) and [image-2.png] and [shot.png](<C:/a b/shot.png>)';
-        expect(findImagePathCitationNames(draft)).toEqual(['image-1.png', 'shot.png']);
-        expect(assignImageAttachmentFilenames([{ name: 'image.png', type: 'image/png' }], findImagePathCitationNames(draft)))
-            .toEqual(['image-2.png']);
-    });
 });
 
-describe('image save mode', () => {
-    test('attaches only while the setting is off', () => {
-        expect(imageSaveModeForModel(false, ['text'])).toBe('attach');
-        expect(imageSaveModeForModel(false, ['text', 'image'])).toBe('attach');
-        expect(imageSaveModeForModel(false, undefined)).toBe('attach');
-    });
-
-    test('a model without image input gets the saved file in place of the attachment', () => {
-        expect(imageSaveModeForModel(true, ['text'])).toBe('instead');
-    });
-
-    test('a model that takes images gets the attachment and the saved file', () => {
-        expect(imageSaveModeForModel(true, ['text', 'image'])).toBe('alongside');
-        expect(imageSaveModeForModel(true, ['TEXT', 'IMAGE'])).toBe('alongside');
-    });
-
-    test('unknown model metadata counts as a model that takes the attachment', () => {
-        expect(imageSaveModeForModel(true, undefined)).toBe('alongside');
-    });
-
+describe('saved image files', () => {
     test('saves a HEIC the decoder can read as the JPEG its attachment carries', async () => {
         const saved = await prepareImageToSave(new File(['heic-data'], 'photo.heic', { type: 'image/heic' }));
         expect(saved && { ...saved, bytes: new TextDecoder().decode(saved.bytes) })
-            .toEqual({ filename: 'photo.jpg', bytes: 'jpeg-data', linkOnly: false });
+            .toEqual({ filename: 'photo.jpg', bytes: 'jpeg-data' });
     });
 
-    test('saves a HEIC the decoder cannot read unconverted, for its link only', async () => {
+    test('saves an unreadable HEIC as its original bytes for tools', async () => {
         const original = decodeHeic;
         decodeHeic = async () => { throw new Error('ERR_LIBHEIF format not supported'); };
         try {
             const saved = await prepareImageToSave(new File(['hdr-heic'], 'IMG_4015.heic', { type: 'image/heic' }));
             expect(saved && { ...saved, bytes: new TextDecoder().decode(saved.bytes) })
-                .toEqual({ filename: 'IMG_4015.heic', bytes: 'hdr-heic', linkOnly: true });
+                .toEqual({ filename: 'IMG_4015.heic', bytes: 'hdr-heic' });
         } finally {
             decodeHeic = original;
         }

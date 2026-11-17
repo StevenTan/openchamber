@@ -51,11 +51,11 @@ describe("attachment file preparation", () => {
     }
   })
 
-  test("reads documents and images named by a mention on send", () => {
-    for (const filename of ["reports/BUDGET.XLSX", "shot.png", "photo.JPG", "anim.gif", "pic.webp", "IMG_1.heic"]) {
+  test("reads image mentions for native input and leaves other files as paths", () => {
+    for (const filename of ["shot.png", "photo.JPG", "anim.gif", "pic.webp", "IMG_1.heic"]) {
       expect(isReadOnSendMentionFilename(filename)).toBe(true)
     }
-    for (const filename of ["notes.txt", "icon.svg", "scan.pdf"]) {
+    for (const filename of ["reports/BUDGET.XLSX", "notes.txt", "icon.svg", "scan.pdf"]) {
       expect(isReadOnSendMentionFilename(filename)).toBe(false)
     }
   })

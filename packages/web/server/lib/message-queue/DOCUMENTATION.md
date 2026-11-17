@@ -75,6 +75,14 @@ field the model reads as the file identity, falling back to `filename` when
 absent. `filename` itself still rides the attachment unchanged for the UI's
 own display.
 
+At delivery, ordinary files become short text notes naming their path on the
+OpenCode host. Native images follow the resolved model's image-input capability.
+Existing `agentPath` and file-URI paths are reused; a pathless data URL is saved
+through OpenCode's experimental filesystem API. A captured text payload from a
+notebook or Office document uses a `.txt` suffix for the saved copy. Catalog or
+write failures leave the item queued under the normal retry policy. Stored
+attachments remain intact for take/edit and later delivery attempts.
+
 `parseQueuedItemInput` rejects anything the server could not deliver later
 (no text, attachments, or context; missing model; malformed attachment or
 context entry). Public snapshots and broadcasts strip the payloads —

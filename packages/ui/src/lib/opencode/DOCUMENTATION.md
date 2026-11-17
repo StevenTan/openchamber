@@ -22,6 +22,9 @@ to the shared UI domain model. Sync owns transcript membership and store writes.
   first message 404. Other errors stop the walk and propagate unchanged.
 - A runtime switch during a successful read also discards that response. Sync
   independently checks runtime identity and transcript membership before writing.
+- Temp-file writes retain the captured runtime key through byte preparation,
+  the temp-directory lookup and each write. A host switch stops uploads before
+  another request can use the replacement host's transport or credentials.
 - `getRecordedTurnDiff` uses the managed plugin's public RPC through the same
   runtime-aware SDK transport. `turn-file-diffs.ts` validates patch records and
   lightweight tool references. Missing plugin/history and capture failures

@@ -23,6 +23,7 @@ import { useI18n } from '@/lib/i18n';
 
 import type { ToolPopupContent } from './message/types';
 import { ScrollableOverlay } from '@/components/ui/ScrollableOverlay';
+import { ComposerAttachmentCard } from './composer/attachments/ComposerAttachmentCard';
 
 const FileAttachmentButton = memo(() => {
   const { t } = useI18n();
@@ -134,246 +135,6 @@ const FileAttachmentButton = memo(() => {
 
 FileAttachmentButton.displayName = 'FileAttachmentButton';
 
-interface ImagePreviewProps {
-  file: AttachedFile;
-  onRemove: () => void;
-  onShowPopup?: (content: ToolPopupContent) => void;
-  gallery?: NonNullable<ToolPopupContent['image']>['gallery'];
-  index?: number;
-}
-
-const ImagePreview = memo(({ file, onRemove, onShowPopup, gallery, index = 0 }: ImagePreviewProps) => {
-  const { t } = useI18n();
-  const thumbnailRef = useRef<HTMLDivElement>(null);
-  const isLocalImagePreview =
-    file.source !== 'server' &&
-    file.mimeType.startsWith('image/') &&
-    typeof file.dataUrl === 'string' &&
-    file.dataUrl.startsWith('data:image/');
-
-  const imageUrl = isLocalImagePreview ? file.dataUrl : (file.serverPath || '');
-
-  const extractFilename = (path: string): string => {
-    const normalized = path.replace(/\\/g, '/');
-    const parts = normalized.split('/');
-    return parts[parts.length - 1] || path;
-  };
-
-  const getFileExtension = (filename: string): string => {
-    const parts = filename.split('.');
-    return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : '';
-  };
-
-  const displayName = extractFilename(file.filename);
-  const extension = getFileExtension(file.filename);
-  const handleOpenPreview = React.useCallback(() => {
-    if (!onShowPopup || !imageUrl) return;
-
-    onShowPopup({
-      open: true,
-      title: displayName || 'Image',
-      content: '',
-      metadata: {
-        tool: 'image-preview',
-        filename: displayName,
-        mime: file.mimeType,
-        size: file.size,
-      },
-      image: {
-        url: imageUrl,
-        mimeType: file.mimeType,
-        filename: displayName,
-        size: file.size,
-        gallery,
-        index,
-        origin: thumbnailRef.current?.querySelector('img') ?? undefined,
-      },
-    });
-  }, [displayName, file.mimeType, file.size, gallery, imageUrl, index, onShowPopup]);
-
-  if (!imageUrl) {
-    // Fallback to text-only for server images without preview
-    return (
-      <button
-        type="button"
-        className="flex items-center gap-1.5 text-sm hover:opacity-80 transition-opacity text-start h-auto min-h-5 py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
-      >
-        <FileTypeIcon filePath={file.filename} extension={extension} className="h-4 w-4" />
-        <span className="text-foreground truncate max-w-[200px]">
-          {displayName}
-        </span>
-        <span
-          onClick={(e) => {
-            e.stopPropagation();
-            onRemove();
-          }}
-          className="flex items-center justify-center h-5 w-5 flex-shrink-0 hover:bg-[var(--interactive-hover)] rounded-full transition-colors cursor-pointer"
-          aria-label={t('chat.fileAttachment.actions.removeNamed', { name: displayName })}
-        >
-          <Icon name="close" className="h-4 w-4 text-muted-foreground" />
-        </span>
-      </button>
-    );
-  }
-
-  return (
-    <div
-      ref={thumbnailRef}
-      role={onShowPopup ? 'button' : undefined}
-      tabIndex={onShowPopup ? 0 : undefined}
-      onClick={handleOpenPreview}
-      onKeyDown={(event) => {
-        if (!onShowPopup) return;
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          handleOpenPreview();
-        }
-      }}
-      className="relative h-16 w-16 rounded-lg border border-edge bg-background overflow-hidden flex-shrink-0 cursor-zoom-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      aria-label={displayName}
-    >
-      <StatusImage
-        src={imageUrl}
-        alt={displayName}
-        variant="thumbnail"
-        className="h-full w-full"
-        imgClassName="h-full w-full object-cover"
-        lazy
-      />
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            onClick={(event) => {
-              event.stopPropagation();
-              onRemove();
-            }}
-            className="absolute top-1 inset-e-1 h-5 w-5 rounded-md bg-background/80 text-foreground hover:bg-background flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            // Inline: the mobile stylesheet floors every button at 36px, which
-            // would swallow a 64px thumbnail; the thumbnail itself is the target.
-            style={{ width: 20, height: 20, minWidth: 0, minHeight: 0 }}
-            aria-label={t('chat.fileAttachment.actions.removeNamed', { name: displayName })}
-          >
-            <Icon name="close" className="h-3.5 w-3.5" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="top" sideOffset={6}>{t('chat.fileAttachment.actions.removeImage')}</TooltipContent>
-      </Tooltip>
-    </div>
-  );
-});
-
-ImagePreview.displayName = 'ImagePreview';
-
-const useFileDetails = (file: AttachedFile) => {
-  const getFileExtension = (filename: string): string => {
-    const parts = filename.split('.');
-    return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : '';
-  };
-
-  const extractFilename = (path: string): string => {
-    const normalized = path.replace(/\\/g, '/');
-    const parts = normalized.split('/');
-    const filename = parts[parts.length - 1];
-    return filename || path;
-  };
-
-  return {
-    displayName: extractFilename(file.filename),
-    fileSize: formatFileSize(file.size),
-    extension: getFileExtension(file.filename),
-  };
-};
-
-interface FileChipProps {
-  file: AttachedFile;
-  onRemove: () => void;
-}
-
-const FileChip = memo(({ file, onRemove }: FileChipProps) => {
-  const { t } = useI18n();
-  const { displayName, fileSize, extension } = useFileDetails(file);
-
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        // Prevent click from bubbling if clicking the remove button
-        if ((e.target as HTMLElement).closest('[data-remove-button]')) {
-          return;
-        }
-      }}
-      className="inline-flex h-auto min-h-7 items-center gap-1.5 rounded-lg border border-edge bg-background ps-2 pe-1 text-xs text-foreground text-start hover:opacity-90 transition-opacity py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]"
-    >
-      <FileTypeIcon filePath={file.filename} extension={extension} className="h-4 w-4 flex-shrink-0" />
-      <span className="truncate max-w-[200px]" title={displayName}>{displayName}</span>
-      {fileSize && <span className="text-muted-foreground flex-shrink-0">{fileSize}</span>}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span
-            data-remove-button
-            onClick={(e) => {
-              e.stopPropagation();
-              onRemove();
-            }}
-            className="flex items-center justify-center h-5 w-5 flex-shrink-0 hover:bg-[var(--interactive-hover)] rounded-md transition-colors cursor-pointer"
-            aria-label={t('chat.fileAttachment.actions.removeNamed', { name: displayName })}
-          >
-            <Icon name="close" className="h-3.5 w-3.5 text-muted-foreground" />
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="top" sideOffset={6}>{t('chat.fileAttachment.actions.removeNamed', { name: displayName })}</TooltipContent>
-      </Tooltip>
-    </button>
-  );
-});
-
-FileChip.displayName = 'FileChip';
-
-const VSCodeFileChip = memo(({ file, onRemove }: FileChipProps) => {
-  const { t } = useI18n();
-  const { displayName, extension } = useFileDetails(file);
-
-  // Detect selection-style attachments: ends with ":N" or ":N-M"
-  const isSelectionAttachment = /:\d+(?:-\d+)?$/.test(displayName);
-
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        // Prevent click from bubbling if clicking the remove button
-        if ((e.target as HTMLElement).closest('[data-remove-button]')) {
-          return;
-        }
-      }}
-      className="inline-flex items-center gap-1 text-xs pe-1 rounded-sm border border-solid bg-transparent text-foreground not-italic hover:opacity-90 transition-colors text-start"
-      style={{ borderColor: 'var(--interactive-border)' }}
-    >
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span
-            data-remove-button
-            onClick={(e) => {
-              e.stopPropagation();
-              onRemove();
-            }}
-            className="flex items-center justify-center h-5 w-5 flex-shrink-0 hover:bg-[var(--interactive-hover)] rounded-full transition-colors cursor-pointer"
-            aria-label={t('chat.fileAttachment.activeEditor.remove')}
-          >
-            <Icon name="close" className="h-4 w-4 text-muted-foreground" />
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="top" sideOffset={6}>{t('chat.fileAttachment.activeEditor.remove')}</TooltipContent>
-      </Tooltip>
-        <FileTypeIcon filePath={file.filename} extension={extension} className="h-4 w-4" />
-        <span className={cn('text-foreground', isSelectionAttachment ? 'whitespace-nowrap' : 'truncate max-w-[200px]')} title={file.vscodePath}>
-          {displayName}
-        </span>
-    </button>
-  );
-});
-
-VSCodeFileChip.displayName = 'VSCodeFileChip';
-
 interface AttachedFilesListProps {
   onShowPopup?: (content: ToolPopupContent) => void;
   className?: string;
@@ -381,91 +142,37 @@ interface AttachedFilesListProps {
   draftIdentity?: ChatDraftIdentity | null;
 }
 
-export const AttachedVSCodeFileChips = memo(({ onShowPopup, draftIdentity }: AttachedFilesListProps) => {
-  const attachedFiles = useDraftAttachedFiles(draftIdentity);
+const ComposerAttachments = ({ files, onShowPopup, className }: {
+  files: AttachedFile[];
+  onShowPopup?: (content: ToolPopupContent) => void;
+  className?: string;
+}) => {
   const removeAttachedFile = useInputStore((state) => state.removeAttachedFile);
-
-  const vscodeFiles = attachedFiles.filter((file) => file.source === 'vscode');
-
-  if (vscodeFiles.length === 0) return null;
-
-  const images = vscodeFiles.filter((f) => f.mimeType.startsWith('image/'));
-  const otherFiles = vscodeFiles.filter((f) => !f.mimeType.startsWith('image/'));
-  const imageGallery = images.map((file) => ({
-    url: file.dataUrl || file.serverPath || '',
-    mimeType: file.mimeType,
-    filename: file.filename,
-    size: file.size,
-  })).filter((image) => image.url);
-
+  const documents = new Set<string>();
+  const visible = files.filter((file) => {
+    if (!file.sourceDocumentId) return true;
+    if (documents.has(file.sourceDocumentId)) return false;
+    documents.add(file.sourceDocumentId);
+    return true;
+  });
+  const images = visible.filter((file) => file.mimeType.startsWith('image/'));
+  const gallery = images.map((file) => ({ url: file.dataUrl || file.serverPath || '', mimeType: file.mimeType, filename: file.filename, size: file.size }));
+  if (files.length === 0) return null;
   return (
-    <div className="flex items-center gap-2 flex-wrap">
-      {images.map((file, index) => (
-        <ImagePreview key={file.id} file={file} onRemove={() => removeAttachedFile(file.id)} onShowPopup={onShowPopup} gallery={imageGallery} index={index} />
-      ))}
-      {otherFiles.map((file) => (
-        <VSCodeFileChip key={file.id} file={file} onRemove={() => removeAttachedFile(file.id)} />
-      ))}
+    <div className={cn('flex w-full min-w-0 gap-2 overflow-x-auto pb-1', className)}>
+      {visible.map((file) => <ComposerAttachmentCard key={file.id} file={file} onRemove={() => removeAttachedFile(file.id)} onShowPopup={onShowPopup} gallery={gallery} index={images.indexOf(file)} />)}
     </div>
   );
-});
+};
 
+export const AttachedVSCodeFileChips = memo(({ onShowPopup, draftIdentity }: AttachedFilesListProps) => (
+  <ComposerAttachments files={useDraftAttachedFiles(draftIdentity).filter((file) => file.source === 'vscode')} onShowPopup={onShowPopup} />
+));
 AttachedVSCodeFileChips.displayName = 'AttachedVSCodeFileChips';
 
-export const AttachedFilesList = memo(({ onShowPopup, className, draftIdentity }: AttachedFilesListProps) => {
-  const attachedFiles = useDraftAttachedFiles(draftIdentity);
-  const removeAttachedFile = useInputStore((state) => state.removeAttachedFile);
-
-  // An @-mention a failed send put back is shown by its mention in the text,
-  // which decides whether it goes.
-  const files = attachedFiles.filter((file) => file.source !== 'vscode'
-    && !file.id.startsWith(INLINE_SERVER_ATTACHMENT_ID_PREFIX));
-
-  if (files.length === 0) return null;
-
-  const images = files.filter((f) => f.mimeType.startsWith('image/'));
-  const otherFiles = files.filter((f) => !f.mimeType.startsWith('image/'));
-  const imageGallery = images.map((file) => ({
-    url: file.dataUrl || file.serverPath || '',
-    mimeType: file.mimeType,
-    filename: file.filename,
-    size: file.size,
-  })).filter((image) => image.url);
-
-  return (
-    <div className={cn('w-full space-y-2', className)}>
-      {/* Images row - inline with previews */}
-      {images.length > 0 && (
-        <div className="flex items-center gap-2 flex-wrap">
-          {images.map((file, index) => (
-            <ImagePreview
-              key={file.id}
-              file={file}
-              onRemove={() => removeAttachedFile(file.id)}
-              onShowPopup={onShowPopup}
-              gallery={imageGallery}
-              index={index}
-            />
-          ))}
-        </div>
-      )}
-      
-      {/* Other files row - inline text-only */}
-      {otherFiles.length > 0 && (
-        <div className="flex items-center gap-2 flex-wrap">
-          {otherFiles.map((file) => (
-            <FileChip
-              key={file.id}
-              file={file}
-              onRemove={() => removeAttachedFile(file.id)}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-});
-
+export const AttachedFilesList = memo(({ onShowPopup, className, draftIdentity }: AttachedFilesListProps) => (
+  <ComposerAttachments files={useDraftAttachedFiles(draftIdentity).filter((file) => file.source !== 'vscode' && !file.id.startsWith(INLINE_SERVER_ATTACHMENT_ID_PREFIX))} onShowPopup={onShowPopup} className={className} />
+));
 AttachedFilesList.displayName = 'AttachedFilesList';
 
 export const ActiveEditorFileSuggestion = memo(() => {

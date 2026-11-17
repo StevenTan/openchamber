@@ -633,6 +633,16 @@ export const canRequestNativeDirectoryAccess = (): boolean => (
   isDesktopShell() && hasDesktopInvoke() && isDesktopLocalOriginActive()
 );
 
+export const createDesktopFileThumbnailsAPI = (): RuntimeAPIs['fileThumbnails'] => {
+  if (!getDesktopBridge()?.invoke || !['darwin', 'win32'].includes(getElectronPlatform() ?? '')) return undefined;
+  return {
+    read: async (path) => {
+      if (!canRequestNativeDirectoryAccess()) return null;
+      return z.string().startsWith('data:image/').nullable().parse(await invokeDesktop('desktop_get_file_thumbnail', { path }));
+    },
+  };
+};
+
 const pendingSessionLinksSchema = z.array(z.object({
   sessionId: z.string().min(1),
   messageId: z.string().min(1).optional(),

@@ -29,6 +29,7 @@ import { useSessionDisplayStore } from "@/stores/useSessionDisplayStore"
 import { syncSessionKnowledge } from "@/lib/sessionKnowledgeApi"
 import { fetchResponseStyleInstruction } from "@/lib/responseStyle"
 import { attachmentWireName } from "@/lib/attachmentIdentity"
+import { prepareAttachmentInputs } from './attachment-delivery'
 import { useGlobalSessionsStore, resolveGlobalSessionDirectory } from "@/stores/useGlobalSessionsStore"
 import { isDirectoryUnknown, useDirectoryStore } from "@/stores/useDirectoryStore"
 import { useSessionFoldersStore } from "@/stores/useSessionFoldersStore"
@@ -196,6 +197,7 @@ export async function routeMessage(params: {
    */
   markBusy?: boolean
 }): Promise<'command' | 'prompt' | 'shell'> {
+  const attachmentRuntimeKey = params.runtimeKey ?? getRuntimeKey()
   const assertRuntimeCurrent = () => {
     if (params.runtimeKey !== undefined && params.runtimeKey !== getRuntimeKey()) {
       throw new Error("Message was not sent because the runtime changed.")
@@ -313,7 +315,7 @@ export async function routeMessage(params: {
         agent: selection.agent,
         command: cmdName,
         arguments: tail.join(" "),
-        files: sendFiles,
+        files: await prepareAttachmentInputs(sendFiles, useConfigStore.getState().getModelMetadata(params.providerID, params.modelID)?.modalities?.input, sendDirectory(), attachmentRuntimeKey),
         context: commandContext.length > 0 ? commandContext : undefined,
         delivery: params.delivery,
         directory: sendDirectory(),
@@ -355,7 +357,7 @@ export async function routeMessage(params: {
         agent: selection.agent,
         text: params.content,
         agentMentions: params.agentMentionName ? [{ name: params.agentMentionName }] : undefined,
-        files: sendFiles,
+        files: await prepareAttachmentInputs(sendFiles, useConfigStore.getState().getModelMetadata(params.providerID, params.modelID)?.modalities?.input, sendDirectory(), attachmentRuntimeKey),
         context: context.length > 0 ? context : undefined,
         delivery: params.delivery,
         messageId: messageID,

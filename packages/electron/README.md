@@ -129,6 +129,8 @@ PDF iframes also start with an opaque origin under the packaged UI protocol. The
 
 The preload bridge exposes desktop-only APIs to the web UI through `window.__OPENCHAMBER_DESKTOP__`. Privileged commands are checked in `main.mjs`, not only in the UI.
 
+Composer document cards obtain macOS and Windows thumbnails through the local-page-gated `desktop_get_file_thumbnail` command and Electron's `nativeImage.createThumbnailFromPath`. The shared runtime exposes this optional capability as `fileThumbnails`; remote OpenCode hosts do not resolve their paths against the desktop filesystem. Other runtimes render PDF thumbnails with the shared PDF.js viewer and use file-type icons for other documents.
+
 Confirmed chat application links use the local-page-gated `desktop_open_external_url`
 command and the OS protocol handler. `external-url-policy.mjs` validates schemes
 again in main, with the same exclusions as the shared UI classifier. Native

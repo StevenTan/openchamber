@@ -1,4 +1,4 @@
-import { getUnsupportedAttachmentInputs, HeicConversionError, prepareAttachmentFile } from '@/sync/attachment-files';
+import { HeicConversionError, prepareAttachmentFile } from '@/sync/attachment-files';
 
 interface ImageAttachmentCandidate {
     name: string;
@@ -177,65 +177,22 @@ export const buildAttachmentCitationText = (filenames: string[]): string => (
 );
 
 /**
- * Markdown links to images saved where OpenCode runs, so a model without image
- * input (or its subagent) can open them by path. A plain link: a draft that
- * starts with `!` switches the composer into shell mode, so `![name](path)`
- * cannot lead a message. Windows paths get forward slashes, which every
- * Windows tool accepts and markdown does not read as escapes; a path with
- * spaces or parentheses goes in angle brackets.
- */
-export const buildImagePathCitationText = (images: Array<{ filename: string; path: string }>): string => (
-    images.map(({ filename, path }) => {
-        const target = path.replace(/\\/g, '/');
-        return `[${filename}](${/[\s()]/.test(target) ? `<${target}>` : target})`;
-    }).join(' ')
-);
-
-/**
- * What the composer does with an image while the "save pasted images as files"
- * setting is on (`attach` while it is off). `instead`: a model without image
- * input gets the saved file linked by path and no attachment, which it could
- * not read (#5087). `alongside`: the model gets the attachment and the message
- * also links the saved file, for tools that need it (#5218). Unknown model
- * metadata counts as a model that takes the attachment.
- */
-export const imageSaveModeForModel = (
-    savePastedImagesAsFiles: boolean,
-    inputModalities: string[] | undefined,
-): 'instead' | 'alongside' | 'attach' => {
-    if (!savePastedImagesAsFiles) return 'attach';
-    if (inputModalities && getUnsupportedAttachmentInputs([{ mimeType: 'image/png' }], inputModalities).length > 0) {
-        return 'instead';
-    }
-    return 'alongside';
-};
-
-/**
- * The file the "save pasted images as files" setting writes for an image: what
- * its attachment would carry, or `null` when the image cannot be read. A HEIC
- * the bundled decoder cannot read (Apple's HDR gain-map photos) is written
- * unconverted under its own name and marked `linkOnly`: the agent opens it by
- * the link's path with its own tools, and it never attaches, because providers
- * refuse HEIC image parts.
+ * The bytes saved on the OpenCode host for an image attachment. An unreadable
+ * HEIC keeps its original bytes so the agent's tools can convert the saved file.
  */
 export const prepareImageToSave = async (
     file: File,
-): Promise<{ filename: string; bytes: Uint8Array; linkOnly: boolean } | null> => {
+): Promise<{ filename: string; bytes: Uint8Array } | null> => {
     try {
         const output = await prepareAttachmentFile(file);
         return output
-            ? { filename: output.file.name, bytes: new Uint8Array(await output.file.arrayBuffer()), linkOnly: false }
+            ? { filename: output.file.name, bytes: new Uint8Array(await output.file.arrayBuffer()) }
             : null;
     } catch (error) {
         if (!(error instanceof HeicConversionError)) return null;
-        return { filename: file.name, bytes: new Uint8Array(await file.arrayBuffer()), linkOnly: true };
+        return { filename: file.name, bytes: new Uint8Array(await file.arrayBuffer()) };
     }
 };
-
-/** Names of the markdown links already in the text, so a new paste picks a free one. */
-export const findImagePathCitationNames = (text: string): string[] => (
-    Array.from(text.matchAll(/\[([^\]\n]+)\]\(/g), (match) => match[1])
-);
 
 export const findAttachmentCitationRanges = (text: string, filenames: string[]): CitationRange[] => {
     if (!text || !text.includes('[') || filenames.length === 0) {

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import { createRuntimeOpencodeClient, opencodeClient } from "./client"
 import { configureRuntimeUrlResolver, getRuntimeUrlResolver, setRuntimeUrlResolver } from "../runtime-url"
+import * as runtimeSwitch from "../runtime-switch"
 
 const previous = getRuntimeUrlResolver()
 beforeEach(() => {
@@ -230,6 +231,24 @@ describe("v2 status and cancellation HTTP boundary", () => {
       ])
     } finally {
       fetch.mockRestore()
+    }
+  })
+
+  test("a runtime switch during the temp-folder lookup stops all file writes", async () => {
+    const runtime = spyOn(runtimeSwitch, 'getRuntimeKey')
+    runtime.mockReturnValue('runtime-a')
+    const paths: string[] = []
+    const fetch = spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      paths.push(new URL(input instanceof Request ? input.url : input.toString()).pathname)
+      runtime.mockReturnValue('runtime-b')
+      return Response.json({ version: '2.2.7', pid: 1, urls: [], paths: { tmp: '/tmp/opencode' } })
+    })
+    try {
+      await expect(opencodeClient.writeOpenCodeTempFiles('/repo', [{ filename: 'photo.png', bytes: new Uint8Array([1]) }], 'runtime-a')).rejects.toThrow()
+      expect(paths).toEqual(['/api/info'])
+    } finally {
+      fetch.mockRestore()
+      runtime.mockRestore()
     }
   })
 

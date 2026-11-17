@@ -438,42 +438,22 @@ comment mode").
 | `largeTextPasteOffer.ts` | Large-paste choice offer id begin/resolve (supersede + double-apply guards) |
 
 `ChatInput.handlePaste` owns paste orchestration: URL-over-selection markdown
-links, clipboard files, and large plain-text pastes. Pasted and dropped files
-share `attachFilesWithCitation`: every file attaches and is cited in the draft
-as `[name]`; images get a generated unique name first, other files keep their
-own name and are cited only after they attached. A copied file's filename text
-is suppressed so only the citation lands in the draft.
+links, clipboard files, and large plain-text pastes. Pasted, dropped and picked files share `attachFiles` and appear in the attachment cards outside the editable text. File names and paths stay in attachment metadata. Clipboard text that merely names its files is suppressed; other pasted text remains editable.
 An Android image paste arrives from the input method rather than from a paste event, because
 a WebView declares no content types on its `EditorInfo` and the IME refuses the paste before
 the page can hear about it. The Capacitor Android shell declares image content on the editor
 it exposes and sends what the IME commits to `lib/nativeImagePaste.ts`, which hands the
 composer the same file a pasted image would be, and the composer runs it through
-`attachFilesWithCitation` like any other. The declaration belongs to the composer alone: the
+`attachFiles` like any other. The declaration belongs to the composer alone: the
 WebView is one input connection for every editable element in the app, so the composer
 reports its focus to the shell and drops the declaration on blur, and the shell asks the IME
 to read the declaration again when the composer takes focus, since the IME reads it when an
 element takes focus and that can be before the report arrives. The paste handler re-checks
 focus as a backstop for that window. Every other runtime pastes images through `handlePaste` unchanged, and an IME
 without content insertion keeps refusing.
-With the profile setting `savePastedImagesAsFiles` on, pasted, dropped and
-picked images (`attachFilesWithCitation`, `attachFiles`) are written into a new
-folder under OpenCode's own temp folder (`opencodeClient.writeOpenCodeTempFiles`:
-`GET /api/info` names the folder, `POST /api/experimental/fs/write` writes it)
-and cited as `[name](absolute path)` (a plain link: a draft starting with `!`
-turns into a shell command), so the model, a subagent or a tool reads the file
-by path; OpenCode's agents may read that folder without asking.
-`imageSaveModeForModel` picks one of three cases. A model whose metadata lists
-no `image` input gets only the link, since it could not read the attachment
-(#5087), and the modality toast says where the images went. Any other model,
-unknown metadata included, also gets the image attached under the link's name,
-with no second `[name]` citation (#5218). An image that could not be saved
-attaches as before, with an error toast. A HEIC the bundled decoder cannot read
-(Apple's HDR gain-map photos) is saved unconverted under its own name and gets
-only its link in both cases: providers refuse HEIC image parts, and the store's
-own fallback for it (`sync/DOCUMENTATION.md`) would write a second copy and add
-a chip that repeats the link. With the setting off nothing is
-saved. One setting covers both cases: a split by model kind read as a puzzle of
-exceptions in Settings, and nobody needs the files for one kind of model only.
+With `savePastedImagesAsFiles` on, image bytes are written into OpenCode's temp folder and the returned path travels as `agentPath` alongside the image. The bytes and path belong to the active OpenCode host. Ordinary files, including PDF and Office documents, reach the model as tool-readable path notes. Supported images retain native input. A failed save or attachment leaves the other files available.
+
+`ComposerAttachmentCard` owns the shared card layout. Images use their bytes. The local desktop can request an operating-system thumbnail for a document; PDF.js renders a PDF's first page on runtimes without that thumbnail. Other files show their type icon. Preview failures leave opening and sending available. Preview bytes are independent of the model payload. HAR and notebook normalization keeps its redaction and omission rules before delivery saves their prepared content for tools.
 The browser annotation screenshot and comment-field image pastes keep
 attaching. The bytes go through the active runtime's OpenCode route (the
 OpenChamber server's proxy, the VS Code bridge, the relay for a phone), so the

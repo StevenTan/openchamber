@@ -180,9 +180,6 @@ import { eventMatchesShortcut, getEffectiveShortcutCombo, normalizeCombo, shortc
 import {
     assignImageAttachmentFilenames,
     buildAttachmentCitationText,
-    buildImagePathCitationText,
-    findImagePathCitationNames,
-    imageSaveModeForModel,
     nextPastedContextFilename,
     prepareImageToSave,
     renameFileForAttachmentCitation,
@@ -224,7 +221,6 @@ import { composerAutoCorrect } from './composer/editor/autocorrect';
 import {
     appendInlineText,
     appendWithLineBreaks,
-    buildImagePasteInsertion,
     getMarkdownAutoPairEdit,
     getOrderedListContinuationEdit,
     shouldWrapSelectionAsLink,
@@ -959,7 +955,8 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
 
         if (!inputModalities || filesToCheck.length === 0) return;
 
-        const incompatibleFiles = getUnsupportedAttachmentInputs(filesToCheck, inputModalities);
+        const incompatibleFiles = getUnsupportedAttachmentInputs(filesToCheck, inputModalities)
+            .filter(({ modality }) => modality !== 'image' && modality !== 'pdf');
         if (incompatibleFiles.length === 0) return;
 
         const unsupportedModalities = Array.from(new Set(incompatibleFiles.map(({ modality }) => modality)));
@@ -1342,8 +1339,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         | { status: 'runtime-changed' };
 
     /**
-     * Document and image mentions (`@notes.docx`, `@shot.png`) are sent as
-     * converted attachments with their real type, like a picked file. Their
+     * Image mentions (`@shot.png`) are sent as native image attachments. Their
      * sources are fetched up front — by the send, or by queueing, since the
      * server that later delivers a queued message cannot read them.
      */
@@ -3485,14 +3481,14 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         };
     }, [clearDropTextSuppression, clearFileMentionPasteSuppression]);
 
-    const insertCitationAtSelection = React.useCallback((citationText: string, leadingText: string) => {
-        if (!citationText && !leadingText) return;
+    const insertPastedText = React.useCallback((text: string) => {
+        if (!text) return;
         const editor = composerRef.current;
         const currentMessage = editor?.getValue() ?? messageRef.current;
         const selectionStart = editor?.getSelection().start ?? currentMessage.length;
         const selectionEnd = editor?.getSelection().end ?? currentMessage.length;
         const insertionText = withInlineInsertionBoundaries(
-            buildImagePasteInsertion(leadingText, citationText),
+            text,
             currentMessage.slice(0, selectionStart),
             currentMessage.slice(selectionEnd),
         );
@@ -3500,189 +3496,62 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     }, [insertTextAtSelection]);
 
     const savePastedImagesAsFiles = useUIStore((state) => state.savePastedImagesAsFiles);
-    const imageSaveMode = imageSaveModeForModel(savePastedImagesAsFiles, currentModelMetadata?.modalities?.input);
-    const currentModelName = currentModelMetadata?.name ?? currentModelId ?? '';
-    const currentModelKey = `${currentProviderId ?? ''}/${currentModelId ?? ''}`;
-
-    /**
-     * Saves the images where OpenCode runs and cites each saved one in the
-     * draft as `[name](path)`, so the model, a subagent or a tool opens it by
-     * path: in place of the attachment for a model that takes no images
-     * (#5087), next to it for one that does (#5218). Each image gets a name no
-     * attachment or link in the draft uses yet. Answers both groups under
-     * those names; the caller attaches the unsaved ones as before, and in
-     * `alongside` the `attachable` saved ones too. A HEIC saved unconverted
-     * gets only its link (`prepareImageToSave`).
-     */
-    const saveImagesWithPathCitation = React.useCallback(async (
-        files: File[],
-        leadingText: string,
-        reservedNames: string[],
-        mode: 'instead' | 'alongside',
-    ): Promise<{ saved: File[]; attachable: File[]; unsaved: File[] }> => {
-        const attachmentDraftKey = useInputStore.getState().attachmentDraftKey;
-        const names = assignImageAttachmentFilenames(files, [
-            ...reservedNames,
-            ...findImagePathCitationNames(composerRef.current?.getValue() ?? messageRef.current),
-        ]);
-        const images = files.map((file, index) => renameFileForAttachmentCitation(file, names[index]));
-        // A cold or remote OpenCode can take seconds; this toast says what is going on.
-        const savingToastId = toast.loading(t('chat.chatInput.toast.imagesSaving', { files: images.map((file) => file.name).join(', ') }));
-        const prepared = await Promise.all(images.map((file) => prepareImageToSave(file).catch(() => null)));
-        const readable = prepared.filter((entry) => entry !== null);
-        let results: Awaited<ReturnType<typeof opencodeClient.writeOpenCodeTempFiles>>;
-        try {
-            results = readable.length > 0
-                ? await opencodeClient.writeOpenCodeTempFiles(currentDirectory, readable.map(({ filename, bytes }) => ({ filename, bytes })))
-                : [];
-        } catch (error) {
-            results = readable.map(({ filename }) => ({ filename, error: error instanceof Error ? error : new Error(String(error)) }));
-        }
-        toast.dismiss(savingToastId);
-        if (useInputStore.getState().attachmentDraftKey !== attachmentDraftKey) return { saved: [], attachable: [], unsaved: [] };
-
-        const saved = results.flatMap((result) => 'path' in result ? [result] : []);
-        const savedNames = new Set(saved.map((result) => result.filename));
-        const isSaved = (index: number) => {
-            const entry = prepared[index];
-            return Boolean(entry && savedNames.has(entry.filename));
-        };
-        const unsaved = images.filter((_file, index) => !isSaved(index));
-        if (results.some((result) => 'error' in result)) {
-            // The error text can carry the path; the name says what failed.
-            console.warn('[chat] Saving an image failed', results.flatMap((result) => 'error' in result ? [result.error.name] : []));
-        }
-
-        if (saved.length > 0) {
-            insertCitationAtSelection(buildImagePathCitationText(saved), leadingText);
-            const firstPath = saved[0].path.replace(/\\/g, '/');
-            const savedFiles = saved.map((result) => result.filename).join(', ');
-            const folder = firstPath.slice(0, firstPath.lastIndexOf('/'));
-            if (mode === 'alongside') {
-                // One toast for a run of pastes; the newest names the latest folder.
-                toast.info(t('chat.chatInput.toast.imagesSaved', { files: savedFiles, folder }), { id: `images-saved:${currentModelKey}` });
-            } else {
-                // When some failed, the modality warning for those (attached next)
-                // takes the shared id, so this toast keeps its own.
-                toast.info(t('chat.chatInput.toast.imagesSavedForTextModel', {
-                    model: currentModelName,
-                    files: savedFiles,
-                    folder,
-                }), unsaved.length > 0 ? undefined : { id: `attachment-modalities:${currentModelKey}` });
-            }
-        }
-        if (unsaved.length > 0) {
-            const files = unsaved.map((file) => file.name).join(', ');
-            toast.error(mode === 'alongside'
-                ? t('chat.chatInput.toast.imageCopySaveFailed', { files })
-                : t('chat.chatInput.toast.imageSaveFailed', { files }));
-        }
-        return {
-            saved: images.filter((_file, index) => isSaved(index)),
-            attachable: images.filter((_file, index) => isSaved(index) && !prepared[index]?.linkOnly),
-            unsaved,
-        };
-    }, [currentDirectory, currentModelKey, currentModelName, insertCitationAtSelection, t]);
-
-    /**
-     * Attach files that arrived by paste or drop and cite each one in the
-     * draft as `[name]`, the same way pasted images are cited. Images get a
-     * generated unique name up front; other files keep their own name and are
-     * cited only once they attached, so a rejected file leaves no dangling
-     * citation.
-     */
-    const attachFilesWithCitation = React.useCallback(async (
-        files: File[],
+    const attachFiles = React.useCallback(async (
+        files: FileList | File[],
         leadingText: string = '',
+        renameImages: boolean = false,
     ): Promise<void> => {
-        const attachmentDraftKey = useInputStore.getState().attachmentDraftKey;
-        let imageFiles = files.filter((file) => file.type.startsWith('image/'));
-        const otherFiles = files.filter((file) => !file.type.startsWith('image/'));
-
-        const insertCitation = (filenames: string[], text: string) => {
-            insertCitationAtSelection(filenames.length > 0 ? buildAttachmentCitationText(filenames) : '', text);
-        };
-
-        // With the setting on, links to saved images keep their names too, so an
-        // attachment after a failed save never repeats one.
-        const usedNames = () => [
-            ...useInputStore.getState().attachedFiles.map((file) => file.filename),
-            ...pendingPastedAttachmentFilenamesRef.current,
-            ...(savePastedImagesAsFiles ? findImagePathCitationNames(composerRef.current?.getValue() ?? messageRef.current) : []),
-        ];
-
-        let savedAny = false;
-        let attached = false;
-        if (imageSaveMode !== 'attach' && imageFiles.length > 0) {
-            const { saved, attachable, unsaved } = await saveImagesWithPathCitation(imageFiles, leadingText, usedNames(), imageSaveMode);
-            if (useInputStore.getState().attachmentDraftKey !== attachmentDraftKey) return;
-            if (saved.length > 0) {
-                savedAny = true;
-                leadingText = '';
+        const draftKey = useInputStore.getState().attachmentDraftKey;
+        const runtimeKey = getRuntimeKey();
+        const ownsDraft = () => getRuntimeKey() === runtimeKey && useInputStore.getState().attachmentDraftKey === draftKey;
+        const reservedNames: string[] = [];
+        try {
+            let list = Array.from(files);
+            if (renameImages) {
+                const images = list.filter((file) => file.type.startsWith('image/'));
+                const names = assignImageAttachmentFilenames(images, [...useInputStore.getState().attachedFiles.map((file) => file.filename), ...pendingPastedAttachmentFilenamesRef.current]);
+                names.forEach((name) => { pendingPastedAttachmentFilenamesRef.current.add(name); reservedNames.push(name); });
+                const renamed = new Map(images.map((file, index) => [file, renameFileForAttachmentCitation(file, names[index])]));
+                list = list.map((file) => renamed.get(file) ?? file);
             }
-            if (imageSaveMode === 'alongside') {
-                // The links already name these, so they attach without a second citation.
-                for (const file of attachable) {
-                    try {
-                        attached = (await addAttachedFile(file)) || attached;
-                    } catch (error) {
-                        console.error('Clipboard image attach failed', error);
-                        toast.error(error instanceof Error ? error.message : t('chat.chatInput.toast.clipboardAttachFailed'));
+            const images = savePastedImagesAsFiles ? list.filter((file) => file.type.startsWith('image/')) : [];
+            const savedPaths = new Map<File, string>();
+            const saveErrors = new Set<File>();
+            if (images.length > 0) {
+                const toastId = toast.loading(t('chat.chatInput.toast.imagesSaving', { files: images.map((file) => file.name).join(', ') }));
+                try {
+                    const prepared = await Promise.all(images.map((file) => prepareImageToSave(file)));
+                    const readable = prepared.filter((file) => file !== null);
+                    if (!ownsDraft()) return;
+                    const saved = await opencodeClient.writeOpenCodeTempFiles(currentDirectory, readable.map(({ filename, bytes }) => ({ filename, bytes })), runtimeKey);
+                    for (let index = 0; index < images.length; index++) {
+                        const output = prepared[index];
+                        const result = output && saved.find((entry) => entry.filename === output.filename);
+                        if (result && 'path' in result) savedPaths.set(images[index], result.path);
+                        else saveErrors.add(images[index]);
                     }
-                    if (useInputStore.getState().attachmentDraftKey !== attachmentDraftKey) return;
+                } catch (error) {
+                    console.error('Saving pasted images failed', error);
+                    images.forEach((file) => saveErrors.add(file));
+                } finally {
+                    toast.dismiss(toastId);
                 }
             }
-            imageFiles = unsaved;
-        }
-
-        const assignedImageNames = assignImageAttachmentFilenames(imageFiles, usedNames());
-        // Pending before the text lands, so the editor draws the citation as a
-        // chip in the same transaction that inserts it.
-        for (const filename of assignedImageNames) pendingPastedAttachmentFilenamesRef.current.add(filename);
-        insertCitation(assignedImageNames, leadingText);
-
-        for (let index = 0; index < imageFiles.length; index += 1) {
-            const filename = assignedImageNames[index];
-            const file = renameFileForAttachmentCitation(imageFiles[index], filename);
-            try {
-                attached = (await addAttachedFile(file)) || attached;
-            } catch (error) {
-                console.error('Clipboard image attach failed', error);
-                toast.error(error instanceof Error ? error.message : t('chat.chatInput.toast.clipboardAttachFailed'));
-            } finally {
-                pendingPastedAttachmentFilenamesRef.current.delete(filename);
-            }
-            if (useInputStore.getState().attachmentDraftKey !== attachmentDraftKey) {
-                // The draft changed under the paste: the rest never attach here.
-                for (const rest of assignedImageNames.slice(index + 1)) pendingPastedAttachmentFilenamesRef.current.delete(rest);
-                return;
-            }
-        }
-
-        const attachedOtherNames: string[] = [];
-        let reported = false;
-        for (const file of otherFiles) {
-            try {
-                if (await addAttachedFile(file)) {
-                    attached = true;
-                    attachedOtherNames.push(file.name);
+            if (!ownsDraft()) return;
+            if (saveErrors.size > 0) toast.error(t('chat.chatInput.toast.imageSaveFailed', { files: [...saveErrors].map((file) => file.name).join(', ') }));
+            insertPastedText(leadingText);
+            for (const file of list) {
+                try {
+                    if (!await addAttachedFile(file, chatDraftIdentity, savedPaths.get(file))) throw new Error(t('chat.chatInput.toast.attachFileFailed'));
+                } catch (error) {
+                    toast.error(error instanceof Error ? error.message : t('chat.chatInput.toast.attachFileFailed'));
                 }
-            } catch (error) {
-                console.error('File attach failed', error);
-                // The store names the cause (a file too large to attach).
-                if (error instanceof Error) {
-                    toast.error(error.message);
-                    reported = true;
-                }
+                if (!ownsDraft()) return;
             }
-            if (useInputStore.getState().attachmentDraftKey !== attachmentDraftKey) return;
+        } finally {
+            reservedNames.forEach((name) => pendingPastedAttachmentFilenamesRef.current.delete(name));
         }
-        insertCitation(attachedOtherNames, '');
-
-        if (files.length > 0 && !attached && !savedAny && !reported) {
-            toast.error(t('chat.chatInput.toast.attachFileFailed'));
-        }
-    }, [addAttachedFile, imageSaveMode, insertCitationAtSelection, savePastedImagesAsFiles, saveImagesWithPathCitation, t]);
+    }, [addAttachedFile, chatDraftIdentity, currentDirectory, insertPastedText, savePastedImagesAsFiles, t]);
 
     const handlePaste = React.useCallback(async (event: ClipboardEvent) => {
         const clipboardData = event.clipboardData;
@@ -3726,8 +3595,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             }
         }
 
-        // Images get a citation and a generated name; every other clipboard
-        // file (Finder/Explorer copy, a saved document) attaches as picked.
+        // Clipboard images receive distinct names; copied files keep their names.
         const imageMap = new Map<string, File>();
         const otherFileMap = new Map<string, File>();
         const collectClipboardFile = (file: File) => {
@@ -3762,7 +3630,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             // A copied file also carries its name as text; keep it out of the draft.
             e.preventDefault();
             if (!sessionReady) return;
-            await attachFilesWithCitation(otherFiles);
+            await attachFiles(otherFiles);
             return;
         }
 
@@ -3914,8 +3782,8 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         }
 
         e.preventDefault();
-        await attachFilesWithCitation([...imageFiles, ...otherFiles], pastedText);
-    }, [addAttachedFile, attachFilesWithCitation, currentSessionId, inputMode, largeTextPasteBehavior, largeTextPasteGesture, readLargeTextPasteSnapshot, markFileMentionPasteSuppression, message, mobileShell, newSessionDraftOpen, insertTextAtSelection, setMessage, t, updateAutocompleteState, resolveSessionLinks, sessionLinkOrigins, pastedSessionIds, isBtwActive, readPastedReferenceLinks]);
+        await attachFiles([...imageFiles, ...otherFiles], pastedText, true);
+    }, [addAttachedFile, attachFiles, currentSessionId, inputMode, largeTextPasteBehavior, largeTextPasteGesture, readLargeTextPasteSnapshot, markFileMentionPasteSuppression, message, mobileShell, newSessionDraftOpen, insertTextAtSelection, setMessage, t, updateAutocompleteState, resolveSessionLinks, sessionLinkOrigins, pastedSessionIds, isBtwActive, readPastedReferenceLinks]);
 
     // Android commits an image through the IME instead of the page (see nativeImagePaste).
     React.useEffect(() => {
@@ -3934,8 +3802,8 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             return;
         }
         if (!currentSessionId && !newSessionDraftOpen) return;
-        void attachFilesWithCitation([paste.file]);
-    }), [attachFilesWithCitation, currentSessionId, mobileShell.focused, newSessionDraftOpen, t]);
+        void attachFiles([paste.file], '', true);
+    }), [attachFiles, currentSessionId, mobileShell.focused, newSessionDraftOpen, t]);
 
     const completeMentionSelection = useStableHandler((name: string) => {
         const editor = composerRef.current;
@@ -4282,7 +4150,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         }
 
         if (files.length > 0) {
-            await attachFilesWithCitation(files);
+            await attachFiles(files, '', true);
         }
         clearDropTextSuppression();
     };
@@ -4300,50 +4168,6 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     };
 
     const fileInputRef = React.useRef<HTMLInputElement>(null);
-
-    const attachFiles = React.useCallback(async (files: FileList | File[]) => {
-        const attachmentDraftKey = useInputStore.getState().attachmentDraftKey;
-        let list = Array.isArray(files) ? files : Array.from(files);
-        let attached = false;
-
-        const images = list.filter((file) => file.type.startsWith('image/'));
-        if (imageSaveMode !== 'attach' && images.length > 0) {
-            const { saved, attachable, unsaved } = await saveImagesWithPathCitation(
-                images,
-                '',
-                useInputStore.getState().attachedFiles.map((file) => file.filename),
-                imageSaveMode,
-            );
-            if (useInputStore.getState().attachmentDraftKey !== attachmentDraftKey) return;
-            const others = list.filter((file) => !file.type.startsWith('image/'));
-            if (imageSaveMode === 'alongside') {
-                // A HEIC saved unconverted gets only its link, which counts as attached.
-                attached = saved.length > attachable.length;
-                list = [...others, ...attachable, ...unsaved];
-            } else {
-                attached = saved.length > 0;
-                list = [...others, ...unsaved];
-            }
-        }
-
-        let reported = false;
-        for (const file of list) {
-            try {
-                attached = (await addAttachedFile(file)) || attached;
-            } catch (error) {
-                console.error('File attach failed', error);
-                // The store names the cause (a file too large to attach).
-                if (error instanceof Error) {
-                    toast.error(error.message);
-                    reported = true;
-                }
-            }
-            if (useInputStore.getState().attachmentDraftKey !== attachmentDraftKey) return;
-        }
-        if (list.length > 0 && !attached && !reported) {
-            toast.error(t('chat.chatInput.toast.attachFileFailed'));
-        }
-    }, [addAttachedFile, imageSaveMode, saveImagesWithPathCitation, t]);
 
     const handleVSCodePickFiles = React.useCallback(async () => {
         try {

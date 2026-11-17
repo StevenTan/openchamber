@@ -39,6 +39,8 @@ const createOpenCode = () => {
     children: {},
     tail: [],
     commands: [],
+    models: [],
+    writes: [],
     sent: [],
     switched: [],
     failNext: null,
@@ -81,6 +83,13 @@ const createOpenCode = () => {
     }
     if (pathname.endsWith('/message')) return Response.json({ data: state.tail, cursor: {} });
     if (pathname === '/api/command') return wrapped(state.commands);
+    if (pathname === '/api/model') return wrapped(state.models);
+    if (pathname === '/api/info') return Response.json({ paths: { tmp: '/tmp/opencode' } });
+    if (pathname === '/api/experimental/fs/write') {
+      const target = new URL(url).searchParams.get('path');
+      state.writes.push({ path: target, bytes: Array.from(init.body) });
+      return wrapped({ path: target });
+    }
     if (method === 'POST' && (pathname.endsWith('/model') || pathname.endsWith('/agent'))) {
       // Kept apart from `sent`: switching the session is not a message.
       state.switched.push({ path: pathname, body: JSON.parse(init.body) });
@@ -1006,11 +1015,9 @@ describe('message queue runtime', () => {
       { text: 'conflict payload', resume: false },
       { text: 'use the skill', resume: false },
     ]);
-    expect(openCode.state.sent.at(-1).body).toEqual({
-      text: 'follow up',
-      files: [{ uri: 'data:text/plain,hi', name: 'f.txt' }],
-      agents: [{ name: 'reviewer' }],
-    });
+    expect(openCode.state.sent.at(-1).body).toMatchObject({ text: 'follow up', agents: [{ name: 'reviewer' }] });
+    expect(openCode.state.sent.at(-1).body.files[0].name).toBe(openCode.state.writes[0].path);
+    expect(await (await fetch(openCode.state.sent.at(-1).body.files[0].uri)).text()).toContain(openCode.state.writes[0].path);
   });
 
   // OpenCode's commit deletes everything admitted past the revert's boundary (#6244).
@@ -1145,12 +1152,10 @@ describe('message queue runtime', () => {
     emit({ type: 'session.status', properties: { sessionID: SESSION, status: { type: 'idle' } } });
     await vi.waitFor(() => {
       expect(openCode.state.sent[0].path).toBe(`/api/session/${SESSION}/command`);
-      expect(openCode.state.sent[0].body).toEqual({
-        name: 'review',
-        text: '',
-        files: [{ uri: 'data:text/plain,hi', name: 'f.txt' }],
-      });
+      expect(openCode.state.sent[0].body.name).toBe('review');
+      expect(openCode.state.sent[0].body.files[0].name).toBe(openCode.state.writes[0].path);
     });
+    expect(await (await fetch(openCode.state.sent[0].body.files[0].uri)).text()).toContain(openCode.state.writes[0].path);
   });
 
   it('hands the model an attachment\'s resolved on-disk path as its name', async () => {
@@ -1164,11 +1169,65 @@ describe('message queue runtime', () => {
     }));
     emit({ type: 'session.status', properties: { sessionID: SESSION, status: { type: 'idle' } } });
     await vi.waitFor(() => {
-      expect(openCode.state.sent.at(-1).body).toEqual({
-        text: 'follow up',
-        files: [{ uri: 'data:text/plain,hi', name: '/Users/me/Documents/report.txt' }],
-      });
+      expect(openCode.state.sent.at(-1).body.files[0].name).toBe('/Users/me/Documents/report.txt');
     });
+    expect(await (await fetch(openCode.state.sent.at(-1).body.files[0].uri)).text()).toContain('/Users/me/Documents/report.txt');
+  });
+
+  it('delivers supported images and tool-readable PDF paths for the captured model', async () => {
+    const { runtime, openCode } = createRuntime();
+    openCode.state.models = [{ providerID: 'anthropic', modelID: 'claude', capabilities: { input: ['text', 'image', 'pdf'] } }];
+    const image = { id: 'image', filename: 'photo.png', mimeType: 'image/png', size: 3, source: 'local', dataUrl: 'data:image/png;base64,AQID' };
+    const pdf = { id: 'pdf', filename: 'report.pdf', mimeType: 'application/pdf', size: 3, source: 'local', dataUrl: 'data:application/pdf;base64,AQID', agentPath: '/docs/report.pdf' };
+    await runtime.enqueue(SESSION, DIRECTORY, item({ attachments: [image, pdf] }));
+    await vi.waitFor(() => expect(openCode.state.sent).toHaveLength(1));
+    const files = openCode.state.sent[0].body.files;
+    expect(files[0]).toEqual({ uri: image.dataUrl, name: image.filename });
+    expect(files[1].name).toBe(pdf.agentPath);
+    expect(await (await fetch(files[1].uri)).text()).toContain('/docs/report.pdf');
+    expect(openCode.state.writes).toEqual([]);
+    const catalogCall = openCode.fetchImpl.mock.calls.find(([url]) => new URL(url).pathname === '/api/model');
+    expect(catalogCall[1].headers['x-opencode-directory']).toBe(encodeURIComponent(DIRECTORY));
+    runtime.stop();
+    await runtime.flush();
+  });
+
+  it('saves a pathless image on the OpenCode host for a routed text model', async () => {
+    const { runtime, openCode } = createRuntime({
+      resolveAutoSelection: async () => ({ model: { providerID: 'anthropic', id: 'claude' } }),
+    });
+    openCode.state.models = [{ providerID: 'anthropic', modelID: 'claude', capabilities: { input: ['text'] } }];
+    await runtime.enqueue(SESSION, DIRECTORY, item({
+      sendConfig: { providerID: 'openchamber', modelID: 'auto' },
+      attachments: [{ id: 'image', filename: 'photo.png', mimeType: 'image/png', size: 3, source: 'local', dataUrl: 'data:image/png;base64,AQID' }],
+    }));
+    await vi.waitFor(() => expect(openCode.state.sent).toHaveLength(1));
+    expect(openCode.state.writes).toHaveLength(1);
+    expect(openCode.state.writes[0].bytes).toEqual([1, 2, 3]);
+    const file = openCode.state.sent[0].body.files[0];
+    expect(file.name).toBe(openCode.state.writes[0].path);
+    expect(file.name).toMatch(/^\/tmp\/opencode\/openchamber\/[^/]+\/photo\.png$/);
+    expect(await (await fetch(file.uri)).text()).toContain(file.name);
+    runtime.stop();
+    await runtime.flush();
+  });
+
+  it('keeps the original attachment queued when its tool-readable copy cannot be saved', async () => {
+    const { runtime, openCode } = createRuntime();
+    openCode.state.models = [{ providerID: 'anthropic', modelID: 'claude', capabilities: { input: ['text'] } }];
+    openCode.state.failNext = /experimental\/fs\/write/;
+    const image = { id: 'image', filename: 'photo.png', mimeType: 'image/png', size: 3, source: 'local', dataUrl: 'data:image/png;base64,AQID' };
+    await runtime.enqueue(SESSION, DIRECTORY, item({ attachments: [image] }));
+    await vi.waitFor(() => {
+      expect(openCode.state.failNext).toBe(null);
+      expect(runtime.sessionSnapshot(SESSION).sendingId).toBe(null);
+    });
+    expect(openCode.state.sent).toEqual([]);
+    expect(runtime.sessionSnapshot(SESSION).items).toHaveLength(1);
+    const taken = await runtime.take(SESSION, runtime.sessionSnapshot(SESSION).items[0].id);
+    expect(taken.item.attachments[0]).toEqual(image);
+    runtime.stop();
+    await runtime.flush();
   });
 
   it('admits captured context as synthetic messages and still runs a queued command through the command route', async () => {

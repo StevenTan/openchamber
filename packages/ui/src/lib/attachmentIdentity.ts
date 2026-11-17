@@ -2,10 +2,13 @@ type AttachmentIdentity = {
   filename: string;
   /** The on-disk path, when the runtime could resolve one for the attachment. */
   agentPath?: string;
+  vscodeSource?: 'file' | 'selection';
 };
 
 export const attachmentWireName = (attachment: AttachmentIdentity): string =>
-  attachment.agentPath ?? attachment.filename;
+  attachment.agentPath ?? (attachment.vscodeSource === 'selection'
+    ? attachmentCopyName(attachment.filename)
+    : attachment.filename);
 
 /** Preserve literal backslashes in POSIX filenames. */
 export const attachmentBasename = (value: string): string => {
@@ -13,3 +16,8 @@ export const attachmentBasename = (value: string): string => {
   const segments = normalized.split('/');
   return segments[segments.length - 1] || value;
 };
+
+export const attachmentCopyName = (value: string): string => Array.from(
+  attachmentBasename(value),
+  (char) => char.charCodeAt(0) < 32 || '\\/:<>"|?*'.includes(char) ? '-' : char,
+).join('');

@@ -8,22 +8,21 @@ import type { AttachIssueRequest } from '@openchamber/sdk'
 import type { ContextPartMetadata } from '@/lib/messages/contextParts'
 import type { AttachedFile } from "@/stores/types/sessionTypes"
 import type { InlineCommentDraftTarget } from "@/stores/useInlineCommentDraftStore"
-import { HeicConversionError, prepareAttachmentFiles } from "./attachment-files"
+import { HeicConversionError, prepareAttachmentFiles, isDocumentAttachmentFilename } from "./attachment-files"
 import { getChatDraftIdentityKey, subscribeChatDraftDeletion, type ChatDraftIdentity } from "@/lib/chatDraftPersistence"
 import { pathForDroppedFile } from "@/lib/desktop"
 import { attachmentBasename } from "@/lib/attachmentIdentity"
 import { formatFileSize } from "@/lib/fileSize"
 import { formatMessage, useI18nStore } from "@/lib/i18n/store"
 import { opencodeClient } from "@/lib/opencode/client"
+import { getRuntimeKey } from "@/lib/runtime-switch"
 
 const FILE_URI_PREFIX = "file://"
-// Past this a file is not read into the prompt: base64 makes it a third
-// larger, and OpenCode hands the model every byte of an attachment.
+// Bounds bytes retained inline in drafts, including attachment previews.
 const MAX_INLINE_ATTACHMENT_BYTES = 10 * 1024 * 1024
 // OpenCode refuses any attachment past this, by `file://` URL or by @-mention,
 // so a larger file would fail every send it rides along with.
 const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024
-const MAX_ATTACHMENT_PREPARATION_ATTEMPTS = 3
 // Their intake removes content the original still holds: credentials from HAR,
 // outputs from notebooks.
 const INTAKE_REDACTED_FILENAME = /\.(har|ipynb)$/i
@@ -71,12 +70,6 @@ const toFileUrl = (filepath: string): string => {
 
 const getVSCodeSelectionKey = (path: string, filename: string): string => `${path}\u0000${filename}`
 
-const hasGeneratedFilenameCollision = (filenames: string[], attachedFiles: AttachedFile[]): boolean => {
-  if (filenames.length === 0) return false
-  const attachedFilenames = new Set(attachedFiles.map((attachment) => attachment.filename.toLowerCase()))
-  return filenames.some((filename) => attachedFilenames.has(filename.toLowerCase()))
-}
-
 const readFileAsDataUrl = (file: File, mime: string): Promise<string> => new Promise((resolve, reject) => {
   const reader = new FileReader()
   reader.onload = () => {
@@ -92,12 +85,13 @@ const readFileAsDataUrl = (file: File, mime: string): Promise<string> => new Pro
 export const prepareLocalAttachments = async (
   file: File,
   reservedFilenames: Iterable<string> = [],
+  savedPath?: string,
 ): Promise<AttachedFile[] | undefined> => {
   const preparedOrPending = prepareAttachmentFiles(file, reservedFilenames)
   const preparedFiles = preparedOrPending instanceof Promise ? await preparedOrPending : preparedOrPending
   if (!preparedFiles || preparedFiles.length === 0) return
 
-  const agentPath = pathForDroppedFile(file) ?? undefined
+  const agentPath = savedPath ?? pathForDroppedFile(file) ?? undefined
 
   const sourceDocumentId = preparedFiles.length > 1
     ? `${Date.now()}-${Math.random().toString(36).slice(2)}`
@@ -120,7 +114,7 @@ export const prepareLocalAttachments = async (
     // Only the first entry represents the original; the rest are extracted images.
     if (agentPath && attachedFiles.length === 0 && !INTAKE_REDACTED_FILENAME.test(file.name)) {
       attached.agentPath = agentPath
-      attached.filename = file.name
+      attached.filename = savedPath ? attachmentBasename(savedPath) : file.name
     }
     attachedFiles.push(attached)
   }
@@ -157,11 +151,11 @@ const prepareFileReference = async (file: File, path: string): Promise<AttachedF
  * Writes the file into OpenCode's temp folder, on the machine OpenCode runs
  * on, and answers its path there, or null when the write failed.
  */
-const saveWhereOpenCodeRuns = async (file: File, directory: string | undefined): Promise<string | null> => {
+const saveWhereOpenCodeRuns = async (file: File, directory: string | undefined, runtimeKey: string): Promise<string | null> => {
   try {
     const [result] = await opencodeClient.writeOpenCodeTempFiles(directory, [
       { filename: file.name, bytes: new Uint8Array(await file.arrayBuffer()) },
-    ])
+    ], runtimeKey)
     if (result && "path" in result) return result.path
     if (result) console.warn("[chat] Saving an attachment failed", result.error.name)
   } catch (error) {
@@ -307,7 +301,7 @@ export type InputState = {
   setPendingSyntheticParts: (parts: SyntheticContextPart[] | null, target?: string | null) => void
   consumePendingSyntheticParts: (target?: string | null) => SyntheticContextPart[] | null
   getPendingSyntheticParts: (target?: string | null) => SyntheticContextPart[] | null
-  addAttachedFile: (file: File, target?: ChatDraftIdentity | null) => Promise<boolean>
+  addAttachedFile: (file: File, target?: ChatDraftIdentity | null, savedPath?: string) => Promise<boolean>
   removeAttachedFile: (id: string) => void
   /** Files filed under `target`, or the current slot when none is named. */
   getAttachedFiles: (target?: ChatDraftIdentity | null) => AttachedFile[]
@@ -469,9 +463,10 @@ export const useInputStore = create<InputState>()((set, get) => ({
     target === null ? get().pendingSyntheticParts : get().pinnedSyntheticParts.get(target) ?? null
   ),
 
-  addAttachedFile: async (file: File, target?: ChatDraftIdentity | null) => {
+  addAttachedFile: async (file: File, target?: ChatDraftIdentity | null, savedPath?: string) => {
     const generation = attachmentReadGeneration
-    const referencePath = INTAKE_REDACTED_FILENAME.test(file.name) ? null : pathForDroppedFile(file)
+    const runtimeKey = target?.runtimeKey ?? getRuntimeKey()
+    let referencePath = INTAKE_REDACTED_FILENAME.test(file.name) ? null : savedPath ?? pathForDroppedFile(file)
     const attachReference = async (path: string): Promise<boolean> => {
       const reference = await prepareFileReference(file, path)
       if (generation !== attachmentReadGeneration) return false
@@ -490,36 +485,45 @@ export const useInputStore = create<InputState>()((set, get) => ({
       }))
     }
 
-    for (let attempt = 0; attempt < MAX_ATTACHMENT_PREPARATION_ATTEMPTS; attempt += 1) {
-      const reservedFilenames = attachedFilesFor(get(), target).map((attachment) => attachment.filename)
-      let attachedFiles: AttachedFile[] | undefined
-      try {
-        attachedFiles = await prepareLocalAttachments(file, reservedFilenames)
-      } catch (error) {
-        if (!(error instanceof HeicConversionError) || generation !== attachmentReadGeneration) return false
-        // A HEIC the decoder cannot read goes as a note naming the original
-        // where OpenCode runs, and the agent converts it with its own tools.
-        // It never goes as an image part: providers refuse HEIC, and the
-        // whole send would fail. On desktop the file is already on the shared
-        // disk; elsewhere it is written into OpenCode's temp folder first.
-        const path = referencePath ?? await saveWhereOpenCodeRuns(file, target?.directory)
-        if (path) return attachReference(path)
-        throw new Error(formatMessage(useI18nStore.getState().dictionary, 'chat.fileAttachment.toast.heicConversionFailed', {
-          name: file.name,
-        }))
-      }
+    if (file.type === 'application/pdf' && !referencePath) {
+      referencePath = await saveWhereOpenCodeRuns(file, target?.directory, runtimeKey)
       if (generation !== attachmentReadGeneration) return false
-      // OpenCode drops a binary type it has no use for without a word, so a
-      // file we cannot prepare never goes as bytes.
-      if (!attachedFiles) return referencePath ? attachReference(referencePath) : false
-
-      const generatedFilenames = attachedFiles.slice(1).map((attachment) => attachment.filename)
-      if (hasGeneratedFilenameCollision(generatedFilenames, attachedFilesFor(get(), target))) continue
-
-      set((state) => appendAttachedFiles(state, attachedFiles, target))
-      return true
+      if (!referencePath) throw new Error(formatMessage(useI18nStore.getState().dictionary, 'chat.fileAttachment.toast.attachFailed'))
     }
-    return false
+
+    if (isDocumentAttachmentFilename(file.name)) {
+      const path = referencePath ?? await saveWhereOpenCodeRuns(file, target?.directory, runtimeKey)
+      if (generation !== attachmentReadGeneration) return false
+      return path ? attachReference(path) : false
+    }
+
+    let attachedFiles: AttachedFile[] | undefined
+    try {
+      attachedFiles = await prepareLocalAttachments(file, [], referencePath ?? undefined)
+    } catch (error) {
+      if (!(error instanceof HeicConversionError) || generation !== attachmentReadGeneration) return false
+      // A HEIC the decoder cannot read goes as a note naming the original
+      // where OpenCode runs, and the agent converts it with its own tools.
+      // It never goes as an image part: providers refuse HEIC, and the
+      // whole send would fail. On desktop the file is already on the shared
+      // disk; elsewhere it is written into OpenCode's temp folder first.
+      const path = referencePath ?? await saveWhereOpenCodeRuns(file, target?.directory, runtimeKey)
+      if (path) return attachReference(path)
+      throw new Error(formatMessage(useI18nStore.getState().dictionary, 'chat.fileAttachment.toast.heicConversionFailed', {
+        name: file.name,
+      }))
+    }
+    if (generation !== attachmentReadGeneration) return false
+    // OpenCode drops a binary type it has no use for without a word, so a
+    // file we cannot prepare never goes as bytes.
+    if (!attachedFiles) {
+      const path = referencePath ?? await saveWhereOpenCodeRuns(file, target?.directory, runtimeKey)
+      if (generation !== attachmentReadGeneration) return false
+      return path ? attachReference(path) : false
+    }
+
+    set((state) => appendAttachedFiles(state, attachedFiles, target))
+    return true
   },
 
   removeAttachedFile: (id) =>
@@ -550,21 +554,13 @@ export const useInputStore = create<InputState>()((set, get) => ({
   clearAttachedFiles: (target) => get().setAttachedFiles([], target),
 
   addVSCodeFileAttachment: (path: string, name: string, fileSize: number | null) => {
-    if (fileSize !== null && fileSize > MAX_ATTACHMENT_BYTES) {
-      throw new Error(formatMessage(useI18nStore.getState().dictionary, 'chat.fileAttachment.toast.overSendLimit', {
-        name,
-        size: formatFileSize(MAX_ATTACHMENT_BYTES),
-      }))
-    }
     const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`
     const isDuplicate = get().attachedFiles.some(
       (f) => f.source === 'vscode' && f.vscodeSource === 'file' && (f.vscodePath || '') === path
     )
     if (isDuplicate) return
     const dataUrl = toFileUrl(path)
-    // `file://` URLs are the same contract used by server-source attachments.
-    // The submission path passes `dataUrl` as `url` directly to the OpenCode
-    // server, which resolves `file://` paths natively. No base64 encoding needed.
+    // Drafts keep the host path; delivery supplies its tool-readable note.
     const attached: AttachedFile = {
       id,
       file: new File([], name, { type: 'text/plain' }),

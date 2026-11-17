@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
-import { strToU8, zipSync } from "fflate"
 import { useInputStore } from "./input-store"
 import { getChatDraftIdentityKey } from "@/lib/chatDraftPersistence"
 import { opencodeClient } from "@/lib/opencode/client"
@@ -60,8 +59,6 @@ const waitForReaderCount = async (count: number) => {
   }
 }
 
-const pngBytes = new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
-
 describe("input-store composer restore", () => {
   beforeEach(() => {
     useInputStore.setState({ pendingComposerRestore: null })
@@ -110,6 +107,47 @@ describe("input-store attachments", () => {
     })
     useInputStore.getState().setAttachedFiles([])
   })
+
+  testWithMockFileReader("a PDF keeps preview bytes and its saved path in one attachment", async () => {
+    useInputStore.getState().clearAttachedFiles()
+    const write = spyOn(opencodeClient, 'writeOpenCodeTempFiles').mockResolvedValue([{ filename: 'report.pdf', path: '/remote/tmp/report.pdf' }])
+    try {
+      const adding = useInputStore.getState().addAttachedFile(new File(['%PDF-fixture'], 'report.pdf', { type: 'application/pdf' }))
+      await waitForReaderCount(1)
+      resolveReader(pendingReaders[0], 'data:application/pdf;base64,JVBERg==')
+      expect(await adding).toBe(true)
+      expect(useInputStore.getState().attachedFiles).toMatchObject([{ filename: 'report.pdf', agentPath: '/remote/tmp/report.pdf', mimeType: 'application/pdf' }])
+    } finally { write.mockRestore() }
+  })
+
+  testWithMockFileReader("a binary clipboard file is saved and attached as a tool-readable reference", async () => {
+    useInputStore.getState().clearAttachedFiles()
+    const write = spyOn(opencodeClient, 'writeOpenCodeTempFiles').mockResolvedValue([{ filename: 'archive.zip', path: '/remote/tmp/archive.zip' }])
+    try {
+      const adding = useInputStore.getState().addAttachedFile(new File([new Uint8Array([80, 75, 0, 0])], 'archive.zip', { type: 'application/zip' }))
+      await waitForReaderCount(1)
+      resolveReader(pendingReaders[0], 'data:text/plain;base64,bm90ZQ==')
+      expect(await adding).toBe(true)
+      const [attachment] = useInputStore.getState().attachedFiles
+      expect(attachment).toMatchObject({ filename: 'archive.zip', agentPath: '/remote/tmp/archive.zip', mimeType: 'text/plain' })
+      expect(await attachment.file.text()).toContain('/remote/tmp/archive.zip')
+    } finally { write.mockRestore() }
+  })
+
+  test("a PDF save finishing after the attachment draft changed cannot attach there", async () => {
+    useInputStore.getState().clearAttachedFiles()
+    let resolveSaved!: (files: Array<{ filename: string; path: string }>) => void
+    const saved = new Promise<Array<{ filename: string; path: string }>>((resolve) => { resolveSaved = resolve })
+    const write = spyOn(opencodeClient, 'writeOpenCodeTempFiles').mockImplementation(() => saved)
+    try {
+      const adding = useInputStore.getState().addAttachedFile(new File(['%PDF-fixture'], 'report.pdf', { type: 'application/pdf' }))
+      useInputStore.getState().clearAttachedFiles()
+      resolveSaved([{ filename: 'report.pdf', path: '/remote/tmp/report.pdf' }])
+      expect(await adding).toBe(false)
+      expect(useInputStore.getState().attachedFiles).toEqual([])
+    } finally { write.mockRestore() }
+  })
+
 
   testWithMockFileReader("refuses a file over 10 MB without reading it when it has no path on disk", async () => {
     const big = new File([new Uint8Array(10 * 1024 * 1024 + 1)], "place.rbxl")
@@ -176,9 +214,9 @@ describe("input-store attachments", () => {
     }
   })
 
-  test("refuses a VS Code file over 20 MB, which OpenCode would refuse on every send", () => {
-    expect(() => useInputStore.getState().addVSCodeFileAttachment("/workspace/map.bin", "map.bin", 20 * 1024 * 1024 + 1)).toThrow("map.bin")
-    expect(useInputStore.getState().attachedFiles).toEqual([])
+  test("a large VS Code file remains a reference to its host path", () => {
+    useInputStore.getState().addVSCodeFileAttachment("/workspace/map.bin", "map.bin", 25 * 1024 * 1024)
+    expect(useInputStore.getState().attachedFiles).toMatchObject([{ dataUrl: "file:///workspace/map.bin", size: 25 * 1024 * 1024 }])
   })
 
   testWithMockFileReader("does not attach a local file that finishes reading after attachments are cleared", async () => {
@@ -446,111 +484,31 @@ describe("input-store attachments", () => {
     expect(useInputStore.getState().attachedFiles[0]?.dataUrl).toBe("data:image/webp;base64,AQID")
   })
 
-  testWithMockFileReader("adds extracted document text and referenced images atomically", async () => {
-    const archive = zipSync({
-      "word/document.xml": strToU8(`<w:document xmlns:w="w" xmlns:a="a" xmlns:r="r"><w:body><w:p><w:t>Diagram</w:t><a:blip r:embed="rId1"/></w:p></w:body></w:document>`),
-      "word/_rels/document.xml.rels": strToU8(`<Relationships><Relationship Id="rId1" Target="media/image.png" Type="image"/></Relationships>`),
-      "word/media/image.png": pngBytes,
-    })
-    const addPromise = useInputStore.getState().addAttachedFile(new File([archive], "design.docx"))
-
-    await waitForReaderCount(1)
-    expect(pendingReaders).toHaveLength(1)
-    resolveReader(pendingReaders[0], "data:text/plain;base64,RG9jdW1lbnQ=")
-    await waitForReaderCount(2)
-    expect(pendingReaders).toHaveLength(2)
-    expect(useInputStore.getState().attachedFiles).toEqual([])
-    resolveReader(pendingReaders[1], "data:image/png;base64,AQID")
-
-    expect(await addPromise).toBe(true)
-    expect(useInputStore.getState().attachedFiles.map((attachment) => ({
-      filename: attachment.filename,
-      mimeType: attachment.mimeType,
-    }))).toEqual([
-      { filename: "design.docx", mimeType: "text/plain" },
-      { filename: "design-image-1.png", mimeType: "image/png" },
-    ])
+  testWithMockFileReader("a document is saved intact and represented by one tool-readable reference", async () => {
+    const write = spyOn(opencodeClient, "writeOpenCodeTempFiles").mockResolvedValue([{ filename: "design.docx", path: "/remote/tmp/design.docx" }])
+    try {
+      const original = new File(["office-package-bytes"], "design.docx")
+      const adding = useInputStore.getState().addAttachedFile(original)
+      await waitForReaderCount(1)
+      resolveReader(pendingReaders[0], "data:text/plain;base64,bm90ZQ==")
+      expect(await adding).toBe(true)
+      const files = useInputStore.getState().attachedFiles
+      expect(files).toHaveLength(1)
+      expect(files[0]).toMatchObject({ filename: "design.docx", agentPath: "/remote/tmp/design.docx", mimeType: "text/plain" })
+      expect(write.mock.calls[0][1][0].bytes).toEqual(new TextEncoder().encode("office-package-bytes"))
+      expect(await files[0].file.text()).toContain("/remote/tmp/design.docx")
+    } finally { write.mockRestore() }
   })
 
-  testWithMockFileReader("regenerates document image names when the composer changes during preparation", async () => {
-    const archive = zipSync({
-      "word/document.xml": strToU8(`<w:document xmlns:w="w" xmlns:a="a" xmlns:r="r"><w:body><w:p><a:blip r:embed="rId1"/></w:p></w:body></w:document>`),
-      "word/_rels/document.xml.rels": strToU8(`<Relationships><Relationship Id="rId1" Target="media/image.png" Type="image"/></Relationships>`),
-      "word/media/image.png": pngBytes,
-    })
-    const addPromise = useInputStore.getState().addAttachedFile(new File([archive], "design.docx"))
-
-    await waitForReaderCount(1)
-    resolveReader(pendingReaders[0], "data:text/plain;base64,RG9jdW1lbnQ=")
-    await waitForReaderCount(2)
-    useInputStore.getState().addVSCodeFileAttachment("/workspace/design-image-1.png", "design-image-1.png", 1)
-    resolveReader(pendingReaders[1], "data:image/png;base64,AQID")
-
-    await waitForReaderCount(3)
-    resolveReader(pendingReaders[2], "data:text/plain;base64,RG9jdW1lbnQ=")
-    await waitForReaderCount(4)
-    resolveReader(pendingReaders[3], "data:image/png;base64,AQID")
-
-    expect(await addPromise).toBe(true)
-    expect(useInputStore.getState().attachedFiles.map((attachment) => attachment.filename)).toEqual([
-      "design-image-1.png",
-      "design.docx",
-      "design-image-2.png",
-    ])
-    const textAttachment = useInputStore.getState().attachedFiles[1]
-    expect((await textAttachment?.file.text())?.includes("[design-image-2.png]")).toBe(true)
-  })
-
-  testWithMockFileReader("extracted document entries share a sourceDocumentId for cascade removal", async () => {
-    const archive = zipSync({
-      "word/document.xml": strToU8(`<w:document xmlns:w="w" xmlns:a="a" xmlns:r="r"><w:body><w:p><w:t>Diagram</w:t><a:blip r:embed="rId1"/></w:p></w:body></w:document>`),
-      "word/_rels/document.xml.rels": strToU8(`<Relationships><Relationship Id="rId1" Target="media/image.png" Type="image"/></Relationships>`),
-      "word/media/image.png": pngBytes,
-    })
-    const addPromise = useInputStore.getState().addAttachedFile(new File([archive], "design.docx"))
-
-    await waitForReaderCount(1)
-    resolveReader(pendingReaders[0], "data:text/plain;base64,RG9jdW1lbnQ=")
-    await waitForReaderCount(2)
-    resolveReader(pendingReaders[1], "data:image/png;base64,AQID")
-
-    expect(await addPromise).toBe(true)
+  test("removing a grouped attachment preserves unrelated files", () => {
+    const store = useInputStore.getState()
+    for (const filename of ["document.docx", "diagram.png", "separate.txt"]) {
+      store.addRestoredAttachment({ url: "data:text/plain,content", mimeType: "text/plain", filename })
+    }
     const files = useInputStore.getState().attachedFiles
-    expect(files).toHaveLength(2)
-    expect(files[0].filename).toBe("design.docx")
-    expect(files[1].filename).toBe("design-image-1.png")
-
-    // All entries from the same document extraction share the same sourceDocumentId
-    expect(files[0].sourceDocumentId).toBeDefined()
-    expect(files[0].sourceDocumentId).toBe(files[1].sourceDocumentId)
-
-    // Removing any entry in the group cascade-removes all entries
-    useInputStore.getState().removeAttachedFile(files[0].id)
-    expect(useInputStore.getState().attachedFiles).toEqual([])
-  })
-
-  testWithMockFileReader("removing an extracted image child also cascade-removes the document group", async () => {
-    const archive = zipSync({
-      "word/document.xml": strToU8(`<w:document xmlns:w="w" xmlns:a="a" xmlns:r="r"><w:body><w:p><w:t>Diagram</w:t><a:blip r:embed="rId1"/></w:p></w:body></w:document>`),
-      "word/_rels/document.xml.rels": strToU8(`<Relationships><Relationship Id="rId1" Target="media/image.png" Type="image"/></Relationships>`),
-      "word/media/image.png": pngBytes,
-    })
-    const addPromise = useInputStore.getState().addAttachedFile(new File([archive], "design.docx"))
-
-    await waitForReaderCount(1)
-    resolveReader(pendingReaders[0], "data:text/plain;base64,RG9jdW1lbnQ=")
-    await waitForReaderCount(2)
-    resolveReader(pendingReaders[1], "data:image/png;base64,AQID")
-
-    expect(await addPromise).toBe(true)
-    const files = useInputStore.getState().attachedFiles
-    expect(files).toHaveLength(2)
-    expect(files[0].filename).toBe("design.docx")
-    expect(files[1].filename).toBe("design-image-1.png")
-
-    // Removing the image child also cascade-removes the entire group
-    useInputStore.getState().removeAttachedFile(files[1].id)
-    expect(useInputStore.getState().attachedFiles).toEqual([])
+    store.setAttachedFiles(files.map((file, index) => index < 2 ? { ...file, sourceDocumentId: "document" } : file))
+    store.removeAttachedFile(files[1].id)
+    expect(useInputStore.getState().attachedFiles.map((file) => file.filename)).toEqual(["separate.txt"])
   })
 
   testWithMockFileReader("non-document attachments do not have sourceDocumentId and remove individually", async () => {
@@ -569,31 +527,7 @@ describe("input-store attachments", () => {
     expect(useInputStore.getState().attachedFiles).toEqual([])
   })
 
-  testWithMockFileReader("PPTX slide extraction cascades removal of all slide images", async () => {
-    const archive = zipSync({
-      "ppt/slides/slide1.xml": strToU8(`<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:cSld><p:spTree><p:pic><p:nvPicPr/><p:blipFill><a:blip r:embed="rId1"/></p:blipFill></p:pic></p:spTree></p:cSld></p:sld>`),
-      "ppt/slides/_rels/slide1.xml.rels": strToU8(`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Target="../media/image1.png" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"/></Relationships>`),
-      "ppt/media/image1.png": pngBytes,
-    })
-    const addPromise = useInputStore.getState().addAttachedFile(new File([archive], "deck.pptx"))
 
-    await waitForReaderCount(1)
-    resolveReader(pendingReaders[0], "data:text/plain;base64,RG9jdW1lbnQ=")
-    await waitForReaderCount(2)
-    resolveReader(pendingReaders[1], "data:image/png;base64,AQID")
-
-    expect(await addPromise).toBe(true)
-    const files = useInputStore.getState().attachedFiles
-    expect(files).toHaveLength(2)
-    expect(files[0].filename).toBe("deck.pptx")
-    expect(files[1].filename).toBe("deck-image-1.png")
-    expect(files[0].sourceDocumentId).toBeDefined()
-    expect(files[0].sourceDocumentId).toBe(files[1].sourceDocumentId)
-
-    // Removing the text entry cascades to the slide image
-    useInputStore.getState().removeAttachedFile(files[0].id)
-    expect(useInputStore.getState().attachedFiles).toEqual([])
-  })
 })
 
 describe("input-store guest attach", () => {

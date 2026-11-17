@@ -2208,6 +2208,8 @@ export interface RuntimeAPIs {
   /** Linux desktop's native PRIMARY buffer; absent in browsers, mobile, VS Code and remote pages. */
   clipboard?: ClipboardAPI;
   zoom?: { set(percent: number): Promise<void> };
+  /** Native file previews on the local desktop runtime; absent on web, mobile and VS Code. */
+  fileThumbnails?: { read(path: string): Promise<string | null> };
   runtime: RuntimeDescriptor;
   terminal: TerminalAPI;
   git: GitAPI;

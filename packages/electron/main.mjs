@@ -1,5 +1,5 @@
 import { canReuseManagedOpenCodePreflight } from './opencode-readiness.mjs';
-import { app, BrowserWindow, clipboard, ClipboardItem, dialog, globalShortcut, ipcMain, Menu, MessageChannelMain, nativeTheme, net as electronNet, Notification, powerMonitor, powerSaveBlocker, protocol, screen, session, shell, webContents } from 'electron';
+import { app, BrowserWindow, clipboard, ClipboardItem, dialog, globalShortcut, ipcMain, Menu, MessageChannelMain, nativeTheme, nativeImage, net as electronNet, Notification, powerMonitor, powerSaveBlocker, protocol, screen, session, shell, webContents } from 'electron';
 import contextMenu from 'electron-context-menu';
 import log from 'electron-log/main.js';
 import dgram from 'node:dgram';
@@ -4750,6 +4750,14 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
       const sessionId = readTrimmedString(args?.sessionId);
       if (sessionId) clearSessionNotifications(sessionId);
       return null;
+    }
+
+    case 'desktop_get_file_thumbnail': {
+      const filePath = z.string().min(1).parse(args?.path);
+      if (!path.isAbsolute(filePath)) throw new Error('An absolute file path is required');
+      if (!['darwin', 'win32'].includes(process.platform)) return null;
+      const image = await nativeImage.createThumbnailFromPath(filePath, { width: 256, height: 256 });
+      return image.isEmpty() ? null : image.toDataURL();
     }
 
     case 'desktop_clipboard_read_selection':

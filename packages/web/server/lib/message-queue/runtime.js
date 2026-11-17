@@ -19,6 +19,8 @@ import { unwrapOpenCodeResponse } from '../opencode/response-envelope.js';
 import { createSessionActivityProbe } from '../opencode/session-activity.js';
 import { attachmentHint } from '../routing/runtime.js';
 import { buildGoalIntroText, createSessionGoal } from '../session-goal/create.js';
+import { fileURLToPath } from 'node:url';
+import { randomUUID } from 'node:crypto';
 
 const QUEUE_FILE_NAME = 'message-queue.json';
 const QUEUE_FILE_VERSION = 1;
@@ -457,10 +459,11 @@ export function createMessageQueueRuntime({
     if (directory) params.set('directory', directory);
     const search = params.toString();
     const headers = { Accept: 'application/json', ...getOpenCodeAuthHeaders() };
+    if (directory) headers['x-opencode-directory'] = encodeURIComponent(directory);
     const init = { method, headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) };
     if (body) {
-      headers['Content-Type'] = 'application/json';
-      init.body = JSON.stringify(body);
+      headers['Content-Type'] = body instanceof Uint8Array ? 'application/octet-stream' : 'application/json';
+      init.body = body instanceof Uint8Array ? body : JSON.stringify(body);
     }
     const response = await fetchImpl(search ? `${base}?${search}` : base, init);
     if (!response.ok) {
@@ -537,6 +540,36 @@ export function createMessageQueueRuntime({
     ...(attachment.agentPath || attachment.filename ? { name: attachment.agentPath || attachment.filename } : {}),
   });
 
+  const preparePromptFiles = async (attachments, model, directory) => {
+    let input = null;
+    if (attachments.some((file) => file.mimeType.startsWith('image/'))) {
+      const models = asList(await openCodeFetch('/api/model', { directory }));
+      if (!models) throw new Error('Invalid OpenCode model catalog');
+      const selected = models.find((entry) => entry.providerID === model.providerID && entry.modelID === model.id);
+      input = asList(asRecord(selected?.capabilities)?.input);
+    }
+    return Promise.all(attachments.map(async (file) => {
+      if (file.mimeType.startsWith('image/') && (!input || input.includes('image'))) return toPromptFile(file);
+      let filePath = file.agentPath || (file.dataUrl.startsWith('file://') ? fileURLToPath(file.dataUrl) : null);
+      if (!filePath) {
+        if (!file.dataUrl.startsWith('data:')) throw new Error('Attachment has no readable file path');
+        const bytes = new Uint8Array(await (await fetch(file.dataUrl)).arrayBuffer());
+        const info = await openCodeFetch('/api/info', { directory });
+        const tmp = asNonEmptyString(asRecord(info?.paths)?.tmp);
+        if (!tmp) throw new Error('OpenCode temp directory is unavailable');
+        const name = Array.from(path.posix.basename(file.filename.replace(/\\/g, '/')),
+          (char) => char.charCodeAt(0) < 32 || ':<>"|?*'.includes(char) ? '-' : char).join('');
+        const filename = file.mimeType === 'text/plain' && /\.(docx|pptx|xlsx|odt|odp|ods|ipynb)$/i.test(name) ? `${name}.txt` : name;
+        const target = `${tmp.replace(/[\\/]+$/, '')}/openchamber/${randomUUID()}/${filename}`;
+        const saved = await openCodeFetch('/api/experimental/fs/write', { directory, method: 'POST', query: { path: target }, body: bytes });
+        filePath = asNonEmptyString(saved?.path);
+        if (!filePath) throw new Error('OpenCode did not return the saved attachment path');
+      }
+      const note = `File on disk: ${filePath}. Read this file with your tools. Its binary content is not included in this message.\n`;
+      return { uri: `data:text/plain;base64,${Buffer.from(note).toString('base64')}`, name: filePath };
+    }));
+  };
+
   /**
    * Captured context travels as synthetic messages in v2 — the composer's
    * inline `synthetic: true` text parts are gone. One message per entry, an
@@ -576,7 +609,7 @@ export function createMessageQueueRuntime({
     const { providerID, modelID, variant } = item.sendConfig;
     let agent = item.sendConfig.agent;
     let model = { id: modelID, providerID, ...(variant ? { variant } : {}) };
-    const promptFiles = item.attachments.map(toPromptFile);
+    let promptFiles = item.attachments.map(toPromptFile);
     // The goal briefing goes last, right before the message the goal is about.
     const synthetics = [
       ...item.context.flatMap(toContextMessages),
@@ -596,6 +629,7 @@ export function createMessageQueueRuntime({
       model = routed.model;
       agent = routed.agent ?? agent;
     }
+    promptFiles = await preparePromptFiles(item.attachments, model, directory);
 
     // v2 selects model and agent on the session, not per prompt: the choice is
     // switched once and then persists.
