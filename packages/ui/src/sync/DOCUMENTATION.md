@@ -2,6 +2,11 @@
 
 ## Scope
 
+Tool result completion and snapshot merging check recorded Code Mode calls as
+well as top-level calls for content-shell markers. A whole owning message fills
+both through the existing runtime-aware read; a lighter page cannot replace a
+whole message already displayed by that store.
+
 Forms with metadata kind `openchamber-async-question` stay in directory form state
 and appear through `useScopedForms`. `useScopedBlockingForms` and the global
 blocking-request index exclude them. Sending a message preserves these forms;

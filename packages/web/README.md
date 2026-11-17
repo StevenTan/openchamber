@@ -64,8 +64,11 @@ sources; package and desktop builds generate the runtime files automatically.
 Managed Codex search tools live in `server/lib/agent-search`. The `native`
 search integration uses the configured proxy's `/alpha/search` endpoint for
 search, page opening, text lookup and link traversal. It requires a proxy that
-supports this protocol and uses the invoking model's provider API key. The direct
+supports this protocol and uses the invoking model's provider API key. The
 `web.run` tool returns backend text and preserves structured results in metadata.
+
+Managed operation tools use native Code Mode with complete descriptions and
+parameter signatures. Tools that render dedicated cards keep direct entries.
 
 Managed child-agent controls live in `server/lib/agent-collaboration`. They send
 follow-ups, wait for idle, and interrupt children started by the native

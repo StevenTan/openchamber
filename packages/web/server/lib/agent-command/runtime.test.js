@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createAgentToolRuntime } from '../agent-tool/runtime.js';
 import { EventEmitter, on } from 'node:events';
 import { setImmediate } from 'node:timers/promises';
+import { TerminalManager } from './dist/terminal-manager.js';
 
 const quote = (value) => "'" + value.replaceAll("'", "'\"'\"'") + "'";
 const nodeCommand = (script) => `${quote(process.execPath)} -e ${quote(script)}`;
@@ -70,12 +71,22 @@ const enqueueInput = async sessionID => {
 };
 
 describe('managed command tools', () => {
+  it('returns structured command output for script continuations', async () => {
+    const result = await tools.get('exec_command').execute({ cmd: nodeCommand('console.log("structured")') }, context);
+    expect(result.output).toEqual(JSON.parse(result.content));
+    expect(result.output).toMatchObject({ status: 'completed', exit_code: 0 });
+  });
+
   it('exposes command execution and continuation as direct tools', () => {
     expect([...tools.keys()]).toEqual(['exec_command', 'write_stdin', 'clock_sleep']);
     expect([...tools.values()].every(tool => tool.options.codemode === false)).toBe(true);
     expect(tools.get('exec_command').input.required).toEqual(['cmd']);
     expect(tools.get('write_stdin').input.required).toEqual(['session_id']);
     expect(tools.get('clock_sleep').input.required).toEqual(['duration_ms']);
+    expect(tools.get('exec_command').description).toContain('Set tty: true at launch');
+    expect(tools.get('exec_command').input.properties.tty.description).toContain('write_stdin can supply input');
+    expect(tools.get('write_stdin').description).toContain('session mode is fixed at launch');
+    expect(tools.get('write_stdin').input.properties.close_stdin.default).toBe(false);
   });
 
   it('completes a clock sleep and reports elapsed time', async () => {
@@ -160,9 +171,11 @@ describe('managed command tools', () => {
 
   it('uses pipes by default and exposes a terminal only when requested', async () => {
     const cmd = nodeCommand('console.log(JSON.stringify({ stdin: !!process.stdin.isTTY, stdout: !!process.stdout.isTTY, stderr: !!process.stderr.isTTY })); process.stdin.on("end", () => console.log("stdin closed")); process.stdin.resume()');
-    const piped = await run('exec_command', { cmd, yield_time_ms: 5000 });
-    expect(piped).toMatchObject({ status: 'completed', exit_code: 0 });
-    expect(piped.output).toBe('{"stdin":false,"stdout":false,"stderr":false}\nstdin closed');
+    const piped = await run('exec_command', { cmd, yield_time_ms: 250 });
+    expect(piped.status).toBe('running');
+    expect(piped.output).toBe('{"stdin":false,"stdout":false,"stderr":false}');
+    const closed = await run('write_stdin', { session_id: piped.session_id, close_stdin: true, yield_time_ms: 1000 });
+    expect(closed).toMatchObject({ status: 'completed', exit_code: 0, output: 'stdin closed' });
     const terminal = await run('exec_command', { cmd, tty: true, yield_time_ms: 500 });
     expect(terminal.output).toContain('{"stdin":true,"stdout":true,"stderr":true}');
     await run('write_stdin', { session_id: terminal.session_id, chars: '\x03', yield_time_ms: 5000 });
@@ -180,10 +193,62 @@ describe('managed command tools', () => {
     expect(result).toMatchObject({ status: 'completed', exit_code: 0, output: 'Password: done' });
   });
 
-  it('rejects text input to a pipe session and keeps the command interruptible', async () => {
-    const started = await run('exec_command', { cmd: nodeCommand('setInterval(() => {}, 1000)'), yield_time_ms: 0 });
-    await expect(run('write_stdin', { session_id: started.session_id, chars: 'hello\n' })).rejects.toThrow('stdin is closed');
-    expect((await run('write_stdin', { session_id: started.session_id, chars: '\x03', yield_time_ms: 5000 })).status).toBe('completed');
+  it('supplies pipe input and EOF together without terminal echo', async () => {
+    const started = await run('exec_command', { cmd: nodeCommand('let text=""; process.stdin.setEncoding("utf8"); process.stdin.on("data", part => text += part); process.stdin.on("end", () => console.log("received:" + text))'), yield_time_ms: 250 });
+    const result = await run('write_stdin', { session_id: started.session_id, chars: 'hello', close_stdin: true, yield_time_ms: 1000 });
+    expect(result).toMatchObject({ status: 'completed', exit_code: 0, output: 'received:hello' });
+  });
+
+  it('keeps a pipe open across writes until explicit EOF', async () => {
+    const started = await run('exec_command', { cmd: nodeCommand('process.stdin.on("data", data => process.stdout.write("received:" + data)); process.stdin.on("end", () => console.log("EOF"))'), yield_time_ms: 250 });
+    const first = await run('write_stdin', { session_id: started.session_id, chars: 'first\n', yield_time_ms: 250 });
+    expect(first).toMatchObject({ status: 'running', output: 'received:first' });
+    const last = await run('write_stdin', { session_id: started.session_id, chars: 'last\n', close_stdin: true, yield_time_ms: 1000 });
+    expect(last).toMatchObject({ status: 'completed', output: 'received:last\nEOF' });
+  });
+
+  it('rejects pipe EOF for a PTY while keeping it writable', async () => {
+    const started = await run('exec_command', { cmd: nodeCommand('process.stdin.resume()'), tty: true, yield_time_ms: 250 });
+    await expect(run('write_stdin', { session_id: started.session_id, close_stdin: true })).rejects.toThrow('only for pipe sessions');
+    expect((await run('write_stdin', { session_id: started.session_id, chars: '\x03', yield_time_ms: 1000 })).status).toBe('completed');
+  });
+
+  it('cancels a blocked pipe write without terminating the command', async () => {
+    const manager = new TerminalManager();
+    try {
+      const started = await manager.executeCommand(nodeCommand('setInterval(() => {}, 1000)'), 250, { workdir: root });
+      const controller = new AbortController();
+      const writing = manager.sendInputToProcess(started.pid, 'x'.repeat(512 * 1024), false, controller.signal);
+      let settled = false;
+      writing.then(() => { settled = true; }, () => { settled = true; });
+      const failed = expect(writing).rejects.toThrow('Input wait cancelled');
+      await setImmediate();
+      expect(settled).toBe(false);
+      controller.abort(new Error('Input wait cancelled'));
+      await failed;
+      expect(manager.getSession(started.pid)).not.toBeNull();
+    } finally { await manager.close(); }
+  });
+
+  it('keeps EOF final and reports later writes without stopping the command runtime', async () => {
+    const started = await run('exec_command', { cmd: nodeCommand('process.stdin.on("end", () => console.log("EOF")); process.stdin.resume(); setInterval(() => {}, 1000)'), yield_time_ms: 250 });
+    expect((await run('write_stdin', { session_id: started.session_id, close_stdin: true, yield_time_ms: 250 })).output).toBe('EOF');
+    const warnings = vi.spyOn(process, 'emitWarning');
+    try {
+      for (let index = 0; index < 12; index++) {
+        await expect(run('write_stdin', { session_id: started.session_id, chars: 'late' })).rejects.toThrow();
+      }
+      await setImmediate();
+      expect(warnings.mock.calls.some(([warning]) => String(warning).includes('MaxListenersExceededWarning'))).toBe(false);
+    } finally { warnings.mockRestore(); }
+    expect((await run('write_stdin', { session_id: started.session_id, chars: '\x03', yield_time_ms: 1000 })).status).toBe('completed');
+  });
+
+  it.skipIf(process.platform === 'win32')('reports a child-closed input pipe while keeping command cancellation usable', async () => {
+    const started = await run('exec_command', { cmd: `exec ${nodeCommand('require("fs").closeSync(0); console.log("ready"); setInterval(() => {}, 1000)')}`, shell: '/bin/sh', login: false, yield_time_ms: 250 });
+    expect(started.output).toBe('ready');
+    await expect(run('write_stdin', { session_id: started.session_id, chars: 'hello' })).rejects.toThrow();
+    expect((await run('write_stdin', { session_id: started.session_id, chars: '\x03', yield_time_ms: 1000 })).status).toBe('completed');
   });
 
   it('finishes a command and terminates background jobs in its process group', async () => {

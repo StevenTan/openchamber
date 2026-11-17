@@ -33,6 +33,13 @@ to the shared UI domain model. Sync owns transcript membership and store writes.
   the model included. A failed or empty list lets the switch through. The class
   lives in `agent-unavailable-error.ts`, so code that only reads the error does
   not load the client.
+- `code-mode-parts.ts` projects recorded inner calls into ordinary tool parts,
+  preserving each call's own input, output, metadata, timing and error. Derived
+  IDs identify rows; the owning message/session IDs retain the shared completion
+  path. Malformed records do not hide other calls.
+- `toolContentShells.ts` recognizes both top-level and recorded result shells.
+  Navigation output is compacted through the same rules on streamed results;
+  completing either form fetches its owning message.
 
 ## Decisions
 

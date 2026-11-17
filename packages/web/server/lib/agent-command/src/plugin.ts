@@ -9,7 +9,7 @@ import { createSleepClock } from "./sleep.js";
 export const COMMAND_PLUGIN_ID = "openchamber-command-tool";
 
 export const createCommandPluginSource = (
-  schemas: Record<"exec_command" | "write_stdin", z.core.JSONSchema.JSONSchema>,
+  schemas: Record<"exec_command" | "write_stdin" | "output", z.core.JSONSchema.JSONSchema>,
 ) => String.raw`import { realpath } from 'node:fs/promises'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -62,6 +62,7 @@ export default {
       source: { type: 'tool', messageID: context.messageID, id: context.id },
     })
     const toolResult = (result) => ({
+      output: result,
       content: JSON.stringify(result),
       metadata: { status: result.status, session_id: result.session_id, truncated: result.truncated,
         ...(result.status === 'completed' ? { exit_code: result.exit_code } : {}) },
@@ -82,9 +83,10 @@ export default {
       tools.remove('shell')
       tools.add({
         name: 'exec_command',
-        description: 'Runs a command with output pipes by default; set tty to true for interactive commands. Collects output until the wait ends or the process exits, returning a session ID for continuation. When status is running, continue with write_stdin using the returned session_id. Completed commands retain their session_id for output inspection; status and exit_code report completion.',
+        description: 'Runs a command with stdin, stdout and stderr pipes by default. Use write_stdin to send input; send EOF with close_stdin when the program needs the end of its input. Set tty: true at launch for programs that require a terminal. The session mode is fixed at launch. Collects output until the wait ends or the process exits, returning a session ID for continuation. When status is running, continue with write_stdin using the returned session_id. Completed commands retain their session_id for output inspection; status and exit_code report completion.',
         options: { codemode: false },
         input: ${JSON.stringify(schemas.exec_command)},
+        output: ${JSON.stringify(schemas.output)},
         async execute(input, context) {
           const root = await realpath(ctx.location.directory)
           const workdir = await realpath(path.resolve(root, input.workdir || '.'))
@@ -113,9 +115,10 @@ export default {
       })
       tools.add({
         name: 'write_stdin',
-        description: 'Writes characters to an existing command session and returns recent output. Empty chars waits without writing. Use status to check completion; completed sessions remain readable through offset and length.',
+        description: 'Writes characters to an existing command session and returns recent output. Pipe sessions accept ordinary input and close_stdin: true sends EOF after the supplied chars, so final input and EOF need one call. Empty chars without close_stdin waits without writing. Ctrl+C interrupts either mode. The session mode is fixed at launch. Use status to check completion; completed sessions remain readable through offset and length.',
         options: { codemode: false },
         input: ${JSON.stringify(schemas.write_stdin)},
+        output: ${JSON.stringify(schemas.output)},
         async execute(input, context) {
           if (input.chars && input.chars !== '\x03') await approve(context, 'shell', input.chars)
           const result = await request('write_stdin', context.sessionID, input, context.signal)

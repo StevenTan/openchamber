@@ -54,10 +54,11 @@ const harness = async (storage = new Map(), directory) => {
     if (status === 'completed') settled.result = result;
     else settled.error = result;
     await hooks['execute.after'](settled);
-    return result.metadata.openchamberTurnDiff;
+    return result.metadata?.openchamberTurnDiff;
   };
   return {
     directory, storage, stop, tool,
+    begin: (name, input, identity) => hooks['execute.before']({ tool: name, input, messageID: 'assistant', sessionID: 'session', ...identity }),
     read: (id = turnID, sessionID = 'session') => handlers.read({ sessionID, turnID: id }),
     turn: (id) => { turnID = id; },
     context: (messages) => { context = messages; },
@@ -67,6 +68,76 @@ const harness = async (storage = new Map(), directory) => {
 };
 
 describe('recorded turn file diffs', () => {
+  it('records relative and absolute operations on one file under one baseline', async () => {
+    const h = await harness();
+    const file = path.join(h.directory, 'code.txt');
+    await fs.writeFile(file, 'before\n');
+    await h.tool('write', { path: 'code.txt' }, () => fs.writeFile(file, 'middle\n'));
+    await h.tool('edit', { path: file }, () => fs.writeFile(file, 'after\n'));
+    const record = await h.read();
+    expect(record.files).toHaveLength(1);
+    expect(record.files[0]).toMatchObject({ file: 'code.txt', additions: 1, deletions: 1 });
+    expect(record.files[0].patch).toContain('-before\n+after');
+  });
+  it('publishes script file changes on the outer execute result', async () => {
+    const h = await harness();
+    const file = path.join(h.directory, 'code.txt');
+    await fs.writeFile(file, 'before\n');
+    const identity = { id: 'script' };
+    const metadata = await h.tool('execute', { code: 'write file' }, async () => {
+      await h.tool('write', { path: file }, () => fs.writeFile(file, 'after\n'), 'completed', identity);
+    }, 'completed', identity);
+    expect(metadata.files).toEqual([{ file: 'code.txt', status: 'modified', additions: 1, deletions: 1 }]);
+    expect((await h.read()).files[0].patch).toContain('+after');
+  });
+
+  it('records concurrent edits sharing a script call ID after both edits settle', async () => {
+    const h = await harness();
+    const a = path.join(h.directory, 'a');
+    const b = path.join(h.directory, 'b');
+    await fs.writeFile(a, 'a before\n');
+    await fs.writeFile(b, 'b before\n');
+    const identity = { id: 'outer_script' };
+    let entered;
+    const started = new Promise(resolve => { entered = resolve; });
+    let release;
+    const blocked = new Promise(resolve => { release = resolve; });
+    const writing = h.tool('write', { path: a }, async () => {
+      entered();
+      await blocked;
+      await fs.writeFile(a, 'a after\n');
+    }, 'completed', identity);
+    await started;
+    await h.tool('write', { path: b }, () => fs.writeFile(b, 'b after\n'), 'completed', identity);
+    await h.tool('read', { path: b }, async () => {}, 'completed', identity);
+    release();
+    await writing;
+    expect((await h.read()).files.map(file => file.file).sort()).toEqual(['a', 'b']);
+    expect((await h.read()).files.find(file => file.file === 'a').patch).toContain('+a after');
+  });
+
+  it.each(['rejected', 'interrupted'])('keeps completed file changes when a parallel script call is %s', async outcome => {
+    const h = await harness();
+    const a = path.join(h.directory, 'a');
+    const b = path.join(h.directory, 'b');
+    await fs.writeFile(a, 'a before\n');
+    await fs.writeFile(b, 'b before\n');
+    const identity = { id: 'script' };
+    const execute = async () => {
+      await h.begin('write', { path: b }, identity);
+      await h.tool('write', { path: a }, () => fs.writeFile(a, 'a after\n'), 'completed', identity);
+    };
+    if (outcome === 'rejected') await h.tool('execute', {}, execute, 'failed', identity);
+    else {
+      await h.begin('execute', {}, identity);
+      await execute();
+      await h.event('session.execution.interrupted');
+    }
+    const record = await h.read();
+    expect(record.files.map(file => file.file)).toEqual(['a']);
+    expect(record.files[0].patch).toContain('+a after');
+  });
+
   it.each(['answered', 'cancelled'])('aligns an asynchronous question %s with its displayed turn boundary', async (status) => {
     const h = await harness();
     const a = path.join(h.directory, 'a');

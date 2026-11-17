@@ -10,5 +10,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["server/lib/agent-command/src/**/*.ts", "server/lib/agent-search/src/**/*.ts", "server/lib/agent-question/src/**/*.ts", "server/lib/agent-collaboration/src/**/*.ts"]
+  "include": ["server/lib/agent-command/src/**/*.ts", "server/lib/agent-search/src/**/*.ts", "server/lib/agent-question/src/**/*.ts", "server/lib/agent-collaboration/src/**/*.ts", "server/lib/agent-code-mode/src/**/*.ts"]
 }

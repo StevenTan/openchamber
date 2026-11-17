@@ -126,6 +126,9 @@ test('edit and patch headers render v2 file diff counts as results arrive', asyn
     expect(container.textContent).toContain('+2 −1');
     await render('write', {}, { path: 'new.ts', content: 'one\ntwo' });
     expect(container.textContent).toContain('+2');
+    await render('write', {}, { path: 'new.ts', content: 'one\n' });
+    expect(container.textContent).toContain('+1');
+    expect(container.textContent).not.toContain('+2');
   } finally {
     await act(async () => { root.unmount(); });
     await happyWindow.happyDOM.abort();

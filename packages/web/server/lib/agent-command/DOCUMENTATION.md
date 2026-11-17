@@ -4,7 +4,7 @@
 
 This module owns command processes for managed OpenCode sessions, their output
 buffers, and the `openchamber-command-tool` plugin. `exec_command` starts a process;
-`write_stdin` waits on it, reads new output, and sends raw PTY input.
+`write_stdin` waits on it, reads new output, and sends pipe or raw PTY input.
 The same plugin provides `clock.sleep`, exposed as `clock_sleep` on OpenCode's
 direct tool list. Its timer runs in the plugin process.
 The neighbouring `terminal` module owns the user's visible terminals and the
@@ -26,6 +26,7 @@ External OpenCode and VS Code lifecycles receive no plugin injection.
 - Command startup defaults to 10000 ms and clamps to 250-30000 ms, with a
   10000 ms minimum on Windows. Non-empty writes default to 250 ms and clamp to
   250-30000 ms; empty waits default to 5000 ms and clamp to 5000-300000 ms.
+  A pipe EOF continuation uses the write window even when its text is empty.
 - Output uses Desktop Commander's line buffer and pagination. The buffer retains
   up to 50 Mi characters per command, with lines split at 1 Mi characters.
   `max_output_tokens` defaults to 10000 approximate tokens, at four UTF-8 bytes
@@ -37,10 +38,13 @@ External OpenCode and VS Code lifecycles receive no plugin injection.
   count from the end. `read_from` and `total_lines` describe the retained buffer.
 - Each continuation waits independently. Input and cancellation reach the
   process while another continuation is waiting.
-- Commands use output pipes and closed stdin by default. `tty: true` allocates
+- Commands use writable stdin and separate output pipes by default. `tty: true` allocates
   a PTY with verbatim input and a shared standard-output/error terminal stream.
-  Empty input only waits. Ctrl+C interrupts commands in either mode; other
-  input requires a PTY.
+  Empty input only waits unless `close_stdin` is true. Pipe input can combine
+  the final text and EOF in one continuation. `close_stdin` is pipe-only; PTYs
+  receive terminal control characters through `chars`. Ctrl+C interrupts either
+  mode. Cancelling an input write stops its wait; bytes already queued remain
+  admitted to the process. Write errors are returned to the invoking tool.
 - A pipe command owns its POSIX process group. On command exit, remaining jobs
   in that group terminate before the session completes. Tasks that explicitly
   detach from the group have their own lifecycle.
@@ -63,6 +67,9 @@ External OpenCode and VS Code lifecycles receive no plugin injection.
   events end it early. Tool cancellation and plugin unload reject pending sleeps,
   clear timers and cancel outstanding inbox queries. Inbox-query and event-stream
   failures surface as tool errors.
+
+Command tools expose their result object alongside display text. Native Code Mode
+scripts can inspect `status`, `session_id`, output and exit status directly.
 
 ## Decisions
 

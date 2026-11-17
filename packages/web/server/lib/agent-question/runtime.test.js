@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createQuestionRuntime, questionStoreDirectory } from './dist/runtime.js';
 
@@ -45,6 +46,40 @@ async function fixture() {
 }
 
 describe('asynchronous questions', () => {
+  it('keeps repeated questions from one script as separate requests', async () => {
+    const f = await fixture();
+    const runtime = f.runtime();
+    const directory = await runtime.materializePlugin(f.dataDir);
+    const { default: plugin } = await import(pathToFileURL(path.join(directory, 'index.js')).href);
+    let tool;
+    const nativeQuestion = { description: 'Native question usage notes', input: {}, execute: vi.fn() };
+    const originalQuestion = { ...nativeQuestion };
+    vi.stubEnv('OPENCHAMBER_AGENT_TOOL_URL', 'http://127.0.0.1:3000');
+    vi.stubGlobal('fetch', async (_url, request) => new Response(JSON.stringify(await runtime.ask(JSON.parse(request.body)))));
+    cleanup.push(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+    await plugin.setup({
+      permission: { assert: async () => {} },
+      tool: { transform: async run => run({
+        update: (name, change) => { expect(name).toBe('question'); change(nativeQuestion); },
+        add: value => { tool = value; },
+      }) },
+    });
+    expect(nativeQuestion.description).toContain('Waits for the user to answer before returning.');
+    expect(nativeQuestion.description).toContain('answer is required before further work can proceed.');
+    expect(nativeQuestion.description).toContain(originalQuestion.description);
+    expect(nativeQuestion.input).toBe(originalQuestion.input);
+    expect(nativeQuestion.execute).toBe(originalQuestion.execute);
+    expect(tool.description).toContain('immediately returns a JSON receipt');
+    expect(tool.description).toContain('Awaiting this call waits for question creation; execution then continues in the same turn');
+    const context = { sessionID: 'ses_1', agent: 'build', messageID: 'message', id: 'outer_script', signal: new AbortController().signal };
+    const first = JSON.parse((await tool.execute({ questions: [{ title: 'First question' }] }, context)).content);
+    const second = JSON.parse((await tool.execute({ questions: [{ title: 'Second question' }] }, context)).content);
+    expect(first).toMatchObject({ status: 'pending', message: expect.any(String) });
+    expect(second).toMatchObject({ status: 'pending', message: expect.any(String) });
+    expect(first.question_id).not.toBe(second.question_id);
+    expect([...f.forms.values()].map(form => form.fields[0].title)).toEqual(['First question', 'Second question']);
+  });
+
   it('delivers a submitted question group in one message and preserves request order', async () => {
     const f = await fixture();
     const runtime = f.runtime();

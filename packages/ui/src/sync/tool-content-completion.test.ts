@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, mock, test } from "bun:test"
 import type { ChildStoreManager as ChildStores } from "./child-store"
-import { toolContentShellChars } from "@/lib/opencode/toolContentShells"
+import { hasShelledToolContent, toolContentShellChars } from "@/lib/opencode/toolContentShells"
 
 const paths: string[] = []
 const responses: Array<() => Response> = []
@@ -100,6 +100,28 @@ test("completes the child's existing shell through the parent and shares the req
   paths.length = 0
   await completeToolContent(target, messageID)
   expect(paths).toEqual([])
+})
+
+test("completes an inner result when the script's own output is whole", async () => {
+  const nested = (shell: boolean) => {
+    const message = wire(false)
+    const part = message.content[0]
+    return { ...message, content: [{ ...part, name: "execute", state: { ...part.state, metadata: { openchamberToolCalls: [{
+        tool: "read", status: "completed", input: { path: "a.ts" }, output: shell ? "" : "FILE_BODY",
+        time: { start: 1, end: 2 }, metadata: shell ? { openchamberContentShell: { chars: 9 } } : {},
+      }] } } }] }
+  }
+  responses.push(() => json({ data: nested(true) }))
+  const record = await opencodeClient.getSessionMessage(sessionID, messageID, directory)
+  const store = stores.getChild(directory)
+  if (!store) throw new Error("Expected displayed store")
+  store.setState({ message: { [sessionID]: [record.info] }, part: { [messageID]: record.parts } })
+  paths.length = 0
+  responses.push(() => json({ data: nested(false) }))
+  await completeToolContent(target, messageID)
+  expect(paths).toEqual([`/api/session/${sessionID}/message/${messageID}`])
+  expect(store.getState().part[messageID].some(hasShelledToolContent)).toBe(false)
+  expect(JSON.stringify(store.getState().part[messageID])).toContain("FILE_BODY")
 })
 
 test("does not request a message outside the displayed transcript", async () => {

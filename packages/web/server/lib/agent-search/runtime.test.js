@@ -7,13 +7,17 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { materializeSearchPlugin } from './runtime.js';
 
 let root, server, context, provider, requests, tool, hooks, native, selection, backendResponse, status;
+let cleanupPlugin;
+let registered;
+let replaySearch;
 const invocation = (sessionID = 'session-a') => ({ sessionID, agent: 'build', messageID: 'message', id: 'call', signal: new AbortController().signal, progress: vi.fn(async () => {}) });
 
 async function setup(options = {}) {
+  await cleanupPlugin?.();
   context.options = options;
   const directory = await materializeSearchPlugin(root);
   const { default: plugin } = await import(pathToFileURL(path.join(directory, 'index.js')).href);
-  await plugin.setup(context);
+  cleanupPlugin = await plugin.setup(context);
 }
 
 beforeEach(async () => {
@@ -35,6 +39,13 @@ beforeEach(async () => {
   provider = { id: 'proxy', settings: { apiKey: 'fixture-key', baseURL: `http://127.0.0.1:${server.address().port}/v1` }, headers: { authorization: 'stale' } };
   selection = 'native';
   hooks = new Map();
+  registered = new Map();
+  let transformTool;
+  const replayTools = async () => {
+    registered.clear();
+    registered.set('websearch', {});
+    transformTool({ namespace() {}, remove: id => registered.delete(id), add: value => { tool = value; registered.set('web_run', value); } });
+  };
   context = {
     options: {},
     provider: { list: vi.fn(async () => ({ data: [provider] })) },
@@ -45,9 +56,13 @@ beforeEach(async () => {
     permission: { assert: vi.fn(async () => {}) },
     websearch: {
       providers: vi.fn(async () => ({ data: [{ id: 'native' }] })),
-      transform: async transform => transform({ add: value => { native = value; }, default: { get: () => selection, set: value => { selection = value; } } }),
+      transform: async transform => {
+        replaySearch = () => transform({ add: value => { native = value; }, default: { get: () => selection, set: value => { selection = value; } } });
+        replaySearch();
+      },
     },
-    tool: { transform: async transform => transform({ namespace() {}, add: value => { tool = value; } }) },
+    tool: { reload: replayTools, transform: async transform => { transformTool = transform; await replayTools(); } },
+    event: { subscribe: async function* ({ signal }) { await new Promise(resolve => signal.addEventListener('abort', resolve, { once: true })); } },
     session: {
       context: vi.fn(async () => [
         { id: 'user', type: 'user', text: 'Find the docs' },
@@ -60,8 +75,47 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  await cleanupPlugin();
+  cleanupPlugin = undefined;
   await new Promise(resolve => server.close(resolve));
   await fs.rm(root, { recursive: true, force: true });
+});
+
+it('registers only the selected search implementation and removes both when disabled', async () => {
+  expect([...registered.keys()]).toEqual(['web_run']);
+  selection = 'other';
+  context.websearch.providers.mockResolvedValue({ data: [{ id: 'native' }, { id: 'other' }] });
+  await hooks.get('prompt')();
+  expect([...registered.keys()]).toEqual(['websearch']);
+  selection = false;
+  await hooks.get('prompt')();
+  expect([...registered.keys()]).toEqual([]);
+  selection = 'native';
+  await hooks.get('prompt')();
+  expect([...registered.keys()]).toEqual(['web_run']);
+  selection = 'random';
+  await hooks.get('prompt')();
+  expect([...registered.keys()]).toEqual(['websearch']);
+});
+
+it('reads selection after the provider registry refreshes its transforms', async () => {
+  selection = 'other';
+  context.websearch.providers.mockImplementationOnce(async () => {
+    selection = 'native';
+    return { data: [{ id: 'native' }, { id: 'other' }] };
+  });
+  await hooks.get('prompt')();
+  expect([...registered.keys()]).toEqual(['web_run']);
+});
+
+it('refreshes search tools when selection changes during a running turn', async () => {
+  await hooks.get('prompt')();
+  selection = false;
+  replaySearch();
+  expect([...registered.keys()]).toEqual([]);
+  selection = 'native';
+  replaySearch();
+  expect([...registered.keys()]).toEqual(['web_run']);
 });
 
 it('returns the backend text verbatim and preserves opaque result variants outside model content', async () => {
@@ -109,15 +163,10 @@ it.each(['literature_search_query', 'weather', 'sports', 'screenshot', 'max_outp
   expect(requests).toEqual([]);
 });
 
-it.each(['context', 'generate', 'compaction'])('honors the search selection in %s requests', async name => {
-  const event = { tools: { websearch: {}, web_run: {}, webfetch: {} } };
-  await hooks.get(name)(event);
-  expect(Object.keys(event.tools)).toEqual(['web_run', 'webfetch']);
+it('checks the selected implementation when a saved invocation starts', async () => {
   selection = false;
-  const disabled = { tools: { websearch: {}, web_run: {}, webfetch: {} } };
-  await hooks.get(name)(disabled);
-  expect(Object.keys(disabled.tools)).toEqual(['websearch', 'webfetch']);
   await expect(tool.execute({}, invocation())).rejects.toThrow('Select Codex search');
+  expect(requests).toEqual([]);
 });
 
 it('checks search-provider policy and invocation permissions before sending requests', async () => {

@@ -337,11 +337,14 @@ export function executeHasBackgroundableWork(metadata: Metadata | undefined): bo
  * are dropped rather than failing the list, so one malformed call cannot erase
  * the other calls of the same script.
  */
-export function executeToolCalls(metadata: Metadata | undefined): ExecuteToolCall[] {
+export function executeToolCalls(
+  metadata: Metadata | undefined,
+  include: (call: z.infer<typeof executeToolCallSchema> & { tool: string }) => boolean = () => true,
+): ExecuteToolCall[] {
   const calls = metadataSchema.parse(metadata ?? {}).toolCalls ?? []
   const parsed: ExecuteToolCall[] = []
   for (const call of calls) {
-    if (!call?.tool) continue
+    if (!call?.tool || !include({ ...call, tool: call.tool })) continue
     const entry: ExecuteToolCall = { tool: call.tool }
     const action = openChamberToolCall(call.tool, call.input)?.action
     if (action) entry.action = action

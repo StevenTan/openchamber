@@ -3,8 +3,18 @@
 Managed OpenCode exposes `request_user_input_async` with one or more questions,
 each carrying `title` and optional string `options`. Every field accepts free
 text; the first option is selected initially and requires explicit submission.
-The tool returns a question ID without waiting for the user. OpenCode's native
-forms render the question in the shared composer dock.
+The tool returns a JSON receipt containing `question_id`, `status: "pending"`,
+and `message`. Awaiting the call waits for question creation; the same turn can
+continue independent work while the user answers. Answers arrive as later session
+messages. OpenCode's native forms render the question in the shared composer dock.
+
+The plugin also describes the native `question` tool as waiting for an answer
+before returning. Its execution and input schema remain native. Use it when the
+answer is required before further work; use `request_user_input_async` when
+independent work can continue while the question is pending.
+
+Each tool invocation supplies its own request identity. Multiple questions within
+one native Code Mode script remain separate requests and keep their shared session.
 
 The UI groups pending asynchronous requests by their owning session. Fields retain
 their request IDs, answers stay in the client draft while the user switches

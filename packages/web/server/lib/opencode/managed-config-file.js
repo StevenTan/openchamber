@@ -6,6 +6,7 @@ import { EXTENSION_AUTHORING_COMMAND, materializeAuthoringSkill } from '../guest
 import { materializeTurnDiffPlugin } from '../turn-diffs/materialize.js';
 import { materializeCollaborationPlugin } from '../agent-collaboration/runtime.js';
 import { materializeQuotaUsagePlugin } from '../quota/response-usage.js';
+import { materializeCodeModePlugin } from '../agent-code-mode/runtime.js';
 
 export const MANAGED_CONFIG_FILE_NAME = 'opencode.managed.json';
 
@@ -141,6 +142,7 @@ export const createManagedConfigRuntime = ({
     directories.push(await materializeTurnDiffPlugin({ fsPromises, path, instanceDir }));
     if (agentToolRuntime) directories.push(await materializeCollaborationPlugin(instanceDir));
     directories.push(await materializeQuotaUsagePlugin({ fsPromises, instanceDir }));
+    if (agentToolRuntime) directories.push(await materializeCodeModePlugin(instanceDir));
     const disabled = includeImage ? [...DISABLED_BUILTIN_PLUGINS, BUILTIN_IMAGE_PLUGIN] : DISABLED_BUILTIN_PLUGINS;
     const authoring = await materializeAuthoringSkill({ fsPromises, instanceDir, openchamberVersion });
     const skills = [authoring.skillsRoot, ...await listExtensionSkillDirectories()];

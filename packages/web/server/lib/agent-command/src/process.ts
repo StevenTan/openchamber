@@ -14,7 +14,6 @@ import {
 
 export interface CommandProcess {
   pid: number;
-  write(input: string): void;
   onData(
     listener: (data: string, stream?: "stdout" | "stderr") => void,
   ): { dispose(): void };
@@ -27,6 +26,7 @@ export interface CommandProcess {
 interface CommandLaunch {
   process: CommandProcess;
   shellExecutable: string;
+  sendInput(input: string, closeStdin: boolean, signal?: AbortSignal): void | Promise<void>;
   closeNative?: () => void;
 }
 
@@ -71,7 +71,7 @@ async function spawnPipedCommand(
   const child = spawn(executable, args, {
     cwd: workdir,
     env,
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: ["pipe", "pipe", "pipe"],
     detached: process.platform !== "win32",
   });
   const kill = (signal: NodeJS.Signals = "SIGTERM") => {
@@ -113,11 +113,6 @@ async function spawnPipedCommand(
   const pid = child.pid!; // The spawn event guarantees a process ID.
   const commandProcess: CommandProcess = {
     pid,
-    write(input) {
-      if (input !== "\x03")
-        throw new Error("stdin is closed; start interactive commands with tty: true");
-      kill("SIGINT");
-    },
     onData(listener) {
       child.stdout.setEncoding("utf8");
       child.stderr.setEncoding("utf8");
@@ -141,7 +136,40 @@ async function spawnPipedCommand(
     },
     kill,
   };
-  return { process: commandProcess, shellExecutable: executable };
+  const pendingInput = new Set<(error: Error) => void>();
+  // Stream failures reject pending writes; callbacks may have already reported the same failure.
+  child.stdin.on("error", error => {
+    for (const failed of pendingInput) failed(error);
+  });
+  const sendInput = (input: string, closeStdin: boolean, signal?: AbortSignal) => {
+    signal?.throwIfAborted();
+    if (input === "\x03") {
+      kill("SIGINT");
+      input = "";
+    }
+    if (!input && !closeStdin) return;
+    return new Promise<void>((resolve, reject) => {
+      const cleanup = () => {
+        pendingInput.delete(failed);
+        signal?.removeEventListener("abort", aborted);
+      };
+      const failed = (error: Error) => { cleanup(); reject(error); };
+      const aborted = () => {
+        cleanup();
+        reject(signal?.reason);
+      };
+      const completed = (error?: Error | null) => {
+        if (error) { failed(error); return; }
+        cleanup();
+        resolve();
+      };
+      pendingInput.add(failed);
+      signal?.addEventListener("abort", aborted, { once: true });
+      if (closeStdin) child.stdin.end(input, completed);
+      else child.stdin.write(input, completed);
+    });
+  };
+  return { process: commandProcess, shellExecutable: executable, sendInput };
 }
 
 export async function prepareCommandSpawn(tty: boolean) {
@@ -173,8 +201,7 @@ export async function prepareCommandSpawn(tty: boolean) {
     if (!provider)
       return spawnPipedCommand(shell.executable, shell.args, workdir, env);
     const launch = resolvePosixPtyLaunch(shell.executable, shell.args);
-    const terminal: CommandProcess =
-      provider.spawn(launch.executable, launch.args, {
+    const terminal: CommandProcess & { write(input: string): void } = provider.spawn(launch.executable, launch.args, {
         cwd: workdir,
         env,
         cols: 120,
@@ -183,6 +210,11 @@ export async function prepareCommandSpawn(tty: boolean) {
     return {
       process: terminal,
       shellExecutable,
+      sendInput(input: string, closeStdin: boolean, signal?: AbortSignal) {
+        signal?.throwIfAborted();
+        if (closeStdin) throw new Error("close_stdin is available only for pipe sessions; send terminal EOF through chars for a PTY");
+        terminal.write(input);
+      },
       closeNative: () => {
         if (provider.backend === "bun-pty") terminal.kill();
       },

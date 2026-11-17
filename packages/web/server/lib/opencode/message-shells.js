@@ -63,6 +63,7 @@ const MAX_ENVELOPE_CHARS = 256 * 1024;
 // A result of one text item small enough to read: an envelope is a few
 // kilobytes, and a large result is something else.
 const singleTextSchema = z.tuple([z.object({ type: z.literal('text'), text: z.string().max(MAX_ENVELOPE_CHARS) })]);
+const recordedCallSchema = z.object({ tool: z.string(), output: z.string() });
 
 /**
  * Which action an OpenChamber envelope answers and whether it succeeded: what
@@ -85,7 +86,18 @@ const shellTool = (part, keepWhole) => {
   if (!isRecord(state) || (state.status !== 'completed' && state.status !== 'error')) return tool;
   if (keepWhole.has(tool.name) || ALWAYS_WHOLE_TOOLS.has(tool.name)) return tool;
   const content = Array.isArray(state.content) ? state.content : [];
-  const metadata = isRecord(state.metadata) ? state.metadata : {};
+  const originalMetadata = isRecord(state.metadata) ? state.metadata : {};
+  const metadata = Array.isArray(originalMetadata.openchamberToolCalls) ? {
+    ...originalMetadata,
+    openchamberToolCalls: originalMetadata.openchamberToolCalls.map(call => {
+      const recorded = recordedCallSchema.safeParse(call);
+      if (!recorded.success) return call;
+      const nested = shellTool({ name: recorded.data.tool, state: {
+        ...call, content: [{ type: 'text', text: recorded.data.output }],
+      } }, keepWhole).state;
+      return { ...call, output: nested.content[0].text, metadata: nested.metadata };
+    }),
+  } : originalMetadata;
   // `metadata.output` repeats a shell's output for the running view.
   const { output: _output, ...keptMetadata } = metadata;
   if (content.length === 0 && _output === undefined) return tool;

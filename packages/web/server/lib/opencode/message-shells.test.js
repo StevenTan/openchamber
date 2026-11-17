@@ -38,6 +38,19 @@ describe('parsePartShellsHeader', () => {
 });
 
 describe('shellMessagePage', () => {
+  test('shells recorded script results using each tool rule and keeps its file diff', () => {
+    const calls = [
+      { tool: 'read', status: 'completed', input: { path: 'a.ts' }, output: 'FILE_BODY', time: { start: 1, end: 2 } },
+      { tool: 'edit', status: 'completed', input: { path: 'a.ts' }, output: 'Edited', time: { start: 2, end: 3 }, metadata: { files: [{ file: 'a.ts', patch: '-old\n+new' }] } },
+    ];
+    const original = page([tool('execute', completed({ metadata: { openchamberToolCalls: calls } }))]);
+    const result = shellMessagePage(original, new Set());
+    const [read, edit] = result.data[0].content[0].state.metadata.openchamberToolCalls;
+    expect(read).toMatchObject({ tool: 'read', input: { path: 'a.ts' }, output: '', metadata: { openchamberContentShell: { chars: 9 } } });
+    expect(edit).toEqual(calls[1]);
+    expect(original.data[0].content[0].state.metadata.openchamberToolCalls[0].output).toBe('FILE_BODY');
+    expect(shellMessagePage(original, new Set(['read'])).data[0].content[0].state.metadata.openchamberToolCalls[0]).toEqual(calls[0]);
+  });
   test('replaces a finished result with a marker and keeps what the collapsed row reads', () => {
     const result = shellMessagePage(page([tool('shell', completed(), { native: { a: 1, b: 2 } })]), new Set());
     const part = result.data[0].content[0];

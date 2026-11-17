@@ -34,7 +34,7 @@ const commandInput = z
     tty: z
       .boolean()
       .default(false)
-      .describe("True allocates a PTY for interactive commands. Defaults to false, which uses output pipes and closed stdin."),
+      .describe("Set true at launch for programs that require a terminal. Defaults to false: stdin, stdout and stderr use pipes, and write_stdin can supply input. This mode is fixed for the session."),
     shell: z.string().min(1).optional().describe("Shell binary to launch. Defaults to the user's default shell."),
   })
   .strict();
@@ -50,8 +50,9 @@ const stdinInput = z
       .string()
       .default("")
       .describe(
-        "Characters to write to PTY stdin. Defaults to empty, which waits without writing. Input is sent verbatim; include a newline to submit a line. Ctrl+C (U+0003) interrupts commands in either mode. Other input requires tty: true at launch.",
+        "Characters to write to command stdin. Input is sent verbatim; include a newline to submit a line. Ctrl+C (U+0003) interrupts commands in either mode. Defaults to empty, which waits without writing unless close_stdin is true.",
       ),
+    close_stdin: z.boolean().default(false).describe("Close a pipe session's stdin after sending chars, delivering EOF. Combine with the final input in one call, or use empty chars to send only EOF. Applies to tty: false sessions; PTY input uses terminal control characters."),
     yield_time_ms: z.number().int().min(0).optional().describe(
       "Collect output until completion or this wait ends. Non-empty writes default to 250 ms, with an effective range of 250-30000 ms. Empty waits default to 5000 ms, with a range of 5000-300000 ms. Output chunks do not end the wait. Absolute and tail reads return immediately.",
     ),
@@ -174,6 +175,16 @@ export function createCommandToolRuntime({
     const source = createCommandPluginSource({
       exec_command: z.toJSONSchema(commandInput, { io: "input" }),
       write_stdin: z.toJSONSchema(stdinInput, { io: "input" }),
+      output: z.toJSONSchema(z.object({
+        status: z.enum(["running", "completed"]),
+        session_id: z.string(),
+        output: z.string(),
+        truncated: z.boolean(),
+        read_from: z.number(),
+        total_lines: z.number(),
+        exit_code: z.number().nullable().optional(),
+        signal: z.number().optional(),
+      })),
     });
     await fs.mkdir(pluginDirectory, { recursive: true });
     for (const [name, content] of [
@@ -243,10 +254,10 @@ export function createCommandToolRuntime({
     if (!manager) throw new Error("Command session not found");
     const args = stdinInput.parse(input);
     const pid = Number(args.session_id);
-    if (args.chars && manager.getSession(pid))
-      manager.sendInputToProcess(pid, args.chars);
+    if ((args.chars || args.close_stdin) && manager.getSession(pid))
+      await manager.sendInputToProcess(pid, args.chars, args.close_stdin, signal);
     if (args.offset === undefined || args.offset === 0)
-      await manager.waitForOutput(pid, continuationWait(args.chars, args.yield_time_ms), signal);
+      await manager.waitForOutput(pid, continuationWait(args.chars, args.yield_time_ms, args.close_stdin), signal);
     signal?.throwIfAborted();
     return readResult(manager, pid, args);
   };

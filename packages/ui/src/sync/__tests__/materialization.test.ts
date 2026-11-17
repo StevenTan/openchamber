@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import type { Message, Part, PartType, ToolPart } from "@/lib/opencode/model"
+import type { Message, Part, PartType, ToolPart, Metadata } from "@/lib/opencode/model"
 import {
   getSessionMaterializationRequestKey,
   getSessionMaterializationStatus,
@@ -456,6 +456,32 @@ describe("materializeSessionSnapshots", () => {
 
     const holdingShell = materializeSessionSnapshots({ message: { ses_1: [info] }, part: { msg_1: [shell] } }, "ses_1", [{ info, parts: [whole] }])
     expect(holdingShell.part.msg_1[0]).toEqual(whole)
+  })
+
+  test("retains loaded script and inner results independently while other inner calls are shells", () => {
+    const script = (page: boolean, full: boolean): ToolPart => {
+      const metadata: Metadata = {
+        openchamberToolCalls: [
+          { tool: "read", status: "completed", input: { path: "a.ts" }, output: full ? "FILE_BODY" : "", time: { start: 1, end: 2 },
+            metadata: full ? {} : { openchamberContentShell: { chars: 9 } } },
+          { tool: "exec_command", status: "completed", input: { cmd: "ls" }, output: page ? "" : "COMMAND_BODY", time: { start: 1, end: 2 },
+            metadata: page ? { openchamberContentShell: { chars: 12 } } : {} },
+        ],
+      };
+      if (page) metadata.openchamberContentShell = { chars: 7 };
+      return {
+        id: "script", messageID: "msg_1", sessionID: "ses_1", type: "tool", tool: "execute", callID: "script",
+        state: { status: "completed", input: { code: "return results" }, output: page ? "" : "SUMMARY", time: { start: 1, end: 2 }, metadata },
+      };
+    };
+    const info = completedAssistantMessage("msg_1");
+    const existing = script(false, false);
+    const result = materializeSessionSnapshots({ message: { ses_1: [info] }, part: { msg_1: [existing] } }, "ses_1", [{ info, parts: [script(true, false)] }]);
+    expect(JSON.stringify(result.part.msg_1)).toContain("SUMMARY");
+    expect(JSON.stringify(result.part.msg_1)).toContain("COMMAND_BODY");
+    expect(JSON.stringify(result.part.msg_1)).not.toContain("FILE_BODY");
+    const complete = materializeSessionSnapshots(result, "ses_1", [{ info, parts: [script(false, true)] }]);
+    expect(JSON.stringify(complete.part.msg_1)).toContain("FILE_BODY");
   })
 
   test("preserves state.attachments from existing part when completed snapshot lacks them", () => {

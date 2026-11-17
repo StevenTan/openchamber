@@ -191,6 +191,9 @@ gap.
   Dockerfile. They move together, including `opencode.url` in `flake.nix`
   (see the bump steps).
 
+  The web package's `@opencode/codemode` catalog dependency follows the same
+  CLI version; its declared `effect` dependency follows that package's version.
+
 ## "What's new in OpenCode 2.x?"
 
 Answer from the diff. Done when every API-facing change between the pinned

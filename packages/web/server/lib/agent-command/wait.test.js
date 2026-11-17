@@ -24,4 +24,9 @@ describe('command wait windows', () => {
     expect(continuationWait('', 300000)).toBe(300000);
     expect(continuationWait('', 600000)).toBe(300000);
   });
+
+  it('treats EOF without text as an input operation', () => {
+    expect(continuationWait('', undefined, true)).toBe(250);
+    expect(continuationWait('', 1000, true)).toBe(1000);
+  });
 });

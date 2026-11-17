@@ -1,6 +1,6 @@
 import { opencodeClient } from "@/lib/opencode/client"
 import { getRuntimeKey } from "@/lib/runtime-switch"
-import { toolContentShellChars } from "@/lib/opencode/toolContentShells"
+import { hasShelledToolContent } from "@/lib/opencode/toolContentShells"
 import { materializeSessionSnapshots } from "./materialization"
 import { getSyncChildStores } from "./sync-refs"
 
@@ -39,7 +39,7 @@ export function completeToolContent(target: CompletionTarget, messageID: string)
   if (!store) return Promise.resolve()
   const state = store.getState()
   if (!state.message[target.sessionID]?.some((message) => message.id === messageID)
-    || !state.part[messageID]?.some((part) => toolContentShellChars(part) !== null)) {
+    || !state.part[messageID]?.some(hasShelledToolContent)) {
     return Promise.resolve()
   }
   const completion = opencodeClient.getToolContentMessage(target.sessionID, messageID, target.directory)

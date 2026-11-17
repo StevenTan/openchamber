@@ -3,6 +3,11 @@
 ## Purpose
 This module provides OpenCode server integration utilities for the web server runtime, including configuration management and provider authentication.
 
+Message pages apply the tool-content shell policy to recorded Code Mode calls
+as well as top-level tool parts. File edit metadata stays immediately available;
+other results retain their collapsed-row fields and a content-shell marker.
+Single-message reads return the original complete records.
+
 The managed config registers `agent-search` alongside `agent-command`. It
 disables the external `opencode-websearch` plugin while the built-in search
 plugin owns the `native` provider. See `../agent-search/DOCUMENTATION.md` for
@@ -1477,6 +1482,10 @@ model's tool list. Its contract is in `../agent-command/DOCUMENTATION.md`.
 The managed child-agent coordination plugin adds follow-up, wait and interrupt
 tools alongside native `subagent`. Its contract is in
 `../agent-collaboration/DOCUMENTATION.md`.
+
+The managed Code Mode plugin selects operation tools for native `execute` and
+supplies complete tool descriptions and signatures. Card tools retain direct
+entries; `../agent-code-mode/DOCUMENTATION.md` owns the catalog contract.
 
 OpenChamber injects its own OpenCode plugins through a file it owns rather than
 through the process environment, because an environment variable cannot change

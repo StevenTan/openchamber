@@ -52,6 +52,7 @@ interface TerminalSession {
   evictedChars: number;
 }
 interface ManagedSession extends TerminalSession {
+  sendInput(input: string, closeStdin: boolean, signal?: AbortSignal): void | Promise<void>;
   streams: StreamTails;
   shellExecutable: string;
   closed: Promise<void>;
@@ -108,10 +109,10 @@ export class TerminalManager {
     this.getEnvironment = getEnvironment;
     this.closing = false;
   }
-  sendInputToProcess(pid: number, input: string): boolean {
+  async sendInputToProcess(pid: number, input: string, closeStdin: boolean, signal?: AbortSignal): Promise<boolean> {
     const session = this.sessions.get(pid);
     if (!session) return false;
-    session.process.write(input);
+    await session.sendInput(input, closeStdin, signal);
     return true;
   }
   async executeCommand(
@@ -150,6 +151,7 @@ export class TerminalManager {
       process: childProcess,
       shellExecutable,
       closeNative,
+      sendInput,
     } = child;
     if (signal?.aborted || this.closing) {
       const exited = new Promise<void>((resolve) => {
@@ -178,6 +180,7 @@ export class TerminalManager {
       evictedChars: 0,
       streams: newStreamTails(),
       shellExecutable,
+      sendInput,
       closed: new Promise((resolve) => {
         resolveClosed = resolve;
       }),

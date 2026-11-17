@@ -3,9 +3,10 @@
 ## Ownership
 
 This module registers `web.run` and the `native` search provider in managed
-OpenCode instances. OpenCode flattens the direct tool name to `web_run`.
+OpenCode instances. Native Code Mode calls the search tool as `tools.web.run`.
 `runtime.js` publishes the bundled plugin in the managed instance directory.
 `UPSTREAM.md` identifies the official protocol and tool-description sources.
+`selection.ts` owns provider selection, registry visibility and its lifecycle.
 
 Web and Electron inject the plugin. Hosted and Capacitor clients use their
 connected server's plugin. External OpenCode and VS Code own their plugins.
@@ -20,7 +21,7 @@ connected server's plugin. External OpenCode and VS Code own their plugins.
   opaque in tool metadata. They may contain future result variants.
 - Image search produces text and metadata. Image URLs in search text are
   source data; the plugin does not emit file content items.
-- Direct calls use the invoking assistant's model and the provider's current
+- Calls use the invoking assistant's model and the provider's current
   credentials and headers. Model `baseURL` takes precedence over provider
   `baseURL`; requests use `<baseURL>/alpha/search`.
 - Backend references use `openchamber_<sessionID>`. Sessions cannot share
@@ -30,8 +31,12 @@ connected server's plugin. External OpenCode and VS Code own their plugins.
   text, with a shared approximate 1000-token assistant budget. Tool results,
   reasoning and media are outside this search context.
 - OpenCode search selection, provider policy and `websearch` permissions govern
-  access. With `native` selected, model requests expose `web_run`; other search
-  selections use OpenCode's built-in `websearch`.
+  access. The tool registry contains `web_run` with `native` selected, built-in
+  `websearch` for another selected provider, and neither when search is disabled.
+  Search-selection transforms refresh the registry during running turns;
+  provider events and prompt admission refresh the available provider set.
+  Each native invocation refreshes provider availability before contacting the
+  backend, including policy changes awaiting their event observer.
 - Plugin options own runtime settings: `web_search` (`cached`, `indexed` or `live`,
   default `cached`),
   `web_search_config` (`user_location`, `search_context_size`,

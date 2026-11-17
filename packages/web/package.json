@@ -24,11 +24,11 @@
     "build:watch": "bun ../../scripts/build-builtin-extensions.mjs && vite build --watch",
     "prepack": "bun run build:server && bun ../../scripts/build-builtin-extensions.mjs",
     "type-check": "bun check -b && bun run type-check:server",
-    "lint": "oxlint -c ../../oxlint.config.ts --report-unused-disable-directives src server/lib/agent-command/src server/lib/agent-search/src server/lib/agent-question/src server/lib/agent-collaboration/src",
+    "lint": "oxlint -c ../../oxlint.config.ts --report-unused-disable-directives src server/lib/agent-command/src server/lib/agent-search/src server/lib/agent-question/src server/lib/agent-collaboration/src server/lib/agent-code-mode/src",
     "test": "bun run build:server && vitest run",
     "start": "node bin/cli.js serve",
     "type-check:server": "tsc --project tsconfig.agent-command.json",
-    "build:server": "bun run type-check:server && tsc --project tsconfig.agent-command.build.json && bun build ./server/lib/agent-search/src/plugin.ts --outfile ./server/lib/agent-search/dist/plugin.js --target node --format esm && tsc --project tsconfig.agent-question.build.json && bun build ./server/lib/agent-collaboration/src/plugin.ts ./server/lib/agent-collaboration/src/runtime.ts --outdir ./server/lib/agent-collaboration/dist --target node --format esm"
+    "build:server": "bun run type-check:server && tsc --project tsconfig.agent-command.build.json && bun build ./server/lib/agent-search/src/plugin.ts --outfile ./server/lib/agent-search/dist/plugin.js --target node --format esm && tsc --project tsconfig.agent-question.build.json && bun build ./server/lib/agent-collaboration/src/plugin.ts ./server/lib/agent-collaboration/src/runtime.ts --outdir ./server/lib/agent-collaboration/dist --target node --format esm && bun build ./server/lib/agent-code-mode/src/plugin.ts --outfile ./server/lib/agent-code-mode/dist/plugin.js --target node --format esm"
   },
   "dependencies": {
     "7zip-bin": "5.2.0",
@@ -37,12 +37,14 @@
     "@octokit/rest": "^22.0.1",
     "@openchamber/sdk": "workspace:*",
     "@opencode/client": "2.2.7",
+    "@opencode/codemode": "2.2.7",
     "@opencode/schema": "2.2.7",
     "@simplewebauthn/server": "13.3.3",
     "@vscode/ripgrep": "^1.18.0",
     "bun-pty": "0.6.0",
     "compression": "^1.8.1",
     "cron-parser": "^5.10.1",
+    "effect": "4.1.0",
     "express": "^5.1.0",
     "http-proxy-middleware": "^3.0.5",
     "jose": "^6.1.3",

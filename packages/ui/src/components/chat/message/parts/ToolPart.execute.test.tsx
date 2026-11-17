@@ -83,6 +83,8 @@ test('a Code Mode call shows its script, the tools it called, and the truncation
     Element: happyWindow.Element,
     HTMLElement: happyWindow.HTMLElement,
     SVGElement: happyWindow.SVGElement,
+    Event: happyWindow.Event,
+    CustomEvent: happyWindow.CustomEvent,
     requestAnimationFrame: happyWindow.requestAnimationFrame.bind(happyWindow),
     cancelAnimationFrame: happyWindow.cancelAnimationFrame.bind(happyWindow),
     getComputedStyle: happyWindow.getComputedStyle.bind(happyWindow),
@@ -203,6 +205,55 @@ test('a Code Mode call shows its script, the tools it called, and the truncation
       for (const text of expected) expect(container.textContent).toContain(text);
       expect(container.textContent).not.toContain('schemaVersion');
     }
+    const filePart: ToolPartData = {
+      ...part, id: 'prt_files',
+      state: {
+        status: 'completed', input: { code: 'await tools.edit({path:"src/example.ts",oldString:"before",newString:"after"})' },
+        output: 'SCRIPT_SUMMARY', time: { start: 1, end: 10 },
+        metadata: { toolCalls: [{ tool: 'read', status: 'completed', input: { path: '/repo/notes.txt' } }, { tool: 'read', status: 'error', input: {} }], openchamberToolCalls: [
+          { tool: 'edit', status: 'completed', input: { path: 'src/example.ts', oldString: 'before', newString: 'after' },
+            output: 'EDIT_RESULT', time: { start: 2, end: 3 }, metadata: { files: [{ file: '/repo/src/example.ts', additions: 1, deletions: 1,
+              patch: '--- a/src/example.ts\n+++ b/src/example.ts\n@@ -1 +1 @@\n-before\n+after\n' }] } },
+          { tool: 'read', status: 'completed', input: { path: '/repo/notes.txt' }, output: 'READ_RESULT', time: { start: 4, end: 5 } },
+        ] },
+      },
+    };
+    await act(async () => {
+      root.render(
+        <SyncProvider sdk={sdk} directory="/repo">
+          <I18nProvider>
+            <ThemeSystemContext.Provider value={themeContext}>
+              <ToolPart key={filePart.id} part={filePart} isExpanded={false} isMobile={false} onToggle={() => {}} />
+            </ThemeSystemContext.Provider>
+          </I18nProvider>
+        </SyncProvider>,
+      );
+    });
+    expect(container.textContent).toContain('example.ts');
+    expect(container.textContent).toContain('notes.txt');
+    expect(container.textContent).toContain('+1');
+    expect(container.textContent).toContain('−1');
+    const rows = Array.from(container.querySelectorAll('[role="button"]'));
+    const editRow = rows.find(row => row.textContent?.includes('example.ts'));
+    const readRow = rows.find(row => row.textContent?.includes('notes.txt'));
+    if (!editRow || !readRow) throw new Error('Expected file activity rows');
+    await act(async () => {
+      await import('./ToolPartDiffPreview');
+      editRow.querySelector<HTMLElement>('.cursor-pointer')!.click();
+    });
+    expect(container.querySelector('button[aria-label="Open file diff"]')).not.toBeNull();
+    expect(container.textContent).not.toContain('SCRIPT_SUMMARY');
+    await act(async () => { readRow.querySelector<HTMLElement>('.cursor-pointer')!.click(); });
+    expect(container.textContent).toContain('READ_RESULT');
+    await act(async () => {
+      root.render(
+        <SyncProvider sdk={sdk} directory="/repo"><I18nProvider><ThemeSystemContext.Provider value={themeContext}>
+          <ToolPart key={filePart.id} part={filePart} isExpanded isMobile={false} onToggle={() => {}} />
+        </ThemeSystemContext.Provider></I18nProvider></SyncProvider>,
+      );
+    });
+    expect(container.textContent).toContain('Tool calls');
+    expect(container.textContent).not.toContain('{"path":"/repo/notes.txt"}');
   } finally {
     await act(async () => { root.unmount(); });
     await happyWindow.happyDOM.abort();

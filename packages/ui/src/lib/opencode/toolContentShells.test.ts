@@ -2,11 +2,30 @@ import { describe, expect, test } from "bun:test"
 
 import type { JsonValue } from "./model"
 import { projectToolPart } from "./projection"
-import { toolContentShellChars, toolContentShellEnvelope } from "./toolContentShells"
+import { hasShelledToolContent, toolContentShellChars, toolContentShellEnvelope, withoutUnshownResult } from "./toolContentShells"
 
 const owner = { sessionID: "ses_1", messageID: "msg_1" }
 
 describe("toolContentShellChars", () => {
+  test("compacts recorded navigation results and recognizes them inside a whole script", () => {
+    const whole = projectToolPart({
+      type: "tool", id: "script", name: "execute", time: { created: 1, ran: 2, completed: 3 },
+      state: { status: "completed", input: {}, content: [{ type: "text", text: "Script answer" }], metadata: {
+        openchamberToolCalls: [
+          { tool: "read", status: "completed", input: { path: "a.ts" }, output: "FILE_BODY", time: { start: 1, end: 2 } },
+          { tool: "edit", status: "completed", input: { path: "a.ts" }, output: "Edited", time: { start: 2, end: 3 } },
+        ],
+      } },
+    }, owner)
+    expect(hasShelledToolContent(whole)).toBe(false)
+    const shelled = withoutUnshownResult(whole)
+    expect(toolContentShellChars(shelled)).toBeNull()
+    expect(hasShelledToolContent(shelled)).toBe(true)
+    expect(JSON.stringify(shelled)).not.toContain("FILE_BODY")
+    expect(JSON.stringify(shelled)).toContain("Edited")
+    expect(JSON.stringify(whole)).toContain("FILE_BODY")
+    expect(withoutUnshownResult(shelled)).toBe(shelled)
+  })
   test("reads the marker the server puts on a shelled call", () => {
     const part = projectToolPart({
       type: "tool",

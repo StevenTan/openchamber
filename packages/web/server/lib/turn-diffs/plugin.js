@@ -78,6 +78,7 @@ export default {
     const directory = ctx.location.directory;
     const queues = new Map();
     const calls = new Map();
+    const scripts = new Map();
     const turns = new Map();
     const anchors = new Map();
     const controller = new AbortController();
@@ -152,8 +153,32 @@ export default {
       turn.dirty = false;
       return record;
     };
+    const settleCapture = async (key, capture) => {
+      calls.delete(key);
+      let metadata;
+      try {
+        if (capture.error) throw new Error(capture.error);
+        metadata = summary(await save(capture.turn));
+      } catch (error) {
+        metadata = { error: error.message };
+        if (capture.turn) {
+          metadata.turnID = capture.turn.turnID;
+          metadata.files = Object.keys(capture.turn.files).map((file) => ({ file: displayPath(file, capture.turn.directory), status: 'modified' }));
+        }
+        console.error('[turn-diffs] capture failed:', error.message);
+      }
+      const script = scripts.get(key);
+      if (script) script.diff = metadata;
+      return metadata;
+    };
     const finish = async (sessionID, deleted = false) => {
       anchors.delete(sessionID);
+      for (const [key, capture] of calls) {
+        if (capture.sessionID !== sessionID) continue;
+        if (!deleted && scripts.has(key)) await settleCapture(key, capture);
+        else calls.delete(key);
+      }
+      for (const [key, script] of scripts) if (script.sessionID === sessionID) scripts.delete(key);
       for (const { key, value } of await scan(`active:${sessionID}:`)) {
         // The last settled tool already persisted the actual file bytes as a patch.
         // Reading the workspace here could include later unrelated changes.
@@ -166,10 +191,16 @@ export default {
       }
     };
     await ctx.tool.hook('execute.before', async (event) => {
+      if (event.tool === 'execute') {
+        scripts.set(callKey(event), { sessionID: event.sessionID });
+        return;
+      }
       if (!['write', 'edit', 'patch'].includes(event.tool)) return;
       await serial(event.sessionID, async () => {
-        const capture = { sessionID: event.sessionID };
-        calls.set(callKey(event), capture);
+        const key = callKey(event);
+        const capture = calls.get(key) ?? { sessionID: event.sessionID, pending: 0 };
+        capture.pending++;
+        calls.set(key, capture);
         try {
           const turn = await getTurn(event.sessionID, await anchorFor(event.sessionID, event.messageID));
           capture.turn = turn;
@@ -193,22 +224,26 @@ export default {
       });
     });
     await ctx.tool.hook('execute.after', async (event) => {
-      const capture = calls.get(callKey(event));
-      if (!capture) return;
-      calls.delete(callKey(event));
-      await serial(event.sessionID, async () => {
-        let metadata;
-        try {
-          if (capture.error) throw new Error(capture.error);
-          metadata = summary(await save(capture.turn));
-        } catch (error) {
-          metadata = { error: error.message };
-          if (capture.turn) {
-            metadata.turnID = capture.turn.turnID;
-            metadata.files = Object.keys(capture.turn.files).map((file) => ({ file: displayPath(file, capture.turn.directory), status: 'modified' }));
+      if (event.tool === 'execute') {
+        await serial(event.sessionID, async () => {
+          const key = callKey(event);
+          const capture = calls.get(key);
+          if (capture) await settleCapture(key, capture);
+          const script = scripts.get(key);
+          scripts.delete(key);
+          if (script?.diff) {
+            const result = event.status === 'completed' ? event.result : event.error;
+            result.metadata = { ...result.metadata, openchamberTurnDiff: script.diff };
           }
-          console.error('[turn-diffs] capture failed:', error.message);
-        }
+        });
+        return;
+      }
+      if (!['write', 'edit', 'patch'].includes(event.tool)) return;
+      await serial(event.sessionID, async () => {
+        const capture = calls.get(callKey(event));
+        if (!capture) return;
+        if (--capture.pending > 0) return;
+        const metadata = await settleCapture(callKey(event), capture);
         const result = event.status === 'completed' ? event.result : event.error;
         result.metadata = { ...result.metadata, openchamberTurnDiff: metadata };
       });

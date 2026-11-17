@@ -9,6 +9,7 @@ import { BlockBody } from './BlockLine';
 import { FormMarkdown } from '../../FormMarkdown';
 import { MessageFilesDisplay } from '../../FileAttachment';
 import { getToolMetadata } from '@/lib/toolHelpers';
+import { codeModeCallParts } from '@/lib/opencode/code-mode-parts';
 import type { FilePart, Metadata, Part, ToolInput, ToolPart as ToolPartType, ToolState as ToolStateUnion } from '@/lib/opencode/model';
 import { toolDisplayStyles } from '@/lib/typography';
 import { WorkerHighlightedCode } from '@/components/code/WorkerHighlightedCode';
@@ -92,6 +93,7 @@ import {
     executeOutputTruncation,
     executeScript,
     executeToolCalls,
+    directToolName,
     isEditTool,
     isExecuteTool,
     isFileChangeTool,
@@ -213,7 +215,7 @@ const parseDiffStats = (metadata?: Metadata): { added: number; removed: number }
 
 const parseWriteLineCount = (input?: Record<string, unknown>): number | null => {
     if (!input?.content || typeof input.content !== 'string') return null;
-    let lines = 1;
+    let lines = input.content.endsWith('\n') ? 0 : 1;
     for (let index = 0; index < input.content.length; index += 1) {
         if (input.content.charCodeAt(index) === 10) {
             lines += 1;
@@ -237,6 +239,7 @@ const buildWritePreviewPatch = (filePath: string | undefined, content: string): 
     })();
 
     const lines = normalizedContent.split('\n');
+    if (lines.at(-1) === '') lines.pop();
     const hunkSize = lines.length;
     const body = lines.map((line) => `+${line}`).join('\n');
 
@@ -1182,7 +1185,18 @@ const ToolExpandedContent: React.FC<ToolExpandedContentProps> = React.memo(({
         || isExecuteTool(part.tool);
     const isExecute = isExecuteTool(part.tool);
     const executeCode = React.useMemo(() => (isExecute ? executeScript(input) : undefined), [input, isExecute]);
-    const executeCalls = React.useMemo(() => (isExecute ? executeToolCalls(metadata) : []), [isExecute, metadata]);
+    const executeCalls = React.useMemo(() => {
+        if (!isExecute) return [];
+        const recorded = codeModeCallParts(part);
+        return executeToolCalls(metadata, call => {
+            const index = recorded.findIndex(record => record.tool === directToolName(call.tool)
+                && record.state.status === call.status
+                && JSON.stringify(record.state.input) === JSON.stringify(call.input));
+            if (index === -1) return true;
+            recorded.splice(index, 1);
+            return false;
+        });
+    }, [isExecute, metadata, part]);
     const executeTruncation = React.useMemo(
         () => (isExecute ? executeOutputTruncation(metadata) : null),
         [isExecute, metadata],
@@ -2509,16 +2523,16 @@ const SubagentToolPartContent: React.FC<ToolPartProps> = (props) => {
  * failed call or a failed script keeps the script row, the only one that
  * shows what went wrong.
  */
-const useShownToolPart = (part: ToolPartProps['part']): ToolPartProps['part'] => {
+const useShownToolPart = (part: ToolPartProps['part'], hasRecordedCalls: boolean): ToolPartProps['part'] => {
     const metadata = 'metadata' in part.state ? part.state.metadata : undefined;
     const sole = React.useMemo(
-        () => (isExecuteTool(part.tool) ? soleNamedCall(metadata) : undefined),
-        [metadata, part.tool],
+        () => (!hasRecordedCalls && isExecuteTool(part.tool) ? soleNamedCall(metadata) : undefined),
+        [hasRecordedCalls, metadata, part.tool],
     );
     const finished = part.state.status === 'completed';
     const direct = React.useMemo(
-        () => (!sole && finished && isExecuteTool(part.tool) ? soleDirectCall(metadata) : undefined),
-        [finished, metadata, part.tool, sole],
+        () => (!hasRecordedCalls && !sole && finished && isExecuteTool(part.tool) ? soleDirectCall(metadata) : undefined),
+        [hasRecordedCalls, finished, metadata, part.tool, sole],
     );
     const ruled = useGuestToolPresentation(direct?.tool) ? direct : undefined;
     const shown = sole ?? ruled;
@@ -2530,12 +2544,25 @@ const useShownToolPart = (part: ToolPartProps['part']): ToolPartProps['part'] =>
 
 const ToolPart: React.FC<ToolPartProps> = (incoming) => {
     const { t } = useI18n();
-    const part = useShownToolPart(incoming.part);
+    const calls = React.useMemo(() => codeModeCallParts(incoming.part), [incoming.part]);
+    const part = useShownToolPart(incoming.part, calls.length > 0);
     const props = part === incoming.part ? incoming : { ...incoming, part };
     const toolName = normalizeToolName(props.part.tool) || 'tool';
     const displayName = toolDisplayName(toolName, t);
     const backgroundShellID = isShellTool(toolName) ? readBackgroundShellID(props.part) : undefined;
+    const [expandedCalls, setExpandedCalls] = React.useState<ReadonlySet<string>>(() => new Set());
+    const toggleCall = React.useCallback((id: string) => setExpandedCalls(current => {
+        const next = new Set(current);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+    }), []);
 
+    const content = backgroundShellID
+        ? <BackgroundShellToolPartContent {...props} shellID={backgroundShellID} />
+        : isSubagentTool(toolName) ? <SubagentToolPartContent {...props} />
+            : isShellTool(toolName) ? <ShellToolPartContent {...props} />
+                : <ToolPartContent {...props} />;
     return (
         <ToolPartErrorBoundary
             displayName={displayName}
@@ -2543,13 +2570,12 @@ const ToolPart: React.FC<ToolPartProps> = (incoming) => {
             resetKey={props.part}
             toolName={toolName}
         >
-            {backgroundShellID
-                ? <BackgroundShellToolPartContent {...props} shellID={backgroundShellID} />
-                : isSubagentTool(toolName)
-                    ? <SubagentToolPartContent {...props} />
-                    : isShellTool(toolName)
-                        ? <ShellToolPartContent {...props} />
-                        : <ToolPartContent {...props} />}
+            {calls.length > 0 ? <div className="space-y-1">
+                {content}
+                {calls.map(call => (
+                    <ToolPart key={call.id} {...incoming} part={call} isExpanded={expandedCalls.has(call.id)} onToggle={toggleCall} />
+                ))}
+            </div> : content}
         </ToolPartErrorBoundary>
     );
 };
