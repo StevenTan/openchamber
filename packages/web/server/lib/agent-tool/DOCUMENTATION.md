@@ -378,7 +378,9 @@ past the 2048-character cut.
 
 ## Result contract
 
-Every completed call returns JSON:
+Every completed call returns a result object with a declared output schema.
+Code Mode scripts can read its fields directly. Display content retains the
+same JSON envelope:
 
 ```json
 {

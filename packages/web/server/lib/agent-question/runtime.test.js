@@ -69,11 +69,15 @@ describe('asynchronous questions', () => {
     expect(nativeQuestion.description).toContain(originalQuestion.description);
     expect(nativeQuestion.input).toBe(originalQuestion.input);
     expect(nativeQuestion.execute).toBe(originalQuestion.execute);
-    expect(tool.description).toContain('immediately returns a JSON receipt');
+    expect(tool.description).toContain('immediately returns a receipt object');
     expect(tool.description).toContain('Awaiting this call waits for question creation; execution then continues in the same turn');
     const context = { sessionID: 'ses_1', agent: 'build', messageID: 'message', id: 'outer_script', signal: new AbortController().signal };
-    const first = JSON.parse((await tool.execute({ questions: [{ title: 'First question' }] }, context)).content);
-    const second = JSON.parse((await tool.execute({ questions: [{ title: 'Second question' }] }, context)).content);
+    const firstResult = await tool.execute({ questions: [{ title: 'First question' }] }, context);
+    const secondResult = await tool.execute({ questions: [{ title: 'Second question' }] }, context);
+    const first = firstResult.output;
+    const second = secondResult.output;
+    expect(JSON.parse(firstResult.content)).toEqual(first);
+    expect(JSON.parse(secondResult.content)).toEqual(second);
     expect(first).toMatchObject({ status: 'pending', message: expect.any(String) });
     expect(second).toMatchObject({ status: 'pending', message: expect.any(String) });
     expect(first.question_id).not.toBe(second.question_id);

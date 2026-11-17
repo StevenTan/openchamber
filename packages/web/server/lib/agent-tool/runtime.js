@@ -58,6 +58,24 @@ import { materializeSearchPlugin } from '../agent-search/runtime.js';
 import { registerCollaborationRoutes } from '../agent-collaboration/dist/runtime.js';
 
 const TOOL_SCHEMA_VERSION = 1;
+const TOOL_OUTPUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    schemaVersion: { type: 'integer', const: TOOL_SCHEMA_VERSION },
+    ok: { type: 'boolean' },
+    action: { type: 'string' },
+    data: { description: 'Action-specific result data.' },
+    error: {
+      type: 'object',
+      properties: { message: { type: 'string' }, kind: { type: 'string' }, status: { type: 'integer' } },
+      required: ['message'],
+      additionalProperties: true,
+    },
+    exitCode: { type: 'integer' },
+  },
+  required: ['schemaVersion', 'ok', 'action'],
+  additionalProperties: true,
+};
 const PLUGIN_ID = 'openchamber-agent-tool';
 // Everything either managed tool may ask for; the agent allowlist stays
 // narrower than the full control surface.
@@ -529,7 +547,7 @@ const answerClosedInChat = (note) => String.raw`
             const answer = { answered: false, reason: "chat" }
             const payload = { schemaVersion: ${TOOL_SCHEMA_VERSION}, ok: true, action: args.action, data: { answer, note: ${JSON.stringify(note)} } }
             await progress({ ok: true })
-            return { content: JSON.stringify(payload), metadata: { openchamber: { schemaVersion: ${TOOL_SCHEMA_VERSION}, action: args.action, description: title, ok: true, answer } } }
+            return { output: payload, content: JSON.stringify(payload), metadata: { openchamber: { schemaVersion: ${TOOL_SCHEMA_VERSION}, action: args.action, description: title, ok: true, answer } } }
           }`;
 
 /**
@@ -673,6 +691,7 @@ const createToolEntry = ({ name, description, definitions, parameters, codeMode,
       name: ${JSON.stringify(name)},
       description: ${JSON.stringify(description)},
       options: { codemode: ${codeMode ? 'true' : 'false'} },
+      output: ${JSON.stringify(TOOL_OUTPUT_SCHEMA)},
       input: {
         type: "object",
         properties: {
@@ -715,10 +734,8 @@ ${reviveDependsOn}${actionSchema.normalize}${secretRunNormalize}${normalizeBoole
         await progress()
         const endpoint = process.env.OPENCHAMBER_AGENT_TOOL_URL
         const token = process.env.OPENCHAMBER_AGENT_TOOL_TOKEN
-        // No output schema is declared, so a result must never carry an output
-        // field: OpenCode rejects that with "Tool result declared output
-        // without an output schema". The envelope travels as text content.
         const failure = (payload) => ({
+          output: payload,
           content: JSON.stringify(payload),
           metadata: { openchamber: { schemaVersion: ${TOOL_SCHEMA_VERSION}, action: args.action, description: title, ok: false } },
         })
@@ -745,7 +762,7 @@ ${secretRun ? SECRET_RUN_PERMISSION : ''}${answers ? answerWaitSetup(answers.wai
           try { result = JSON.parse(content) } catch {}
           const valid = result?.schemaVersion === ${TOOL_SCHEMA_VERSION} && typeof result?.ok === "boolean" && typeof result?.action === "string"
           await progress({ ok: valid && result.ok === true })
-          if (valid) return { content, metadata: { openchamber: { schemaVersion: ${TOOL_SCHEMA_VERSION}, action: args.action, description: title, ok: result.ok === true${answers ? ANSWER_METADATA : ''} } } }
+          if (valid) return { output: result, content, metadata: { openchamber: { schemaVersion: ${TOOL_SCHEMA_VERSION}, action: args.action, description: title, ok: result.ok === true${answers ? ANSWER_METADATA : ''} } } }
           return failure({ schemaVersion: ${TOOL_SCHEMA_VERSION}, ok: false, action: args.action, error: { message: "OpenChamber returned an invalid response", kind: "runtime", status: response.status } })
         } catch (error) {${answers ? answerClosedInChat(answers.closedInChatNote) : ''}
           return failure({ schemaVersion: ${TOOL_SCHEMA_VERSION}, ok: false, action: args.action, error: { message: error instanceof Error ? error.message : String(error), kind: "runtime" } })

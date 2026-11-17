@@ -21,6 +21,10 @@ plugins and receive no injection.
 - Waiting uses OpenCode's session wait API and returns when any target becomes
   idle. The returned text and error belong to its latest assistant message.
   Idle is an execution state, not a success verdict. A timeout reports no result.
+- `wait_agent` returns an object with `timed_out` and `result`; a timeout has a
+  null result. `interrupt_agent` returns an object with `session_id` and
+  `interrupted`. Their output schemas expose these fields to Code Mode scripts;
+  display content retains the JSON representation.
 - Wait timeouts, tool cancellation and plugin unload release pending waits.
   They do not interrupt the children. Interrupt explicitly requests
   `resume: false`; acceptance does not imply cleanup has already completed.

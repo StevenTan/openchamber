@@ -809,6 +809,7 @@ describe('managed agent tool runtime', () => {
       // A malformed call asks nothing.
       const malformed = await tools.openchamber_secret.execute({ ...input, args: 'deploy' }, context);
       expect(JSON.parse(malformed.content)).toMatchObject({ ok: false, error: { kind: 'usage' } });
+      expect(malformed.output).toEqual(JSON.parse(malformed.content));
       expect(asserted).toHaveLength(2);
     } finally {
       globalThis.fetch = originalFetch;
@@ -951,6 +952,7 @@ describe('managed agent tool runtime', () => {
       await hooks.prompt({ sessionID: 'ses_caller' });
       const closedResult = await closed;
       expect(JSON.parse(closedResult.content)).toMatchObject({ ok: true, data: { answer: { answered: false, reason: 'chat' } } });
+      expect(closedResult.output).toEqual(JSON.parse(closedResult.content));
       expect(closedResult.metadata.openchamber).toMatchObject({ ok: true, answer: { answered: false, reason: 'chat' } });
       // The server let go of the page too, so a late answer finds nothing.
       await vi.waitFor(() => expect(() => service.answerPage({ sessionId: 'ses_caller', callId: 'call_2', summary: 'B' }))
@@ -1323,8 +1325,7 @@ describe('managed agent tool runtime', () => {
         { sessionID: 'ses_1', agent: 'build', messageID: 'msg_1', id: 'call_1', progress },
       );
 
-      // No output schema is declared, so the envelope has to travel as content.
-      expect(result.output).toBeUndefined();
+      expect(result.output).toEqual(JSON.parse(result.content));
       expect(JSON.parse(result.content)).toEqual({
         schemaVersion: 1,
         ok: true,

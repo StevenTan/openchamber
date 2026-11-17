@@ -3,10 +3,12 @@
 Managed OpenCode exposes `request_user_input_async` with one or more questions,
 each carrying `title` and optional string `options`. Every field accepts free
 text; the first option is selected initially and requires explicit submission.
-The tool returns a JSON receipt containing `question_id`, `status: "pending"`,
+The tool returns a receipt object containing `question_id`, `status: "pending"`,
 and `message`. Awaiting the call waits for question creation; the same turn can
 continue independent work while the user answers. Answers arrive as later session
 messages. OpenCode's native forms render the question in the shared composer dock.
+The declared output schema supplies these fields to Code Mode scripts. Display
+content retains the JSON receipt and question metadata.
 
 The plugin also describes the native `question` tool as waiting for an answer
 before returning. Its execution and input schema remain native. Use it when the

@@ -19,12 +19,13 @@ interface NativeSubagent {
   execute(input: SubagentInput, context: Invocation): Promise<{ content: string; metadata?: Tool.Metadata }>;
 }
 
-interface Registration<Input> {
+interface Registration<Input, Output = never> {
   name: string;
   description: string;
   options: { namespace: string; codemode: false; permission: string };
   input: z.core.JSONSchema.JSONSchema;
-  execute(input: Input, context: Invocation): Promise<{ content?: string | readonly Tool.Content[]; metadata?: Tool.Metadata }>;
+  execute(input: Input, context: Invocation): Promise<{ content?: string | readonly Tool.Content[]; metadata?: Tool.Metadata; output?: Output }>;
+  output?: z.core.JSONSchema.JSONSchema;
 }
 
 interface PluginContext {
@@ -37,7 +38,7 @@ interface PluginContext {
     get(name: "subagent"): NativeSubagent | undefined;
     update(name: "subagent", update: (tool: NativeSubagent) => void): void;
     namespace(value: { name: string; description: string }): void;
-    add<Input>(tool: Registration<Input>): void;
+    add<Input, Output = never>(tool: Registration<Input, Output>): void;
   }) => void): Promise<void> };
 }
 
@@ -45,6 +46,11 @@ const target = z.string().min(1).describe("Child session ID returned by subagent
 const sendInput = z.object({ target, message: z.string().min(1).describe("Follow-up instructions for the subagent.") }).strict();
 const interruptInput = z.object({ target }).strict();
 const waitResult = z.object({ session_id: z.string(), status: z.literal("idle"), output: z.string(), error: z.json().optional() });
+const waitOutput = z.discriminatedUnion("timed_out", [
+  z.object({ timed_out: z.literal(true), result: z.null() }),
+  z.object({ timed_out: z.literal(false), result: waitResult }),
+]);
+const interruptOutput = z.object({ session_id: z.string(), interrupted: z.boolean() });
 const waitInput = z.object({
   targets: z.array(target).min(1).describe("Child session IDs. Returns when any target becomes idle."),
   timeout_ms: z.number().int().min(10000).max(3600000).default(30000).describe("Wait timeout in milliseconds. Defaults to 30000, range 10000–3600000. Prefer a longer wait over repeated polling."),
@@ -140,11 +146,12 @@ export default {
           return { content: result.content, metadata: result.metadata };
         },
       });
-      editor.add<z.infer<typeof waitInput>>({
+      editor.add<z.infer<typeof waitInput>, z.infer<typeof waitOutput>>({
         name: "wait_agent",
-        description: "Wait for any of the specified child agents to become idle, returning that child's latest assistant text and any error. Idle includes completion, failure and interruption; it does not imply success. Timeout returns timed_out=true. Cancellation or timeout ends only the wait and leaves the agents running. Background completion notifications remain active.",
+        description: "Wait for any of the specified child agents to become idle. Returns an object with timed_out and result; result contains the child's session_id, idle status, latest assistant text in output, and any error. Idle includes completion, failure and interruption; it does not imply success. Timeout returns timed_out=true and result=null. Cancellation or timeout ends only the wait and leaves the agents running. Background completion notifications remain active.",
         options: { namespace: "collaboration", codemode: false, permission: "subagent" },
         input: z.toJSONSchema(waitInput, { io: "input" }),
+        output: z.toJSONSchema(waitOutput),
         async execute(input, context) {
           const args = waitInput.parse(input);
           const waiting = new AbortController();
@@ -171,18 +178,22 @@ export default {
                 return waitResult.parse(result);
               }),
             ]);
-            return { content: JSON.stringify({ timed_out: result === null, result }) };
+            const output: z.infer<typeof waitOutput> = result === null
+              ? { timed_out: true, result: null }
+              : { timed_out: false, result };
+            return { output, content: JSON.stringify(output) };
           } finally {
             clearTimeout(timer);
             waiting.abort();
           }
         },
       });
-      editor.add<z.infer<typeof interruptInput>>({
+      editor.add<z.infer<typeof interruptInput>, z.infer<typeof interruptOutput>>({
         name: "interrupt_agent",
-        description: "Interrupt an existing child agent without deleting its session. Returns whether interruption was accepted; cleanup settles asynchronously. Use wait_agent to wait for idle, or send_input to give the child another task.",
+        description: "Interrupt an existing child agent without deleting its session. Returns an object with session_id and interrupted, indicating whether interruption was accepted; cleanup settles asynchronously. Use wait_agent to wait for idle, or send_input to give the child another task.",
         options: { namespace: "collaboration", codemode: false, permission: "subagent" },
         input: z.toJSONSchema(interruptInput),
+        output: z.toJSONSchema(interruptOutput),
         async execute(input, context) {
           const args = interruptInput.parse(input);
           const signal = AbortSignal.any([context.signal, lifetime.signal]);
@@ -190,7 +201,8 @@ export default {
           await approve(child.agent, context);
           signal.throwIfAborted();
           const result = await ctx.session.interrupt({ sessionID: args.target, resume: false }, { signal });
-          return { content: JSON.stringify({ session_id: args.target, ...result }) };
+          const output = { session_id: args.target, interrupted: result.interrupted };
+          return { output, content: JSON.stringify(output) };
         },
       });
     });

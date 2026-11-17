@@ -7,6 +7,12 @@ export const questionInput = z.object({
   }).strict()).min(1),
 }).strict();
 
+const questionOutput = z.object({
+  question_id: z.string(),
+  status: z.literal("pending"),
+  message: z.string(),
+});
+
 export const createQuestionPluginSource = () => `import { randomUUID } from 'node:crypto'
 export default {
   id: "openchamber-question-tool",
@@ -23,9 +29,10 @@ export default {
       })
       tools.add({
         name: 'request_user_input_async',
-        description: 'Creates user questions and immediately returns a JSON receipt containing question_id, status: "pending", and message. Awaiting this call waits for question creation; execution then continues in the same turn while the user answers. Answers arrive later as a new message in this session. Use for missing information, preferences, constraints, clarification, or approval. Continue independent work after the receipt; use required answers before dependent work. List only suggested answers as options, with the recommended option first; free-text entry is provided automatically.',
+        description: 'Creates user questions and immediately returns a receipt object containing question_id, status: "pending", and message. Awaiting this call waits for question creation; execution then continues in the same turn while the user answers. Answers arrive later as a new message in this session. Use for missing information, preferences, constraints, clarification, or approval. Continue independent work after the receipt; use required answers before dependent work. List only suggested answers as options, with the recommended option first; free-text entry is provided automatically.',
         options: { codemode: false, permission: 'question' },
         input: ${JSON.stringify(z.toJSONSchema(questionInput))},
+        output: ${JSON.stringify(z.toJSONSchema(questionOutput))},
         async execute(input, context) {
           await ctx.permission.assert({
             sessionID: context.sessionID, agent: context.agent, action: 'question',
@@ -40,7 +47,7 @@ export default {
           })
           const result = await response.json()
           if (!response.ok) throw new Error(result.error)
-          return { content: JSON.stringify(result), metadata: { questionID: result.question_id } }
+          return { output: result, content: JSON.stringify(result), metadata: { questionID: result.question_id } }
         },
       })
     })

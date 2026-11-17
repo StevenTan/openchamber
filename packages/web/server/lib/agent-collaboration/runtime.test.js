@@ -7,7 +7,10 @@ import { materializeCollaborationPlugin } from './runtime.js';
 
 let directory, tools, ctx, native, close, wait, executeNative;
 const invocation = signal => ({ sessionID: 'parent', agent: 'build', messageID: 'message', id: 'call', signal: signal ?? new AbortController().signal, progress: vi.fn(async () => {}) });
-const content = result => JSON.parse(result.content);
+const content = result => {
+  expect(JSON.parse(result.content)).toEqual(result.output);
+  return result.output;
+};
 
 beforeEach(async () => {
   vi.useFakeTimers();
