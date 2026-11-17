@@ -1183,7 +1183,7 @@ export const CommandPalette: React.FC = () => {
           input: only the list below it changes. */}
       <DialogContent
         className="gap-0 overflow-hidden p-0 max-w-[min(720px,calc(100vw-2rem))]"
-        layerClassName="items-start pt-[12vh]"
+        layerClassName="items-start pt-[24vh]"
         showCloseButton={false}
       >
         <Command
