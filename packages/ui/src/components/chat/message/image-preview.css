@@ -18,10 +18,6 @@
   color: var(--surface-foreground);
 }
 
-html.desktop-runtime .oc-image-viewer-controls button:not(:disabled):not([aria-disabled="true"]) {
-  cursor: pointer;
-}
-
 .oc-image-viewer-state {
   position: absolute;
   inset: 0;

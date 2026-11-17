@@ -73,6 +73,8 @@ This folder owns runtime-independent controls and their Base UI integration, inc
   font-relative vertical padding. Explicit square button sizes stay fixed.
   Active-pill tracks and their containers use minimum heights so labels can
   increase their height with the interface font preference.
+- Enabled buttons, links, tabs and semantic actions use the pointer cursor.
+  The base-layer rule lets controls keep explicit text, drag and resize cursors.
 
 ## Decisions
 
