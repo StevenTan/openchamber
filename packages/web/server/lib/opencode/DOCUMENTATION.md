@@ -1553,6 +1553,15 @@ under a running child.
   harmless. The card's delivery state (`guests/opencode-plugin.js`) tells the
   user, and the same button is the way in.
 
+### Bundled coding agent
+
+Managed launches register `Codex-默认` through `codex-agent-plugin.js`, using
+`codex-agent-prompt.txt` as its system prompt and `mode: all`. The agent follows
+the selected model and existing default-agent settings. OpenCode applies user
+and project agent configuration after plugin registration, so same-name custom
+agents can override the bundled definition. The plugin writes only its own
+instance directory. External OpenCode and VS Code own their agent configuration.
+
 ### Session title prompt
 
 OpenCode names a new session with its hidden `title` agent. Its built-in prompt

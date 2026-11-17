@@ -7,6 +7,7 @@ import { materializeTurnDiffPlugin } from '../turn-diffs/materialize.js';
 import { materializeCollaborationPlugin } from '../agent-collaboration/runtime.js';
 import { materializeQuotaUsagePlugin } from '../quota/response-usage.js';
 import { materializeCodeModePlugin } from '../agent-code-mode/runtime.js';
+import { materializeCodexAgentPlugin } from './codex-agent-plugin.js';
 
 export const MANAGED_CONFIG_FILE_NAME = 'opencode.managed.json';
 
@@ -136,6 +137,7 @@ export const createManagedConfigRuntime = ({
       directories.push(await limitFailoverRuntime.materializePlugin());
     }
     directories.push(await materializeSessionTitlePlugin({ fsPromises, path, instanceDir }));
+    directories.push(await materializeCodexAgentPlugin({ fsPromises, path, instanceDir }));
     if (agentToolRuntime) directories.push(await agentToolRuntime.materializeCommandPlugin());
     if (agentToolRuntime) directories.push(await agentToolRuntime.materializeSearchPlugin());
     if (agentToolRuntime) directories.push(await agentToolRuntime.materializeQuestionPlugin());
