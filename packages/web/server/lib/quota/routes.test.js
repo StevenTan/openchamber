@@ -6,6 +6,7 @@ import { configureOpenCodeCredentials } from '../opencode/auth.js';
 import { attachExtensionQuotaProvider, detachExtensionQuotaProvider } from './extension-registry.js';
 import { QuotaRouteError } from './route-error.js';
 import { registerQuotaRoutes } from './routes.js';
+import { mutateQuotaConfiguration } from './configurations.js';
 
 const app = (providers) => {
   const server = express();
@@ -65,7 +66,8 @@ describe('z.ai gift reset activation route', () => {
       json: async () => ({ code: 200, msg: 'success', data: 1, success: true }),
     });
     vi.stubGlobal('fetch', upstream);
-    const response = await request(app({})).post('/api/quota/zai-coding-plan/gift-reset/use').send(body);
+    const { configuration } = mutateQuotaConfiguration('POST', undefined, { name: 'z.ai', templateId: 'zai-coding-plan', source: 'account', providerId: null });
+    const response = await request(app({})).post(`/api/quota/${configuration.id}/gift-reset/use`).send(body);
     return { response, upstream };
   };
 

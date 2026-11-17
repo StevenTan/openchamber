@@ -200,13 +200,13 @@ const resolveSessionSubtitle = (
 const buildUsage = (): TrayUsage => {
   const { dictionary } = useI18nStore.getState();
   const t = (key: Parameters<typeof formatMessage>[1], params?: Parameters<typeof formatMessage>[2]) => formatMessage(dictionary, key, params);
-  const { results, dropdownProviderIds, displayMode, extensionProviders } = useQuotaStore.getState();
+  const { results, dropdownProviderIds, displayMode, extensionProviders, configurations } = useQuotaStore.getState();
   const mode: TrayUsage['mode'] = displayMode === 'remaining' ? 'remaining' : 'usage';
   if (!dropdownProviderIds.length) return { mode, groups: [] };
 
   const byProvider = new Map(results.map((result) => [result.providerId, result]));
   const groups: TrayUsageGroup[] = [];
-  for (const meta of quotaProviderList(extensionProviders)) {
+  for (const meta of quotaProviderList(extensionProviders, configurations)) {
     if (!dropdownProviderIds.includes(meta.id)) continue;
     const result = byProvider.get(meta.id);
     if (!result || result.configured !== true) continue;

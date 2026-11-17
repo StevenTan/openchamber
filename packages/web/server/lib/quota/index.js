@@ -9,6 +9,7 @@
 export {
   attachExtensionQuotaProvider,
   detachExtensionQuotaProvider,
+  initializeQuotaConfigurations,
   listConfiguredQuotaProviders,
   listUsagePageProviders,
   fetchQuotaForProvider,

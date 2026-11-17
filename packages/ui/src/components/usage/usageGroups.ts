@@ -59,7 +59,7 @@ export const useUsageProviderGroups = (): UsageProviderGroup[] => {
 
         const modelEntries = Object.entries(result?.usage?.models ?? {});
         const providerSelectedModels = selectedQuotaModels[providerMeta.id] ?? [];
-        const visibleModelEntries = selectVisibleModelEntries(providerMeta.id, modelEntries, providerSelectedModels);
+        const visibleModelEntries = selectVisibleModelEntries(providerMeta.templateId ?? providerMeta.id, modelEntries, providerSelectedModels);
         for (const [modelName, modelUsage] of visibleModelEntries) {
           const entries = Object.entries(modelUsage.windows ?? {});
           if (entries.length === 0) continue;

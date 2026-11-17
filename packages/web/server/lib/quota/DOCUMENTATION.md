@@ -3,6 +3,52 @@
 ## Purpose
 This module fetches quota and usage signals for supported providers in the web server runtime.
 
+## Usage configurations
+
+`templates.js` defines the built-in usage templates shared with the UI. Each
+saved configuration has an ID, name, template, data source, a provider ID and
+source revision. `GET/POST /api/quota/configurations` and
+`PUT/DELETE /api/quota/configurations/:id` own the catalog in
+`quota/configurations.json`. Templates appear only in the creation picker;
+the catalog contains actual usage entries and starts empty. An empty catalog
+stays empty.
+
+Each usage entry selects a template and one provider and can be renamed or deleted. Names retain the source
+revision. A source or provider binding change creates a new revision; snapshots
+and in-flight fetches belong to that revision. Each configuration has independent
+renderer results, display selections and `quota/snapshots/<id>.json` data.
+The configured-provider list and agent usage reads enumerate this catalog.
+Extensions keep their own catalog entries and lifecycle.
+
+Version 1 catalogs migrate to version 2 after the runtime reads configured
+accounts successfully. The migration retains configured accounts, explicitly
+edited entries and custom entries, with their IDs and source revisions intact.
+Untouched, unconfigured defaults are omitted. Existing visibility, model
+selections and snapshots keep their keys. A failed credential read or write
+leaves the saved catalog intact.
+
+The account source uses the template's account sign-in on the connected instance.
+Managed credentials retain the template's existing storage and account lifecycle.
+
+The provider-response source is supported by Codex on managed servers. The
+`openchamber-quota-usage` plugin matches each OpenCode request's provider ID to
+the entries selecting that provider and reads `x-codex-*` HTTP response headers. It preserves
+the body and atomically stores percentages, window lengths, reset times and the
+observation time. Paths are absolute because OpenCode has its own working directory.
+This source uses existing model requests and credentials and makes no outbound
+request of its own. It stays inside the enterprise boundary.
+
+Only observations matching an active configuration ID and source revision reach
+its card. Empty observations have empty windows. Malformed or unreadable saved
+state is an error. Source changes clear the renderer's sample before refresh,
+including on transport failure. `fetchedAt` is the observation time.
+
+Web, desktop and mobile use the server catalog. VS Code supports the same catalog
+and account queries through its bridge. Provider-response sources are explicitly
+unavailable in VS Code and with external OpenCode. Templates declare support;
+unsupported sources cannot be selected. The saved Codex source and snapshot are
+read together when initializing a catalog from `codex-source.json`.
+
 Node server entrypoints apply `../network-defaults.js` before serving requests,
 including the daemon launched directly through `server/index.js`. Connection
 attempts get 5 seconds without changing address-family selection. The VS Code
@@ -39,7 +85,7 @@ the list loses its usage card with no error.
 | `antigravity` | Antigravity | `providers/antigravity/index.js` | Antigravity accounts file (`~/.config/opencode/antigravity-accounts.json` or the `$OPENCODE_CONFIG_DIR` equivalent) |
 | `claude` | Claude | `providers/claude/` | Claude Code Keychain entry, Claude Code credentials file, OpenCode `auth.json` (`anthropic`, `claude`), `CLAUDE_CODE_OAUTH_TOKEN` |
 | `cline-pass` | ClinePass | `providers/cline-pass.js` | `cline-pass` (API key under `key` or `token`) |
-| `codex` | Codex | `providers/codex.js` | `openai`, `codex`, `chatgpt` |
+| `codex` | Codex | `providers/codex.js` | `openai`, `codex`, `chatgpt`, or the provider bound in Codex usage settings |
 | `cursor` | Cursor | `providers/cursor.js` | Environment/token files, OpenChamber-managed credentials, or explicit one-time Cursor import |
 | `deepinfra` | DeepInfra | `providers/deepinfra.js` | `deepinfra`, `deep-infra`, `deep_infra` (API key under `key` or `token`) |
 | `deepseek` | DeepSeek | `providers/deepseek.js` | `deepseek` (API key under `key` or `token`) |
@@ -68,7 +114,7 @@ the list loses its usage card with no error.
 ## Who reads quota
 
 - The Usage page and the work status panel, through `GET /api/quota/providers` and `GET /api/quota/:providerId` (`routes.js`).
-- The `openchamber_usage` agent tool (`../openchamber-control/usage-read.js`), which calls the same `listConfiguredQuotaProviders` and `fetchQuotaForProvider` in-process, with the page's deadlines and fallback. It asks only `listUsagePageProviders()`: every registry entry except `github-copilot-addon`, which the page never reads, then the attached extensions. The UI's built-in list (`QUOTA_PROVIDERS` in `packages/ui/src/lib/quota/providers/index.ts`) and this one are kept equal by a test in `usage-read.test.js`, so a new provider is added to both, and a registry entry the page does not show joins `NOT_ON_USAGE_PAGE`.
+- The `openchamber_usage` agent tool (`../openchamber-control/usage-read.js`), which calls the same `listConfiguredQuotaProviders` and `fetchQuotaForProvider` in-process, with the page's deadlines and fallback. It awaits `listUsagePageProviders()` for saved entries and attached extensions. Templates without an actual entry are not queried. Catalog reads share the list timeout and support cancellation.
 
 ## Internal-only provider module
 - `providers/openai.js` exists for logic parity/reuse but is intentionally not registered for dispatcher ID routing.

@@ -1417,6 +1417,10 @@ export const settingsDict = {
   'settings.usage.page.state.providerNotConfiguredDescription': 'Ajoutez des informations d\'identification dans l\'onglet Fournisseurs pour activer le suivi de l\'utilisation.',
   'settings.usage.page.state.claudeSignedOutTitle': 'Non connecté à Claude Code',
   'settings.usage.page.state.claudeSignInCommand': 'Exécutez cette commande dans un terminal :',
+  "settings.usage.configuration.provider": "Fournisseur",
+  "settings.usage.configuration.chooseProvider": "Choisir un fournisseur",
+  "settings.usage.configuration.loadFailed": "Impossible de charger les configurations d’utilisation. Actualisez la page.",
+  "settings.usage.configuration.saveFailed": "Impossible d’enregistrer la configuration d’utilisation.",
   'settings.usage.page.section.modelQuotas': 'Quotas de modèles',
   'settings.usage.page.section.otherModels': 'Autres modèles',
   'settings.usage.page.state.noQuotaWindowsTitle': 'Aucune fenêtre de quota signalée',
@@ -2777,4 +2781,10 @@ export const settingsDict = {
   'settings.agents.sidebar.toast.enableFailed': 'Impossible d’activer l’agent : son fichier de configuration n’a pas pu être écrit',
   'settings.openchamber.keyboardShortcuts.action.search_prompt_history.label': "Rechercher dans l’historique des prompts",
 
+  "settings.usage.configuration.name": "Nom",
+  "settings.usage.configuration.template": "Modèle",
+  "settings.usage.configuration.add": "Nouveau suivi",
+  "settings.usage.configuration.deleteConfirm": "Supprimer \"{name}\" et sa configuration enregistrée ?",
+  "settings.usage.configuration.account": "Compte du service",
+  "settings.usage.configuration.accountHint": "Utilise la connexion ou les identifiants du service sur l’instance connectée.",
 } as const;

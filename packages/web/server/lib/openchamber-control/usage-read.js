@@ -114,7 +114,8 @@ export const createUsageReadAction = ({
       throw new OpenChamberControlError('The usage tool is turned off in OpenChamber settings', 403);
     }
     const quota = await loadQuota();
-    const known = quota.listUsagePageProviders();
+    const known = await untilAborted(withDeadline(Promise.resolve().then(() => quota.listUsagePageProviders()), listTimeoutMs), signal);
+    if (known === TIMED_OUT) throw new OpenChamberControlError(`Could not read usage configurations within ${seconds(listTimeoutMs)} seconds`, 504);
     const providerId = asNonEmptyString(input.providerId);
     if (!providerId) return untilAborted(readAll(quota, known), signal);
 

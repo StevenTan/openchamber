@@ -1389,6 +1389,10 @@ export const settingsDict = {
   'settings.usage.page.state.providerNotConfiguredDescription': '請在「供應商」分頁新增憑證以啟用用量追蹤。',
   'settings.usage.page.state.claudeSignedOutTitle': '尚未登入 Claude Code',
   'settings.usage.page.state.claudeSignInCommand': '請在終端機中執行此指令：',
+  "settings.usage.configuration.provider": "Provider",
+  "settings.usage.configuration.chooseProvider": "選擇 provider",
+  "settings.usage.configuration.loadFailed": "無法讀取用量設定，請重新整理後再試。",
+  "settings.usage.configuration.saveFailed": "無法儲存用量設定。",
   'settings.usage.page.section.modelQuotas': '模型配額',
   'settings.usage.page.section.otherModels': '其他模型',
   'settings.usage.page.state.noQuotaWindowsTitle': '未報告配額視窗',
@@ -2777,4 +2781,10 @@ export const settingsDict = {
   'settings.agents.sidebar.toast.enableFailed': '無法啟用代理：無法寫入其設定檔',
   'settings.openchamber.keyboardShortcuts.action.search_prompt_history.label': "搜尋提示歷史記錄",
 
+  "settings.usage.configuration.name": "名稱",
+  "settings.usage.configuration.template": "基礎範本",
+  "settings.usage.configuration.add": "新增用量",
+  "settings.usage.configuration.deleteConfirm": "刪除「{name}」及其儲存的用量設定？",
+  "settings.usage.configuration.account": "服務帳號",
+  "settings.usage.configuration.accountHint": "使用目前執行個體上該服務的登入狀態或專用憑證。",
 } as const;

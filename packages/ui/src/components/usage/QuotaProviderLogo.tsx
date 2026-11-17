@@ -14,6 +14,7 @@ import { useQuotaStore } from '@/stores/useQuotaStore';
  * package's SVG masked in the text colour).
  */
 export const QuotaProviderLogo: React.FC<{ providerId: string; className?: string; tint?: boolean }> = ({ providerId, className, tint }) => {
+  const templateId = useQuotaStore(state => state.configurations?.find(entry => entry.id === providerId)?.templateId ?? providerId);
   const extension = useQuotaStore((state) => (
     isExtensionQuotaProviderId(providerId) ? state.extensionProviders.find((entry) => entry.id === providerId) ?? null : null
   ));
@@ -21,6 +22,6 @@ export const QuotaProviderLogo: React.FC<{ providerId: string; className?: strin
     () => (extension ? guestPackageIconSrc(extension.guestId, extension.icon, getRuntimeUrlResolver().authenticatedAsset) : undefined),
     [extension],
   );
-  if (!extension) return <ProviderLogo providerId={providerId} className={className} tint={tint} />;
+  if (!extension) return <ProviderLogo providerId={templateId} className={className} tint={tint} />;
   return <GuestIcon icon={resolveGuestIconName(extension.icon)} iconSrc={iconSrc} className={className} />;
 };

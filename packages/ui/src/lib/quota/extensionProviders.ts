@@ -3,7 +3,8 @@ import { z } from 'zod';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import type { ExtensionQuotaProviderId, QuotaProviderId } from '@/types';
 
-import { QUOTA_PROVIDERS, type QuotaProviderMeta } from './providers';
+import type { QuotaProviderMeta } from './providers';
+import type { QuotaConfiguration } from './configurations';
 
 /**
  * A usage provider an installed extension serves (`provides: ["quota"]`), as
@@ -48,14 +49,13 @@ export const sameExtensionQuotaProviders = (a: readonly ExtensionQuotaProvider[]
   })
 );
 
-/** Every usage provider to draw: the built-ins, then the extensions' in the server's order. */
-export const quotaProviderList = (extensionProviders: readonly ExtensionQuotaProvider[]): QuotaProviderMeta[] => (
-  extensionProviders.length === 0
-    ? QUOTA_PROVIDERS
-    : [...QUOTA_PROVIDERS, ...extensionProviders.map(({ id, name }) => ({ id, name }))]
-);
+/** Saved usage configurations followed by the extensions' providers. */
+export const quotaProviderList = (extensionProviders: readonly ExtensionQuotaProvider[], configurations: readonly QuotaConfiguration[] | null = null): QuotaProviderMeta[] => [
+  ...(configurations ?? []).map(({ id, name, templateId }) => ({ id, name, templateId })),
+  ...extensionProviders.map(({ id, name }) => ({ id, name })),
+];
 
 /** The ids of every usage provider to draw, in the same order. */
-export const quotaProviderIds = (extensionProviders: readonly ExtensionQuotaProvider[]): QuotaProviderId[] => (
-  quotaProviderList(extensionProviders).map((provider) => provider.id)
+export const quotaProviderIds = (extensionProviders: readonly ExtensionQuotaProvider[], configurations: readonly QuotaConfiguration[] | null = null): QuotaProviderId[] => (
+  quotaProviderList(extensionProviders, configurations).map((provider) => provider.id)
 );

@@ -1311,6 +1311,17 @@ const handleLocalApiRequest = async (input: RequestInfo | URL, url: URL, init: R
     return new Response(JSON.stringify({ extensions: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   }
 
+  const quotaConfigurationsMatch = pathname.match(/^\/api\/quota\/configurations(?:\/([a-z0-9-]+))?$/);
+  if (quotaConfigurationsMatch) {
+    try {
+      const body = method === 'POST' || method === 'PUT' ? await extractJsonBody(input, init, method) : undefined;
+      const data = await sendBridgeMessage('api:quota:configurations', { method, configurationId: quotaConfigurationsMatch[1], input: body });
+      return new Response(JSON.stringify(data), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    } catch (error) {
+      return new Response(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    }
+  }
+
   if (pathname === '/api/quota/providers') {
     try {
       const data = await sendBridgeMessage('api:quota:providers');
@@ -1321,7 +1332,7 @@ const handleLocalApiRequest = async (input: RequestInfo | URL, url: URL, init: R
     }
   }
 
-  const quotaCredentialMatch = pathname.match(/^\/api\/quota\/credentials\/(exe-dev|cursor|zenmux)(?:\/(validate|import))?$/);
+  const quotaCredentialMatch = pathname.match(/^\/api\/quota\/credentials\/([a-z0-9-]+)(?:\/(validate|import))?$/);
   if (quotaCredentialMatch) {
     try {
       const body = method === 'PUT' ? await extractJsonBody(input, init, method) : undefined;
@@ -2193,6 +2204,10 @@ onCommand('settingsSynced', () => {
     invalidateSettingsCache();
     void syncDesktopSettings({ adoptTheme: false });
   });
+});
+
+onCommand('quotaConfigurationsSynced', () => {
+  void import('@openchamber/ui/stores/useQuotaStore').then(({ useQuotaStore }) => useQuotaStore.getState().loadExtensionProviders());
 });
 
 // The extension host keeps an on/off policy; on reads as `auto`.

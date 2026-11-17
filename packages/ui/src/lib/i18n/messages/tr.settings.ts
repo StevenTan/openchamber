@@ -1445,6 +1445,10 @@ export const settingsDict = {
   'settings.usage.page.state.providerNotConfiguredDescription': 'Kullanım takibini etkinleştirmek için Provider\'lar sekmesinde kimlik bilgileri ekleyin.',
   'settings.usage.page.state.claudeSignedOutTitle': 'Claude Code oturumu açık değil',
   'settings.usage.page.state.claudeSignInCommand': 'Bu komutu bir terminalde çalıştırın:',
+  "settings.usage.configuration.provider": "Sağlayıcı",
+  "settings.usage.configuration.chooseProvider": "Sağlayıcı seçin",
+  "settings.usage.configuration.loadFailed": "Kullanım yapılandırmaları yüklenemedi. Yenilemeyi deneyin.",
+  "settings.usage.configuration.saveFailed": "Kullanım yapılandırması kaydedilemedi.",
   'settings.usage.page.section.modelQuotas': 'Model Kotaları',
   'settings.usage.page.section.otherModels': 'Diğer Modeller',
   'settings.usage.page.state.noQuotaWindowsTitle': 'Bildirilen kota penceresi yok',
@@ -2768,4 +2772,10 @@ export const settingsDict = {
   'settings.agents.sidebar.toast.enableFailed': 'Ajan etkinleştirilemedi: yapılandırma dosyası yazılamadı',
   'settings.openchamber.keyboardShortcuts.action.search_prompt_history.label': "İstem geçmişinde ara",
 
+  "settings.usage.configuration.name": "Ad",
+  "settings.usage.configuration.template": "Şablon",
+  "settings.usage.configuration.add": "Yeni kullanım",
+  "settings.usage.configuration.deleteConfirm": "\"{name}\" ve kayıtlı kullanım yapılandırması silinsin mi?",
+  "settings.usage.configuration.account": "Hizmet hesabı",
+  "settings.usage.configuration.accountHint": "Bağlı örnekte hizmetin oturumunu veya kimlik bilgilerini kullanır.",
 };

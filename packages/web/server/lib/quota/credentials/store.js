@@ -20,8 +20,8 @@ export const readQuotaCredential = (providerId, normalize) => {
   try {
     return normalize(JSON.parse(fs.readFileSync(credentialPath(providerId), 'utf8')));
   } catch (error) {
-    if (error?.code !== 'ENOENT') console.warn(`Failed to read ${providerId} quota credentials`);
-    return null;
+    if (error?.code === 'ENOENT') return null;
+    throw new Error(`Could not read ${providerId} quota credentials`);
   }
 };
 

@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui';
 import { useI18n } from '@/lib/i18n';
+import { useQuotaStore } from '@/stores/useQuotaStore';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 
 type QuotaCredentialProviderId = 'exe-dev' | 'cursor' | 'zenmux';
@@ -35,14 +36,14 @@ export const QuotaCredentials: React.FC<{ providerId: QuotaCredentialProviderId;
       if (!response.ok) throw new Error(payload?.error);
       if (payload?.configured !== undefined) setStatus(payload);
       setValues({});
+      await useQuotaStore.getState().refreshAfterCredentialChange();
       toast.success(t('settings.providers.page.quotaCredentials.saved', { provider: providerName }));
     } catch (error) { toast.error(error instanceof Error && error.message ? error.message : t('settings.providers.page.openCodeGo.saveFailed')); }
     finally { setBusy(false); }
   };
   const field = (name: keyof CredentialPayload, label: string, placeholder: string) => <label className="block typography-ui-label text-foreground">{label}<Input className="mt-1 h-auto min-h-7 font-mono text-xs py-[calc(0.25em*var(--padding-scale,1))] leading-[1.45]" type="password" autoComplete="off" value={values[name] ?? ''} onChange={(event) => setValues((current) => ({ ...current, [name]: event.target.value }))} placeholder={status?.secretMasked ?? placeholder} /></label>;
-  return <div data-settings-item={`usage.${providerId}-credentials`} className="mb-8">
-    <div className="mb-1 px-1"><h3 className="typography-ui-header font-medium text-foreground">{providerName}</h3></div>
-    <section className="space-y-3 px-2 pb-2 pt-0">
+  return <div data-settings-item={`usage.${providerId}-credentials`} className="pt-6">
+    <section className="max-w-[24rem] space-y-3">
       {providerId === 'exe-dev' && <div className="space-y-1.5">
         <p className="typography-meta text-muted-foreground">{t('settings.providers.page.quotaCredentials.exeDevTokenInstructions')}</p>
         <code className="typography-code block whitespace-pre-wrap break-all rounded bg-muted/50 px-2 py-1.5 text-xs text-foreground">{EXE_DEV_TOKEN_COMMAND}</code>

@@ -414,6 +414,10 @@ export class SessionEditorPanelProvider {
     }
   }
 
+  public notifyQuotaConfigurationsSynced(): void {
+    for (const entry of this._allPanels()) entry.panel.webview.postMessage({ type: 'command', command: 'quotaConfigurationsSynced' });
+  }
+
   /** Tells each panel's webview whether the user can see it: VS Code focused and the panel shown. */
   public notifyViewerStateChanged(): void {
     for (const entry of this._allPanels()) {

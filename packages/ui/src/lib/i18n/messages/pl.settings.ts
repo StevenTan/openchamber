@@ -2473,6 +2473,10 @@ export const settingsDict = {
   'settings.usage.page.state.providerNotConfiguredDescription': 'Dodaj dane uwierzytelniające w zakładce Dostawcy, aby włączyć śledzenie użycia.',
   'settings.usage.page.state.claudeSignedOutTitle': 'Nie zalogowano do Claude Code',
   'settings.usage.page.state.claudeSignInCommand': 'Uruchom to polecenie w terminalu:',
+  "settings.usage.configuration.provider": "Dostawca",
+  "settings.usage.configuration.chooseProvider": "Wybierz dostawcę",
+  "settings.usage.configuration.loadFailed": "Nie udało się wczytać konfiguracji użycia. Spróbuj odświeżyć.",
+  "settings.usage.configuration.saveFailed": "Nie udało się zapisać konfiguracji użycia.",
   'settings.usage.page.state.providerNotConfiguredTitle': 'Dostawca nie jest skonfigurowany',
   'settings.usage.page.state.refreshFailedTitle': 'Nie udało się odświeżyć danych o użyciu',
   'settings.usage.sidebar.actions.refreshAria': 'Odśwież użycie',
@@ -2778,4 +2782,10 @@ export const settingsDict = {
   'settings.agents.sidebar.toast.enableFailed': 'Nie udało się włączyć agenta: nie można zapisać jego pliku konfiguracji',
   'settings.openchamber.keyboardShortcuts.action.search_prompt_history.label': "Przeszukaj historię poleceń",
 
+  "settings.usage.configuration.name": "Nazwa",
+  "settings.usage.configuration.template": "Szablon",
+  "settings.usage.configuration.add": "Nowe użycie",
+  "settings.usage.configuration.deleteConfirm": "Usunąć \"{name}\" i zapisaną konfigurację użycia?",
+  "settings.usage.configuration.account": "Konto usługi",
+  "settings.usage.configuration.accountHint": "Używa logowania lub danych uwierzytelniających usługi w połączonej instancji.",
 };

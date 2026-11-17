@@ -1546,6 +1546,10 @@ export const settingsDict = {
   'settings.usage.page.state.providerNotConfiguredDescription': 'Providers タブで認証情報を追加して使用量追跡を有効にしてください。',
   'settings.usage.page.state.claudeSignedOutTitle': 'Claude Code にサインインしていません',
   'settings.usage.page.state.claudeSignInCommand': 'ターミナルでこのコマンドを実行してください：',
+  "settings.usage.configuration.provider": "プロバイダー",
+  "settings.usage.configuration.chooseProvider": "プロバイダーを選択",
+  "settings.usage.configuration.loadFailed": "使用量設定を読み込めませんでした。更新して再試行してください。",
+  "settings.usage.configuration.saveFailed": "使用量設定を保存できませんでした。",
   'settings.usage.page.section.modelQuotas': 'モデル割り当て',
   'settings.usage.page.section.otherModels': 'その他のモデル',
   'settings.usage.page.state.noQuotaWindowsTitle': '報告された割り当てウィンドウはありません',
@@ -2777,4 +2781,10 @@ export const settingsDict = {
   'settings.agents.sidebar.toast.enableFailed': 'エージェントを有効にできませんでした。設定ファイルに書き込めませんでした',
   'settings.openchamber.keyboardShortcuts.action.search_prompt_history.label': "プロンプト履歴を検索",
 
+  "settings.usage.configuration.name": "名前",
+  "settings.usage.configuration.template": "テンプレート",
+  "settings.usage.configuration.add": "使用量を作成",
+  "settings.usage.configuration.deleteConfirm": "「{name}」と保存済みの使用量設定を削除しますか？",
+  "settings.usage.configuration.account": "サービスのアカウント",
+  "settings.usage.configuration.accountHint": "接続先でのサービスへのログイン状態または認証情報を使用します。",
 } as const;

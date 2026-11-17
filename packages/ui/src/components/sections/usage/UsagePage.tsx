@@ -1,8 +1,10 @@
 import React from 'react';
 import { UsageCard } from './UsageCard';
+import { Button } from '@/components/ui/button';
 import { QuotaCredentials } from './QuotaCredentials';
 import { ClaudeCodeSignIn } from './ClaudeCodeSignIn';
 import { ConsoleBudgetsSection } from './ConsoleBudgetsSection';
+import { UsageConfiguration, NewUsageConfiguration, DeleteUsageConfiguration } from './UsageConfiguration';
 import { useQuotaAutoRefresh, useQuotaProviders, useQuotaStore } from '@/stores/useQuotaStore';
 import { updateDesktopSettings } from '@/lib/persistence';
 import { QuotaProviderLogo } from '@/components/usage/QuotaProviderLogo';
@@ -18,6 +20,7 @@ import { useI18n } from '@/lib/i18n';
 import { useWaitingBlink } from '@/hooks/useDurationTicker';
 import { cn } from '@/lib/utils';
 import { formatTimeForPreference } from '@/lib/timeFormat';
+import { QUOTA_PROVIDERS } from '@/lib/quota';
 import { useUIStore, type TimeFormatPreference } from '@/stores/useUIStore';
 import { SettingsPageLayout } from '@/components/sections/shared/SettingsPageLayout';
 import {
@@ -48,7 +51,7 @@ export const UsagePage: React.FC = () => {
   const fetchProviderQuota = useQuotaStore((state) => state.fetchProviderQuota);
   const isLoading = useQuotaStore((state) => state.isLoading);
   const blink = useWaitingBlink(isLoading);
-  const lastUpdated = useQuotaStore((state) => state.lastUpdated);
+  const lastRefresh = useQuotaStore((state) => state.lastUpdated);
   const refreshErrors = useQuotaStore((state) => state.refreshErrors);
   const dropdownProviderIds = useQuotaStore((state) => state.dropdownProviderIds);
   const setProviderInDropdown = useQuotaStore((state) => state.setProviderInDropdown);
@@ -56,11 +59,16 @@ export const UsagePage: React.FC = () => {
   const toggleModelSelected = useQuotaStore((state) => state.toggleModelSelected);
   const applyDefaultSelections = useQuotaStore((state) => state.applyDefaultSelections);
   const providers = useQuotaProviders();
+  const configurations = useQuotaStore(state => state.configurations);
+  const isCreatingConfiguration = useQuotaStore(state => state.isCreatingConfiguration);
+  const startConfiguration = useQuotaStore(state => state.startConfiguration);
+  const configuration = configurations?.find(entry => entry.id === selectedProviderId);
+  const templateId = configuration?.templateId ?? selectedProviderId;
 
   useQuotaAutoRefresh(true, true);
 
   React.useEffect(() => {
-    if (selectedProviderId) {
+    if (selectedProviderId || isCreatingConfiguration) {
       return;
     }
     if (results.length === 0) {
@@ -68,12 +76,15 @@ export const UsagePage: React.FC = () => {
     }
     const firstConfigured = results.find((entry) => entry.configured)?.providerId;
     setSelectedProvider(firstConfigured ?? providers[0]?.id ?? null);
-  }, [providers, results, selectedProviderId, setSelectedProvider]);
+  }, [providers, results, selectedProviderId, setSelectedProvider, isCreatingConfiguration]);
 
   const selectedResult = results.find((entry) => entry.providerId === selectedProviderId) ?? null;
+  const lastUpdated = selectedResult?.fetchedAt ?? lastRefresh;
 
   const providerMeta = providers.find((provider) => provider.id === selectedProviderId);
   const providerName = providerMeta?.name ?? selectedProviderId ?? t('settings.usage.sidebar.title');
+  const templateName = QUOTA_PROVIDERS.find(provider => provider.id === configuration?.templateId)?.name;
+  const usageTitle = t('settings.usage.page.header.providerUsage', { provider: providerName });
   const usage = selectedResult?.usage;
   const refreshError = selectedProviderId ? refreshErrors[selectedProviderId] : undefined;
   const selectedProviderError = refreshError
@@ -85,12 +96,8 @@ export const UsagePage: React.FC = () => {
       ? selectedResult.error
       : null;
   const showInDropdown = selectedProviderId ? dropdownProviderIds.includes(selectedProviderId) : false;
-  const credentialProviderId = selectedProviderId === 'exe-dev'
-    || selectedProviderId === 'cursor'
-    || selectedProviderId === 'zenmux'
-    ? selectedProviderId
-    : null;
-  const hasCredentialsForm = credentialProviderId !== null;
+  const credentialProviderId = configuration?.source !== 'provider' && (templateId === 'exe-dev' || templateId === 'cursor' || templateId === 'zenmux') ? templateId : null;
+  const hasCredentialsForm = credentialProviderId !== null || configuration?.source === 'provider';
   const handleDropdownToggle = React.useCallback((enabled: boolean) => {
     if (!selectedProviderId) {
       return;
@@ -118,15 +125,15 @@ export const UsagePage: React.FC = () => {
     return groupModelsByFamilyWithGetter(
       providerModels,
       (model) => model.name,
-      selectedProviderId as QuotaProviderId
+      templateId as QuotaProviderId
     );
-  }, [providerModels, selectedProviderId]);
+  }, [providerModels, selectedProviderId, templateId]);
 
   const sortedFamilies = React.useMemo(() => {
     if (!selectedProviderId) return [];
-    const families = getAllModelFamilies(selectedProviderId as QuotaProviderId);
+    const families = getAllModelFamilies(templateId as QuotaProviderId);
     return sortModelFamilies(families);
-  }, [selectedProviderId]);
+  }, [selectedProviderId, templateId]);
 
   const [collapsedFamilies, setCollapsedFamilies] = React.useState<Record<string, boolean>>(() => {
     return {};
@@ -153,17 +160,22 @@ export const UsagePage: React.FC = () => {
 
   const providerSelectedModels = selectedProviderId ? (selectedModels[selectedProviderId] ?? []) : [];
 
+  if (isCreatingConfiguration) return <NewUsageConfiguration />;
+
   if (!selectedProviderId) {
     return (
         <div className="flex h-full items-center justify-center text-muted-foreground">
-        <p className="typography-ui-label">{t('settings.usage.page.empty.selectProvider')}</p>
+        {providers.length === 0 && configurations !== null
+          ? <Button onClick={startConfiguration}>{t('settings.usage.configuration.add')}</Button>
+          : <p className="typography-ui-label">{t('settings.usage.page.empty.selectProvider')}</p>}
       </div>
     );
   }
 
   return (
     <SettingsPageLayout
-      title={t('settings.usage.page.header.providerUsage', { provider: providerName })}
+      key={selectedProviderId}
+      title={templateName ? `${usageTitle} · ${templateName}` : usageTitle}
       titleLeading={<QuotaProviderLogo providerId={selectedProviderId} className="h-5 w-5 shrink-0" />}
       description={
         isLoading ? (
@@ -183,19 +195,23 @@ export const UsagePage: React.FC = () => {
         )
       }
       showSaveStatus
+      headerEnd={configuration && <DeleteUsageConfiguration configuration={configuration} />}
     >
       <SettingsSection settingsItem="usage.work-status-panel">
-        <SettingsCheckboxRow
-          checked={showInDropdown}
-          onChange={handleDropdownToggle}
-          label={t('settings.usage.page.options.showInWorkStatus')}
-          ariaLabel={t('settings.usage.page.options.showInWorkStatusAria')}
-          info={t('settings.usage.page.options.showInWorkStatusTooltip')}
-        />
+        {configuration && <UsageConfiguration configuration={configuration} />}
+        <div className={configuration ? 'pt-4' : undefined}>
+          <SettingsCheckboxRow
+            checked={showInDropdown}
+            onChange={handleDropdownToggle}
+            label={t('settings.usage.page.options.showInWorkStatus')}
+            ariaLabel={t('settings.usage.page.options.showInWorkStatusAria')}
+            info={t('settings.usage.page.options.showInWorkStatusTooltip')}
+          />
+        </div>
       </SettingsSection>
 
       {!selectedResult && (
-        <p className="typography-ui-label text-foreground pb-8">{t('settings.usage.page.state.noData')}</p>
+        <p className="typography-ui-label text-muted-foreground pt-6">{t('settings.usage.page.state.noData')}</p>
       )}
 
       {/* Only the selected provider's own failure belongs in its panel. The
@@ -203,7 +219,7 @@ export const UsagePage: React.FC = () => {
           UI consumer left; shown here it labeled DeepSeek with Claude's
           rate-limit message. */}
       {selectedProviderError && (
-        <div className="mb-8 rounded-lg bg-[var(--status-error-background)] px-4 py-3">
+        <div className="mt-6 rounded-lg bg-[var(--status-error-background)] px-4 py-3">
           <p className="typography-ui-label font-medium text-[var(--status-error)]">{t('settings.usage.page.state.refreshFailedTitle')}</p>
           <p dir="auto" className="typography-meta text-[var(--status-error)]/80 mt-1">{selectedProviderError}</p>
         </div>
@@ -211,12 +227,12 @@ export const UsagePage: React.FC = () => {
 
       {/* Providers with an inline credentials form don't need the "go to Providers" banner — the form IS the fix. */}
       {selectedResult && !selectedResult.configured && !hasCredentialsForm && (
-        <div className="mb-8 rounded-lg bg-[var(--status-warning-background)] px-4 py-3">
+        <div className="mt-6 rounded-lg bg-[var(--status-warning-background)] px-4 py-3">
           {/* Claude usage comes from Claude Code's own login, which Providers cannot add. */}
-          {selectedProviderId === 'claude' ? (
+          {templateId === 'claude' ? (
             <>
               <p className="typography-ui-label font-medium text-[var(--status-warning)]">{t('settings.usage.page.state.claudeSignedOutTitle')}</p>
-              <ClaudeCodeSignIn onSignedIn={() => void fetchProviderQuota('claude')} />
+              <ClaudeCodeSignIn onSignedIn={() => void fetchProviderQuota(selectedProviderId, true)} />
             </>
           ) : (
             <>
@@ -230,7 +246,7 @@ export const UsagePage: React.FC = () => {
       )}
 
       {credentialProviderId && (
-        <QuotaCredentials providerId={credentialProviderId} providerName={providerName} />
+        <QuotaCredentials key={credentialProviderId} providerId={credentialProviderId} providerName={providerName} />
       )}
 
       {usage?.windows && Object.keys(usage.windows).length > 0 && (
@@ -358,9 +374,9 @@ export const UsagePage: React.FC = () => {
 
       {selectedResult?.configured && usage && Object.keys(usage.windows ?? {}).length === 0 &&
         providerModels.length === 0 && !usage.consoleBudgets && (
-        <div className="pb-8">
-          <p className="typography-ui-label text-foreground">{t('settings.usage.page.state.noQuotaWindowsTitle')}</p>
-          <p className="typography-meta text-muted-foreground mt-1">{t('settings.usage.page.state.noQuotaWindowsDescription')}</p>
+        <div className="pt-6">
+          <p className="typography-ui-label text-muted-foreground">{t(templateId === 'codex' ? 'settings.usage.page.state.noData' : 'settings.usage.page.state.noQuotaWindowsTitle')}</p>
+          {templateId !== 'codex' && <p className="typography-meta text-muted-foreground mt-1">{t('settings.usage.page.state.noQuotaWindowsDescription')}</p>}
         </div>
       )}
     </SettingsPageLayout>

@@ -3,7 +3,6 @@ import { ScrollableOverlay } from '@/components/ui/ScrollableOverlay';
 import { QuotaProviderLogo } from '@/components/usage/QuotaProviderLogo';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Icon } from "@/components/icon/Icon";
 import { cn } from '@/lib/utils';
 import { resolveUsageTone } from '@/lib/quota';
 import { useQuotaAutoRefresh, useQuotaProviders, useQuotaStore } from '@/stores/useQuotaStore';
@@ -31,11 +30,15 @@ export const UsageSidebar: React.FC<UsageSidebarProps> = ({ onItemSelect }) => {
   const results = useQuotaStore((state) => state.results);
   const selectedProviderId = useQuotaStore((state) => state.selectedProviderId);
   const setSelectedProvider = useQuotaStore((state) => state.setSelectedProvider);
-  const fetchAllQuotas = useQuotaStore((state) => state.fetchAllQuotas);
-  const isLoading = useQuotaStore((state) => state.isLoading);
   const usageDisplayMode = useQuotaStore((state) => state.displayMode);
   const setUsageDisplayMode = useQuotaStore((state) => state.setDisplayMode);
   const providers = useQuotaProviders();
+  const configuredProviderIds = new Set(results.filter(result => result.configured).map(result => result.providerId));
+  const sortedProviders = [...providers].sort((a, b) => Number(configuredProviderIds.has(b.id)) - Number(configuredProviderIds.has(a.id)));
+  const startConfiguration = useQuotaStore(state => state.startConfiguration);
+  const isCreatingConfiguration = useQuotaStore(state => state.isCreatingConfiguration);
+  const configurations = useQuotaStore(state => state.configurations);
+  const configurationLoadFailed = useQuotaStore(state => state.configurationLoadFailed);
   useQuotaAutoRefresh(true, true);
 
   const persistUsageSettings = React.useCallback(async (changes: { usageDisplayMode?: 'usage' | 'remaining'; usageDropdownProviders?: string[] }) => {
@@ -62,18 +65,7 @@ export const UsageSidebar: React.FC<UsageSidebarProps> = ({ onItemSelect }) => {
         <h2 className={`${SETTINGS_SECTION_TITLE_CLASS} mb-3`}>{t('settings.usage.sidebar.title')}</h2>
         <div className="flex items-center justify-between gap-2">
           <span className="typography-meta text-muted-foreground">{t('settings.usage.sidebar.total', { count: providers.length })}</span>
-          <div className="flex items-center gap-2">
-            <Button size="sm"
-              variant="ghost"
-              className="h-7 w-7 px-0 text-muted-foreground"
-              onClick={() => fetchAllQuotas()}
-              aria-label={t('settings.usage.sidebar.actions.refreshAria')}
-              title={t('settings.usage.sidebar.actions.refreshTitle')}
-              disabled={isLoading}
-            >
-              <Icon name="refresh" className={cn('h-3.5 w-3.5', isLoading && 'animate-spin')} />
-            </Button>
-          </div>
+          <Button size="sm" variant="outline" disabled={configurations === null} onClick={() => { startConfiguration(); onItemSelect?.(); }}>{t('settings.usage.configuration.add')}</Button>
         </div>
         <div className="mt-2 flex items-center justify-between gap-2">
           <span className="typography-micro text-muted-foreground">{t('settings.usage.sidebar.field.display')}</span>
@@ -93,12 +85,13 @@ export const UsageSidebar: React.FC<UsageSidebarProps> = ({ onItemSelect }) => {
         </div>
       </div>
 
+      {configurationLoadFailed && <p role="alert" className="typography-meta text-[var(--status-error)] px-3 py-2">{t('settings.usage.configuration.loadFailed')}</p>}
       <ScrollableOverlay outerClassName="flex-1 min-h-0" className="space-y-1 px-3 py-2 overflow-x-hidden">
-        {providers.map((provider) => {
+        {sortedProviders.map((provider) => {
           const result = results.find((entry) => entry.providerId === provider.id);
           const percent = getUsagePercent(result?.usage);
           const tone = resolveUsageTone(percent);
-          const isSelected = provider.id === selectedProviderId;
+          const isSelected = !isCreatingConfiguration && provider.id === selectedProviderId;
           const configured = result?.configured;
 
           const statusStyle = !configured

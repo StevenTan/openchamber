@@ -3,12 +3,13 @@ import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { randomUUID } from 'crypto';
+import { quotaConfigurationStatus, mutateQuotaConfiguration, readQuotaConfiguration, configurationInputSchema } from '../../web/server/lib/quota/configurations.js';
 import { getProviderSources, getStoredProviderConfig, readConfig, upsertProviderConfig } from './opencodeConfig';
 import { getProviderAuth } from './opencodeAuth';
 import { OpenCode } from '@opencode/client';
 import { asSessionId, asSessionIdList, asSessionMetadata, asTimestamp, parseJson, type JsonValue, type SessionArchiveOnOpenCode, type SessionMetadataOnOpenCode, type SessionStateStore } from './openchamberSessionState';
 import type { OpenCodeManager } from './opencode';
-import { activateQuotaGiftReset, fetchQuotaForProvider, listConfiguredQuotaProviders, type QuotaGiftResetType } from './quotaProviders';
+import { activateQuotaGiftReset, fetchQuotaForProvider, listConfiguredQuotaProviders, initializeQuotaConfigurations, type QuotaGiftResetType } from './quotaProviders';
 import { credentialStatus, deleteCredential, importCursorCredential, normalizeCredential, readCredential, validateCredential, writeCredential, type ManagedProvider } from './quotaCredentials';
 import { getSessionActivitySnapshot } from './sessionActivityWatcher';
 import { sessionNotificationSchema } from './sessionNotifications';
@@ -20,6 +21,14 @@ import type { BridgeContext, BridgeResponse } from './bridge';
 import { ENTERPRISE_MODE_ERROR, isEnterpriseMode, publicEnterprisePolicy } from '../../web/server/lib/enterprise-mode.js';
 import { discoverProviderModels } from './model-discovery';
 import { openCodeTrust } from './opencodeTrust';
+import { z } from 'zod';
+
+const quotaConfigurationRequestSchema = z.discriminatedUnion('method', [
+  z.object({ method: z.literal('GET') }),
+  z.object({ method: z.literal('POST'), input: configurationInputSchema }),
+  z.object({ method: z.literal('PUT'), configurationId: z.string(), input: configurationInputSchema }),
+  z.object({ method: z.literal('DELETE'), configurationId: z.string() }),
+]);
 
 /** The base URL a custom provider was saved with; discovery sends its stored key only there. */
 const readStoredProviderBaseURL = (providerID: string): string | undefined => {
@@ -551,6 +560,21 @@ export async function handleSystemBridgeMessage(
       }
     }
 
+    case 'api:quota:configurations': {
+      try {
+        const fields = quotaConfigurationRequestSchema.parse(payload);
+        await initializeQuotaConfigurations();
+        if (fields.method === 'GET') return { id, type, success: true, data: quotaConfigurationStatus(false) };
+        const configurationId = fields.method === 'POST' ? undefined : fields.configurationId;
+        const input = fields.method === 'DELETE' ? undefined : fields.input;
+        const data = mutateQuotaConfiguration(fields.method, configurationId, input, false);
+        void vscode.commands.executeCommand('openchamber.internal.quotaConfigurationsSynced');
+        return { id, type, success: true, data };
+      } catch (error) {
+        return { id, type, success: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    }
+
     case 'api:quota:providers': {
       try {
         const providers = await listConfiguredQuotaProviders();
@@ -619,7 +643,7 @@ export async function handleSystemBridgeMessage(
         return { id, type, success: false, error: 'Invalid gift reset request' };
       }
       try {
-        await activateQuotaGiftReset(providerId, { recordId, resetType, grantType });
+        await activateQuotaGiftReset(readQuotaConfiguration(providerId)?.templateId ?? providerId, { recordId, resetType, grantType });
         return { id, type, success: true, data: { success: true } };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);

@@ -3,6 +3,15 @@
 One directory per Settings page. `shared/` holds the page chrome and controls
 every page is built from; see `.agents/skills/settings-ui-patterns/SKILL.md` for
 which primitive to reach for.
+The Codex Usage detail page selects a ChatGPT sign-in or a bound provider.
+The choice is server-owned and autosaved. Its fields belong to the selected
+Codex detail, so they have no independent Settings search target.
+Usage templates appear only during creation. The list contains saved usage
+entries and extension-provided usage. Entry titles include the template name;
+detail forms edit the name and account or provider source. Every saved entry
+can be deleted.
+The sidebar lists configured entries first,
+preserving catalog order within each group.
 Routing category and custom model editors use shared Collapsible panels.
 Their parent owns the expanded state and field values; panel content unmounts
 after its closing transition.

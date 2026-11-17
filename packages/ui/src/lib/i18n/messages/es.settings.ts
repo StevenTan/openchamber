@@ -1513,6 +1513,10 @@ export const settingsDict = {
   "settings.usage.page.state.providerNotConfiguredDescription": "Añade credenciales en la pestaña de Proveedores para habilitar el seguimiento de uso.",
   "settings.usage.page.state.claudeSignedOutTitle": "No has iniciado sesión en Claude Code",
   "settings.usage.page.state.claudeSignInCommand": "Ejecuta este comando en una terminal:",
+  "settings.usage.configuration.provider": "Proveedor",
+  "settings.usage.configuration.chooseProvider": "Seleccionar proveedor",
+  "settings.usage.configuration.loadFailed": "No se pudieron cargar las configuraciones de uso. Actualiza e inténtalo de nuevo.",
+  "settings.usage.configuration.saveFailed": "No se pudo guardar la configuración de uso.",
   "settings.usage.page.section.modelQuotas": "Cuotas de modelo",
   "settings.usage.page.section.otherModels": "Otros modelos",
   "settings.usage.page.state.noQuotaWindowsTitle": "No se reportaron ventanas de cuota",
@@ -2777,4 +2781,10 @@ export const settingsDict = {
   'settings.agents.sidebar.toast.enableFailed': 'No se pudo activar el agente: no se pudo escribir su archivo de configuración',
   'settings.openchamber.keyboardShortcuts.action.search_prompt_history.label': "Buscar en el historial de indicaciones",
 
+  "settings.usage.configuration.name": "Nombre",
+  "settings.usage.configuration.template": "Plantilla",
+  "settings.usage.configuration.add": "Nuevo seguimiento",
+  "settings.usage.configuration.deleteConfirm": "¿Eliminar \"{name}\" y su configuración guardada?",
+  "settings.usage.configuration.account": "Cuenta del servicio",
+  "settings.usage.configuration.accountHint": "Usa la sesión o las credenciales del servicio en la instancia conectada.",
 } as const;

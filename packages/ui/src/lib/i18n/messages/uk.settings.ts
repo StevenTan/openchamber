@@ -1513,6 +1513,10 @@ export const settingsDict = {
   "settings.usage.page.state.providerNotConfiguredDescription": "Додайте облікові дані на вкладці «Провайдери», щоб увімкнути відстеження використання.",
   "settings.usage.page.state.claudeSignedOutTitle": "Ви не ввійшли в Claude Code",
   "settings.usage.page.state.claudeSignInCommand": "Виконайте цю команду в терміналі:",
+  "settings.usage.configuration.provider": "Провайдер",
+  "settings.usage.configuration.chooseProvider": "Вибрати провайдера",
+  "settings.usage.configuration.loadFailed": "Не вдалося завантажити конфігурації використання. Спробуйте оновити.",
+  "settings.usage.configuration.saveFailed": "Не вдалося зберегти конфігурацію використання.",
   "settings.usage.page.section.modelQuotas": "Модельні квоти",
   "settings.usage.page.section.otherModels": "Інші моделі",
   "settings.usage.page.state.noQuotaWindowsTitle": "Вікна квот не надходять",
@@ -2777,4 +2781,10 @@ export const settingsDict = {
   'settings.agents.sidebar.toast.enableFailed': 'Не вдалося увімкнути агента: не вийшло записати його конфіг',
   'settings.openchamber.keyboardShortcuts.action.search_prompt_history.label': "Пошук в історії запитів",
 
+  "settings.usage.configuration.name": "Назва",
+  "settings.usage.configuration.template": "Шаблон",
+  "settings.usage.configuration.add": "Нове використання",
+  "settings.usage.configuration.deleteConfirm": "Видалити \"{name}\" і збережену конфігурацію використання?",
+  "settings.usage.configuration.account": "Обліковий запис сервісу",
+  "settings.usage.configuration.accountHint": "Використовує вхід або облікові дані сервісу в підключеному екземплярі.",
 } as const;

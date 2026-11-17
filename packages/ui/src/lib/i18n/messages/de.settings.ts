@@ -1494,6 +1494,10 @@ export const settingsDict = {
   'settings.usage.page.state.providerNotConfiguredDescription': 'Fügen Sie Anmeldeinformationen auf der Registerkarte \'Anbieter\' hinzu, um die Nutzungsverfolgung zu aktivieren.',
   'settings.usage.page.state.claudeSignedOutTitle': 'Nicht bei Claude Code angemeldet',
   'settings.usage.page.state.claudeSignInCommand': 'Führen Sie diesen Befehl in einem Terminal aus:',
+  "settings.usage.configuration.provider": "Anbieter",
+  "settings.usage.configuration.chooseProvider": "Anbieter auswählen",
+  "settings.usage.configuration.loadFailed": "Nutzungskonfigurationen konnten nicht geladen werden. Bitte aktualisieren.",
+  "settings.usage.configuration.saveFailed": "Nutzungskonfiguration konnte nicht gespeichert werden.",
   'settings.usage.page.section.modelQuotas': 'Modell-Kontingente',
   'settings.usage.page.section.otherModels': 'Andere Modelle',
   'settings.usage.page.state.noQuotaWindowsTitle': 'Keine Kontingentfenster berichtet',
@@ -2768,4 +2772,10 @@ export const settingsDict = {
   'settings.agents.sidebar.toast.enableFailed': 'Der Agent konnte nicht aktiviert werden: Die Konfigurationsdatei ließ sich nicht schreiben',
   'settings.openchamber.keyboardShortcuts.action.search_prompt_history.label': "Prompt-Verlauf durchsuchen",
 
+  "settings.usage.configuration.name": "Name",
+  "settings.usage.configuration.template": "Vorlage",
+  "settings.usage.configuration.add": "Neue Nutzung",
+  "settings.usage.configuration.deleteConfirm": "\"{name}\" und die gespeicherte Nutzungskonfiguration löschen?",
+  "settings.usage.configuration.account": "Dienstkonto",
+  "settings.usage.configuration.accountHint": "Verwendet die Anmeldung oder Zugangsdaten des Dienstes auf der verbundenen Instanz.",
 };

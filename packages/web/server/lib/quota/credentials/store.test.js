@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterAll, describe, expect, it, spyOn } from 'bun:test';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -9,6 +9,12 @@ const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'openchamber-qu
 process.env.OPENCHAMBER_DATA_DIR = temporaryDirectory;
 
 describe('quota credential store', () => {
+  it('reports an unreadable credential instead of an absent credential', () => {
+    const read = spyOn(fs, 'readFileSync').mockImplementation(() => { throw Object.assign(new Error('Permission denied'), { code: 'EACCES' }); });
+    try { expect(() => readQuotaCredential('exe-dev', value => value)).toThrow('Could not read exe-dev quota credentials'); }
+    finally { read.mockRestore(); }
+  });
+
   it('uses owner-only permissions and rejects arbitrary provider paths', () => {
     writeQuotaCredential('exe-dev', { usageToken: 'secret' });
     writeQuotaCredential('zenmux', { platformApiKey: 'secret' });

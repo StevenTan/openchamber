@@ -282,6 +282,13 @@ export async function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  context.subscriptions.push(
+    vscode.commands.registerCommand('openchamber.internal.quotaConfigurationsSynced', () => {
+      chatViewProvider?.notifyQuotaConfigurationsSynced();
+      sessionEditorProvider?.notifyQuotaConfigurationsSynced();
+    })
+  );
+
   const showSessionNotification = createSessionNotifier({
     isChatAttended: () => vscode.window.state.focused
       && Boolean(chatViewProvider?.isVisible() || sessionEditorProvider?.hasVisiblePanel()),

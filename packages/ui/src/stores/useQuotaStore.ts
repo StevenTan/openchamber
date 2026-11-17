@@ -11,6 +11,7 @@ import { loadDesktopSettings, updateDesktopSettings } from '@/lib/persistence';
 import { fetchConfiguredQuotaProviders, fetchQuota } from '@/lib/quota/fetchQuota';
 import { getRuntimeKey, isTransientRuntimeKey } from '@/lib/runtime-switch';
 import { useConfigStore } from '@/stores/useConfigStore';
+import { requestQuotaConfigurations, type QuotaConfiguration, type QuotaConfigurationInput, type QuotaConfigurationStatus } from '@/lib/quota/configurations';
 import { runBackgroundNetworkTask } from '@/lib/background-network';
 
 const QUOTA_REFRESH_INTERVAL_MS = 3 * 60 * 1000;
@@ -48,15 +49,23 @@ interface QuotaSettingsState {
 
 interface QuotaStore extends QuotaSettingsState {
   results: ProviderResult[];
+  configurations: QuotaConfiguration[] | null;
+  catalogRevision: number | null;
+  providerResponseTemplates: string[];
+  configurationLoadFailed: boolean;
+  saveConfiguration: (input: QuotaConfigurationInput, id?: QuotaProviderId) => Promise<QuotaProviderId | null>;
+  deleteConfiguration: (id: QuotaProviderId) => Promise<void>;
   /**
    * Usage providers installed extensions serve on this instance, after the
-   * built-ins (`GET /api/quota/extensions`). Read on connect and whenever the
+   * saved entries (`GET /api/quota/extensions`). Read on connect and whenever the
    * server announces a change; a failed read keeps the list it had.
    */
   extensionProviders: ExtensionQuotaProvider[];
   /** Instance whose quotas `results` describes, or `null` when nothing is loaded. */
   loadedRuntimeKey: string | null;
   selectedProviderId: QuotaProviderId | null;
+  isCreatingConfiguration: boolean;
+  startConfiguration: () => void;
   isLoading: boolean;
   isFetchingProvider: Record<string, boolean>;
   lastUpdated: number | null;
@@ -65,7 +74,7 @@ interface QuotaStore extends QuotaSettingsState {
   refreshErrors: Partial<Record<QuotaProviderId, string>>;
 
   loadSettings: () => Promise<void>;
-  /** Reads the extension provider list again; new providers are fetched once the instance has loaded, gone ones are forgotten. */
+  /** Reads configurations and extension providers; each failed read retains its own catalog. */
   loadExtensionProviders: () => Promise<void>;
   fetchAllQuotas: () => Promise<void>;
   /** Resolves true when at least one provider answered — see `ensureLoadedForRuntime`. */
@@ -157,7 +166,7 @@ const applyExtensionProviders = (next: ExtensionQuotaProvider[]): void => {
     for (const id of gone) delete refreshErrors[id];
     return {
       extensionProviders: next,
-      dropdownProviderIds: resolveDropdownProviderIds(current.savedDropdownProviderIds, quotaProviderIds(next)),
+      dropdownProviderIds: resolveDropdownProviderIds(current.savedDropdownProviderIds, quotaProviderIds(next, current.configurations)),
       results: gone.length > 0 ? current.results.filter((result) => !isGone(result.providerId)) : current.results,
       refreshErrors,
       selectedProviderId: current.selectedProviderId !== null && isGone(current.selectedProviderId) ? null : current.selectedProviderId,
@@ -168,6 +177,55 @@ const applyExtensionProviders = (next: ExtensionQuotaProvider[]): void => {
   const { results, loadedRuntimeKey, fetchQuotas } = useQuotaStore.getState();
   const arrived = next.map((entry) => entry.id).filter((id) => !results.some((result) => result.providerId === id) && !quotaRequests.has(id));
   if (arrived.length > 0 && (loadedRuntimeKey !== null || results.length > 0)) void fetchQuotas(arrived);
+};
+
+const applyConfigurations = (next: QuotaConfigurationStatus): void => {
+  const state = useQuotaStore.getState();
+  if (state.catalogRevision !== null && next.catalogRevision < state.catalogRevision) return;
+  if (JSON.stringify(state.configurations) === JSON.stringify(next.configurations)
+    && JSON.stringify(state.providerResponseTemplates) === JSON.stringify(next.providerResponseTemplates)) {
+    useQuotaStore.setState({ catalogRevision: next.catalogRevision });
+    return;
+  }
+  configuredProvidersRequest = null;
+  const previous = state.configurations ?? [];
+  const templateChanges = previous.filter(entry => next.configurations.some(current => current.id === entry.id && current.templateId !== entry.templateId)).map(entry => entry.id);
+  const selectedModels = { ...state.selectedModels };
+  const expandedFamilies = { ...state.expandedFamilies };
+  for (const id of templateChanges) { delete selectedModels[id]; delete expandedFamilies[id]; }
+  const invalid = [...new Set([
+    ...previous.filter(entry => !next.configurations.some(current => current.id === entry.id && current.revision === entry.revision)).map(entry => entry.id),
+    ...state.results.filter(entry => !entry.providerId.startsWith('ext-') && !next.configurations.some(current => current.id === entry.providerId)).map(entry => entry.providerId),
+  ])];
+  for (const id of invalid) {
+    quotaRequests.get(id)?.controller.abort();
+    quotaRequests.delete(id);
+  }
+  const names = new Map(next.configurations.map(entry => [entry.id, entry.name]));
+  useQuotaStore.setState(current => {
+    const refreshErrors = { ...current.refreshErrors };
+    for (const id of invalid) delete refreshErrors[id];
+    return {
+      configurations: next.configurations,
+      catalogRevision: next.catalogRevision,
+      providerResponseTemplates: next.providerResponseTemplates,
+      configurationLoadFailed: false,
+      selectedModels,
+      expandedFamilies,
+      results: current.results.filter(entry => !invalid.includes(entry.providerId)).map(entry => ({ ...entry, providerName: names.get(entry.providerId) ?? entry.providerName })),
+      refreshErrors,
+      error: Object.values(refreshErrors)[0] ?? null,
+      dropdownProviderIds: resolveDropdownProviderIds(current.savedDropdownProviderIds, quotaProviderIds(current.extensionProviders, next.configurations)),
+      selectedProviderId: current.selectedProviderId && previous.some(entry => entry.id === current.selectedProviderId) && !names.has(current.selectedProviderId) ? null : current.selectedProviderId,
+      isFetchingProvider: Object.fromEntries(Object.entries(current.isFetchingProvider).filter(([id]) => !invalid.some(value => value === id))),
+      isLoading: quotaRequests.size > 0,
+    };
+  });
+  if (templateChanges.length > 0) void updateDesktopSettings({ usageSelectedModels: selectedModels, usageExpandedFamilies: expandedFamilies });
+  if (state.loadedRuntimeKey !== null || state.results.length > 0) {
+    const arrived = next.configurations.filter(entry => !previous.some(old => old.id === entry.id && old.revision === entry.revision));
+    void useQuotaStore.getState().fetchQuotas(arrived.map(entry => entry.id), { invalidate: true });
+  }
 };
 
 /** Overlapping loads share one list read, as they share one request per provider. */
@@ -193,7 +251,7 @@ const recordNotConfigured = (set: (update: (state: QuotaStore) => Partial<QuotaS
     return {
       results: [
         ...state.results.filter((entry) => !absent.has(entry.providerId)),
-        ...quotaProviderList(state.extensionProviders).filter((provider) => absent.has(provider.id)).map((provider) => ({
+        ...quotaProviderList(state.extensionProviders, state.configurations).filter((provider) => absent.has(provider.id)).map((provider) => ({
           providerId: provider.id, providerName: provider.name, ok: false, configured: false, error: 'Not configured', usage: null, fetchedAt,
         })),
       ],
@@ -208,9 +266,14 @@ export const useQuotaStore = create<QuotaStore>()(
   devtools(
     (set, get) => ({
       results: [],
+      configurations: null,
+      catalogRevision: null,
+      providerResponseTemplates: [],
+      configurationLoadFailed: false,
       extensionProviders: [],
       loadedRuntimeKey: null,
       selectedProviderId: null,
+      isCreatingConfiguration: false,
       isLoading: false,
       isFetchingProvider: {},
       lastUpdated: null,
@@ -218,13 +281,26 @@ export const useQuotaStore = create<QuotaStore>()(
       refreshErrors: {},
       ...defaultQuotaSettings(),
 
+      saveConfiguration: async (input, id) => {
+        const generation = quotaGeneration;
+        const next = await requestQuotaConfigurations(id ? 'PUT' : 'POST', id, input);
+        if (generation !== quotaGeneration) return null;
+        applyConfigurations(next);
+        return get().configurations?.some(entry => entry.id === next.configuration?.id) ? next.configuration?.id ?? null : null;
+      },
+      deleteConfiguration: async (id) => {
+        const generation = quotaGeneration;
+        const next = await requestQuotaConfigurations('DELETE', id);
+        if (generation === quotaGeneration) applyConfigurations(next);
+      },
+
       loadSettings: async () => {
         const generation = quotaGeneration;
         try {
           const settings = await loadSettingsFromRuntime(get().extensionProviders);
           if (generation !== quotaGeneration) return;
           // The list is narrowed against the extensions known when the read lands; a later list read narrows it again.
-          set({ ...settings, dropdownProviderIds: resolveDropdownProviderIds(settings.savedDropdownProviderIds, quotaProviderIds(get().extensionProviders)) });
+          set({ ...settings, dropdownProviderIds: resolveDropdownProviderIds(settings.savedDropdownProviderIds, quotaProviderIds(get().extensionProviders, get().configurations)) });
         } catch (error) {
           console.warn('Failed to load usage settings:', error);
         }
@@ -237,14 +313,21 @@ export const useQuotaStore = create<QuotaStore>()(
         }
         const generation = quotaGeneration;
         inFlightExtensionLoad = (async () => {
-          try {
-            const next = await fetchExtensionQuotaProviders();
-            if (generation !== quotaGeneration) return;
-            applyExtensionProviders(next);
-          } catch (error) {
-            // A failed read is not an empty list: the cards stay until the server answers.
-            if (generation === quotaGeneration) console.warn('Failed to load extension usage providers:', error);
-          }
+          await Promise.all([
+            fetchExtensionQuotaProviders().then(next => {
+              if (generation === quotaGeneration) applyExtensionProviders(next);
+            }).catch(error => {
+              if (generation === quotaGeneration) console.warn('Failed to load extension usage providers:', error);
+            }),
+            requestQuotaConfigurations().then(next => {
+              if (generation === quotaGeneration) { set({ configurationLoadFailed: false }); applyConfigurations(next); }
+            }).catch(error => {
+              if (generation === quotaGeneration) {
+                set({ configurationLoadFailed: true });
+                console.warn('Failed to load usage configurations:', error);
+              }
+            }),
+          ]);
         })().finally(() => {
           if (generation !== quotaGeneration) return;
           inFlightExtensionLoad = null;
@@ -258,14 +341,22 @@ export const useQuotaStore = create<QuotaStore>()(
 
       fetchQuotas: async (providerIds, { invalidate = false } = {}) => {
         const generation = quotaGeneration;
+        const revisions = new Map(get().configurations?.map(entry => [entry.id, entry.revision]));
         try {
           // One read instead of a request per provider nobody has a credential
           // for. An account switch names providers it knows are configured.
           if (!invalidate) set({ isLoading: true });
           const configured = invalidate ? null : await readConfiguredProviders();
           if (generation !== quotaGeneration) return false;
-          const absent = configured ? providerIds.filter((providerId) => !configured.has(providerId)) : [];
-          const targets = providerIds.filter((providerId) => !absent.includes(providerId));
+          const current = get();
+          const active = providerIds.filter(id => {
+            if (id.startsWith('ext-')) return current.extensionProviders.some(entry => entry.id === id);
+            if (current.configurations === null) return true;
+            const configuration = current.configurations.find(entry => entry.id === id);
+            return configuration !== undefined && configuration.revision === revisions.get(id);
+          });
+          const absent = configured ? active.filter((providerId) => !configured.has(providerId)) : [];
+          const targets = active.filter((providerId) => !absent.includes(providerId));
           if (absent.length > 0) recordNotConfigured(set, absent);
           if (targets.length === 0) set({ isLoading: quotaRequests.size > 0 });
           const answered = await Promise.all(targets.map((providerId) => get().fetchProviderQuota(providerId, invalidate)));
@@ -280,7 +371,10 @@ export const useQuotaStore = create<QuotaStore>()(
       },
 
       fetchAllQuotas: async () => {
-        await get().fetchQuotas(quotaProviderIds(get().extensionProviders));
+        set({ isLoading: true });
+        await get().loadExtensionProviders();
+        if (get().configurations === null) { set({ isLoading: false }); return; }
+        await get().fetchQuotas(quotaProviderIds(get().extensionProviders, get().configurations));
       },
 
       fetchProviderQuota: async (providerId, invalidate = false) => {
@@ -293,12 +387,20 @@ export const useQuotaStore = create<QuotaStore>()(
           existing.controller.abort();
           quotaRequests.delete(providerId);
         }
+        if (invalidate) {
+          set(state => {
+            const refreshErrors = { ...state.refreshErrors };
+            delete refreshErrors[providerId];
+            return { results: state.results.filter(entry => entry.providerId !== providerId), refreshErrors, error: Object.values(refreshErrors)[0] ?? null };
+          });
+        }
         const generation = quotaGeneration;
         const controller = new AbortController();
         const promise = Promise.resolve().then(async () => {
           try {
-            const result = await fetchQuota(providerId, { signal: controller.signal });
-            if (generation !== quotaGeneration) return false;
+            const fetched = await fetchQuota(providerId, { signal: controller.signal });
+            const result = { ...fetched, providerName: get().configurations?.find(entry => entry.id === providerId)?.name ?? fetched.providerName };
+            if (generation !== quotaGeneration || controller.signal.aborted) return false;
             // A reachable instance can still report that its provider request
             // failed. Configuration is known, but there is no new usage sample.
             if (!result.ok && result.configured) {
@@ -335,8 +437,9 @@ export const useQuotaStore = create<QuotaStore>()(
             set(state => ({ refreshErrors: { ...state.refreshErrors, [providerId]: message }, error: message }));
             return false;
           } finally {
-            if (quotaRequests.get(providerId)?.controller === controller) quotaRequests.delete(providerId);
-            if (generation === quotaGeneration) {
+            const ownsRequest = quotaRequests.get(providerId)?.controller === controller;
+            if (ownsRequest) quotaRequests.delete(providerId);
+            if (generation === quotaGeneration && (ownsRequest || quotaRequests.has(providerId))) {
               // A superseded request finishes while its replacement still runs;
               // the provider stays fetching until the replacement settles too.
               set((state) => ({
@@ -359,7 +462,7 @@ export const useQuotaStore = create<QuotaStore>()(
         // then cached as if it were the answer.
         if (!useConfigStore.getState().isInitialized) return;
         if (visibleOnly && !hasVisibleQuotaReadout()) return;
-        if (!refresh && get().loadedRuntimeKey === runtimeKey) return;
+        if (!refresh && get().loadedRuntimeKey === runtimeKey && get().configurations !== null) return;
         const generation = quotaGeneration;
         let missingProvidersOnly = false;
         if (inFlightRuntimeLoad) {
@@ -373,8 +476,12 @@ export const useQuotaStore = create<QuotaStore>()(
 
         inFlightRuntimeLoad = (async () => {
           // Both say what this instance shows: its settings and the providers its extensions serve.
-          if (get().loadedRuntimeKey !== runtimeKey) await Promise.all([get().loadSettings(), get().loadExtensionProviders()]);
+          await Promise.all([
+            ...(get().loadedRuntimeKey !== runtimeKey ? [get().loadSettings()] : []),
+            ...(get().loadedRuntimeKey !== runtimeKey || get().configurations === null ? [get().loadExtensionProviders()] : []),
+          ]);
           if (generation !== quotaGeneration) return;
+          if (get().configurations === null) return;
           if (visibleOnly && !hasVisibleQuotaReadout()) {
             lastVisibleRefreshAt = null;
             lastVisibleRefreshIncludedAll = false;
@@ -382,11 +489,14 @@ export const useQuotaStore = create<QuotaStore>()(
           }
           if (!useConfigStore.getState().isInitialized) return;
           const { dropdownProviderIds, fetchQuotas } = get();
-          const requestedIds = allProviders ? quotaProviderIds(get().extensionProviders) : dropdownProviderIds;
+          const requestedIds = allProviders ? quotaProviderIds(get().extensionProviders, get().configurations) : dropdownProviderIds;
           const providerIds = missingProvidersOnly
             ? requestedIds.filter(providerId => !get().results.some(result => result.providerId === providerId))
             : requestedIds;
-          if (providerIds.length === 0) return;
+          if (providerIds.length === 0) {
+            set({ loadedRuntimeKey: runtimeKey });
+            return;
+          }
           const answered = await fetchQuotas(providerIds);
           // Mark the instance loaded only once it actually answered. Claiming it
           // up front meant a load that failed on a cold or briefly unreachable
@@ -416,9 +526,14 @@ export const useQuotaStore = create<QuotaStore>()(
           // The extensions' providers are the instance's too.
           ...defaultQuotaSettings(),
           extensionProviders: [],
+          configurations: null,
+          catalogRevision: null,
+          providerResponseTemplates: [],
+          configurationLoadFailed: false,
           results: [],
           loadedRuntimeKey: null,
           selectedProviderId: null,
+          isCreatingConfiguration: false,
           isLoading: false,
           isFetchingProvider: {},
           lastUpdated: null,
@@ -443,14 +558,15 @@ export const useQuotaStore = create<QuotaStore>()(
         await get().ensureLoadedForRuntime({ refresh: true, allProviders: [...quotaAutoRefreshConsumers.values()].some(Boolean), visibleOnly: true });
       },
 
-      setSelectedProvider: (providerId) => set({ selectedProviderId: providerId }),
+      startConfiguration: () => set({ isCreatingConfiguration: true }),
+      setSelectedProvider: (providerId) => set({ selectedProviderId: providerId, isCreatingConfiguration: false }),
       setDisplayMode: (mode) => set({ displayMode: mode }),
       setProviderInDropdown: (providerId, shown) => {
         const { savedDropdownProviderIds, dropdownProviderIds, extensionProviders } = get();
         // The saved list, since the shown one lacks a provider absent right now, such as a paused extension's.
         const base: readonly string[] = savedDropdownProviderIds ?? dropdownProviderIds;
         const next = shown ? [...new Set([...base, providerId])] : base.filter((id) => id !== providerId);
-        set({ savedDropdownProviderIds: next, dropdownProviderIds: resolveDropdownProviderIds(next, quotaProviderIds(extensionProviders)) });
+        set({ savedDropdownProviderIds: next, dropdownProviderIds: resolveDropdownProviderIds(next, quotaProviderIds(extensionProviders, get().configurations)) });
         return next;
       },
 
@@ -501,7 +617,8 @@ export const useQuotaStore = create<QuotaStore>()(
         // Only apply if no prior selections exist
         if ((state.selectedModels[providerId]?.length ?? 0) > 0) return;
 
-        const defaults = getDefaultModels(providerId as QuotaProviderId, availableModels);
+        const templateId = get().configurations?.find(entry => entry.id === providerId)?.templateId ?? providerId as QuotaProviderId;
+        const defaults = getDefaultModels(templateId, availableModels);
         if (defaults.length === 0) return;
 
         set((s) => ({
@@ -611,8 +728,9 @@ export const useQuotaAutoRefresh = (visible = true, allProviders = false) => {
   }, [visible, allProviders, isInitialized, nativeVisible]);
 };
 
-/** Every usage provider to draw on this instance: the built-ins, then the extensions', in the server's order. */
+/** The instance's usage configurations and extension providers, in catalog order. */
 export const useQuotaProviders = (): QuotaProviderMeta[] => {
   const extensionProviders = useQuotaStore((state) => state.extensionProviders);
-  return React.useMemo(() => quotaProviderList(extensionProviders), [extensionProviders]);
+  const configurations = useQuotaStore((state) => state.configurations);
+  return React.useMemo(() => quotaProviderList(extensionProviders, configurations), [extensionProviders, configurations]);
 };

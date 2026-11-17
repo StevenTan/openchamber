@@ -7,9 +7,28 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('../../opencode/auth.js', () => ({ readOpenCodeCredentials: async () => ({}) }));
 
 import * as google from './google/index.js';
-import { fetchQuotaForProvider, listConfiguredQuotaProviders } from './index.js';
+import { fetchQuotaForProvider, listConfiguredQuotaProviders, initializeQuotaConfigurations } from './index.js';
+import { mutateQuotaConfiguration } from '../configurations.js';
+import { readFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 
 describe('quota provider registry', () => {
+  it('retains a pending catalog when a managed credential cannot be read', async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), 'quota-migration-'));
+    vi.stubEnv('OPENCHAMBER_DATA_DIR', dataDir);
+    try {
+      mkdirSync(join(dataDir, 'quota'));
+      const original = JSON.stringify({ version: 1, catalogRevision: 1, configurations: [{ id: 'exe-dev', name: 'exe.dev', templateId: 'exe-dev', source: 'account', providerId: null, revision: randomUUID() }] });
+      writeFileSync(join(dataDir, 'quota/configurations.json'), original);
+      writeFileSync(join(dataDir, 'quota/exe-dev.json'), '{invalid');
+      await expect(initializeQuotaConfigurations()).rejects.toThrow('Could not read exe-dev quota credentials');
+      expect(readFileSync(join(dataDir, 'quota/configurations.json'), 'utf8')).toBe(original);
+    } finally {
+      vi.unstubAllEnvs();
+      rmSync(dataDir, { recursive: true, force: true });
+    }
+  });
+
   it('exposes google provider configuration helpers through the provider module', () => {
     expect(google.providerId).toBe('google');
     expect(google.providerName).toBe('Google');
@@ -25,10 +44,11 @@ describe('quota provider registry', () => {
     const dataDir = mkdtempSync(join(tmpdir(), 'quota-list-'));
     vi.stubEnv('OPENCHAMBER_DATA_DIR', dataDir);
     try {
-      await expect(listConfiguredQuotaProviders()).resolves.not.toContain('zenmux');
+      const { configuration } = mutateQuotaConfiguration('POST', undefined, { name: 'ZenMux', templateId: 'zenmux', source: 'account', providerId: null });
+      await expect(listConfiguredQuotaProviders()).resolves.not.toContain(configuration.id);
       mkdirSync(join(dataDir, 'quota'), { recursive: true });
       writeFileSync(join(dataDir, 'quota', 'zenmux.json'), JSON.stringify({ platformApiKey: 'key' }));
-      await expect(listConfiguredQuotaProviders()).resolves.toContain('zenmux');
+      await expect(listConfiguredQuotaProviders()).resolves.toContain(configuration.id);
     } finally {
       vi.unstubAllEnvs();
       rmSync(dataDir, { recursive: true, force: true });

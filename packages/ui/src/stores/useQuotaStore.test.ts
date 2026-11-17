@@ -1,11 +1,17 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test"
+import type { QuotaConfigurationStatus, QuotaConfiguration } from "@/lib/quota/configurations"
+import { QUOTA_PROVIDERS } from "@/lib/quota"
 import type { ProviderResult } from "@/types"
 
 let runtimeKey = "url:https://instance-a"
 let isInitialized = true
 const fetched: string[] = []
 
-type StubPayload = { usageDropdownProviders: string[] } | { extensions: never[] } | ProviderResult
+type StubPayload = { usageDropdownProviders: string[] } | { extensions: never[] } | ProviderResult | QuotaConfigurationStatus
+let catalog: QuotaConfigurationStatus = { configurations: [], catalogRevision: 0, providerResponseTemplates: ['codex'] }
+const resetCatalog = () => { catalog = { configurations: QUOTA_PROVIDERS.map(entry => ({ id: entry.id, name: entry.name, templateId: entry.id, source: 'account' as const, providerId: null, revision: 'initial' })), catalogRevision: 1, providerResponseTemplates: ['codex'] } }
+let catalogFails = false;
+let mutationGate: ((answer: QuotaConfigurationStatus, method?: string) => Promise<QuotaConfigurationStatus>) | null = null;
 let quotaRequestsFail = false
 let quotaFails = false;
 // What `/api/quota/providers` names; null answers 500, as a restarting OpenCode does.
@@ -25,22 +31,42 @@ const runtimeSwitch = await import("@/lib/runtime-switch")
 mock.module("@/lib/runtime-switch", () => ({ ...runtimeSwitch, getRuntimeKey: () => runtimeKey }))
 
 const runtimeFetchModule = await import("@/lib/runtime-fetch")
-mock.module("@/lib/runtime-fetch", () => ({
-  ...runtimeFetchModule,
-  runtimeFetch: async (path: string) => {
+const quotaRuntimeFetch = async (path: string, options?: RequestInit) => {
     fetched.push(path)
     if (quotaRequestsFail) throw new Error("network down")
     if (path.startsWith("/api/config/settings")) return json({ usageDropdownProviders: ["claude"] })
     // The extensions' usage providers, read beside the settings; none installed here.
     if (path === "/api/quota/extensions") return json({ extensions: [] })
+    if (path.startsWith('/api/quota/configurations')) {
+      if ((!options?.method || options.method === 'GET') && catalogFails) return new Response('{}', { status: 503 });
+      if (options?.method && options.method !== 'GET') catalog.catalogRevision += 1;
+      const input = options?.body ? JSON.parse(String(options.body)) : null;
+      const id = catalog.configurations.find(entry => entry.id === path.split('/')[4])?.id;
+      if (options?.method === 'DELETE') { catalog.configurations = catalog.configurations.filter(entry => entry.id !== id); return json(catalog); }
+      if (input) {
+        const previous = catalog.configurations.find(entry => entry.id === id);
+        const changed = previous && (previous.templateId !== input.templateId || previous.source !== input.source || previous.providerId !== input.providerId);
+        const configuration: QuotaConfiguration = { ...input, id: id ?? 'quota-test', revision: changed ? 'changed' : previous?.revision ?? 'new' };
+        catalog.configurations = [...catalog.configurations.filter(entry => entry.id !== configuration.id), configuration];
+        const answer = { ...catalog, configurations: [...catalog.configurations], configuration };
+        return json(mutationGate ? await mutationGate(answer, options?.method) : answer);
+      }
+      return json(catalog);
+    }
     if (path === "/api/quota/providers" && listGate) await listGate
     if (path === "/api/quota/providers") return configuredProviders ? Response.json({ providers: configuredProviders }) : new Response("{}", { status: 500 })
+    const provider = catalog.configurations.find(entry => entry.id === path.split('/').at(-1));
+    if (!provider) throw new Error('Unexpected quota endpoint in test fixture');
     if (quotaGate) await quotaGate()
     // A reachable instance reporting a provider failure, which is different
     // from the transport failure `quotaRequestsFail` models.
     if (quotaFails) return json({ providerId: "claude", providerName: "Claude", ok: false, configured: true, error: "authentication failed", usage: null, fetchedAt: 2 })
-    return json({ providerId: "claude", providerName: "Claude", ok: true, configured: true, usage: null, fetchedAt: 1 })
-  },
+    const providerId = provider.id;
+    return json({ providerId, providerName: catalog.configurations.find(entry => entry.id === providerId)?.name ?? providerId, ok: true, configured: true, usage: null, fetchedAt: 1 })
+  }
+mock.module("@/lib/runtime-fetch", () => ({
+  ...runtimeFetchModule,
+  runtimeFetch: quotaRuntimeFetch,
 }))
 
 const configStoreModule = await import("@/stores/useConfigStore")
@@ -56,6 +82,7 @@ describe("Usage quotas are loaded once per ready instance", () => {
     runtimeKey = "url:https://instance-a"
     isInitialized = true
     fetched.length = 0
+    resetCatalog()
     quotaRequestsFail = false
     configuredProviders = ["claude"]
     useQuotaStore.getState().resetForRuntimeSwitch()
@@ -95,6 +122,7 @@ describe("Usage quotas are loaded once per ready instance", () => {
 
     runtimeKey = "url:https://instance-b"
     fetched.length = 0
+    resetCatalog()
     await useQuotaStore.getState().ensureLoadedForRuntime()
 
     expect(fetched.length).toBeGreaterThan(0)
@@ -124,6 +152,7 @@ describe("Usage quotas are loaded once per ready instance", () => {
 
     quotaRequestsFail = false
     fetched.length = 0
+    resetCatalog()
     await useQuotaStore.getState().ensureLoadedForRuntime()
 
     expect(fetched.length).toBeGreaterThan(0)
@@ -148,16 +177,17 @@ describe("Usage quotas are loaded once per ready instance", () => {
 
     // `dropdownProviderIds` decides which providers get queried, so carrying it
     // over would ask the new instance through the old one's selection.
-    expect(useQuotaStore.getState().dropdownProviderIds.length).toBeGreaterThan(1)
+    expect(useQuotaStore.getState().dropdownProviderIds).toEqual([])
     expect(useQuotaStore.getState().displayMode).toBe("usage")
   })
 })
 
 describe("Quotas are requested only for providers with a credential", () => {
-  const requested = () => fetched.filter((path) => path.startsWith("/api/quota/") && path !== "/api/quota/providers" && path !== "/api/quota/extensions")
+  const requested = () => fetched.filter((path) => path.startsWith("/api/quota/") && path !== "/api/quota/providers" && path !== "/api/quota/extensions" && !path.startsWith("/api/quota/configurations"))
 
   beforeEach(() => {
     fetched.length = 0
+    resetCatalog()
     quotaRequestsFail = false
     quotaFails = false
     configuredProviders = ["claude", "github-copilot-addon"]
@@ -181,6 +211,7 @@ describe("Quotas are requested only for providers with a credential", () => {
   })
 
   test("a removed credential clears the sample and the error of the account it belonged to", async () => {
+    await useQuotaStore.getState().loadExtensionProviders()
     await useQuotaStore.getState().fetchQuotas(["claude"])
     useQuotaStore.setState({ refreshErrors: { claude: "boom" }, error: "boom" })
     configuredProviders = []
@@ -246,6 +277,7 @@ describe("A provider-account switch re-reads the trackers", () => {
     runtimeKey = "url:https://instance-a"
     isInitialized = true
     fetched.length = 0
+    resetCatalog()
     quotaRequestsFail = false
     quotaFails = false
     quotaGate = null
@@ -284,9 +316,21 @@ describe("A provider-account switch re-reads the trackers", () => {
     expect(useQuotaStore.getState().refreshErrors.claude).toBeTruthy()
   })
 
+  test("an account switch clears its sample before a request that fails in transport", async () => {
+    await useQuotaStore.getState().ensureLoadedForRuntime()
+    expect(useQuotaStore.getState().results.some((entry) => entry.providerId === "claude")).toBe(true)
+    quotaRequestsFail = true
+    const pending = useQuotaStore.getState().fetchProviderQuota("claude", true)
+    expect(useQuotaStore.getState().results.some((entry) => entry.providerId === "claude")).toBe(false)
+    await pending
+    expect(useQuotaStore.getState().results.some((entry) => entry.providerId === "claude")).toBe(false)
+    expect(useQuotaStore.getState().refreshErrors.claude).toBe("network down")
+  })
+
   test("a switch does not reuse a request in flight for the previous account", async () => {
     await useQuotaStore.getState().ensureLoadedForRuntime()
     fetched.length = 0
+    resetCatalog()
 
     // The stub resolves synchronously, so the in-flight request is stood in for
     // with one that has not answered yet. What matters is that the switch does
@@ -331,3 +375,117 @@ describe("A provider-account switch re-reads the trackers", () => {
     expect(useQuotaStore.getState().isFetchingProvider.claude).toBe(false)
   })
 })
+
+
+describe('Usage configuration lifecycle', () => {
+  beforeEach(() => {
+    mock.module("@/lib/runtime-fetch", () => ({ ...runtimeFetchModule, runtimeFetch: quotaRuntimeFetch }));
+    catalogFails = false; mutationGate = null;
+    resetCatalog(); fetched.length = 0; quotaRequestsFail = false; quotaFails = false; quotaGate = null; listGate = null;
+    configuredProviders = ['claude']; isInitialized = true; runtimeKey = 'url:https://instance-a';
+    useQuotaStore.getState().resetForRuntimeSwitch();
+  });
+
+  test('an empty catalog completes bootstrap and creating its first entry starts a quota read', async () => {
+    catalog.configurations = [];
+    await useQuotaStore.getState().ensureLoadedForRuntime({ allProviders: true });
+    expect(useQuotaStore.getState().configurations).toEqual([]);
+    expect(useQuotaStore.getState().loadedRuntimeKey).toBe(runtimeKey);
+    fetched.length = 0;
+    await useQuotaStore.getState().ensureLoadedForRuntime({ allProviders: true });
+    expect(fetched).toEqual([]);
+    const id = await useQuotaStore.getState().saveConfiguration({ name: 'Personal', templateId: 'codex', source: 'provider', providerId: 'proxy' });
+    expect(fetched).toContain(`/api/quota/${id}`);
+    await useQuotaStore.getState().fetchProviderQuota(id!);
+  });
+
+  test('a new entry has its own result and visibility key', async () => {
+    await useQuotaStore.getState().ensureLoadedForRuntime({ allProviders: true });
+    const source = catalog.configurations.find(entry => entry.id === 'claude')!;
+    const id = await useQuotaStore.getState().saveConfiguration({ ...source, name: 'Personal' });
+    expect(id).toBe('quota-test');
+    await useQuotaStore.getState().fetchProviderQuota(id!);
+    expect(useQuotaStore.getState().configurations?.find(entry => entry.id === id)?.name).toBe('Personal');
+    expect(useQuotaStore.getState().results.find(entry => entry.providerId === id)?.providerName).toBe('Personal');
+    expect(useQuotaStore.getState().results.find(entry => entry.providerId === 'claude')?.providerName).toBe('Claude');
+    expect(useQuotaStore.getState().setProviderInDropdown(id!, true)).toContain(id!);
+  });
+
+  test('renaming retains its sample and updates the displayed name without another quota read', async () => {
+    await useQuotaStore.getState().ensureLoadedForRuntime();
+    const previous = useQuotaStore.getState().results.find(entry => entry.providerId === 'claude');
+    const source = catalog.configurations.find(entry => entry.id === 'claude')!;
+    fetched.length = 0;
+    await useQuotaStore.getState().saveConfiguration({ ...source, name: 'Work' }, source.id);
+    expect(useQuotaStore.getState().results.find(entry => entry.providerId === source.id)).toEqual({ ...previous, providerName: 'Work' });
+    expect(fetched).toEqual(['/api/quota/configurations/claude']);
+  });
+
+  test('changing a source clears the old sample even when refresh fails', async () => {
+    await useQuotaStore.getState().ensureLoadedForRuntime();
+    const source = catalog.configurations.find(entry => entry.id === 'claude')!;
+    quotaFails = true;
+    await useQuotaStore.getState().saveConfiguration({ ...source, providerId: 'new-account' }, source.id);
+    await useQuotaStore.getState().fetchProviderQuota(source.id);
+    expect(useQuotaStore.getState().results.find(entry => entry.providerId === source.id)?.usage).toBeNull();
+    expect(useQuotaStore.getState().results.find(entry => entry.providerId === source.id)?.fetchedAt).not.toBe(1);
+  });
+
+  test('changing templates clears model selections belonging to the previous template', async () => {
+    await useQuotaStore.getState().ensureLoadedForRuntime();
+    const source = catalog.configurations.find(entry => entry.id === 'claude')!;
+    useQuotaStore.setState({ selectedModels: { claude: ['claude-sonnet-4'] }, expandedFamilies: { claude: ['claude'] } });
+    await useQuotaStore.getState().saveConfiguration({ ...source, templateId: 'google' }, source.id);
+    expect(useQuotaStore.getState().selectedModels.claude).toBeUndefined();
+    expect(useQuotaStore.getState().expandedFamilies.claude).toBeUndefined();
+    useQuotaStore.getState().applyDefaultSelections('claude', ['gemini-3-flash']);
+    expect(useQuotaStore.getState().selectedModels.claude).toEqual(['gemini-3-flash']);
+  });
+
+  test('deleting a configuration aborts its pending result and removes it from readouts', async () => {
+    await useQuotaStore.getState().ensureLoadedForRuntime();
+    let release!: () => void;
+    quotaGate = () => new Promise<void>(resolve => { release = resolve; });
+    const pending = useQuotaStore.getState().fetchProviderQuota('claude');
+    while (!release) await new Promise(resolve => setTimeout(resolve, 0));
+    await useQuotaStore.getState().deleteConfiguration('claude');
+    release(); await pending;
+    expect(useQuotaStore.getState().configurations?.some(entry => entry.id === 'claude')).toBe(false);
+    expect(useQuotaStore.getState().results.some(entry => entry.providerId === 'claude')).toBe(false);
+    expect(useQuotaStore.getState().dropdownProviderIds).not.toContain('claude');
+  });
+});
+
+
+describe('Usage catalog ordering and recovery', () => {
+  beforeEach(() => {
+    mock.module("@/lib/runtime-fetch", () => ({ ...runtimeFetchModule, runtimeFetch: quotaRuntimeFetch }));
+    resetCatalog(); catalogFails = false; mutationGate = null; quotaRequestsFail = false; quotaFails = false; quotaGate = null; listGate = null;
+    configuredProviders = ['claude']; isInitialized = true; runtimeKey = 'url:https://instance-a';
+    useQuotaStore.getState().resetForRuntimeSwitch();
+  });
+
+  test('an older mutation response cannot replace a newer catalog', async () => {
+    await useQuotaStore.getState().ensureLoadedForRuntime();
+    let release!: () => void;
+    mutationGate = async (answer, method) => { if (method === 'POST') await new Promise<void>(resolve => { release = resolve; }); return answer; };
+    const source = catalog.configurations.find(entry => entry.id === 'claude')!;
+    const pending = useQuotaStore.getState().saveConfiguration({ ...source, name: 'Personal' });
+    while (!release) await new Promise(resolve => setTimeout(resolve, 0));
+    await useQuotaStore.getState().saveConfiguration({ ...source, name: 'Work' }, source.id);
+    release(); await pending;
+    expect(catalog.configurations.find(entry => entry.id === 'claude')?.name).toBe('Work');
+    expect(useQuotaStore.getState().configurations?.find(entry => entry.id === 'claude')?.name).toBe('Work');
+  });
+
+  test('a failed initial catalog read is retried after the connection recovers', async () => {
+    catalogFails = true;
+    await useQuotaStore.getState().ensureLoadedForRuntime();
+    expect(useQuotaStore.getState().configurations).toBeNull();
+    expect(useQuotaStore.getState().configurationLoadFailed).toBe(true);
+    catalogFails = false;
+    await useQuotaStore.getState().ensureLoadedForRuntime({ refresh: true, allProviders: true });
+    expect(useQuotaStore.getState().configurations?.length).toBe(QUOTA_PROVIDERS.length);
+    expect(useQuotaStore.getState().configurationLoadFailed).toBe(false);
+  });
+});

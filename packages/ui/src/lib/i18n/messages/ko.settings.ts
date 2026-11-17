@@ -1513,6 +1513,10 @@ export const settingsDict = {
   'settings.usage.page.state.providerNotConfiguredDescription': '사용량 추적을 활성화하려면 프로바이더 탭에서 인증 정보를 추가하세요.',
   'settings.usage.page.state.claudeSignedOutTitle': 'Claude Code에 로그인되어 있지 않습니다',
   'settings.usage.page.state.claudeSignInCommand': '터미널에서 이 명령을 실행하세요:',
+  "settings.usage.configuration.provider": "제공업체",
+  "settings.usage.configuration.chooseProvider": "제공업체 선택",
+  "settings.usage.configuration.loadFailed": "사용량 설정을 불러오지 못했습니다. 새로고침해 주세요.",
+  "settings.usage.configuration.saveFailed": "사용량 설정을 저장하지 못했습니다.",
   'settings.usage.page.section.modelQuotas': '모델 할당량',
   'settings.usage.page.section.otherModels': '기타 모델',
   'settings.usage.page.state.noQuotaWindowsTitle': '보고된 할당량 창이 없습니다',
@@ -2777,4 +2781,10 @@ export const settingsDict = {
   'settings.agents.sidebar.toast.enableFailed': '에이전트를 활성화하지 못했습니다. 설정 파일에 쓸 수 없습니다',
   'settings.openchamber.keyboardShortcuts.action.search_prompt_history.label': "프롬프트 기록 검색",
 
+  "settings.usage.configuration.name": "이름",
+  "settings.usage.configuration.template": "템플릿",
+  "settings.usage.configuration.add": "사용량 만들기",
+  "settings.usage.configuration.deleteConfirm": "\"{name}\" 및 저장된 사용량 설정을 삭제할까요?",
+  "settings.usage.configuration.account": "서비스 계정",
+  "settings.usage.configuration.accountHint": "연결된 인스턴스에서 해당 서비스의 로그인 상태 또는 인증 정보를 사용합니다.",
 } as const;

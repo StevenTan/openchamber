@@ -1,5 +1,5 @@
 /** The usage providers OpenChamber reads itself (`packages/web/server/lib/quota/providers`). */
-type BuiltInQuotaProviderId =
+export type BuiltInQuotaProviderId =
   | 'openai'
   | 'codex'
   | 'cursor'
@@ -33,7 +33,7 @@ type BuiltInQuotaProviderId =
 /** A usage provider an installed extension serves (`provides: ["quota"]`): `ext-<extension id>`, the server's name for it. */
 export type ExtensionQuotaProviderId = `ext-${string}`;
 
-export type QuotaProviderId = BuiltInQuotaProviderId | ExtensionQuotaProviderId;
+export type QuotaProviderId = BuiltInQuotaProviderId | ExtensionQuotaProviderId | `quota-${string}`;
 
 export interface UsageWindowGiftReset {
   recordId: number;

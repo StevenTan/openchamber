@@ -1513,6 +1513,10 @@ export const settingsDict = {
   'settings.usage.page.state.providerNotConfiguredDescription': '请在“提供商”标签页添加凭据以启用用量跟踪。',
   'settings.usage.page.state.claudeSignedOutTitle': '未登录 Claude Code',
   'settings.usage.page.state.claudeSignInCommand': '请在终端中运行此命令：',
+  "settings.usage.configuration.provider": "Provider",
+  "settings.usage.configuration.chooseProvider": "选择 provider",
+  "settings.usage.configuration.loadFailed": "无法读取用量配置，请刷新重试。",
+  "settings.usage.configuration.saveFailed": "无法保存用量配置。",
   'settings.usage.page.section.modelQuotas': '模型配额',
   'settings.usage.page.section.otherModels': '其他模型',
   'settings.usage.page.state.noQuotaWindowsTitle': '未报告配额窗口',
@@ -2777,4 +2781,10 @@ export const settingsDict = {
   'settings.agents.sidebar.toast.enableFailed': '无法启用代理：无法写入其配置文件',
   'settings.openchamber.keyboardShortcuts.action.search_prompt_history.label': "搜索提示历史记录",
 
+  "settings.usage.configuration.name": "名称",
+  "settings.usage.configuration.template": "基础模板",
+  "settings.usage.configuration.add": "新建用量",
+  "settings.usage.configuration.deleteConfirm": "删除「{name}」及其保存的用量配置？",
+  "settings.usage.configuration.account": "服务账号",
+  "settings.usage.configuration.accountHint": "使用当前实例上该服务的登录状态或专用凭据。",
 } as const;

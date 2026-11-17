@@ -6,6 +6,9 @@ import path from 'node:path';
 import type { CredentialEntry } from '@opencode/client';
 
 import { configureOpenCodeCredentials } from './opencodeAuth';
+import { quotaTemplates } from '../../web/server/lib/quota/templates.js';
+import { randomUUID } from 'node:crypto';
+import { readCredential } from './quotaCredentials';
 
 const previousQuotaDataDirectory = process.env.OPENCHAMBER_DATA_DIR;
 const temporaryQuotaDataDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'openchamber-vscode-quota-'));
@@ -100,11 +103,23 @@ let ORIGINAL_FETCH: typeof globalThis.fetch;
 
 beforeEach(() => {
   ORIGINAL_FETCH = globalThis.fetch;
+  fs.mkdirSync(path.join(temporaryQuotaDataDirectory, 'quota'), { recursive: true });
+  fs.writeFileSync(path.join(temporaryQuotaDataDirectory, 'quota/configurations.json'), JSON.stringify({
+    version: 2, catalogRevision: 1,
+    configurations: quotaTemplates.map(template => ({ id: template.id, name: template.name, templateId: template.id, source: 'account', providerId: null, revision: randomUUID() })),
+  }));
 });
 
 afterEach(() => {
   globalThis.fetch = ORIGINAL_FETCH;
   copilotEnterpriseUrl = undefined;
+});
+
+test('an unreadable managed credential remains a failed read', () => {
+  const target = path.join(temporaryQuotaDataDirectory, 'quota/exe-dev.json');
+  fs.writeFileSync(target, '{invalid');
+  try { assert.throws(() => readCredential('exe-dev'), /Could not read exe-dev quota credentials/); }
+  finally { fs.unlinkSync(target); }
 });
 
 const stubFetchReturning = (resolver: (url: string, init?: RequestInit) => Promise<unknown>): void => {
@@ -2543,7 +2558,7 @@ describe('Cursor quota provider (VS Code parity)', () => {
     const result = await fetchQuotaForProvider('cursor');
 
     assert.equal(result.ok, true);
-    assert.equal(result.providerName, 'Cursor Enterprise');
+    assert.equal(result.providerName, 'Cursor');
     assert.equal(result.usage!.windows.billing_cycle!.valueLabel, '590 / 1000');
     assert.equal(result.usage!.windows.billing_cycle!.usedPercent, 59);
     assert.equal(result.usage!.windows.on_demand, undefined);

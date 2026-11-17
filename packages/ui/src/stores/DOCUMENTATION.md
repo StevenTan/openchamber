@@ -125,6 +125,21 @@ flicking a popover does not hammer providers. Opening Settings after a narrower
 readout also loads the providers that readout did not request. Runtime switches
 and credential changes invalidate this freshness window and old-account samples.
 A credential event with no visible readout only invalidates samples.
+An individual provider refresh with `invalidate` clears that provider's sample
+before requesting data. A transport failure then retains its error without
+showing the previous account's numbers.
+
+The usage configuration catalog comes from `GET /api/quota/configurations`.
+Templates are creation choices, not catalog entries. Before the catalog loads,
+the store exposes no saved usage entries; an authoritative empty catalog stays
+empty. Extensions retain their own catalog and lifecycle.
+Configuration IDs key results, refresh requests, visibility and model selections;
+template IDs select logos and model families. Mutations apply the server's catalog.
+A rename keeps its sample. Changing the template clears its model and family
+selections in the shared settings. A source revision change aborts its pending request,
+clears its sample and refreshes it. Deletion forgets its result and selection.
+Catalog reads from a previous runtime or before an applied mutation are discarded.
+A failed catalog read retains the last complete catalog.
 
 The usage providers installed extensions serve (`extensionProviders`, from
 `GET /api/quota/extensions`) are read with the instance's settings on the first

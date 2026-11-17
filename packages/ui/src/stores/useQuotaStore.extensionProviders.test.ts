@@ -21,6 +21,8 @@ const pause = () => new Promise((resolve) => setTimeout(resolve, 10));
 
 beforeEach(() => {
   useQuotaStore.getState().resetForRuntimeSwitch();
+  const configurations = QUOTA_PROVIDERS.map(entry => ({ id: entry.id, name: entry.name, templateId: entry.id, source: 'account' as const, providerId: null, revision: 'initial' }));
+  useQuotaStore.setState({ configurations, catalogRevision: 1 });
   extensions = [];
   requested.length = 0;
   network.mockImplementation(async (input) => {
@@ -30,6 +32,7 @@ beforeEach(() => {
       if (extensions === 'down') return new Response('{"error":"Failed"}', { status: 500 });
       return Response.json({ extensions });
     }
+    if (url.endsWith('/api/quota/configurations')) return Response.json({ configurations, catalogRevision: 1, providerResponseTemplates: ['codex'] });
     // The path's last segment is the id the store asked for; `fetchQuota` checks the echo itself.
     const providerId = decodeURIComponent(url.slice(url.lastIndexOf('/') + 1));
     return Response.json(result(providerId));
@@ -41,10 +44,10 @@ afterEach(() => {
 });
 afterAll(() => network.mockRestore());
 
-const fetchedQuotas = () => requested.filter((url) => url.includes('/api/quota/') && !url.endsWith('/extensions'));
+const fetchedQuotas = () => requested.filter((url) => url.includes('/api/quota/') && !url.endsWith('/extensions') && !url.endsWith('/configurations'));
 
 describe('the extensions\' usage providers in the quota store', () => {
-  test('reads the list, draws it after the built-ins, and shows it in Work Status by default like a built-in', async () => {
+  test('reads the list, draws it after saved entries, and shows it in Work Status by default', async () => {
     extensions = [TEAPOT];
     await useQuotaStore.getState().loadExtensionProviders();
     const state = useQuotaStore.getState();
@@ -132,6 +135,6 @@ describe('the extensions\' usage providers in the quota store', () => {
     await useQuotaStore.getState().loadExtensionProviders();
     useQuotaStore.getState().resetForRuntimeSwitch();
     expect(useQuotaStore.getState().extensionProviders).toEqual([]);
-    expect(useQuotaStore.getState().dropdownProviderIds).toEqual(QUOTA_PROVIDERS.map((provider) => provider.id));
+    expect(useQuotaStore.getState().dropdownProviderIds).toEqual([]);
   });
 });

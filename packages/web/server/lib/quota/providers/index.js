@@ -13,6 +13,8 @@ import { buildResult } from '../utils/index.js';
 import * as claude from './claude/index.js';
 import * as clinePass from './cline-pass.js';
 import * as codex from './codex.js';
+import { readQuotaConfigurations, readQuotaConfiguration, quotaConfigurationsNeedMigration, migrateQuotaConfigurations } from '../configurations.js';
+import { fetchResponseQuota } from '../response-usage.js';
 import * as copilot from './copilot.js';
 import * as cursor from './cursor.js';
 import * as deepinfra from './deepinfra.js';
@@ -215,7 +217,6 @@ export { attachExtensionQuotaProvider, detachExtensionQuotaProvider } from '../e
 
 // `hasOwn`, so an id such as `constructor` never resolves to the object's own prototype members.
 const providerOf = (providerId) => (Object.hasOwn(registry, providerId) ? registry[providerId] : extensionQuotaProvider(providerId));
-const providerEntries = () => [...Object.entries(registry), ...extensionQuotaProviderEntries()];
 
 const pendingFetches = new Map();
 
@@ -224,15 +225,24 @@ const pendingFetches = new Map();
 // GitHub Copilot once; the add-on entry asks GitHub a second time.
 const NOT_ON_USAGE_PAGE = new Set([copilot.providerIdAddon]);
 
+export const initializeQuotaConfigurations = async () => {
+  if (!quotaConfigurationsNeedMigration()) return;
+  const auth = await readOpenCodeCredentials();
+  migrateQuotaConfigurations(Object.entries(registry).filter(([, provider]) => provider.isConfigured(auth)).map(([id]) => id));
+};
+
 /**
- * The providers Settings > Usage reads, built-ins first, then the attached
- * extensions: what an agent reading usage may ask, so it never makes a
+ * Saved usage entries, then attached extensions: what an agent reading usage
+ * may ask, so it never makes a
  * request the page does not make.
  */
-export const listUsagePageProviders = () => providerEntries()
-  .filter(([id]) => !NOT_ON_USAGE_PAGE.has(id))
-  .map(([providerId, provider]) => ({ providerId, providerName: provider.providerName }));
-
+export const listUsagePageProviders = async () => {
+  await initializeQuotaConfigurations();
+  return [
+    ...readQuotaConfigurations().map((entry) => ({ providerId: entry.id, providerName: entry.name })),
+    ...extensionQuotaProviderEntries().map(([providerId, provider]) => ({ providerId, providerName: provider.providerName })),
+  ];
+};
 
 /**
  * Providers with a usable credential. OpenCode's stored credentials are read
@@ -240,18 +250,15 @@ export const listUsagePageProviders = () => providerEntries()
  * throws, so a transient failure does not look like "nothing configured".
  */
 export const listConfiguredQuotaProviders = async () => {
+  await initializeQuotaConfigurations();
   const auth = await readOpenCodeCredentials();
   const configured = [];
 
-  for (const [id, provider] of providerEntries()) {
-    try {
-      if (provider.isConfigured(auth)) {
-        configured.push(id);
-      }
-    } catch {
-      // Ignore provider-specific config errors in list API.
-    }
+  for (const configuration of readQuotaConfigurations()) {
+    const provider = providerOf(configuration.templateId);
+    if (configuration.source === 'provider' ? configuration.providerId !== null : provider.isConfigured(auth)) configured.push(configuration.id);
   }
+  for (const [id, provider] of extensionQuotaProviderEntries()) if (provider.isConfigured(auth)) configured.push(id);
 
   return configured;
 };
@@ -285,13 +292,25 @@ const fetchQuotaForProviderUncoalesced = async (providerId) => {
 };
 
 export const fetchQuotaForProvider = (providerId) => {
-  const existing = pendingFetches.get(providerId);
+  const configuration = readQuotaConfiguration(providerId);
+  const key = configuration ? `${providerId}:${configuration.revision}` : providerId;
+  const existing = pendingFetches.get(key);
   if (existing) return existing;
-
-  const pending = fetchQuotaForProviderUncoalesced(providerId).finally(() => {
-    if (pendingFetches.get(providerId) === pending) pendingFetches.delete(providerId);
-  });
-  pendingFetches.set(providerId, pending);
+  const pending = (async () => {
+    if (!configuration) {
+      if (Object.hasOwn(registry, providerId) && !NOT_ON_USAGE_PAGE.has(providerId)) return buildResult({ providerId, providerName: providerId, ok: false, configured: false, error: 'Usage configuration not found' });
+      return fetchQuotaForProviderUncoalesced(providerId);
+    }
+    try {
+      const result = configuration.source === 'provider'
+        ? fetchResponseQuota(configuration)
+        : await fetchQuotaForProviderUncoalesced(configuration.templateId);
+      return { ...result, providerId: configuration.id, providerName: configuration.name };
+    } catch (error) {
+      return buildResult({ providerId: configuration.id, providerName: configuration.name, ok: false, configured: true, error: error.message });
+    }
+  })().finally(() => { if (pendingFetches.get(key) === pending) pendingFetches.delete(key); });
+  pendingFetches.set(key, pending);
   return pending;
 };
 

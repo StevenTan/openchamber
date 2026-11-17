@@ -1545,6 +1545,10 @@ export const settingsDict = {
   'settings.usage.page.state.providerNotConfiguredDescription': 'Add credentials in the Providers tab to enable usage tracking.',
   'settings.usage.page.state.claudeSignedOutTitle': 'Not signed in to Claude Code',
   'settings.usage.page.state.claudeSignInCommand': 'Run this command in a terminal:',
+  "settings.usage.configuration.provider": "Provider",
+  "settings.usage.configuration.chooseProvider": "Select a provider",
+  "settings.usage.configuration.loadFailed": "Could not load usage configurations. Try refreshing.",
+  "settings.usage.configuration.saveFailed": "Could not save usage configuration.",
   'settings.usage.page.section.modelQuotas': 'Model quotas',
   'settings.usage.page.section.otherModels': 'Other models',
   'settings.usage.page.state.noQuotaWindowsTitle': 'No quota windows reported',
@@ -2767,4 +2771,10 @@ export const settingsDict = {
   'settings.agents.sidebar.toast.enableFailed': 'Couldn\'t enable the agent: its config file could not be written',
   'settings.openchamber.keyboardShortcuts.action.search_prompt_history.label': "Search prompt history",
 
+  "settings.usage.configuration.name": "Name",
+  "settings.usage.configuration.template": "Template",
+  "settings.usage.configuration.add": "New usage",
+  "settings.usage.configuration.deleteConfirm": "Delete \"{name}\" and its saved usage configuration?",
+  "settings.usage.configuration.account": "Service account",
+  "settings.usage.configuration.accountHint": "Uses the service’s sign-in or credentials on the connected instance.",
 } as const;

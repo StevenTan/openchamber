@@ -8,6 +8,9 @@ disables the external `opencode-websearch` plugin while the built-in search
 plugin owns the `native` provider. See `../agent-search/DOCUMENTATION.md` for
 the standalone search protocol and provider selection contract.
 
+The managed config also registers the Codex usage observer. Its provider
+binding and snapshot contract belong to `../quota/DOCUMENTATION.md`.
+
 Diagnostic logging for the timeline export (`proxy.js` error lines, the lifecycle journal, the local diagnostics route in `core-routes.js`) is described in `../diagnostics/DOCUMENTATION.md`.
 
 ## Entrypoints and structure

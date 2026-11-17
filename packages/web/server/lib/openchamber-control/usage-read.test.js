@@ -1,6 +1,3 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { createUsageReadAction } from './usage-read.js';
@@ -27,13 +24,14 @@ const sample = (providerId, extra = {}) => ({
 const setup = ({
   settings = { agentUsageToolEnabled: true },
   configured = () => Promise.resolve(['claude', 'codex']),
+  catalog = () => PAGE,
   answer = (providerId) => Promise.resolve(sample(providerId)),
   ...options
 } = {}) => {
   const reads = [];
   let listReads = 0;
   const quota = {
-    listUsagePageProviders: () => PAGE,
+    listUsagePageProviders: catalog,
     listConfiguredQuotaProviders: () => {
       listReads += 1;
       return configured();
@@ -168,16 +166,26 @@ describe('usage.read', () => {
 
     await expect(pending).rejects.toMatchObject({ statusCode: 499 });
   });
+
+  it('bounds a pending catalog read and allows cancellation before quota requests', async () => {
+    const timed = setup({ catalog: never, listTimeoutMs: 20 });
+    await expect(timed.read({})).rejects.toMatchObject({ statusCode: 504 });
+    expect(timed.reads).toEqual([]);
+    const cancelled = setup({ catalog: never, listTimeoutMs: 20 });
+    const controller = new AbortController();
+    const pending = cancelled.read({}, { signal: controller.signal });
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ statusCode: 499 });
+    expect(cancelled.reads).toEqual([]);
+  });
 });
 
 describe('the providers the Usage page reads', () => {
-  it('are the built-ins the page lists, then the extensions', async () => {
+  it('lists saved usage entries without turning templates into entries', async () => {
     const { listUsagePageProviders } = await import('../quota/index.js');
-    const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../..');
-    const pageSource = fs.readFileSync(path.join(root, 'packages/ui/src/lib/quota/providers/index.ts'), 'utf8');
-    const pageIds = [...pageSource.matchAll(/\{ id: '([^']+)'/g)].map((match) => match[1]);
-
-    expect(pageIds.length).toBeGreaterThan(10);
-    expect(listUsagePageProviders().map(({ providerId }) => providerId).sort()).toEqual([...pageIds].sort());
+    const { mutateQuotaConfiguration } = await import('../quota/configurations.js');
+    expect(await listUsagePageProviders()).toEqual([]);
+    const { configuration } = mutateQuotaConfiguration('POST', undefined, { name: 'Personal', templateId: 'codex', source: 'account', providerId: null });
+    expect(await listUsagePageProviders()).toEqual([{ providerId: configuration.id, providerName: 'Personal' }]);
   });
 });

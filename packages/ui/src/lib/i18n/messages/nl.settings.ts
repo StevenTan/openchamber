@@ -1546,6 +1546,10 @@ export const settingsDict = {
   'settings.usage.page.state.providerNotConfiguredDescription': 'Voeg in het tabblad Providers inloggegevens toe om gebruikstracking in te schakelen.',
   'settings.usage.page.state.claudeSignedOutTitle': 'Niet aangemeld bij Claude Code',
   'settings.usage.page.state.claudeSignInCommand': 'Voer deze opdracht uit in een terminal:',
+  "settings.usage.configuration.provider": "Provider",
+  "settings.usage.configuration.chooseProvider": "Selecteer een provider",
+  "settings.usage.configuration.loadFailed": "De gebruiksconfiguraties konden niet worden geladen. Probeer te vernieuwen.",
+  "settings.usage.configuration.saveFailed": "De gebruiksconfiguratie kon niet worden opgeslagen.",
   'settings.usage.page.section.modelQuotas': 'Modellenlimieten',
   'settings.usage.page.section.otherModels': 'Overige modellen',
   'settings.usage.page.state.noQuotaWindowsTitle': 'Geen limietvensters gemeld',
@@ -2767,4 +2771,10 @@ export const settingsDict = {
   'settings.agents.sidebar.toast.enableFailed': 'De agent kon niet worden ingeschakeld: het configuratiebestand kon niet worden geschreven',
   'settings.openchamber.keyboardShortcuts.action.search_prompt_history.label': "Promptgeschiedenis doorzoeken",
 
+  "settings.usage.configuration.name": "Naam",
+  "settings.usage.configuration.template": "Sjabloon",
+  "settings.usage.configuration.add": "Nieuw gebruik",
+  "settings.usage.configuration.deleteConfirm": "\"{name}\" en de opgeslagen gebruiksconfiguratie verwijderen?",
+  "settings.usage.configuration.account": "Serviceaccount",
+  "settings.usage.configuration.accountHint": "Gebruikt de aanmelding of inloggegevens van de dienst op de verbonden instantie.",
 } as const;

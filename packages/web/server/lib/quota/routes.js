@@ -7,6 +7,7 @@ import { asNonEmptyString } from '../shared/guards.js';
 import { fetchQuota as fetchZenmuxQuota } from './providers/zenmux.js';
 import { listExtensionQuotaProviders } from './extension-registry.js';
 import { QuotaRouteError } from './route-error.js';
+import { configureQuotaResponseSupport, quotaConfigurationStatus, mutateQuotaConfiguration, readQuotaConfiguration, quotaConfigurationsNeedMigration } from './configurations.js';
 
 // Keyed by the same provider ids as `normalizers`: a provider with a normalizer
 // but no validator would be stored without ever being checked.
@@ -33,7 +34,28 @@ const credentialError = (res, error) => res.status(400).json({
   error: error instanceof Error ? error.message : 'Credential validation failed',
 });
 
-export function registerQuotaRoutes(app, { getQuotaProviders }) {
+export function registerQuotaRoutes(app, { getQuotaProviders, supportsCodexProviderBinding = () => false, emitChanged = () => {} }) {
+  configureQuotaResponseSupport(supportsCodexProviderBinding);
+  app.get('/api/quota/configurations', async (_req, res) => {
+    try {
+      if (quotaConfigurationsNeedMigration()) await (await getQuotaProviders()).initializeQuotaConfigurations();
+      res.json(quotaConfigurationStatus());
+    } catch { res.status(500).json({ error: 'Could not read usage configurations' }); }
+  });
+  const mutate = async (req, res) => {
+    try {
+      if (quotaConfigurationsNeedMigration()) await (await getQuotaProviders()).initializeQuotaConfigurations();
+      const result = mutateQuotaConfiguration(req.method, req.params.id, req.body);
+      emitChanged();
+      res.json(result);
+    } catch (error) {
+      if (error instanceof QuotaRouteError) return res.status(error.status).json({ code: error.code, error: error.message });
+      res.status(500).json({ error: 'Could not save usage configuration' });
+    }
+  };
+  app.post('/api/quota/configurations', express.json({ limit: '16kb' }), mutate);
+  app.put('/api/quota/configurations/:id', express.json({ limit: '16kb' }), mutate);
+  app.delete('/api/quota/configurations/:id', mutate);
   // The usage providers installed extensions serve right now (id, name, icon,
   // extension), which the UI draws beside its built-in list. Every client reads
   // this on each stream connect, so it answers from memory and asks OpenCode nothing.
@@ -116,7 +138,7 @@ export function registerQuotaRoutes(app, { getQuotaProviders }) {
 
   app.post('/api/quota/:providerId/gift-reset/use', express.json({ limit: '16kb' }), async (req, res) => {
     try {
-      const providerId = req.params.providerId;
+      const providerId = readQuotaConfiguration(req.params.providerId)?.templateId;
       if (!zaiAliases.includes(providerId)) {
         return res.status(404).json({ code: 'UNSUPPORTED_PROVIDER', error: 'Unsupported quota provider' });
       }

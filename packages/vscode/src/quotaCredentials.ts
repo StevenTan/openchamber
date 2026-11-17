@@ -25,7 +25,10 @@ export const normalizeCredential = (provider: ManagedProvider, value: unknown): 
 
 export const readCredential = (provider: ManagedProvider) => {
   try { return normalizeCredential(provider, JSON.parse(fs.readFileSync(target(provider), 'utf8'))); }
-  catch (error) { if ((error as { code?: string }).code !== 'ENOENT') console.warn(`Failed to read ${provider} quota credentials`); return null; }
+  catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return null;
+    throw new Error(`Could not read ${provider} quota credentials`);
+  }
 };
 export const credentialStatus = (provider: ManagedProvider) => {
   const value = readCredential(provider);

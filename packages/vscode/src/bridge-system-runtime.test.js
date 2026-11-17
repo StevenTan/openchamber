@@ -1,4 +1,16 @@
-import { beforeEach, describe, expect, mock, test } from 'bun:test';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { afterAll, beforeEach, describe, expect, mock, test } from 'bun:test';
+
+const previousDataDirectory = process.env.OPENCHAMBER_DATA_DIR;
+const quotaTestDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'quota-bridge-'));
+process.env.OPENCHAMBER_DATA_DIR = quotaTestDirectory;
+afterAll(() => {
+  if (previousDataDirectory === undefined) delete process.env.OPENCHAMBER_DATA_DIR;
+  else process.env.OPENCHAMBER_DATA_DIR = previousDataDirectory;
+  fs.rmSync(quotaTestDirectory, { recursive: true, force: true });
+});
 
 const executeCommand = mock(async () => undefined);
 const updateWorkspaceFolders = mock(async (start, deleteCount, ...foldersToAdd) => {
@@ -52,6 +64,7 @@ mock.module('./opencodeAuth', () => ({
   removeProviderAuth: mock(),
 }));
 mock.module('./quotaProviders', () => ({
+  initializeQuotaConfigurations: mock(async () => undefined),
   activateQuotaGiftReset,
   fetchQuotaForProvider: mock(),
   listConfiguredQuotaProviders: mock(),
@@ -371,5 +384,24 @@ describe('VS Code system bridge api:sessions/metadata:set', () => {
     const response = await handleSystemBridgeMessage(message, { manager }, failingWith(new Error('OpenCode is down')));
 
     expect(response).toEqual({ id: 'meta', type: 'api:sessions/metadata:set', success: false, error: 'OpenCode is down' });
+  });
+});
+
+
+describe('VS Code usage configuration bridge', () => {
+  test('creates entries, renames them and broadcasts catalog mutations', async () => {
+    executeCommand.mockClear();
+    const input = { name: 'Work', templateId: 'claude', providerId: null, source: 'account' };
+    const send = payload => handleSystemBridgeMessage({ id: 'quota-config', type: 'api:quota:configurations', payload }, undefined, deps);
+    const added = await send({ method: 'POST', input });
+    expect(added.success).toBe(true);
+    const configurationId = added.data.configuration.id;
+    const renamed = await send({ method: 'PUT', configurationId, input: { ...input, name: 'Personal' } });
+    expect(renamed.data.configuration.name).toBe('Personal');
+    expect(renamed.data.catalogRevision).toBeGreaterThan(added.data.catalogRevision);
+    const removed = await send({ method: 'DELETE', configurationId });
+    expect(removed.data.configurations.some(entry => entry.id === configurationId)).toBe(false);
+    expect(executeCommand.mock.calls.filter(call => call[0] === 'openchamber.internal.quotaConfigurationsSynced')).toHaveLength(3);
+    expect((await send({ method: 'POST', input: { ...input, templateId: 'codex', source: 'provider' } })).success).toBe(false);
   });
 });

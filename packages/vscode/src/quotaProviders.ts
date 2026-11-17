@@ -14,6 +14,7 @@ import { refreshGoogleAccessToken } from '../../web/server/lib/quota/providers/g
 import { readConsoleBudgets, withConsoleBudgets, type ConsoleBudgets } from '../../web/server/lib/quota/console-budgets.js';
 import { antigravityHeaders, warnIfGeminiGroupMissing } from '../../web/server/lib/quota/providers/antigravity/client.js';
 import { miniMaxStatusError } from '../../web/server/lib/quota/providers/minimax-status.js';
+import { readQuotaConfigurations, readQuotaConfiguration, quotaConfigurationsNeedMigration, migrateQuotaConfigurations } from '../../web/server/lib/quota/configurations.js';
 import { readCodexCliLogin, signInEmailOf } from '../../web/server/lib/quota/providers/codex-cli.js';
 
 type AuthEntry = Record<string, unknown> | string;
@@ -852,7 +853,7 @@ const collectKimiApiKeys = (auth: AuthFile): { apiKey: string; endpoint: string 
  * cannot be read, so a transient failure does not look like "nothing
  * configured".
  */
-export const listConfiguredQuotaProviders = async () => {
+const listConfiguredTemplateProviders = async () => {
   const auth = await readOpenCodeCredentials();
   const configured = new Set<string>();
   if (openCodeGoApiKey(auth) || openCodeGoConsoleCredential(auth)) configured.add('opencode-go');
@@ -4493,15 +4494,36 @@ const fetchQuotaForProviderUncoalesced = async (providerId: string): Promise<Pro
   }
 };
 
+export const initializeQuotaConfigurations = async () => {
+  if (quotaConfigurationsNeedMigration()) migrateQuotaConfigurations(await listConfiguredTemplateProviders());
+};
+
+export const listConfiguredQuotaProviders = async () => {
+  await initializeQuotaConfigurations();
+  const configured = await listConfiguredTemplateProviders();
+  return readQuotaConfigurations().filter(configuration => {
+    if (configuration.source === 'provider') return true;
+    return configured.includes(configuration.templateId);
+  }).map(configuration => configuration.id);
+};
+
 const pendingQuotaFetches = new Map<string, Promise<ProviderResult>>();
 
 export const fetchQuotaForProvider = (providerId: string): Promise<ProviderResult> => {
-  const existing = pendingQuotaFetches.get(providerId);
+  const configuration = readQuotaConfiguration(providerId);
+  const key = configuration ? `${providerId}:${configuration.revision}` : providerId;
+  const existing = pendingQuotaFetches.get(key);
   if (existing) return existing;
-
-  const pending = fetchQuotaForProviderUncoalesced(providerId).finally(() => {
-    if (pendingQuotaFetches.get(providerId) === pending) pendingQuotaFetches.delete(providerId);
+  const read = async (): Promise<ProviderResult> => {
+    if (!configuration && providerId === 'github-copilot-addon') return fetchQuotaForProviderUncoalesced(providerId);
+    if (!configuration) return buildResult({ providerId, providerName: providerId, ok: false, configured: false, error: 'Usage configuration not found' });
+    if (configuration.source === 'provider') return buildResult({ providerId, providerName: configuration.name, ok: false, configured: true, error: 'Provider response usage requires OpenCode managed by OpenChamber' });
+    const result = await fetchQuotaForProviderUncoalesced(configuration.templateId);
+    return { ...result, providerId: configuration.id, providerName: configuration.name };
+  };
+  const pending = read().finally(() => {
+    if (pendingQuotaFetches.get(key) === pending) pendingQuotaFetches.delete(key);
   });
-  pendingQuotaFetches.set(providerId, pending);
+  pendingQuotaFetches.set(key, pending);
   return pending;
 };
