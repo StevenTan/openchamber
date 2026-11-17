@@ -51,6 +51,11 @@ const waitOutput = z.discriminatedUnion("timed_out", [
   z.object({ timed_out: z.literal(false), result: waitResult }),
 ]);
 const interruptOutput = z.object({ session_id: z.string(), interrupted: z.boolean() });
+const listInput = z.object({}).strict();
+const listOutput = z.object({ agents: z.array(z.object({
+  session_id: z.string(), title: z.string().nullable(), agent: z.string(), status: z.enum(["running", "idle"]),
+})) });
+export type AgentList = z.infer<typeof listOutput>;
 const waitInput = z.object({
   targets: z.array(target).min(1).describe("Child session IDs. Returns when any target becomes idle."),
   timeout_ms: z.number().int().min(10000).max(3600000).default(30000).describe("Wait timeout in milliseconds. Defaults to 30000, range 10000–3600000. Prefer a longer wait over repeated polling."),
@@ -202,6 +207,30 @@ export default {
           signal.throwIfAborted();
           const result = await ctx.session.interrupt({ sessionID: args.target, resume: false }, { signal });
           const output = { session_id: args.target, interrupted: result.interrupted };
+          return { output, content: JSON.stringify(output) };
+        },
+      });
+      editor.add<z.infer<typeof listInput>, z.infer<typeof listOutput>>({
+        name: "list_agents",
+        description: "List the current session's direct child agents. Returns an object with agents, each containing session_id, title, agent type and running or idle status. Idle includes completion, failure and interruption; it does not imply success. This is a snapshot, not detailed activity. Use wait_agent or background completion notifications to wait for results.",
+        options: { namespace: "collaboration", codemode: false, permission: "subagent" },
+        input: z.toJSONSchema(listInput),
+        output: z.toJSONSchema(listOutput),
+        async execute(input, context) {
+          listInput.parse(input);
+          const signal = AbortSignal.any([context.signal, lifetime.signal]);
+          signal.throwIfAborted();
+          const response = await fetch(new URL("/api/openchamber/subagent-list", endpoint), {
+            method: "POST",
+            headers: { authorization: `Bearer ${process.env.OPENCHAMBER_AGENT_TOOL_TOKEN}`, "content-type": "application/json" },
+            body: JSON.stringify({ sessionID: context.sessionID }), signal,
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(z.object({ error: z.string() }).parse(result).error);
+          const output = listOutput.parse(result);
+          signal.throwIfAborted();
+          await Promise.all([...new Set(output.agents.map(child => child.agent))].map(agent => approve(agent, context)));
+          signal.throwIfAborted();
           return { output, content: JSON.stringify(output) };
         },
       });

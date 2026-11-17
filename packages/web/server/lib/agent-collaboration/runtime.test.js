@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { materializeCollaborationPlugin } from './runtime.js';
 
-let directory, tools, ctx, native, close, wait, executeNative;
+let directory, tools, ctx, native, close, wait, executeNative, list;
 const invocation = signal => ({ sessionID: 'parent', agent: 'build', messageID: 'message', id: 'call', signal: signal ?? new AbortController().signal, progress: vi.fn(async () => {}) });
 const content = result => {
   expect(JSON.parse(result.content)).toEqual(result.output);
@@ -19,7 +19,8 @@ beforeEach(async () => {
   vi.stubEnv('NO_PROXY', '');
   vi.stubEnv('no_proxy', '');
   wait = vi.fn(async ({ target }) => Response.json({ session_id: target, status: 'idle', output: 'Finished' }));
-  vi.stubGlobal('fetch', (_url, init) => wait(JSON.parse(init.body), { signal: init.signal }));
+  list = vi.fn(async () => Response.json({ agents: [] }));
+  vi.stubGlobal('fetch', (url, init) => (new URL(url).pathname.endsWith('subagent-list') ? list : wait)(JSON.parse(init.body), { signal: init.signal }));
   directory = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-collaboration-'));
   tools = new Map();
   executeNative = vi.fn(async () => ({ output: { sessionID: 'child' }, content: 'Background agent continues', metadata: { sessionID: 'child' } }));
@@ -122,6 +123,50 @@ it('surfaces wait API failures instead of reporting completion or timeout', asyn
 it('requests interruption without automatically resuming the child', async () => {
   expect(content(await tools.get('interrupt_agent').execute({ target: 'child' }, invocation()))).toEqual({ session_id: 'child', interrupted: true });
   expect(ctx.session.interrupt).toHaveBeenCalledWith({ sessionID: 'child', resume: false }, expect.objectContaining({ signal: expect.any(AbortSignal) }));
+});
+
+it('returns child snapshots as objects and checks each distinct agent permission', async () => {
+  const output = { agents: [
+    { session_id: 'working', title: 'Research', agent: 'explore', status: 'running' },
+    { session_id: 'idle', title: 'Review', agent: 'explore', status: 'idle' },
+    { session_id: 'other-agent', title: null, agent: 'build', status: 'idle' },
+  ] };
+  list.mockResolvedValue(Response.json(output));
+  expect(content(await tools.get('list_agents').execute({}, invocation()))).toEqual(output);
+  expect(list).toHaveBeenCalledWith({ sessionID: 'parent' }, expect.objectContaining({ signal: expect.any(AbortSignal) }));
+  expect(ctx.permission.assert.mock.calls.map(([input]) => input.resources)).toEqual([['explore'], ['build']]);
+  expect(executeNative).not.toHaveBeenCalled();
+});
+
+it('returns an empty agent list for a session without children', async () => {
+  expect(content(await tools.get('list_agents').execute({}, invocation()))).toEqual({ agents: [] });
+  expect(ctx.permission.assert).not.toHaveBeenCalled();
+});
+
+it('checks child agent permissions before returning a listing', async () => {
+  list.mockResolvedValue(Response.json({ agents: [{ session_id: 'child', title: 'Research', agent: 'explore', status: 'idle' }] }));
+  ctx.permission.assert.mockRejectedValue(new Error('Permission denied'));
+  await expect(tools.get('list_agents').execute({}, invocation())).rejects.toThrow('Permission denied');
+});
+
+it('surfaces listing transport failures', async () => {
+  list.mockRejectedValue(new Error('Connection failed'));
+  await expect(tools.get('list_agents').execute({}, invocation())).rejects.toThrow('Connection failed');
+});
+
+it('surfaces listing API failures instead of returning empty or partial results', async () => {
+  list.mockResolvedValue(Response.json({ error: 'Page failed' }, { status: 500 }));
+  await expect(tools.get('list_agents').execute({}, invocation())).rejects.toThrow('Page failed');
+});
+
+it('releases the list request when the invoking turn is cancelled', async () => {
+  const controller = new AbortController();
+  list.mockImplementation(blockedWait);
+  const pending = tools.get('list_agents').execute({}, invocation(controller.signal));
+  const rejected = expect(pending).rejects.toThrow();
+  controller.abort();
+  await rejected;
+  expect(list.mock.calls[0][1].signal.aborted).toBe(true);
 });
 
 it('does not expose coordination tools when the native subagent tool is absent', async () => {

@@ -2,8 +2,8 @@
 
 ## Ownership
 
-This managed plugin exposes `collaboration.send_input`, `wait_agent` and
-`interrupt_agent`; OpenCode flattens their names with underscores. It prepares
+This managed plugin exposes `collaboration.send_input`, `wait_agent`,
+`interrupt_agent`, and `list_agents`; OpenCode flattens their names with underscores. It prepares
 inherited history for new native `subagent` calls. OpenCode owns execution,
 persisted history and completion notifications.
 
@@ -45,6 +45,12 @@ plugins and receive no injection.
   owns agent, permission, depth and model validation before executing them.
   Rejection or cancellation before it publishes the child ID deletes the prepared
   session; published children remain available for recovery.
+- `list_agents` reads every page of the invoking session's direct children,
+  excludes preparations without an assigned agent, and checks permissions for
+  each distinct child agent type. It returns `{ agents }` with `session_id`,
+  `title`, `agent`, and `status` fields. Status comes from OpenCode's active
+  session registry and is `running` or `idle`; it is a snapshot, not a success
+  verdict or detailed activity feed. API or permission failures fail the listing.
 
 The authenticated same-machine callback `/api/openchamber/subagent-wait` verifies
 child ownership again. Its SDK requests share the callback's disconnect signal
@@ -77,3 +83,10 @@ The import API accepts `parentID`, while ordinary forks have independent session
 ownership. Import creates an owned child with copied history; the existing-session
 path of the native subagent tool then selects its agent and model and registers
 the normal job observer. Ordinary forks retain their independent ownership.
+
+### Why listing crosses the server callback
+
+OpenCode's Promise plugin context exposes session listing but not the active
+session registry. The authenticated `/api/openchamber/subagent-list` callback
+reads both through the HTTP SDK, with pagination and disconnect cancellation.
+The plugin checks child-agent permissions before returning the snapshot.
