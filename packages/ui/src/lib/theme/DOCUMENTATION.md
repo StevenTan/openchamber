@@ -13,6 +13,10 @@ at 768px, or 1024px with wide layout enabled, including 16px of padding on each
 side. The content box is 736px in normal layout and 992px in wide layout when
 space permits. These widths are independent of the root font size.
 
+Theme application temporarily suppresses transition properties while retaining
+their authored durations. Components mounted during that interval can detect
+their transition support and animate subsequent interactions.
+
 ### Why typography sizes use CSS pixels
 
 Font preferences control reading size independently of layout dimensions.

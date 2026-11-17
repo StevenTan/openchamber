@@ -236,7 +236,7 @@ button,
 :root.oc-theme-switching *,
 :root.oc-theme-switching *::before,
 :root.oc-theme-switching *::after {
-  transition: none !important;
+  transition-property: none !important;
   animation: none !important;
 }
 
