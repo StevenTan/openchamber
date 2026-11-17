@@ -21,10 +21,10 @@ type ImageGallery = NonNullable<ToolPopupContent['image']>;
 export const imageGalleryAt = (target: EventTarget | null, scope: HTMLElement): ImageGallery | null => {
     if (!(target instanceof HTMLImageElement) || !target.matches(MARKDOWN_IMAGE_SELECTOR) || !isPreviewable(target)) return null;
     const images = Array.from(scope.querySelectorAll<HTMLImageElement>(MARKDOWN_IMAGE_SELECTOR)).filter(isPreviewable);
-    const gallery = images.map((image) => ({ url: image.currentSrc || image.src, filename: image.alt.trim() || undefined }));
+    const gallery = images.map((image) => ({ url: image.currentSrc || image.src, filename: image.alt.trim() || undefined, origin: image }));
     const index = images.indexOf(target);
     const selected = gallery[index];
-    return selected ? { ...selected, gallery, index } : null;
+    return selected ? { ...selected, origin: target, gallery, index } : null;
 };
 
 const CLOSED: ToolPopupContent = { open: false, title: '', content: '' };

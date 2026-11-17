@@ -1,0 +1,70 @@
+.oc-image-viewer.pswp {
+  z-index: 0;
+  /* The backdrop needs to sample the application outside the gallery root. */
+  will-change: auto;
+}
+
+.oc-image-viewer .pswp__bg {
+  background: color-mix(in srgb, var(--surface-overlay) 70%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.oc-image-viewer-controls {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  color: var(--surface-foreground);
+}
+
+html.desktop-runtime .oc-image-viewer-controls button:not(:disabled):not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
+.oc-image-viewer-state {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.oc-image-viewer-state > * {
+  pointer-events: auto;
+}
+
+.oc-image-viewer-toolbar {
+  position: absolute;
+  inset-block-start: max(20px, env(safe-area-inset-top));
+  inset-inline-end: max(20px, env(safe-area-inset-right));
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  max-width: calc(100% - 40px);
+  padding: 6px;
+  border-radius: var(--radius-xl);
+  pointer-events: auto;
+}
+
+.oc-image-viewer-previous,
+.oc-image-viewer-next {
+  position: absolute;
+  inset-block-start: 50%;
+  transform: translateY(-50%);
+  pointer-events: auto;
+}
+
+.oc-image-viewer-previous { inset-inline-start: 20px; }
+.oc-image-viewer-next { inset-inline-end: 20px; }
+
+@media (pointer: coarse) {
+  .oc-image-viewer-controls button {
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+  .oc-image-viewer-toolbar {
+    inset-inline: 12px;
+    max-width: none;
+  }
+}
+

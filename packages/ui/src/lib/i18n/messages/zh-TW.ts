@@ -2781,6 +2781,8 @@ export const dict: Record<I18nKey, string> = {
   'chat.toolOutputDialog.image.previousAria': '上一張圖片',
   'chat.toolOutputDialog.image.nextAria': '下一張圖片',
   'chat.toolOutputDialog.image.closeAria': '關閉圖片預覽',
+  'chat.toolOutputDialog.image.zoomInAria': '放大',
+  'chat.toolOutputDialog.image.zoomOutAria': '縮小',
   'chat.toolOutputDialog.mermaid.missingSource': '缺少 Mermaid 來源 URL。',
   'chat.toolOutputDialog.mermaid.loadFailed': '無法載入 Mermaid 圖表。',
   'chat.toolOutputDialog.mermaid.dataUrlMalformed': 'Mermaid 資料 URL 格式不正確。',

@@ -423,6 +423,7 @@ describe('React-owned Markdown media', () => {
     await act(async () => host.querySelector('button')?.click()); await flush();
     expect(popups[0]?.image?.gallery).toHaveLength(2);
     expect(popups[0]?.image?.index).toBe(0);
+    expect(popups[0]?.image?.gallery?.[0]?.origin?.querySelector('img')).toBe(host.querySelector('img'));
     expect(host.querySelector('img')?.getAttribute('data-oc-media-source')).toBe('a.png');
     expect(host.querySelector('img')?.getAttribute('src')).toContain('/api/fs/raw');
   });

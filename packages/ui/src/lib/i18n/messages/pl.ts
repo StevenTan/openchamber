@@ -1682,6 +1682,8 @@ export const dict: Record<I18nKey, string> = {
   'chat.todo.total': 'Łącznie',
   'chat.toolOutputDialog.commandCompleted': 'Polecenie zakończone pomyślnie',
   'chat.toolOutputDialog.image.closeAria': 'Zamknij podgląd obrazu',
+  'chat.toolOutputDialog.image.zoomInAria': 'Powiększ',
+  'chat.toolOutputDialog.image.zoomOutAria': 'Pomniejsz',
   'chat.toolOutputDialog.image.nextAria': 'Następny obraz',
   'chat.toolOutputDialog.image.previousAria': 'Poprzedni obraz',
   'chat.toolOutputDialog.mermaid.closeAria': 'Zamknij podgląd diagramu',

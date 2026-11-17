@@ -2516,6 +2516,8 @@ export const dict = {
   'chat.toolOutputDialog.image.previousAria': 'Vorheriges Bild',
   'chat.toolOutputDialog.image.nextAria': 'Nächstes Bild',
   'chat.toolOutputDialog.image.closeAria': 'Bildvorschau schließen',
+  'chat.toolOutputDialog.image.zoomInAria': 'Vergrößern',
+  'chat.toolOutputDialog.image.zoomOutAria': 'Verkleinern',
   'chat.toolOutputDialog.mermaid.missingSource': 'Fehlende Mermaid-Quell-URL.',
   'chat.toolOutputDialog.mermaid.loadFailed': 'Kann Mermaid-Diagramm nicht laden.',
   'chat.toolOutputDialog.mermaid.dataUrlMalformed': 'Die Mermaid-Daten-URL ist fehlerhaft formatiert.',

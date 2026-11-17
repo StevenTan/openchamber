@@ -2710,6 +2710,8 @@ export const dict = {
   'chat.toolOutputDialog.image.previousAria': 'الصورة السابقة',
   'chat.toolOutputDialog.image.nextAria': 'الصورة التالية',
   'chat.toolOutputDialog.image.closeAria': 'إغلاق معاينة الصورة',
+  'chat.toolOutputDialog.image.zoomInAria': 'تكبير',
+  'chat.toolOutputDialog.image.zoomOutAria': 'تصغير',
   'chat.toolOutputDialog.mermaid.missingSource': 'عنوان URL لمصدر Mermaid مفقود.',
   'chat.toolOutputDialog.mermaid.loadFailed': 'تعذّر تحميل مخطط Mermaid.',
   'chat.toolOutputDialog.mermaid.dataUrlMalformed': 'عنوان URL لبيانات Mermaid تالف.',

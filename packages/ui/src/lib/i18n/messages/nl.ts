@@ -2805,6 +2805,8 @@ export const dict = {
   'chat.toolOutputDialog.image.previousAria': 'Vorige afbeelding',
   'chat.toolOutputDialog.image.nextAria': 'Volgende afbeelding',
   'chat.toolOutputDialog.image.closeAria': 'Afbeeldingsvoorbeeld sluiten',
+  'chat.toolOutputDialog.image.zoomInAria': 'Inzoomen',
+  'chat.toolOutputDialog.image.zoomOutAria': 'Uitzoomen',
   'chat.toolOutputDialog.mermaid.missingSource': 'URL van de Mermaid-bron ontbreekt.',
   'chat.toolOutputDialog.mermaid.loadFailed': 'Kan Mermaid-diagram niet laden.',
   'chat.toolOutputDialog.mermaid.dataUrlMalformed': 'De Mermaid-data-URL is ongeldig.',

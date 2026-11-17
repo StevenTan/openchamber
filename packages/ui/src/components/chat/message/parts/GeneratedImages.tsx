@@ -60,7 +60,7 @@ export function GeneratedImages({ part, paths, onShowPopup }: {
                     onShowPopup={onShowPopup ?? showPopup}
                 />
             ))}
-            {ownPopup && popup.open ? (
+            {ownPopup && popup.image ? (
                 <React.Suspense fallback={null}>
                     <ToolOutputDialog popup={popup} onOpenChange={handlePopupChange} isMobile={isMobile} />
                 </React.Suspense>

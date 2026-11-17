@@ -2710,6 +2710,8 @@ export const dict = {
   'chat.toolOutputDialog.image.previousAria': 'התמונה הקודמת',
   'chat.toolOutputDialog.image.nextAria': 'התמונה הבאה',
   'chat.toolOutputDialog.image.closeAria': 'סגור את התצוגה המקדימה של התמונה',
+  'chat.toolOutputDialog.image.zoomInAria': 'הגדל',
+  'chat.toolOutputDialog.image.zoomOutAria': 'הקטן',
   'chat.toolOutputDialog.mermaid.missingSource': 'חסרה כתובת URL של מקור Mermaid.',
   'chat.toolOutputDialog.mermaid.loadFailed': 'לא ניתן לטעון את תרשים ה-Mermaid.',
   'chat.toolOutputDialog.mermaid.dataUrlMalformed': 'כתובת ה-URL של נתוני Mermaid פגומה.',

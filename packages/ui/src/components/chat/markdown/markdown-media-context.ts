@@ -193,7 +193,7 @@ export class MarkdownMediaOwner {
     const index = gallery.findIndex((entry) => entry.element === element);
     const current = gallery[index];
     if (!current) return;
-    show({ open: true, title: current.filename, content: '', metadata: { tool: 'markdown-image-preview', filename: current.filename }, image: { url: current.url, filename: current.filename, load: current.load, gallery: gallery.map(({ url, filename, load }) => ({ url, filename, load })), index } });
+    show({ open: true, title: current.filename, content: '', metadata: { tool: 'markdown-image-preview', filename: current.filename }, image: { url: current.url, filename: current.filename, load: current.load, origin: current.element, gallery: gallery.map(({ url, filename, load, element }) => ({ url, filename, load, origin: element })), index } });
   }
 
   disconnect(): void {

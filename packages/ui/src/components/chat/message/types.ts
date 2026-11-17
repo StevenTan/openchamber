@@ -22,12 +22,15 @@ export interface ToolPopupContent {
         size?: number;
         /** The image's own bytes, to save it; without it only a `data:` or `blob:` URL can be saved. */
         load?: () => Promise<Blob>;
+        /** The mounted thumbnail used for the zoom transition and keyboard focus. */
+        origin?: HTMLElement;
         gallery?: Array<{
             url: string;
             mimeType?: string;
             filename?: string;
             size?: number;
             load?: () => Promise<Blob>;
+            origin?: HTMLElement;
         }>;
         index?: number;
     };

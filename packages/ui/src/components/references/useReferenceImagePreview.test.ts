@@ -46,10 +46,11 @@ describe('reference image preview', () => {
     expect(imageGalleryAt(after, scope)).toEqual({
       url: 'https://img.test/after.png',
       filename: undefined,
+      origin: after,
       index: 1,
       gallery: [
-        { url: 'https://img.test/before.png', filename: 'Before' },
-        { url: 'https://img.test/after.png', filename: undefined },
+        { url: 'https://img.test/before.png', filename: 'Before', origin: scope.querySelector('img[src$="before.png"]') },
+        { url: 'https://img.test/after.png', filename: undefined, origin: after },
       ],
     });
   });

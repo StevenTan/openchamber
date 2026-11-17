@@ -2770,6 +2770,8 @@ export const dict: Record<I18nKey, string> = {
   'chat.toolOutputDialog.image.previousAria': '上一张图片',
   'chat.toolOutputDialog.image.nextAria': '下一张图片',
   'chat.toolOutputDialog.image.closeAria': '关闭图片预览',
+  'chat.toolOutputDialog.image.zoomInAria': '放大',
+  'chat.toolOutputDialog.image.zoomOutAria': '缩小',
   'chat.toolOutputDialog.mermaid.missingSource': '缺少 Mermaid 源 URL。',
   'chat.toolOutputDialog.mermaid.loadFailed': '无法加载 Mermaid 图表。',
   'chat.toolOutputDialog.mermaid.dataUrlMalformed': 'Mermaid 数据 URL 格式不正确。',

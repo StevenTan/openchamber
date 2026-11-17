@@ -2760,6 +2760,8 @@ export const dict: Record<I18nKey, string> = {
   "chat.toolOutputDialog.image.previousAria": "Imagem anterior",
   "chat.toolOutputDialog.image.nextAria": "Próxima imagem",
   "chat.toolOutputDialog.image.closeAria": "Fechar prévia de imagem",
+  "chat.toolOutputDialog.image.zoomInAria": "Ampliar",
+  "chat.toolOutputDialog.image.zoomOutAria": "Reduzir",
   "chat.toolOutputDialog.mermaid.missingSource": "Falta a URL de origem do Mermaid.",
   "chat.toolOutputDialog.mermaid.loadFailed": "Não foi possível carregar o diagrama de Mermaid.",
   "chat.toolOutputDialog.mermaid.dataUrlMalformed": "A URL de dados do Mermaid está malformada.",

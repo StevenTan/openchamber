@@ -2803,6 +2803,8 @@ export const dict: Record<I18nKey, string> = {
   'chat.toolOutputDialog.image.previousAria': '前の画像',
   'chat.toolOutputDialog.image.nextAria': '次の画像',
   'chat.toolOutputDialog.image.closeAria': '画像プレビューを閉じる',
+  'chat.toolOutputDialog.image.zoomInAria': '拡大',
+  'chat.toolOutputDialog.image.zoomOutAria': '縮小',
   'chat.toolOutputDialog.mermaid.missingSource': 'MermaidソースURLがありません。',
   'chat.toolOutputDialog.mermaid.loadFailed': 'Mermaidダイアグラムを読み込めません。',
   'chat.toolOutputDialog.mermaid.dataUrlMalformed': 'MermaidのデータURLの形式が正しくありません。',

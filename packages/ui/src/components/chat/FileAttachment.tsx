@@ -144,6 +144,7 @@ interface ImagePreviewProps {
 
 const ImagePreview = memo(({ file, onRemove, onShowPopup, gallery, index = 0 }: ImagePreviewProps) => {
   const { t } = useI18n();
+  const thumbnailRef = useRef<HTMLDivElement>(null);
   const isLocalImagePreview =
     file.source !== 'server' &&
     file.mimeType.startsWith('image/') &&
@@ -185,6 +186,7 @@ const ImagePreview = memo(({ file, onRemove, onShowPopup, gallery, index = 0 }: 
         size: file.size,
         gallery,
         index,
+        origin: thumbnailRef.current?.querySelector('img') ?? undefined,
       },
     });
   }, [displayName, file.mimeType, file.size, gallery, imageUrl, index, onShowPopup]);
@@ -216,6 +218,7 @@ const ImagePreview = memo(({ file, onRemove, onShowPopup, gallery, index = 0 }: 
 
   return (
     <div
+      ref={thumbnailRef}
       role={onShowPopup ? 'button' : undefined}
       tabIndex={onShowPopup ? 0 : undefined}
       onClick={handleOpenPreview}
@@ -739,8 +742,8 @@ export const MessageFilesDisplay = memo(({ files, onShowPopup, compact = false, 
                     <TooltipTrigger asChild>
                       <button
                         type="button"
-                        onClick={() => {
-                          if (openTarget) openAttachment(openTarget);
+                        onClick={(event) => {
+                          if (openTarget) openAttachment(openTarget, event);
                         }}
                         className="relative flex-none border border-edge-muted bg-muted/10 overflow-hidden snap-start h-12 w-12 sm:h-14 sm:w-14 md:h-16 md:w-16 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-ring"
                         aria-label={filename}

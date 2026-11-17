@@ -22,13 +22,19 @@ export function useOpenAttachment(onShowPopup: ((content: ToolPopupContent) => v
     const effectiveDirectory = useEffectiveDirectory();
     const openTrackerItem = useOpenTrackerItem();
 
-    return React.useCallback((target: AttachmentOpenTarget, event?: { metaKey: boolean; ctrlKey: boolean }) => {
+    return React.useCallback((target: AttachmentOpenTarget, event?: { metaKey: boolean; ctrlKey: boolean; currentTarget?: HTMLElement }) => {
         if (target.kind === 'external') {
             openTrackerItem(target.url, effectiveDirectory, event);
             return;
         }
         if (target.kind === 'popup') {
-            onShowPopup?.(target.popup);
+            const image = target.popup.image;
+            const origin = event?.currentTarget?.querySelector('img');
+            if (image && origin) {
+                onShowPopup?.({ ...target.popup, image: { ...image, origin } });
+            } else {
+                onShowPopup?.(target.popup);
+            }
             return;
         }
         if (runtime?.editor) {

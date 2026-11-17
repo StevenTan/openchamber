@@ -648,6 +648,13 @@ and background rows follow the same rule through `useShellOutput`. Reading the
 whole output on every progress update is not an option: OpenCode sends one
 update, with the `shellID`, when the command starts.
 
+### Why PhotoSwipe owns image motion
+
+The gallery reads the mounted thumbnail and its natural dimensions through
+PhotoSwipe's data API. Opening, closing, loading and gestures share one image
+lifecycle, including thumbnails cropped with `object-fit: cover`. React owns
+the application toolbar and Base UI owns the modal focus scope.
+
 ### Message parts
 
 - Assistant Markdown treats raw HTML as inert visible text, including HTML
@@ -699,16 +706,27 @@ update, with the `shellID`, when the command starts.
   DOM restoration participates in loading.
   While it loads the label's icon spins; an image that is missing, too large
   or fails validation keeps its label with a warning icon and "Image couldn't
-  load" in its tooltip (`data-oc-media-state`). Image attachments, the preview
-  overlay and diff images draw through `StatusImage`
-  (`components/ui/status-image.tsx`), which shows loading and failure in the
-  image's own frame.
+  load" in its tooltip (`data-oc-media-state`). Image thumbnails and diff
+  images draw through `StatusImage` (`components/ui/status-image.tsx`),
+  which shows loading and failure in the image's own frame. The shared image
+  overlay uses PhotoSwipe with the same loading, failure and retry states.
   Remote model/tool Markdown images stay labels or links, so a model or a
   fetched page cannot learn when the user read the message. Documents and
   references retain their explicit inline-image policy. A click on loaded
   assistant media opens the shared attachment preview overlay
-  with every drawn image of the message as its gallery. The viewer's download
-  saves an image's own file: each gallery item may carry `load`, which for a
+  with every drawn image of the message as its gallery. The library owns the
+  thumbnail opening and closing animation, including CSS-cropped thumbnails,
+  dragging, zooming and slide navigation. Loaded gallery thumbnails provide their
+  natural dimensions; entries without a thumbnail learn their dimensions when
+  the full image loads. Wide long images open at the top and fill the available width.
+  Image failures retain the modal backdrop while showing Retry. The viewer
+  keeps its Base UI focus scope until the library's `destroy` event.
+  Keyboard-opened previews then restore focus to the
+  thumbnail control. Its full-screen popup excludes the desktop window's drag
+  region. Reduced motion uses zero-duration transitions. RTL
+  reverses the slide order so swipes, arrow keys and navigation agree.
+  The viewer's download saves an image's own file: each gallery item may carry
+  `load`, which for a
   message's local image reads the whole file through its grant with
   `runtimeFetch` (`loadMessageImageBlob`), never by fetching the asset URL;
   an item without it saves only from a `data:` or object URL, and a remote

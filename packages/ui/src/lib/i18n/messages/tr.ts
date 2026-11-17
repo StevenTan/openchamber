@@ -2633,6 +2633,8 @@ export const dict = {
   'chat.toolOutputDialog.image.previousAria': 'Önceki görsel',
   'chat.toolOutputDialog.image.nextAria': 'Sonraki görsel',
   'chat.toolOutputDialog.image.closeAria': 'Görsel önizlemesini kapat',
+  'chat.toolOutputDialog.image.zoomInAria': 'Yakınlaştır',
+  'chat.toolOutputDialog.image.zoomOutAria': 'Uzaklaştır',
   'chat.toolOutputDialog.mermaid.missingSource': 'Mermaid kaynak URL\'si eksik.',
   'chat.toolOutputDialog.mermaid.loadFailed': 'Mermaid diyagramı yüklenemedi.',
   'chat.toolOutputDialog.mermaid.dataUrlMalformed': 'Mermaid veri URL\'si hatalı biçimlendirilmiş.',

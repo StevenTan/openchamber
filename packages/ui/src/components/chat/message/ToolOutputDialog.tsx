@@ -27,19 +27,15 @@ import { ToolbarTooltipButton } from '@/components/ui/action-toolbar';
 import { useDefaultDiffViewMode } from './useDefaultDiffViewMode';
 import { VirtualizedCodeBlock, type CodeLine } from './parts/VirtualizedCodeBlock';
 import { JsonTreeView } from '@/components/ui/JsonTreeView';
-import { StatusImage } from '@/components/ui/status-image';
 import { Icon } from "@/components/icon/Icon";
 import { getToolIcon } from './parts/toolPresentation';
 import { useGuestToolPresentation } from '@/lib/guests/tool-presentation';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useI18n, type I18nKey, type I18nParams } from '@/lib/i18n';
 import { runtimeFetch } from '@/lib/runtime-fetch';
-import { isVSCodeRuntime } from '@/lib/desktop';
-import { toast } from '@/components/ui';
-import { saveFile } from './parts/saveFile';
 import { MermaidLoadFailure, getMermaidDataUrlSourcePromise, isCurrentMermaidLoadRequest, isMermaidLoadFailure, nextMermaidLoadRequestId } from './toolOutputDialogMermaid';
 import { PIERRE_DIFF_TINT_CSS, PIERRE_SEPARATOR_CSS } from '@/lib/shiki/pierreDiffTint';
 import { ScrollableOverlay } from '@/components/ui/ScrollableOverlay';
+import { ImagePreviewDialog } from './ImagePreviewDialog';
 
 interface ToolOutputDialogProps {
     popup: ToolPopupContent;
@@ -255,275 +251,6 @@ const usePreviewViewport = (open: boolean) => {
     }, [open]);
 
     return viewport;
-};
-
-type GalleryItem = NonNullable<NonNullable<ToolPopupContent['image']>['gallery']>[number];
-
-/**
- * How the viewer reads an image's bytes to save it: the loader its owner
- * gave, else an inline `data:` or object URL. Any other URL is the runtime's
- * or a remote site's, which the viewer does not fetch itself; such an image
- * offers no download. VS Code's webview cannot download at all.
- */
-const imageLoader = (image: GalleryItem | undefined): (() => Promise<Blob>) | null => {
-    if (!image || isVSCodeRuntime()) return null;
-    if (image.load) return image.load;
-    const { url } = image;
-    if (/^(?:data|blob):/i.test(url)) return () => fetch(url).then((response) => response.blob());
-    return null;
-};
-
-const EXTENSION_BY_IMAGE_MIME = new Map([['image/png', 'png'], ['image/jpeg', 'jpg'], ['image/gif', 'gif'], ['image/webp', 'webp'], ['image/svg+xml', 'svg']]);
-
-/** The saved file's name: the image's own, given the extension of its format when it has none. */
-const savedImageName = (filename: string | undefined, blob: Blob): string => {
-    const name = filename?.split(/[\\/]/).pop()?.trim() || 'image';
-    if (/\.[A-Za-z0-9]{2,5}$/.test(name)) return name;
-    return `${name}.${EXTENSION_BY_IMAGE_MIME.get(blob.type) ?? 'png'}`;
-};
-
-const ImagePreviewDialog: React.FC<{
-    popup: ToolPopupContent;
-    onOpenChange: (open: boolean) => void;
-    isMobile: boolean;
-}> = ({ popup, onOpenChange, isMobile }) => {
-    const { t, direction } = useI18n();
-    const gallery = React.useMemo(() => {
-        const baseImage = popup.image;
-        if (!baseImage) return [] as GalleryItem[];
-        const fromPopup = Array.isArray(baseImage.gallery)
-            ? baseImage.gallery.filter((item): item is GalleryItem => Boolean(item?.url))
-            : [];
-
-        if (fromPopup.length > 0) {
-            return fromPopup;
-        }
-
-        return [{
-            url: baseImage.url,
-            mimeType: baseImage.mimeType,
-            filename: baseImage.filename,
-            size: baseImage.size,
-            load: baseImage.load,
-        }];
-    }, [popup.image]);
-
-    const [currentIndex, setCurrentIndex] = React.useState(0);
-    const [imageNaturalSize, setImageNaturalSize] = React.useState<{ url: string; width: number; height: number } | null>(null);
-    const { isRendered, isVisible, isTransitioning } = usePreviewOverlayState(popup.open);
-    const viewport = usePreviewViewport(popup.open);
-
-    React.useEffect(() => {
-        if (!popup.open || gallery.length === 0) {
-            return;
-        }
-
-        const requestedIndex = typeof popup.image?.index === 'number' ? popup.image.index : -1;
-        if (requestedIndex >= 0 && requestedIndex < gallery.length) {
-            setCurrentIndex(requestedIndex);
-            return;
-        }
-
-        const matchingIndex = popup.image?.url
-            ? gallery.findIndex((item) => item.url === popup.image?.url)
-            : -1;
-        setCurrentIndex(matchingIndex >= 0 ? matchingIndex : 0);
-    }, [gallery, popup.image?.index, popup.image?.url, popup.open]);
-
-    const currentImage = gallery[currentIndex] ?? gallery[0] ?? popup.image;
-    const imageTitle = currentImage?.filename || popup.title || 'Image preview';
-    const loadCurrentImage = imageLoader(currentImage);
-    const currentFilename = currentImage?.filename;
-    const handleDownload = React.useCallback(async () => {
-        if (!loadCurrentImage) return;
-        try {
-            const blob = await loadCurrentImage();
-            await saveFile(new File([blob], savedImageName(currentFilename, blob), { type: blob.type }));
-        } catch {
-            toast.error(t('chat.image.downloadFailed'));
-        }
-    }, [currentFilename, loadCurrentImage, t]);
-    const hasMultipleImages = gallery.length > 1;
-
-    const showPrevious = React.useCallback(() => {
-        if (gallery.length <= 1) return;
-        setCurrentIndex((prev) => (prev - 1 + gallery.length) % gallery.length);
-    }, [gallery.length]);
-
-    const showNext = React.useCallback(() => {
-        if (gallery.length <= 1) return;
-        setCurrentIndex((prev) => (prev + 1) % gallery.length);
-    }, [gallery.length]);
-
-    React.useEffect(() => {
-        if (!popup.open) {
-            return;
-        }
-
-        const onKeyDown = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') {
-                onOpenChange(false);
-                return;
-            }
-
-            // "Previous" sits at the start of the row: on the right in RTL.
-            const previousKey = direction === 'rtl' ? 'ArrowRight' : 'ArrowLeft';
-            const nextKey = direction === 'rtl' ? 'ArrowLeft' : 'ArrowRight';
-            if (event.key === previousKey && hasMultipleImages) {
-                event.preventDefault();
-                showPrevious();
-                return;
-            }
-
-            if (event.key === nextKey && hasMultipleImages) {
-                event.preventDefault();
-                showNext();
-            }
-        };
-
-        window.addEventListener('keydown', onKeyDown);
-        return () => {
-            window.removeEventListener('keydown', onKeyDown);
-        };
-    }, [direction, hasMultipleImages, onOpenChange, popup.open, showNext, showPrevious]);
-
-    // The measured size belongs to one URL. Resetting it in an effect on URL
-    // change raced the load event of an already-cached image, which left the
-    // viewer stuck at its maximum box with wide dead margins around the image.
-    const currentImageUrl = currentImage?.url;
-    const currentNaturalSize = imageNaturalSize && imageNaturalSize.url === currentImageUrl
-        ? imageNaturalSize
-        : null;
-
-    const imageDisplaySize = React.useMemo(() => {
-        const maxWidth = Math.max(160, viewport.width * (isMobile ? 0.86 : 0.75));
-        const maxHeight = Math.max(160, viewport.height * (isMobile ? 0.72 : 0.75));
-
-        if (!currentNaturalSize) {
-            return {
-                width: Math.round(maxWidth),
-                height: Math.round(maxHeight),
-            };
-        }
-
-        const widthScale = maxWidth / currentNaturalSize.width;
-        const heightScale = maxHeight / currentNaturalSize.height;
-        const scale = Math.min(widthScale, heightScale);
-
-        return {
-            width: Math.max(1, Math.round(currentNaturalSize.width * scale)),
-            height: Math.max(1, Math.round(currentNaturalSize.height * scale)),
-        };
-    }, [currentNaturalSize, isMobile, viewport.height, viewport.width]);
-
-    if (!isRendered || !currentImage || typeof document === 'undefined') {
-        return null;
-    }
-
-    const content = (
-        <div className={cn('fixed inset-0 z-50', popup.open ? 'pointer-events-auto' : 'pointer-events-none')}>
-            <div
-                aria-hidden="true"
-                className={cn(
-                    // Same scrim as DialogOverlay, so the image viewer sits on
-                    // the app the way every other dialog does.
-                    'oc-glass-backdrop absolute inset-0 bg-surface-overlay/60',
-                    isTransitioning && 'transition-opacity duration-150 ease-out',
-                    isVisible ? 'opacity-100' : 'opacity-0'
-                )}
-                onMouseDown={() => onOpenChange(false)}
-            />
-
-            {hasMultipleImages && (
-                <>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <button
-                                type="button"
-                                onMouseDown={(event) => event.stopPropagation()}
-                                onClick={showPrevious}
-                                className="absolute inset-s-3 top-1/2 -translate-y-1/2 z-10 h-10 w-10 flex items-center justify-center rounded-full bg-surface-elevated/90 text-surface-elevated-foreground hover:bg-surface-elevated focus:outline-none focus:ring-2 focus:ring-ring"
-                                aria-label={t('chat.toolOutputDialog.image.previousAria')}
-                            >
-                                <Icon name="arrow-left-s" className="h-6 w-6" />
-                            </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" sideOffset={6}>{t('chat.toolOutputDialog.image.previousAria')}</TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <button
-                                type="button"
-                                onMouseDown={(event) => event.stopPropagation()}
-                                onClick={showNext}
-                                className="absolute inset-e-3 top-1/2 -translate-y-1/2 z-10 h-10 w-10 flex items-center justify-center rounded-full bg-surface-elevated/90 text-surface-elevated-foreground hover:bg-surface-elevated focus:outline-none focus:ring-2 focus:ring-ring"
-                                aria-label={t('chat.toolOutputDialog.image.nextAria')}
-                            >
-                                <Icon name="arrow-right-s" className="h-6 w-6" />
-                            </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" sideOffset={6}>{t('chat.toolOutputDialog.image.nextAria')}</TooltipContent>
-                    </Tooltip>
-                </>
-            )}
-
-            <div
-                className={cn(
-                    'absolute inset-0 flex items-center justify-center pointer-events-none',
-                    isMobile ? 'p-2.5' : 'p-4'
-                )}
-            >
-                <div
-                    className={cn(
-                        'pointer-events-auto flex flex-col gap-2',
-                        isTransitioning && 'transition-opacity duration-150 ease-out',
-                        isVisible ? 'opacity-100' : 'opacity-0'
-                    )}
-                    style={{ width: `${imageDisplaySize.width}px` }}
-                >
-                    <div className="flex items-center justify-between gap-2">
-                        <div className="min-w-0 flex-1 text-foreground typography-ui-header font-semibold truncate" title={imageTitle}>
-                            {imageTitle}
-                        </div>
-                        <div className="flex shrink-0 items-center gap-0.5">
-                            {loadCurrentImage ? (
-                                <ToolbarTooltipButton label={t('chat.image.download')} icon="download" onClick={() => { void handleDownload(); }} />
-                            ) : null}
-                            <ToolbarTooltipButton
-                                label={t('chat.toolOutputDialog.image.closeAria')}
-                                icon="close"
-                                onClick={() => onOpenChange(false)}
-                            />
-                        </div>
-                    </div>
-
-                    <StatusImage
-                        src={currentImage.url}
-                        alt={imageTitle}
-                        variant="large"
-                        style={{ width: `${imageDisplaySize.width}px`, height: `${imageDisplaySize.height}px` }}
-                        imgClassName="block h-full w-full object-contain"
-                        lazy
-                        onLoad={(element) => {
-                            const width = element.naturalWidth;
-                            const height = element.naturalHeight;
-                            const url = element.getAttribute('src') ?? '';
-                            if (width > 0 && height > 0) {
-                                setImageNaturalSize((previous) => {
-                                    if (previous && previous.url === url && previous.width === width && previous.height === height) {
-                                        return previous;
-                                    }
-                                    return { url, width, height };
-                                });
-                            }
-                        }}
-                    />
-                </div>
-            </div>
-        </div>
-    );
-
-    return createPortal(content, document.body);
 };
 
 // ── PERF-007: Virtualised sub-components for dialog ──────────────────
@@ -1010,7 +737,7 @@ const ToolOutputDialog: React.FC<ToolOutputDialogProps> = ({ popup, onOpenChange
     }, [defaultDiffViewMode, popup.open, popup.title]);
 
     if (popup.image) {
-        return <ImagePreviewDialog popup={popup} onOpenChange={onOpenChange} isMobile={isMobile} />;
+        return <ImagePreviewDialog popup={popup} onOpenChange={onOpenChange} />;
     }
 
     if (popup.mermaid) {
