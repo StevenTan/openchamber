@@ -252,6 +252,17 @@ systemctl --user enable --now opencode openchamber
 
 </details>
 
+## PDF environment
+
+Managed agents include a `pdf` skill and `load_workspace_dependencies` tool.
+Prepare standalone Python, locked PDF libraries and Poppler on the server with
+`npm run prepare:workspace-runtime`; it installs into
+`~/.cache/openchamber-runtimes/<platform>-<arch>/<fingerprint>/openchamber-primary-runtime`.
+Set `OPENCHAMBER_WORKSPACE_RUNTIME_DIR` to
+use a prepared runtime at another location. The interpreter runs independently
+of project and system Python environments. Mobile clients use their connected
+server's environment. See the [runtime contract](server/lib/workspace-dependencies/DOCUMENTATION.md).
+
 ## What makes the web version special
 
 - **Remote access** - Cloudflare tunnel with QR onboarding. Scan from your phone, start coding.

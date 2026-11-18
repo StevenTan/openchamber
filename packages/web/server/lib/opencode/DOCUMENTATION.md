@@ -1560,6 +1560,13 @@ under a running child.
   harmless. The card's delivery state (`guests/opencode-plugin.js`) tells the
   user, and the same button is the way in.
 
+### Workspace PDF environment
+
+The managed config includes the workspace dependency locator plugin and its
+`pdf` skill root. The [workspace dependencies module](../workspace-dependencies/DOCUMENTATION.md)
+owns runtime paths, preparation and package versions. These entries follow the
+managed process lifecycle; external OpenCode configurations are not modified.
+
 ### Bundled coding agent
 
 Managed launches register `Codex-默认` through `codex-agent-plugin.js`, using

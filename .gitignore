@@ -83,3 +83,6 @@ artifacts/
 # TypeScript build-mode caches: UI declarations for project references
 packages/ui/.tsbuild/
 *.tsbuildinfo
+
+packages/web/.cache/workspace-runtime/
+packages/web/server/lib/workspace-dependencies/dist/

@@ -322,6 +322,7 @@ That runs, in order:
 1. `build:web-assets` to build the web UI and copy it into `packages/electron/resources/web-dist`.
 2. `prepare:opencode-cli` to download/cache the pinned OpenCode CLI and copy it into `packages/electron/resources/opencode-cli`.
 3. `prepare:ripgrep` to download/cache the target architecture's ripgrep and copy it into `packages/electron/resources/ripgrep`.
+   `prepare:workspace-runtime` packages the target Python PDF runtime in `resources/workspace-runtime-bundle`.
 4. `bundle:main` to create `packages/electron/dist-bundle/{entry,main,early-startup}.mjs`.
 5. `rebuild:native` to rebuild native modules for Electron.
 6. `package.mjs` to run `electron-builder`; its `afterPack` hook stages the compiled macOS icon asset catalog and gives the macOS main executable its own UUID.
@@ -463,6 +464,21 @@ Use an explicit override when testing a different OpenCode CLI build or when a u
 Find in files (the contents mode of the sidebar's file search) runs ripgrep, which `@openchamber/web` gets from `@vscode/ripgrep`. That package installs one platform package (`@vscode/ripgrep-<os>-<arch>`) for the machine running `bun install`, so a desktop build for the other architecture would ship the wrong binary. `prepare:ripgrep` downloads the target architecture's platform package tarball from npm at the version the lockfile pins, checks the tarball, downloaded or cached, against the sha512 that `bun.lock` records for that package, caches it under `packages/electron/.cache/ripgrep`, stages `rg` or `rg.exe` into `resources/ripgrep`, and runs `rg --version` on it. A Windows arm64 build runs on an x64 runner, so its workflow step passes `OPENCHAMBER_TARGET_ARCH` and the version run is skipped there. `extraResources` ships that directory as `Resources/ripgrep`, and `build.files` keeps every `@vscode/ripgrep-*` platform package out of the asar. The `afterPack` check fails the build when the staged binary is missing or a platform package was packed; the Linux AppImage verifier also checks the binary's ELF architecture.
 
 The server (`packages/web/server/lib/fs/ripgrep.js`) looks for ripgrep in this order: `Resources/ripgrep` in a packaged build, the installed `@vscode/ripgrep` platform package (desktop development, web installs, Docker), then `rg` on the PATH. Without any of them the search route answers 501 and the file tree says the server cannot search contents.
+
+## Bundled PDF runtime
+
+`prepare:workspace-runtime` prepares standalone Python, hash-locked PDF libraries and Poppler
+for the package architecture, then creates an archive and SHA256 manifest.
+`extraResources` ships the payload in `Resources/workspace-runtime-bundle`; main
+supplies it through `OPENCHAMBER_WORKSPACE_RUNTIME_PAYLOAD_DIR`. Managed process
+setup installs the verified archive into
+`~/.cache/openchamber-runtimes/<platform>-<arch>/<fingerprint>/openchamber-primary-runtime` and reuses
+that version on subsequent starts. Executables and Python caches stay outside
+the signed App. Managed agents receive the `pdf` skill and
+`load_workspace_dependencies` tool, which returns Python, `pdftoppm`, `pdfinfo` and library
+paths. Desktop development uses the same payload and cache installation;
+run the prepare script before testing PDF tasks. The environment contract belongs
+to [workspace dependencies](../web/server/lib/workspace-dependencies/DOCUMENTATION.md).
 
 ## Common Env Vars
 

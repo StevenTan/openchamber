@@ -1,0 +1,92 @@
+{
+  "bundleVersion": "1",
+  "pythonVersion": "3.12.16",
+  "targets": {
+    "darwin-arm64": {
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.12.16%2B20261110-aarch64-apple-darwin-install_only_stripped.tar.gz",
+      "sha256": "2f11b8aa3726bdbd87dd9eb76568412faddf4f47e26913fa45d6a2e424972acd",
+      "wheelPlatforms": [
+        "macosx_13_0_arm64",
+        "macosx_11_0_arm64",
+        "macosx_10_13_universal2",
+        "macosx_10_9_universal2"
+      ]
+    },
+    "darwin-x64": {
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.12.16%2B20261110-x86_64-apple-darwin-install_only_stripped.tar.gz",
+      "sha256": "b78a4c479f1964ec484880bee567568266f68da102269fb93a05fe8716b45f91",
+      "wheelPlatforms": [
+        "macosx_13_0_x86_64",
+        "macosx_10_13_x86_64",
+        "macosx_10_13_universal2",
+        "macosx_10_9_universal2",
+        "macosx_10_9_x86_64",
+        "macosx_10_10_x86_64",
+        "macosx_10_15_x86_64"
+      ]
+    },
+    "linux-arm64": {
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.12.16%2B20261110-aarch64-unknown-linux-gnu-install_only_stripped.tar.gz",
+      "sha256": "b6a41defec4975d94b4ff1950236e7383e5c02ba40ea48c9ec33c66087a35aab",
+      "wheelPlatforms": [
+        "manylinux_2_28_aarch64",
+        "manylinux_2_17_aarch64",
+        "manylinux2014_aarch64"
+      ]
+    },
+    "linux-x64": {
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.12.16%2B20261110-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+      "sha256": "6a9e62dad033790aef722dbd370e0ce76ce17b73627ba3ae679f537049350b39",
+      "wheelPlatforms": [
+        "manylinux_2_28_x86_64",
+        "manylinux_2_17_x86_64",
+        "manylinux2014_x86_64"
+      ]
+    },
+    "win32-x64": {
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.12.16%2B20261110-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+      "sha256": "355ee61b8207b91574491b1c6dc9b0ebb4408fc56bfafe498f3ef439314b52dc",
+      "wheelPlatforms": [
+        "win_amd64"
+      ]
+    },
+    "win32-arm64": {
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.12.16%2B20261110-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+      "sha256": "355ee61b8207b91574491b1c6dc9b0ebb4408fc56bfafe498f3ef439314b52dc",
+      "wheelPlatforms": [
+        "win_amd64"
+      ]
+    }
+  },
+  "poppler": {
+    "version": "26.06.0",
+    "release": "v26.06.0-1",
+    "source": "https://github.com/unpins/poppler-utils/tree/v26.06.0-1",
+    "targets": {
+      "darwin-arm64": {
+        "url": "https://github.com/unpins/poppler-utils/releases/download/v26.06.0-1/poppler-utils-26.06.0-1-aarch64-darwin.zst",
+        "sha256": "e4b77ba89b44d407b4e0930179229e847bd18018f7073b667b0727bfbb5fe321"
+      },
+      "darwin-x64": {
+        "url": "https://github.com/unpins/poppler-utils/releases/download/v26.06.0-1/poppler-utils-26.06.0-1-x86_64-darwin.zst",
+        "sha256": "4c626388e8db026d67218a63796952fd26310e97011ae8e571c86f6d79d9a86e"
+      },
+      "linux-arm64": {
+        "url": "https://github.com/unpins/poppler-utils/releases/download/v26.06.0-1/poppler-utils-26.06.0-1-aarch64-linux.zst",
+        "sha256": "35871e00648e4d9a04195273db9e0f4278cdbb3f7f8c9d7daa7ac86bc0fdae5b"
+      },
+      "linux-x64": {
+        "url": "https://github.com/unpins/poppler-utils/releases/download/v26.06.0-1/poppler-utils-26.06.0-1-x86_64-linux.zst",
+        "sha256": "2764246c1e70669942883bbc2fbf32408ffde786304f9904b1be65efbba3ce2c"
+      },
+      "win32-x64": {
+        "url": "https://github.com/unpins/poppler-utils/releases/download/v26.06.0-1/poppler-utils-26.06.0-1-x86_64-windows.exe.zst",
+        "sha256": "bb8ad5fcab4d979437fe73f5751b564bd26b99e576dbfca5151c3d8130b46c45"
+      },
+      "win32-arm64": {
+        "url": "https://github.com/unpins/poppler-utils/releases/download/v26.06.0-1/poppler-utils-26.06.0-1-x86_64-windows.exe.zst",
+        "sha256": "bb8ad5fcab4d979437fe73f5751b564bd26b99e576dbfca5151c3d8130b46c45"
+      }
+    }
+  }
+}

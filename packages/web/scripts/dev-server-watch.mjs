@@ -67,8 +67,9 @@ export function runDevServerWatch(options = {}) {
   const questionCompiler = runner(process.execPath, [compilerPath, '--project', 'tsconfig.agent-question.build.json', '--watch', '--preserveWatchOutput'], spawnOptions);
   const collaborationCompiler = runner(command, ['build', './server/lib/agent-collaboration/src/plugin.ts', './server/lib/agent-collaboration/src/runtime.ts', '--outdir', './server/lib/agent-collaboration/dist', '--target', 'node', '--format', 'esm', '--watch'], spawnOptions);
   const codeModeCompiler = runner(command, ['build', './server/lib/agent-code-mode/src/plugin.ts', '--outfile', './server/lib/agent-code-mode/dist/plugin.js', '--target', 'node', '--format', 'esm', '--watch'], spawnOptions);
+  const workspaceCompiler = runner(command, ['build', './server/lib/workspace-dependencies/src/plugin.ts', '--outfile', './server/lib/workspace-dependencies/dist/plugin.js', '--target', 'node', '--format', 'esm', '--watch'], spawnOptions);
   const child = runner(command, args, spawnOptions);
-  const watchers = [compiler, searchCompiler, questionCompiler, collaborationCompiler, codeModeCompiler, child];
+  const watchers = [compiler, searchCompiler, questionCompiler, collaborationCompiler, codeModeCompiler, workspaceCompiler, child];
   let exitSignal = null;
   const stop = (signal) => {
     exitSignal = signal;
@@ -85,7 +86,7 @@ export function runDevServerWatch(options = {}) {
       if (exitSignal) process.kill(process.pid, exitSignal);
     });
 
-  for (const builder of [compiler, searchCompiler, questionCompiler, collaborationCompiler, codeModeCompiler]) {
+  for (const builder of [compiler, searchCompiler, questionCompiler, collaborationCompiler, codeModeCompiler, workspaceCompiler]) {
     builder.on('error', (error) => {
       console.error('[dev:web:server] Failed to start tool compiler:', error);
       process.exitCode = 1;
@@ -104,6 +105,7 @@ export function runDevServerWatch(options = {}) {
     questionCompiler.kill();
     collaborationCompiler.kill();
     codeModeCompiler.kill();
+    workspaceCompiler.kill();
     console.error('[dev:web:server] Failed to start server watcher:', error);
     process.exitCode = 1;
   });
@@ -113,6 +115,7 @@ export function runDevServerWatch(options = {}) {
     questionCompiler.kill();
     collaborationCompiler.kill();
     codeModeCompiler.kill();
+    workspaceCompiler.kill();
     if (signal) {
       exitSignal = signal;
       return;

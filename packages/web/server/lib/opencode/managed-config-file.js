@@ -8,6 +8,7 @@ import { materializeCollaborationPlugin } from '../agent-collaboration/runtime.j
 import { materializeQuotaUsagePlugin } from '../quota/response-usage.js';
 import { materializeCodeModePlugin } from '../agent-code-mode/runtime.js';
 import { materializeCodexAgentPlugin } from './codex-agent-plugin.js';
+import { materializeWorkspaceDependencies } from '../workspace-dependencies/runtime.js';
 
 export const MANAGED_CONFIG_FILE_NAME = 'opencode.managed.json';
 
@@ -145,9 +146,11 @@ export const createManagedConfigRuntime = ({
     if (agentToolRuntime) directories.push(await materializeCollaborationPlugin(instanceDir));
     directories.push(await materializeQuotaUsagePlugin({ fsPromises, instanceDir }));
     if (agentToolRuntime) directories.push(await materializeCodeModePlugin(instanceDir));
+    const workspace = await materializeWorkspaceDependencies({ fsPromises, path, instanceDir, env });
+    directories.push(workspace.plugin);
     const disabled = includeImage ? [...DISABLED_BUILTIN_PLUGINS, BUILTIN_IMAGE_PLUGIN] : DISABLED_BUILTIN_PLUGINS;
     const authoring = await materializeAuthoringSkill({ fsPromises, instanceDir, openchamberVersion });
-    const skills = [authoring.skillsRoot, ...await listExtensionSkillDirectories()];
+    const skills = [authoring.skillsRoot, workspace.skillsRoot, ...await listExtensionSkillDirectories()];
     const extensionPlugins = await listExtensionPluginDirectories();
     return { disabled, directories, extensionPlugins, permissions, policies: readPluginDenials(), skills, commands: { [EXTENSION_AUTHORING_COMMAND]: authoring.command } };
   };

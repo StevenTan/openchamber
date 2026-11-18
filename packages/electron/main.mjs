@@ -1582,6 +1582,7 @@ const spawnLocalServer = async () => {
       : lanAccessBlockedByMissingPassword ? 'missing-password' : undefined,
     OPENCHAMBER_DIST_DIR: resolveWebDistDir(),
     OPENCHAMBER_RUNTIME: 'desktop',
+    OPENCHAMBER_WORKSPACE_RUNTIME_PAYLOAD_DIR: path.join(resourceRoot(), 'workspace-runtime-bundle'),
     // OpenCode uses process cwd as a fallback directory; app userData would make
     // packaged desktop look like a separate empty workspace.
     OPENCHAMBER_OPENCODE_CWD: resolveManagedOpenCodeCwd({

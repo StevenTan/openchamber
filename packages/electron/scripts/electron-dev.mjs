@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { withUserEnv } from '../../web/server/lib/injected-env.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -229,14 +230,14 @@ async function main() {
     hmrApiPort = String(await findAvailablePort(preferredHmrApiPort));
     hmrUiPort = String(await findAvailablePort(preferredHmrUiPort));
     devServer = spawnProcess('node', ['./scripts/dev-web-hmr.mjs'], {
-      env: {
+      env: withUserEnv({
         ...process.env,
         ...bundledOpenCodeCliEnv,
         OPENCHAMBER_ELECTRON_DEV: '1',
         OPENCHAMBER_HMR_UI_PORT: hmrUiPort,
         OPENCHAMBER_HMR_API_PORT: hmrApiPort,
         OPENCHAMBER_DISABLE_PWA_DEV: '1',
-      },
+      }, { OPENCHAMBER_WORKSPACE_RUNTIME_PAYLOAD_DIR: path.join(electronDir, 'resources', 'workspace-runtime-bundle') }),
     });
   }
 
