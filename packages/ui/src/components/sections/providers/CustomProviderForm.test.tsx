@@ -81,6 +81,31 @@ test('saved models start collapsed with a one-line summary and open on click', a
 test('a new provider opens its first blank model row for editing', async () => {
   const container = await render(<CustomProviderForm existingProviderIDs={new Set()} onSubmit={() => {}} />);
   expect(buttonByText(container, 'New model').getAttribute('aria-expanded')).toBe('true');
+  expect(buttonByText(container, 'OpenAI Chat Completions').disabled).toBe(false);
+});
+
+test('the Codex API preset opens with editable Responses connection fields', async () => {
+  const container = await render(
+    <CustomProviderForm preset="codex-api" existingProviderIDs={new Set()} onSubmit={() => {}} />,
+  );
+  expect(container.textContent).toContain('OpenAI Responses');
+  expect(buttonByText(container, 'OpenAI Responses').disabled).toBe(true);
+  const values = [...container.querySelectorAll('input')].map((input) => input.value);
+  expect(values).toContain('codex-api');
+  expect(values).toContain('https://api.openai.com/v1');
+  expect(values).toContain('Codex API');
+  expect(buttonByText(container, 'Find models').disabled).toBe(false);
+});
+
+test('the default provider icon displays sparkles after a logo load failure', async () => {
+  const container = await render(
+    <CustomProviderForm preset="codex-api" existingProviderIDs={new Set()} onSubmit={() => {}} />,
+  );
+  const button = container.querySelector('button[aria-label="Default"]');
+  const logo = button?.querySelector('img');
+  expect(logo).not.toBeNull();
+  await act(async () => { logo?.dispatchEvent(new Event('error')); });
+  expect(button?.querySelector('use')?.getAttribute('href')).toBe('#oc-sparkling');
 });
 
 test('found models are reviewed once and added as collapsed rows next to the saved ones', async () => {

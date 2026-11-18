@@ -27,6 +27,8 @@ const CUSTOM_PROVIDER_NPM_PACKAGES = new Set([
   '@ai-sdk/anthropic',
 ]);
 const MODEL_CAPABILITIES = new Set(['text', 'image', 'audio', 'video', 'pdf']);
+const modelSettingsSchema = z.object({ textVerbosity: z.enum(['low', 'medium', 'high']).nullable().optional() });
+const nativeCompactionSchema = z.object({ type: z.literal('native') });
 
 // OpenCode 2 keeps providers under `providers` with `package: "aisdk:<npm>"`,
 // `settings.baseURL`, and `models.<id>.modelID`. The v1 `provider` map with
@@ -128,6 +130,11 @@ function validateCustomProviderConfig(providerId, config, options = {}) {
     // absent keeps the stored one.
     const modelType = MODEL_TYPE_SCHEMA.safeParse(modelValue.type).data;
     if (modelType) normalizedModels[trimmedId].type = modelType;
+    if (modelValue.settings !== undefined) {
+      const settings = modelSettingsSchema.safeParse(modelValue.settings);
+      if (!settings.success) return { ok: false, error: `Model "${trimmedId}" output verbosity must be low, medium, high, or null` };
+      if (settings.data.textVerbosity !== undefined) normalizedModels[trimmedId].settings = settings.data;
+    }
     if (isPlainObject(modelValue.limit)) {
       const context = modelValue.limit.context;
       const output = modelValue.limit.output;
@@ -173,6 +180,11 @@ function validateCustomProviderConfig(providerId, config, options = {}) {
     settings: { baseURL },
     models: normalizedModels,
   };
+  if (settingsBlock.compaction !== undefined) {
+    const compaction = nativeCompactionSchema.safeParse(settingsBlock.compaction);
+    if (!compaction.success) return { ok: false, error: 'Provider compaction type must be native' };
+    normalized.settings.compaction = compaction.data;
+  }
 
   let env = [];
   if (Array.isArray(config.env)) {
@@ -224,6 +236,22 @@ function mergeCustomProviderConfig(existingValue, normalizedConfig) {
     Object.entries(normalizedModels).map(([modelId, normalizedModel]) => {
       const existingModel = isPlainObject(existingModels[modelId]) ? existingModels[modelId] : {};
       const mergedModel = { ...existingModel, ...normalizedModel };
+      if (normalizedModel.settings?.textVerbosity !== undefined) {
+        const settings = { ...existingModel.settings, ...normalizedModel.settings };
+        if (settings.textVerbosity === null) delete settings.textVerbosity;
+        if (Object.keys(settings).length > 0) mergedModel.settings = settings;
+        else delete mergedModel.settings;
+        if (Array.isArray(mergedModel.variants)) {
+          mergedModel.variants = mergedModel.variants.map((variant) => {
+            if (!variant.settings || !Object.prototype.hasOwnProperty.call(variant.settings, 'textVerbosity')) return variant;
+            const { textVerbosity: _verbosity, ...remaining } = variant.settings;
+            const updated = { ...variant };
+            if (Object.keys(remaining).length > 0) updated.settings = remaining;
+            else delete updated.settings;
+            return updated;
+          });
+        }
+      }
       if (Array.isArray(mergedModel.variants) && mergedModel.variants.length === 0) {
         delete mergedModel.variants;
       }

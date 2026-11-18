@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   SettingsCheckboxRow,
+  SettingsStackedField,
   SETTINGS_FIELD_LABEL_CLASS,
   SETTINGS_HELPER_CLASS,
   SETTINGS_ICON_BUTTON_CLASS,
@@ -8,11 +9,12 @@ import {
 import { SettingsInfoHint } from '@/components/sections/shared/SettingsInfoHint';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Icon } from '@/components/icon/Icon';
 import { useI18n } from '@/lib/i18n';
 import { formatGoalTokens } from '@/lib/sessionGoalMetadata';
 import { cn } from '@/lib/utils';
-import type { ModelFieldErrors, ModelRow } from './custom-provider-form';
+import { modelTextVerbosity, type TextVerbosity, type ModelFieldErrors, type ModelRow } from './custom-provider-form';
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
 
@@ -31,6 +33,8 @@ type Props = {
   onToolsChange: (tools: boolean) => void;
   onImageGenerationChange: (imageGeneration: boolean) => void;
   onRemove?: () => void;
+  showTextVerbosity: boolean;
+  onTextVerbosityChange: (value: TextVerbosity | null | undefined) => void;
 };
 
 const positive = (value: string): number | null => {
@@ -53,6 +57,8 @@ export const CustomProviderModelRow: React.FC<Props> = ({
   onToolsChange,
   onImageGenerationChange,
   onRemove,
+  showTextVerbosity,
+  onTextVerbosityChange,
 }) => {
   const { t } = useI18n();
   const editorId = React.useId();
@@ -62,6 +68,15 @@ export const CustomProviderModelRow: React.FC<Props> = ({
   const context = positive(model.contextWindow);
   const output = positive(model.maxOutputTokens);
   const extraInputs = model.inputCapabilities.filter((capability) => capability !== 'text');
+  const verbosity = modelTextVerbosity(model);
+  const savedVerbosity = modelTextVerbosity({ ...model, textVerbosity: undefined });
+  const verbosityLabels = {
+    inherit: 'settings.providers.page.custom.models.verbosity.inherit',
+    variants: 'settings.providers.page.custom.models.verbosity.variants',
+    low: 'settings.providers.page.custom.models.verbosity.low',
+    medium: 'settings.providers.page.custom.models.verbosity.medium',
+    high: 'settings.providers.page.custom.models.verbosity.high',
+  } as const;
   const summary = [
     context ? t('settings.providers.page.custom.discovery.contextValue', { value: formatGoalTokens(context) }) : null,
     output ? t('settings.providers.page.custom.discovery.outputValue', { value: formatGoalTokens(output) }) : null,
@@ -179,6 +194,33 @@ export const CustomProviderModelRow: React.FC<Props> = ({
               aria-label={t('settings.providers.page.custom.models.variantsLabel')}
             />
           </div>
+
+          {showTextVerbosity ? (
+            <SettingsStackedField
+              label={t('settings.providers.page.custom.models.verbosity.label')}
+              info={t('settings.providers.page.custom.models.verbosity.info')}
+            >
+              <Select
+                value={verbosity}
+                onValueChange={(value) => {
+                  if (value === 'inherit') onTextVerbosityChange(null);
+                  else if (value === 'variants') onTextVerbosityChange(undefined);
+                  else if (value === 'low' || value === 'medium' || value === 'high') onTextVerbosityChange(value);
+                }}
+              >
+                <SelectTrigger aria-label={t('settings.providers.page.custom.models.verbosity.label')}>
+                  <SelectValue>{t(verbosityLabels[verbosity])}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="inherit">{t(verbosityLabels.inherit)}</SelectItem>
+                  {savedVerbosity === 'variants' ? <SelectItem value="variants">{t(verbosityLabels.variants)}</SelectItem> : null}
+                  <SelectItem value="low">{t(verbosityLabels.low)}</SelectItem>
+                  <SelectItem value="medium">{t(verbosityLabels.medium)}</SelectItem>
+                  <SelectItem value="high">{t(verbosityLabels.high)}</SelectItem>
+                </SelectContent>
+              </Select>
+            </SettingsStackedField>
+          ) : null}
 
           {(['inputCapabilities', 'outputCapabilities'] as const).map((target) => (
             <div key={target} className="space-y-1">

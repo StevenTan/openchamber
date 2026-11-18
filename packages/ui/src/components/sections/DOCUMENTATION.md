@@ -150,6 +150,12 @@ serves), `usesMachineCredentials` counts that as credentials: the card shows
 OpenCode config is switched on (`activation: "enabled"`) even without a key, so
 activation alone is not a sign-in signal.
 
+The Codex API key preset opens the custom-provider form with OpenAI Responses,
+native compaction, the official API base URL and an editable provider ID. Its
+form state locks the protocol while creating the provider. It uses the same model
+discovery, credential storage and configuration editing as other custom providers.
+OpenCode resolves the saved OpenAI SDK package alias to its native Responses provider.
+
 The custom-provider form can discover models before save through
 `POST /api/provider/discover-models`. Discovery is a one-time prefill the user
 starts with "Find models": they pick which returned models to add, the review
@@ -157,6 +163,11 @@ panel closes, and nothing stays in sync with the provider afterwards (a
 maintainer decision; never add a recurring refresh). Provider metadata wins
 field by field and models.dev fills the gaps. Discovery failure never removes
 rows or blocks saving.
+
+OpenAI Responses model rows expose output verbosity. Saving an explicit choice
+sets the model default across reasoning levels; choosing the provider default
+clears model and variant verbosity overrides. Untouched settings preserve
+per-level differences, displayed as "Per reasoning level".
 
 Model rows render collapsed (name, id, limits, non-text inputs) so a provider
 with dozens of models stays scannable; a row added by hand opens, and a row

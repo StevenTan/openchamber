@@ -10,7 +10,6 @@ import {
 } from '@/components/sections/shared/SettingsSection';
 import { SettingsInfoHint } from '@/components/sections/shared/SettingsInfoHint';
 import { ProviderLogo } from '@/components/ui/ProviderLogo';
-import { useProviderLogo } from '@/hooks/useProviderLogo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -25,6 +24,7 @@ import { cn } from '@/lib/utils';
 import {
   CUSTOM_PROVIDER_PROTOCOLS,
   createEmptyCustomProviderForm,
+  createCodexApiProviderForm,
   createHeaderRow,
   createModelRow,
   modelDiscoveryErrorSchema,
@@ -48,6 +48,7 @@ type CustomProviderFormProps = {
   busy?: boolean;
   mode?: 'create' | 'edit';
   initialValues?: CustomProviderFormState;
+  preset?: 'codex-api';
   allowExistingAuth?: boolean;
   authFailureHint?: string | null;
   onSubmit: (plan: CustomProviderPersistPlan) => void | Promise<void>;
@@ -61,6 +62,7 @@ export const CustomProviderForm: React.FC<CustomProviderFormProps> = ({
   busy = false,
   mode = 'create',
   initialValues,
+  preset,
   allowExistingAuth = false,
   authFailureHint = null,
   onSubmit,
@@ -70,7 +72,7 @@ export const CustomProviderForm: React.FC<CustomProviderFormProps> = ({
   const { t } = useI18n();
   const isEdit = mode === 'edit';
   const [form, setForm] = React.useState<CustomProviderFormState>(
-    () => initialValues ?? createEmptyCustomProviderForm(),
+    () => initialValues ?? (preset === 'codex-api' ? createCodexApiProviderForm() : createEmptyCustomProviderForm()),
   );
   const [err, setErr] = React.useState<FieldErrors>({});
   const [modelErrors, setModelErrors] = React.useState<ModelFieldErrors[]>([]);
@@ -85,7 +87,6 @@ export const CustomProviderForm: React.FC<CustomProviderFormProps> = ({
   ));
   const seededEditProviderIdRef = React.useRef<string | null>(null);
   const logoProviderId = form.providerID.trim() || 'custom';
-  const { hasLogo: providerHasLogo } = useProviderLogo(logoProviderId);
   // A logo stored under the typed ID: kept when the provider was removed and is added again.
   const storedLogo = useUIStore((state) => state.customProviderLogos[logoProviderId]);
   const pickedLogoFile = form.logo instanceof File ? form.logo : null;
@@ -246,11 +247,11 @@ export const CustomProviderForm: React.FC<CustomProviderFormProps> = ({
   return (
     <form onSubmit={handleSubmit} className="space-y-0">
       <SettingsSection
-        title={isEdit ? t('settings.providers.page.custom.editTitle') : t('settings.providers.page.custom.title')}
+        title={preset ? undefined : isEdit ? t('settings.providers.page.custom.editTitle') : t('settings.providers.page.custom.title')}
         settingsItem="providers.custom"
         contentClassName={SETTINGS_FIELDS_STACK_CLASS}
       >
-        <p className={SETTINGS_HELPER_CLASS}>{t('settings.providers.page.custom.description')}</p>
+        {preset ? null : <p className={SETTINGS_HELPER_CLASS}>{t('settings.providers.page.custom.description')}</p>}
 
         {authFailureHint ? (
           <p className="typography-meta text-[var(--status-warning)]" role="status">
@@ -289,10 +290,14 @@ export const CustomProviderForm: React.FC<CustomProviderFormProps> = ({
               setForm((prev) => ({
                 ...prev,
                 protocol,
-                models: prev.models.map((row) => (row.savedVariants ? { ...row, savedVariants: {} } : row)),
+                models: prev.models.map((row) => ({
+                  ...row,
+                  savedVariants: row.savedVariants ? {} : undefined,
+                  textVerbosity: protocol === 'openai-responses' ? undefined : null,
+                })),
               }));
             }}
-            disabled={busy}
+            disabled={busy || form.protocolLocked}
           >
             <SelectTrigger aria-label={t('settings.providers.page.custom.field.protocol.label')} className="w-full">
               <SelectValue>
@@ -342,9 +347,12 @@ export const CustomProviderForm: React.FC<CustomProviderFormProps> = ({
               aria-pressed={form.icon === null}
               onClick={() => setForm((previous) => ({ ...previous, icon: null }))}
             >
-              {providerHasLogo
-                ? <ProviderLogo providerId={logoProviderId} className="size-4" ignoreCustomIcon />
-                : <Icon name="checkbox-blank-circle" className="size-4 text-muted-foreground" />}
+              <ProviderLogo
+                providerId={logoProviderId}
+                className="size-4"
+                ignoreCustomIcon
+                fallback={<Icon name="sparkling" className="size-4 text-muted-foreground" />}
+              />
             </Button>
             {CUSTOM_PROVIDER_ICONS.map((entry) => (
               <Button
@@ -461,6 +469,11 @@ export const CustomProviderForm: React.FC<CustomProviderFormProps> = ({
               errors={modelErrors[index]}
               expanded={expandedRows.has(model.row)}
               onToggle={() => toggleRow(model.row)}
+              showTextVerbosity={form.protocol === 'openai-responses'}
+              onTextVerbosityChange={(textVerbosity) => setForm((previous) => ({
+                ...previous,
+                models: previous.models.map((entry, rowIndex) => rowIndex === index ? { ...entry, textVerbosity } : entry),
+              }))}
               onChange={(key, value) => setModel(index, key, value)}
               onToggleCapability={(target, capability) => toggleCapability(index, target, capability)}
               onToolsChange={(tools) => setForm((previous) => ({

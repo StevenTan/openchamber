@@ -86,6 +86,25 @@ describe('custom provider config persistence', () => {
     }
   });
 
+  test('creates Responses providers with native compaction and preserves it during edits', () => {
+    const config = {
+      name: 'Codex API', package: 'aisdk:@ai-sdk/openai', env: ['CODEX_API_KEY'],
+      settings: { baseURL: 'https://example.com/v1', compaction: { type: 'native' } },
+      models: { coding: { name: 'Coding' } },
+    };
+    const result = upsertProviderConfig('codex-api', config, projectDir, 'project');
+    const created = readJson(result.path).providers['codex-api'];
+    expect(created.settings.compaction).toEqual({ type: 'native' });
+    expect(getProviderSources('codex-api', projectDir).config.package).toBe('aisdk:@ai-sdk/openai');
+    writeJson(result.path, { providers: { 'codex-api': { ...created, package: '@opencode/ai/providers/openai' } } });
+    expect(getProviderSources('codex-api', projectDir).config.package).toBe('@opencode/ai/providers/openai');
+    upsertProviderConfig('codex-api', { ...config, settings: { baseURL: 'https://example.com/v1' } }, projectDir, 'project');
+    expect(readJson(result.path).providers['codex-api']).toEqual(created);
+    expect(validateCustomProviderConfig('codex-api', {
+      ...config, settings: { ...config.settings, compaction: { type: 'invalid' } },
+    }).ok).toBe(false);
+  });
+
   test('rejects unsupported adapter packages', () => {
     const result = validateCustomProviderConfig('ok', {
       name: 'X',
@@ -157,6 +176,39 @@ describe('custom provider config persistence', () => {
 
     upsertProviderConfig('campus-llm', { ...base, models: { m: { name: 'M', variants: [] } } }, projectDir, 'project');
     expect(readJson(result.path).providers['campus-llm'].models.m).toEqual({ modelID: 'm', name: 'M' });
+  });
+
+  test.each(['low', 'medium', 'high', null])('model verbosity %s applies across reasoning levels and preserves other settings', (textVerbosity) => {
+    const configPath = path.join(projectDir, '.opencode', 'opencode.json');
+    const variants = [
+      { id: 'low', settings: { reasoningEffort: 'low', textVerbosity: 'low', reasoningSummary: 'auto' } },
+      { id: 'high', settings: { reasoningEffort: 'high', textVerbosity: 'high' } },
+    ];
+    writeJson(configPath, { providers: { coding: {
+      package: 'aisdk:@ai-sdk/openai', name: 'Coding', env: ['CODING_KEY'], settings: { baseURL: 'https://example.com/v1' },
+      models: { m: { modelID: 'm', name: 'M', settings: { temperature: 0.3, textVerbosity: 'medium' }, variants } },
+    } } });
+    upsertProviderConfig('coding', {
+      package: 'aisdk:@ai-sdk/openai', name: 'Coding', env: ['CODING_KEY'], settings: { baseURL: 'https://example.com/v1' },
+      models: { m: { modelID: 'm', name: 'M', settings: { textVerbosity }, variants } },
+    }, projectDir, 'project');
+    const model = readJson(configPath).providers.coding.models.m;
+    expect(model.settings.temperature).toBe(0.3);
+    if (textVerbosity === null) expect(model.settings).not.toHaveProperty('textVerbosity');
+    else expect(model.settings.textVerbosity).toBe(textVerbosity);
+    expect(model.variants).toEqual([
+      { id: 'low', settings: { reasoningEffort: 'low', reasoningSummary: 'auto' } },
+      { id: 'high', settings: { reasoningEffort: 'high' } },
+    ]);
+  });
+
+  test('rejects an unsupported model verbosity', () => {
+    const result = validateCustomProviderConfig('coding', {
+      package: 'aisdk:@ai-sdk/openai', name: 'Coding', env: ['CODING_KEY'], settings: { baseURL: 'https://example.com/v1' },
+      models: { m: { name: 'M', settings: { textVerbosity: 'verbose' } } },
+    });
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('verbosity');
   });
 
   test('upsertProviderConfig updates existing entry and clears disabled_providers', () => {

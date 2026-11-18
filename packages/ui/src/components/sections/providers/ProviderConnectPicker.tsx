@@ -13,6 +13,7 @@ import {
 import { useI18n } from '@/lib/i18n';
 import { matchesRankQuery, rankByQuery } from '@/lib/search/fuzzySearch';
 import { splitConnectableProviders, type ConnectableProvider } from './connectableProviders';
+import { CODEX_API_PRESET_ID } from './custom-provider-form';
 
 const ROW_GRID_CLASS = 'grid grid-cols-1 gap-0.5 @xl:grid-cols-2 @3xl:grid-cols-3';
 
@@ -44,6 +45,7 @@ export const ProviderConnectPicker: React.FC<ProviderConnectPickerProps> = ({ pr
   const [showAll, setShowAll] = React.useState(false);
   const { popular, others } = React.useMemo(() => splitConnectableProviders(providers ?? []), [providers]);
   const customLabel = t('settings.providers.page.custom.title');
+  const codexApiLabel = t('settings.providers.connect.codexApi');
 
   if (providers === null) {
     return (
@@ -64,14 +66,21 @@ export const ProviderConnectPicker: React.FC<ProviderConnectPickerProps> = ({ pr
   if (query.trim().length > 0) {
     const matches = rankByQuery(providers, query, (provider) => [provider.name, provider.id]);
     const customMatches = matchesRankQuery([customLabel, 'other', 'custom', 'openai-compatible'], query);
+    const codexApiMatches = matchesRankQuery([codexApiLabel, 'codex', 'api key', 'responses'], query);
     return (
       <>
         {search}
-        {matches.length === 0 && !customMatches ? (
+        {matches.length === 0 && !customMatches && !codexApiMatches ? (
           <p className="py-6 typography-meta text-muted-foreground">{t('settings.providers.page.connect.noProvidersFound')}</p>
         ) : (
           <div className={ROW_GRID_CLASS}>
             {matches.map((provider) => <ProviderRow key={provider.id} provider={provider} onSelect={onSelect} />)}
+            {codexApiMatches ? (
+              <button type="button" className={ROW_CLASS} onClick={() => onSelect(CODEX_API_PRESET_ID)}>
+                <ProviderLogo providerId="openai" className="size-4 shrink-0" />
+                <span className="truncate">{codexApiLabel}</span>
+              </button>
+            ) : null}
             {customMatches ? (
               <button type="button" className={ROW_CLASS} onClick={onSelectCustom}>
                 <Icon name="add" className="size-4 shrink-0 text-muted-foreground" />
@@ -101,6 +110,11 @@ export const ProviderConnectPicker: React.FC<ProviderConnectPickerProps> = ({ pr
               onOpen={() => onSelect(provider.id)}
             />
           ))}
+          <SettingsCard
+            icon={<ProviderLogo providerId="openai" className="size-5" />}
+            title={codexApiLabel}
+            onOpen={() => onSelect(CODEX_API_PRESET_ID)}
+          />
           <SettingsAddCard label={customLabel} hint={t('settings.providers.connect.customHint')} onClick={onSelectCustom} />
         </div>
       </SettingsSection>

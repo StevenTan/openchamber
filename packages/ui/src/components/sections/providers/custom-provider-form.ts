@@ -21,6 +21,7 @@ export const CUSTOM_PROVIDER_PROTOCOLS = {
 export type CustomProviderProtocol = keyof typeof CUSTOM_PROVIDER_PROTOCOLS;
 export type CustomProviderPackage = (typeof CUSTOM_PROVIDER_PROTOCOLS)[CustomProviderProtocol];
 export const CUSTOM_PROVIDER_ID = '__custom_provider__';
+export const CODEX_API_PRESET_ID = '__codex_api_preset__';
 const PROVIDER_ID_PATTERN = /^[a-z0-9][a-z0-9-_]*$/;
 const BASE_URL_PATTERN = /^https?:\/\//;
 const ENV_KEY_PATTERN = /^\{env:([^}]+)\}$/;
@@ -32,6 +33,8 @@ export type CustomProviderTranslator = (
 
 /** One reasoning level as OpenCode stores it: an id plus the request change. */
 type ModelVariantConfig = Model['variants'][number];
+const textVerbositySchema = z.enum(['low', 'medium', 'high']);
+export type TextVerbosity = z.infer<typeof textVerbositySchema>;
 /** What one reasoning level changes on the request. */
 export type ModelVariantOverlay = Omit<ModelVariantConfig, 'id'>;
 
@@ -65,6 +68,9 @@ export type ModelRow = {
    * only for rows the user added in this form.
    */
   savedVariants?: Record<string, ModelVariantOverlay>;
+  savedTextVerbosity?: TextVerbosity;
+  /** Undefined preserves saved settings; null explicitly inherits the provider default. */
+  textVerbosity?: TextVerbosity | null;
 };
 
 export type HeaderRow = {
@@ -87,10 +93,12 @@ export type CustomProviderFormState = {
   /** The logo image: a file picked here, the stored one cleared, or null for whatever is stored. Wins over `icon`. */
   logo: File | 'removed' | null;
   protocol: CustomProviderProtocol;
+  protocolLocked?: boolean;
   baseURL: string;
   apiKey: string;
   models: ModelRow[];
   headers: HeaderRow[];
+  nativeCompaction?: boolean;
 };
 
 export type FieldErrors = {
@@ -118,6 +126,7 @@ export type CustomProviderConfig = {
   env?: string[];
   settings: {
     baseURL: string;
+    compaction?: { type: 'native' };
   };
   headers?: Record<string, string>;
   models: Record<string, CustomProviderModelConfig>;
@@ -130,6 +139,7 @@ export type CustomProviderModelConfig = {
   variants?: ModelVariantConfig[];
   limit?: { context?: number; output?: number };
   capabilities?: { tools: boolean; input: string[]; output: string[] };
+  settings?: { textVerbosity: TextVerbosity | null };
 };
 
 export type CustomProviderPersistPlan = {
@@ -186,6 +196,7 @@ export type ProviderLikeForCustomForm = {
       variants?: readonly ModelVariantConfig[];
       limit?: { context?: number; output?: number };
       capabilities?: { tools?: boolean; input?: string[]; output?: string[] };
+      settings?: Model['settings'] | { textVerbosity?: TextVerbosity | null };
     }>
     | Record<string, unknown>;
 };
@@ -305,6 +316,16 @@ function readSavedVariants(variants: readonly ModelVariantConfig[] | undefined):
   return Object.fromEntries((variants ?? []).map(({ id, ...overlay }) => [id, overlay]));
 }
 
+export function modelTextVerbosity(model: ModelRow): TextVerbosity | 'inherit' | 'variants' {
+  if (model.textVerbosity !== undefined) return model.textVerbosity ?? 'inherit';
+  const levels = Object.values(model.savedVariants ?? {}).map((variant) => (
+    textVerbositySchema.safeParse(variant.settings?.textVerbosity).data ?? model.savedTextVerbosity
+  ));
+  if (model.savedTextVerbosity !== undefined) levels.push(model.savedTextVerbosity);
+  if (new Set(levels).size > 1) return 'variants';
+  return levels[0] ?? model.savedTextVerbosity ?? 'inherit';
+}
+
 export const createHeaderRow = (): HeaderRow => ({
   row: nextRow(),
   key: '',
@@ -321,6 +342,16 @@ export const createEmptyCustomProviderForm = (): CustomProviderFormState => ({
   apiKey: '',
   models: [createModelRow()],
   headers: [createHeaderRow()],
+});
+
+export const createCodexApiProviderForm = (): CustomProviderFormState => ({
+  ...createEmptyCustomProviderForm(),
+  providerID: 'codex-api',
+  name: 'Codex API',
+  protocol: 'openai-responses',
+  protocolLocked: true,
+  baseURL: 'https://api.openai.com/v1',
+  nativeCompaction: true,
 });
 
 /**
@@ -461,6 +492,7 @@ export function providerToCustomFormState(provider: ProviderLikeForCustomForm): 
             variants: storedVariantsSchema.safeParse(entry.variants).data,
             limit: storedLimitSchema.safeParse(entry.limit).data,
             capabilities: storedCapabilitiesSchema.safeParse(entry.capabilities).data,
+            settings: storedModelSettingsSchema.safeParse(entry.settings).data,
           };
         })
       : []);
@@ -484,6 +516,7 @@ export function providerToCustomFormState(provider: ProviderLikeForCustomForm): 
           capabilitiesKnown: Boolean(model.capabilities),
           variants: Object.keys(savedVariants).join(', '),
           savedVariants,
+          savedTextVerbosity: storedModelSettingsSchema.safeParse(model.settings).data?.textVerbosity ?? undefined,
         };
       })
     : [createModelRow()];
@@ -522,6 +555,7 @@ const storedCapabilitiesSchema = z.object({
   input: z.array(z.string()).optional(),
   output: z.array(z.string()).optional(),
 });
+const storedModelSettingsSchema = z.object({ textVerbosity: textVerbositySchema.nullable().optional() });
 
 export const storedProviderEntrySchema = z.object({
   name: z.string().optional(),
@@ -537,6 +571,7 @@ export const storedProviderEntrySchema = z.object({
     variants: storedVariantsSchema.optional(),
     limit: storedLimitSchema.optional(),
     capabilities: storedCapabilitiesSchema.optional(),
+    settings: storedModelSettingsSchema.optional(),
   })).optional(),
 });
 
@@ -656,6 +691,7 @@ export function validateCustomProvider(input: ValidateCustomProviderInput): Vali
       const modelID = model.id.trim();
       const entry: CustomProviderModelConfig = { modelID, name: model.name.trim() };
       if (model.type) entry.type = model.type;
+      if (model.textVerbosity !== undefined) entry.settings = { textVerbosity: model.textVerbosity };
       const context = parsePositiveInteger(model.contextWindow);
       const output = parsePositiveInteger(model.maxOutputTokens);
       if (context || output) entry.limit = { ...(context ? { context } : {}), ...(output ? { output } : {}) };
@@ -738,6 +774,7 @@ export function validateCustomProvider(input: ValidateCustomProviderInput): Vali
         baseURL,
         headers: headerConfig,
         models: modelConfig,
+        nativeCompaction: input.form.nativeCompaction,
       }),
     },
   };
@@ -765,6 +802,7 @@ function buildCustomProviderConfig(input: {
   baseURL: string;
   headers: Record<string, string>;
   models: Record<string, CustomProviderModelConfig>;
+  nativeCompaction?: boolean;
 }): CustomProviderConfig {
   const config: CustomProviderConfig = {
     package: CUSTOM_PROVIDER_PROTOCOLS[input.protocol],
@@ -772,6 +810,7 @@ function buildCustomProviderConfig(input: {
     settings: { baseURL: input.baseURL },
     models: input.models,
   };
+  if (input.nativeCompaction) config.settings.compaction = { type: 'native' };
   if (input.env) config.env = [input.env];
   if (Object.keys(input.headers).length > 0) config.headers = input.headers;
   return config;

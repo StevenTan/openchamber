@@ -311,6 +311,11 @@ describe('mcp entity', () => {
 });
 
 describe('provider entity', () => {
+  it('preserves native OpenCode provider packages through config projection', () => {
+    const provider = { package: '@opencode/ai/providers/openai', settings: { compaction: { type: 'native' } } };
+    expect(toProviderEntity(provider)).toEqual(provider);
+  });
+
   it('migrates npm/api/options into package/settings', () => {
     expect(toProviderEntity({
       npm: '@ai-sdk/openai-compatible',

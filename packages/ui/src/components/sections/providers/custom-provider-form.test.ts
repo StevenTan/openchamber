@@ -2,6 +2,8 @@ import { describe, expect, test } from 'bun:test';
 import {
   buildIntegrationKeyRequest,
   createEmptyCustomProviderForm,
+  createCodexApiProviderForm,
+  modelTextVerbosity,
   modelRowFromDiscovery,
   buildProviderUpsertRequest,
   storeKeyAfterConfigWrite,
@@ -17,6 +19,66 @@ import {
 } from './custom-provider-form';
 
 const t = (key: string) => key;
+
+test('the Codex API preset saves a configurable Responses endpoint and API key', () => {
+  const form = createCodexApiProviderForm();
+  form.apiKey = 'sk-test';
+  form.baseURL = 'https://gateway.example.com/v1';
+  form.models = [modelRowFromDiscovery({ id: 'coding-model', name: 'Coding Model' })];
+
+  const plan = validateCustomProvider({ form, t, existingProviderIDs: new Set() }).result;
+  expect(plan).toBeDefined();
+  if (!plan) throw new Error('Expected a valid provider plan');
+  expect(plan.config.package).toBe('aisdk:@ai-sdk/openai');
+  expect(plan.config.settings.baseURL).toBe('https://gateway.example.com/v1');
+  expect(plan.config.settings.compaction).toEqual({ type: 'native' });
+  expect(plan.config.models['coding-model']).toMatchObject({ modelID: 'coding-model', name: 'Coding Model' });
+  expect(buildIntegrationKeyRequest(plan)).toEqual({ integrationID: 'codex-api', key: 'sk-test' });
+  expect(providerToEditFormState({ id: 'codex-api', models: [] }, plan.config)).toMatchObject({
+    protocol: 'openai-responses',
+    baseURL: 'https://gateway.example.com/v1',
+  });
+  expect(createEmptyCustomProviderForm().nativeCompaction).toBeUndefined();
+});
+
+test('verbosity changes are explicit while saved reasoning-level differences stay intact', () => {
+  const saved = {
+    package: 'aisdk:@ai-sdk/openai', name: 'Coding', settings: { baseURL: 'https://example.com/v1' },
+    models: { coding: { name: 'Coding', settings: { textVerbosity: 'medium' as const }, variants: [
+      { id: 'low', settings: { reasoningEffort: 'low', textVerbosity: 'low' } },
+      { id: 'high', settings: { reasoningEffort: 'high', textVerbosity: 'high' } },
+    ] } },
+  };
+  const form = providerToEditFormState({ id: 'coding', models: [] }, saved);
+  expect(modelTextVerbosity(form.models[0])).toBe('variants');
+  const save = () => validateCustomProvider({
+    form, t, existingProviderIDs: new Set(['coding']), editingProviderID: 'coding', allowExistingAuth: true,
+  }).result?.config.models.coding;
+  expect(save()?.settings).toBeUndefined();
+  expect(save()?.variants).toEqual(saved.models.coding.variants);
+
+  form.models[0].textVerbosity = 'high';
+  expect(modelTextVerbosity(form.models[0])).toBe('high');
+  expect(save()?.settings).toEqual({ textVerbosity: 'high' });
+  form.models[0].textVerbosity = null;
+  expect(modelTextVerbosity(form.models[0])).toBe('inherit');
+  expect(save()?.settings).toEqual({ textVerbosity: null });
+  form.models[0].textVerbosity = undefined;
+  expect(modelTextVerbosity(form.models[0])).toBe('variants');
+  expect(save()?.settings).toBeUndefined();
+});
+
+test('uniform saved verbosity is shown for model defaults and reasoning levels', () => {
+  const form = createCodexApiProviderForm();
+  const model = form.models[0];
+  expect(modelTextVerbosity(model)).toBe('inherit');
+  model.savedTextVerbosity = 'medium';
+  expect(modelTextVerbosity(model)).toBe('medium');
+  model.savedVariants = { high: { settings: { textVerbosity: 'low' } } };
+  expect(modelTextVerbosity(model)).toBe('variants');
+  model.savedTextVerbosity = undefined;
+  expect(modelTextVerbosity(model)).toBe('low');
+});
 
 const baseForm = (overrides: Partial<CustomProviderFormState> = {}): CustomProviderFormState => ({
   providerID: 'custom-provider',

@@ -58,6 +58,7 @@ import {
   buildProviderUpsertRequest,
   storeKeyAfterConfigWrite,
   CUSTOM_PROVIDER_ID,
+  CODEX_API_PRESET_ID,
   isConfigDefinedCustomProvider,
   providerToEditFormState,
   resolveProviderConfigScope,
@@ -220,7 +221,8 @@ export const ProvidersPage: React.FC = () => {
   const [customAuthFailureHint, setCustomAuthFailureHint] = React.useState<string | null>(null);
   const [lastCustomPersistId, setLastCustomPersistId] = React.useState<string | null>(null);
   const isAddMode = selectedProviderId === ADD_PROVIDER_ID;
-  const isCustomCreateMode = isAddMode && candidateProviderId === CUSTOM_PROVIDER_ID;
+  const isCodexApiPreset = candidateProviderId === CODEX_API_PRESET_ID;
+  const isCustomCreateMode = isAddMode && (candidateProviderId === CUSTOM_PROVIDER_ID || isCodexApiPreset);
   const isCustomEditMode = Boolean(
     editingCustomProviderId
     && selectedProviderId
@@ -293,6 +295,7 @@ export const ProvidersPage: React.FC = () => {
     if (
       candidateProviderId
       && candidateProviderId !== CUSTOM_PROVIDER_ID
+      && candidateProviderId !== CODEX_API_PRESET_ID
       && !unconnectedProviders.some((provider) => provider.id === candidateProviderId)
     ) {
       setCandidateProviderId('');
@@ -633,7 +636,7 @@ export const ProvidersPage: React.FC = () => {
     const candidateName = unconnectedProviders?.find((provider) => provider.id === candidateProviderId)?.name ?? candidateProviderId;
     return (
       <SettingsPageLayout
-        title={isCustomCreateMode ? t('settings.providers.page.connect.title') : candidateName}
+        title={isCodexApiPreset ? t('settings.providers.connect.codexApi') : isCustomCreateMode ? t('settings.providers.page.connect.title') : candidateName}
         titleLeading={isCustomCreateMode ? candidateBackButton : (
           <span className="flex items-center gap-2">
             {candidateBackButton}
@@ -644,7 +647,9 @@ export const ProvidersPage: React.FC = () => {
       >
           {isCustomCreateMode ? (
             <CustomProviderForm
+              key={candidateProviderId}
               mode="create"
+              preset={isCodexApiPreset ? 'codex-api' : undefined}
               existingProviderIDs={connectedProviderIds}
               busy={authBusyKey?.startsWith('custom:') ?? false}
               authFailureHint={customAuthFailureHint}

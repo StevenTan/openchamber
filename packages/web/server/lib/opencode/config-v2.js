@@ -542,6 +542,7 @@ const AISDK_PREFIX = 'aisdk:';
 function toProviderPackage(value) {
   const trimmed = trimmedString(value);
   if (!trimmed) return undefined;
+  if (trimmed.startsWith('@opencode/ai/providers/')) return trimmed;
   return trimmed.includes(':') ? trimmed : `${AISDK_PREFIX}${trimmed}`;
 }
 
@@ -644,7 +645,7 @@ function toProviderModelEntity(raw) {
   ]);
 }
 
-/** Canonical v2 provider entry: `package` with `aisdk:`, `settings.baseURL`, split overlays. */
+/** Canonical v2 provider entry: native or `aisdk:` package, `settings.baseURL`, split overlays. */
 function toProviderEntity(raw) {
   const source = isRecord(raw) ? raw : {};
   const legacyOptions = isRecord(source.options) ? { ...source.options } : {};

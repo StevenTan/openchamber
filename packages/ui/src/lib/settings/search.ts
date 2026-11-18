@@ -1433,7 +1433,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     id: 'providers.connect',
     page: 'providers',
     titleKey: 'settings.providers.page.connect.title',
-    keywords: ['add provider', 'connect provider', 'credentials'],
+    keywords: ['add provider', 'connect provider', 'credentials', 'codex', 'responses', 'api key'],
   },
   {
     // Opens the Classification providers sub-page (SettingsView sets the request).
@@ -1449,7 +1449,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'providers',
     titleKey: 'settings.providers.page.custom.title',
     descriptionKey: 'settings.providers.page.custom.description',
-    keywords: ['other', 'custom', 'openai-compatible', 'base url', 'api key'],
+    keywords: ['other', 'custom', 'openai-compatible', 'base url', 'api key', 'textVerbosity', 'output detail'],
   },
   {
     id: 'providers.auth',
