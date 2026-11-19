@@ -12,11 +12,12 @@ it('discovers upstream page tools without opening a browser', async () => {
   expect(names).not.toContain('browser_tabs');
   expect(names).not.toContain('browser_close');
   expect(names).not.toContain('browser_navigate');
+  expect(names).not.toContain('browser_handle_dialog');
 });
 
-it('rejects host execution and tab-management calls at the page boundary', () => {
+it('rejects unsupported page tools at the page boundary', () => {
   expect(playwrightCallSchema.parse({ tool: 'browser_click', arguments: { target: 'e5' } })).toEqual({ tool: 'browser_click', arguments: { target: 'e5' } });
-  for (const tool of ['browser_run_code_unsafe', 'browser_tabs', 'browser_close', 'browser_navigate']) {
+  for (const tool of ['browser_run_code_unsafe', 'browser_tabs', 'browser_close', 'browser_navigate', 'browser_handle_dialog']) {
     expect(playwrightCallSchema.safeParse({ tool, arguments: {} }).success).toBe(false);
   }
 });

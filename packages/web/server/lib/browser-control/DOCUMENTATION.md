@@ -189,7 +189,7 @@ what the actions alone do not show (frame rate, animations).
   input channel and inserts text through `webContents.insertText`. It exposes
   no browser-wide debugging port. Each view owns one in-process MCP connection;
   closing the view releases it. The official server owns element references,
-  actionability, waiting, page evaluation, dialog handling and result encoding.
+  actionability, waiting, page evaluation and result encoding.
 - Browser tools use the `openchamber_web` permission. Cancellation and request
   timeout disconnect Playwright from the affected view, stopping pending page
   actions; other calls on that view fail, and a later call reconnects. Native
@@ -202,6 +202,7 @@ what the actions alone do not show (frame rate, animations).
   answered with an explicit size error so the caller can narrow its request.
 - The exported page tools are an explicit allowlist. Host-process script
   execution and tools that create or close native pages are outside it.
+  JavaScript dialog handling remains with the user and the native host.
   Page JavaScript evaluation has the upstream MCP execution semantics. Runtimes
   without an Electron browser host cannot run these page tools; their existing
   browser display behavior remains available.

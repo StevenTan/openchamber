@@ -11,7 +11,7 @@ const PLAYWRIGHT_TOOLS = [
   'browser_fill_form', 'browser_select_option', 'browser_press_key',
   'browser_hover', 'browser_drag', 'browser_wait_for', 'browser_evaluate',
   'browser_console_messages', 'browser_network_requests', 'browser_network_request',
-  'browser_handle_dialog', 'browser_highlight', 'browser_hide_highlight',
+  'browser_highlight', 'browser_hide_highlight',
   'browser_file_upload', 'browser_drop',
 ];
 
