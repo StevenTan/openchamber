@@ -66,6 +66,7 @@ const DialogOverlay = React.forwardRef<
         "oc-glass-backdrop fixed inset-0 z-50 bg-surface-overlay/60",
         "transition-opacity duration-150 ease-out",
         "data-[starting-style]:opacity-0 data-[ending-style]:opacity-0",
+        "starting:opacity-0",
         className
       )}
       {...props}
@@ -140,6 +141,7 @@ function DialogContent({
             "transition-all duration-150 ease-out",
             "data-[starting-style]:opacity-0 data-[starting-style]:scale-[0.98]",
             "data-[ending-style]:opacity-0 data-[ending-style]:scale-[0.98]",
+            bottomSheet ? "starting:transform-[translateY(100%)]" : "starting:opacity-0 starting:scale-[0.98]",
             // When a nested dialog opens on top of this one, dim this popup the
             // same way the page behind a dialog is dimmed (Base UI marks the
             // parent popup with data-nested-dialog-open). Brightness dims the
