@@ -26,6 +26,12 @@ The pinned official `@opencode/codemode` dependency generates descriptors only.
   retain their other contents, including notices combining several sources.
 - The plugin runs on managed Web and Electron servers. Hosted and Capacitor clients
   use their connected server; external OpenCode and VS Code own their plugins.
+- `tools.store({ key, value })` and `tools.load({ key })` are asynchronous operation
+  tools. They keep JSON snapshots in memory, isolated by the native calling
+  session ID. Values survive script and turn completion, failure and interruption;
+  session deletion and server restart clear them. Store overwrites a key and
+  returns `{ key }`; load returns a copy of the value or a catchable error for a
+  missing key. Cache contents are ephemeral and are not inherited by forked sessions.
 
 ## Decisions
 
@@ -83,3 +89,11 @@ attachments and existing transcript contents remain user-provided context.
 Complete descriptions stay in the system prefix for prompt caching. A short
 reference after conversation history resolves the precedence of historical
 Code Mode notices without duplicating definitions or editing stored messages.
+
+### Session memory lifetime
+
+The process shares the session cache across plugin module activations. OpenCode
+can evict an idle Location while its sessions remain usable, so cache ownership
+and one deletion-event listener outlive Location scopes. Tool definitions are
+created for each activation. Zod's JSON schema validates cached values at the
+native tool boundary without sharing Effect parser internals across bundles.

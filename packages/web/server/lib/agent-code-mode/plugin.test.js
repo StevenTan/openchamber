@@ -26,7 +26,7 @@ async function fixture(execute = () => Effect.succeed({ content: 'FILE_CONTENT',
     skill: { list: () => Effect.succeed({ data: skills }) },
     tool: {
       list: () => Effect.sync(() => [...tools.values()]),
-      transform: run => Effect.sync(() => run({ get: id => tools.get(id), list: () => [...tools.values()], update: (id, change) => change(tools.get(id)) })),
+      transform: run => Effect.sync(() => run({ get: id => tools.get(id), add: tool => tools.set(tool.name, { ...tool, id: tool.name }), remove: id => tools.delete(id), list: () => [...tools.values()], update: (id, change) => change(tools.get(id)) })),
       hook: (name, run) => Effect.sync(() => toolHooks.set(name, event => Effect.runPromise(run(event)))),
     },
     agent: { get: () => Effect.succeed({ data: { permissions: [{ action: '*', resource: '*', effect: 'allow' }] } }) },
@@ -96,6 +96,8 @@ it('supplies complete descriptions and parameter signatures while preserving dir
   expect(text).toContain('FULL_READ_INSTRUCTIONS');
   expect(text).toContain('PATH_FIELD_INSTRUCTIONS');
   expect(text).toContain('tools.example_file(');
+  expect(text).toContain('tools.store(');
+  expect(text).toContain('tools.load(');
   expect(text).toContain('ENVIRONMENT');
   expect(text).toContain('NATIVE_SKILL_GUIDANCE');
   expect(text).not.toContain('OLD_PARTIAL_CATALOG');

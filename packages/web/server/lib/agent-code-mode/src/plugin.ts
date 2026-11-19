@@ -10,6 +10,7 @@ import type { Permission } from "@opencode/schema/permission";
 import { createCallActivity } from "./call-activity.js";
 import { adaptFileTools, type FileToolEditor } from "./file-tools.js";
 import { assertFileSkill, filterVirtualSkillGuidance, type SkillRegistry } from "./skill-policy.js";
+import { createSessionMemory, processMemory } from "./session-memory.js";
 
 const directTools = new Set([
   "openchamber_render", "openchamber_secret", "openchamber_image",
@@ -120,8 +121,10 @@ export default {
   id: "openchamber-code-mode",
   effect: (ctx: PluginContext) => Effect.gen(function* () {
     const activity = createCallActivity();
+    const memory = createSessionMemory(processMemory.sessions);
     yield* ctx.tool.transform(editor => {
       adaptFileTools(editor);
+      for (const tool of memory.tools) editor.add(tool);
       for (const tool of editor.list()) {
         if (directTools.has(tool.id)) continue;
         editor.update(tool.id, value => {
@@ -164,6 +167,14 @@ export default {
       Stream.runForEach(event => Effect.sync(() => activity.clear(event.data.sessionID))),
       Effect.forkScoped({ startImmediately: true }),
     );
+    if (!processMemory.listening) {
+      processMemory.listening = true;
+      yield* ctx.event.subscribe({ types: ["session.deleted"] }).pipe(
+        Stream.runForEach(event => Effect.sync(() => memory.clear(event.data.sessionID))),
+        Effect.ensuring(Effect.sync(() => { processMemory.listening = false; })),
+        Effect.forkDetach({ startImmediately: true }),
+      );
+    }
     for (const name of ["context", "compaction", "generate"] as const) yield* ctx.session.hook(name, event => Effect.gen(function* () {
       const [registered, session, agent, skills] = yield* Effect.all([
         ctx.tool.list(), ctx.session.get({ sessionID: event.sessionID }), ctx.agent.get({ agentID: event.agent }), ctx.skill.list(),
