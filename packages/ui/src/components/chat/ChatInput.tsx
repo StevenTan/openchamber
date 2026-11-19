@@ -72,6 +72,7 @@ import type { SnippetAutocompleteHandle } from './SnippetAutocomplete';
 import { withoutSnippetToken } from '@/lib/snippetNames';
 import type { EmojiAutocompleteHandle } from '@/components/emoji/EmojiAutocomplete';
 import { cn } from "@/lib/utils";
+import { Button } from '@/components/ui/button';
 import { ModelControls } from './ModelControls';
 import { parseAgentMentions } from '@/lib/messages/agentMentions';
 import { CONTEXT_METADATA_KEY, draftFromContextPayload } from '@/lib/messages/contextParts';
@@ -292,7 +293,7 @@ import { SessionTrustPausedRow } from './SessionTrustPausedRow';
 import { useOpenCodeTrustPaused } from '@/components/projects/useOpenCodeTrustPause';
 import { useFolderMissing } from '@/components/session/sidebar/projects/useProjectFolderMissing';
 import { isSpaceDirectory } from '@/lib/spaces/space-route';
-import { SessionSuggestionChip } from '@/components/chat/SessionSuggestionChip';
+import { useSessionPrediction } from '@/hooks/useSessionPrediction';
 import { SessionDoneHintRow } from '@/components/chat/SessionDoneHintRow';
 import { SessionReviewHintRow } from '@/components/chat/SessionReviewHintRow';
 import { BackgroundShellsStrip } from '@/components/chat/BackgroundShellsStrip';
@@ -3103,6 +3104,16 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             return;
         }
 
+        if (predictionText && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey
+            && (e.key === 'Tab' || e.key === 'ArrowRight' || e.key === 'Escape'
+                || (e.key === 'Enter' && (!isMobile || hasHardwareKeyboard)))) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.key === 'Escape') dismissPrediction();
+            else applyPrediction();
+            return;
+        }
+
         if (e.key === 'Enter' && e.altKey && !e.ctrlKey && !e.metaKey) {
             e.preventDefault();
             composerRef.current?.insertText('\n');
@@ -4564,15 +4575,6 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     attachMobileCommentRef.current = mobileComment.submit;
 
 
-    const applyAssistSuggestion = React.useCallback((text: string) => {
-        setMessage(text);
-        if (isMobile && !mobileComposerExpanded) {
-            mobileShell.expand();
-        } else {
-            requestAnimationFrame(() => composerRef.current?.focus());
-        }
-    }, [isMobile, mobileComposerExpanded, mobileShell]);
-
     // Linked references render as chips beside the attached files, inside the
     // composer box and inside the mobile pill.
     const linkedReferenceChips = !isVSCode && hasLinkedReferences ? (
@@ -4674,20 +4676,20 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             isMobile={isMobile}
         />
     ) : null;
-    // The suggested follow-up is the composer's own top row on every surface
-    // (inside the mobile pill and the box alike); on mobile the model and
-    // agent are its bottom row too, so the surface stays one shape.
-    const suggestionHidden = hasContent || newSessionDraftOpen || isBtwActive || isBtwPanelVisible || queuedMessages.length > 0 || hasPendingForm;
-    const suggestionRow = !isBtwActive ? (
-        <SessionSuggestionChip
-            sessionId={currentSessionId}
-            directory={currentSessionDirectoryForSync ?? currentDirectory}
-            hidden={suggestionHidden}
-            onApply={applyAssistSuggestion}
-        />
-    ) : null;
-    // Jev's "looks done" hint shares the composer's top row slot, above the
-    // suggestion, so nothing below the input moves.
+    const { text: sessionPrediction, dismiss: dismissPrediction } = useSessionPrediction(
+        currentSessionId, currentSessionDirectoryForSync ?? currentDirectory,
+        !newSessionDraftOpen && !isBtwActive && inputMode === 'normal',
+        currentAgentName,
+    );
+    const predictionText = !hasContent && !isBtwPanelVisible && queuedMessages.length === 0
+        && !hasPendingForm && openAutocomplete === null && !isPromptHistorySearchOpen ? sessionPrediction : null;
+    const applyPrediction = React.useCallback(() => {
+        if (!predictionText) return;
+        dismissPrediction();
+        setMessage(predictionText);
+        if (isMobile && !mobileComposerExpanded) mobileShell.expand();
+        else requestAnimationFrame(() => composerRef.current?.focus());
+    }, [predictionText, dismissPrediction, isMobile, mobileComposerExpanded, mobileShell, setMessage]);
     const doneHintRow = !isBtwActive && !newSessionDraftOpen ? (
         <SessionDoneHintRow
             sessionId={currentSessionId}
@@ -4762,8 +4764,6 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             onSendMessage={handleQueuedMessageSend}
         />
     ) : null;
-    // Null exactly when the suggestion row alone would have been: the mobile
-    // pill picks its shape from whether a top row exists.
     const folderMissingRow = sessionFolder.missing && currentSessionId && currentSessionDirectoryForSync && !isBtwActive && !newSessionDraftOpen
         ? <SessionFolderMissingRow sessionId={currentSessionId} directory={currentSessionDirectoryForSync} busy={sessionPhase !== 'idle'} />
         : null;
@@ -4772,7 +4772,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     const trustPausedRow = trustPausedDirectory && !folderMissingRow && !isBtwActive
         ? <SessionTrustPausedRow directory={trustPausedDirectory} />
         : null;
-    const composerTopRows = folderMissingRow || trustPausedRow || worktreeSetupRow || creatingSessionRow || spaceWaitRow || goalRow || autoReviewRow || prWatchRow || extensionWaitRow || backgroundShellsRow || revertRow || queueRow || doneHintRow || reviewHintRow || suggestionRow ? (
+    const composerTopRows = folderMissingRow || trustPausedRow || worktreeSetupRow || creatingSessionRow || spaceWaitRow || goalRow || autoReviewRow || prWatchRow || extensionWaitRow || backgroundShellsRow || revertRow || queueRow || doneHintRow || reviewHintRow ? (
         <>
             {folderMissingRow}
             {trustPausedRow}
@@ -4788,7 +4788,6 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             {queueRow}
             {doneHintRow}
             {reviewHintRow}
-            {suggestionRow}
         </>
     ) : null;
     const mobileModelAgentRow = isMobile ? (
@@ -5058,6 +5057,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                 ) : isMobile && !mobileComposerExpanded && !isBtwActive ? (
                     <MobilePillComposer
                         message={message}
+                        prediction={predictionText}
                         sessionId={currentSessionId}
                         newSessionDraftOpen={newSessionDraftOpen}
                         hasContent={Boolean(hasContent) && !pendingFirstSend}
@@ -5076,7 +5076,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                             </div>
                         )}
                         bottomRow={mobileModelAgentRow}
-                        onExpand={mobileShell.expand}
+                        onExpand={predictionText ? applyPrediction : mobileShell.expand}
                         onPrimaryAction={handlePrimaryAction}
                         onPickLocalFiles={handlePickLocalFiles}
                         onOpenGitHubPicker={openGitHubPicker}
@@ -5235,6 +5235,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                                 viewStore={composerViewStore}
                                 data-testid="chat-input"
                                 value={message}
+                                prediction={predictionText}
                                 languageContext={languageContext}
                                 onChange={handleEditorChange}
                                 onKeyDown={handleEditorKeyDown}
@@ -5262,6 +5263,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                                 boundGapPx={MOBILE_COMPOSER_BOUND_GAP_PX}
                                 className={cn(
                                     'min-h-[52px] px-3 relative z-10',
+                                    predictionText && 'pe-14',
                                     isComposerExpanded
                                         ? cn('h-full min-h-0', isMobile ? 'py-2.5' : 'py-4')
                                         : isMobile
@@ -5270,6 +5272,21 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                                     inputMode === 'shell' ? 'font-mono typography-code' : 'typography-markdown font-[family-name:var(--font-chat)]',
                                 )}
                             />
+                            {predictionText ? (
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="xs"
+                                    aria-label={t('chat.suggestion.applyAria')}
+                                    aria-description={predictionText}
+                                    onMouseDown={(event) => event.preventDefault()}
+                                    onClick={applyPrediction}
+                                    className="absolute end-3 top-3.5 z-20 text-muted-foreground"
+                                    data-accept-prediction
+                                >
+                                    {isMobile && !hasHardwareKeyboard ? <Icon name="pencil-ai-2" className="size-4" /> : <kbd>Tab</kbd>}
+                                </Button>
+                            ) : null}
                         </div>
                     </div>
                     <ComposerFooter

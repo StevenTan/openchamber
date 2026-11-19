@@ -136,10 +136,26 @@ so one wait shows one line, and appears only once the creation has taken
 300 ms, `useShownAfter`, so a fast server never flashes it), the goal (`SessionGoalRow`), a
 review loop and, once it ends, its result until dismissed, a dispute unfolding in place (`AutoReviewStrip`), the pull requests the agent waits on with Stop watching, several collapsed into a count (`PullRequestWatchStrip`), background commands, a staged revert
 (`RevertedMessagesStrip`), the queue (`QueuedMessagesStrip`),
-the "looks done" hint or the review offer, the suggestion
-(`SessionSuggestionChip`). BTW hides all of them. A pending form, a nonempty
-queue, composer content and a new-session draft hide the suggestion; a
-new-session draft also hides the queue.
+the "looks done" hint or the review offer. BTW hides all of them. A new-session
+draft also hides the queue.
+
+`useSessionPrediction` requests one next-message prediction per session idle
+boundary through `generateSessionText`. OpenCode supplies the current session's
+model context without writing history or executing tools. Results, including
+null and dismissed predictions, are cached by runtime, directory, session and
+idle timestamp. New activity, revert and runtime changes cancel pending work.
+Failures leave the composer unchanged and are not retried within that boundary.
+The request has a 30-second deadline and uses the session's model configuration.
+The selected agent and the session's source agent must both be outside Plan;
+entering Plan cancels pending predictions and hides cached results.
+Predictions choose one grounded next user message and are limited to 240 characters.
+
+An empty composer displays the prediction as an IME-safe CSS placeholder.
+Tab, Right Arrow, desktop Enter or the accept control inserts an editable draft;
+Escape dismisses it. Acceptance never sends. Composition and explicit pickers
+take priority. Attachments, queued messages, pending forms, BTW and drafts hide
+the prediction. Mobile also displays it in the collapsed pill; tapping it accepts
+and expands the editor. Web, Electron, VS Code and mobile share this SDK path.
 
 While a session's first send is pending (`pendingDraftSends` in
 `session-ui-store`, from Enter in the draft until the request that starts the

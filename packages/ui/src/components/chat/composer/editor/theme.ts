@@ -100,6 +100,14 @@ export const COMPOSER_EDITOR_THEME_SPEC = {
         userSelect: 'none',
         pointerEvents: 'none',
     },
+    '& .cm-content[data-composer-prediction="true"] .cm-line::before': {
+        opacity: '1',
+        maxWidth: '100%',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+    },
+    '& .cm-content.cm-composer-composing .cm-line::before': { display: 'none' },
     // `drawSelection()` paints its own selection layer, and CodeMirror styles
     // it for the focused editor through
     // `&light.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground`

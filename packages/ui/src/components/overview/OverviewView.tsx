@@ -94,7 +94,6 @@ const SIGNAL_KEY = {
 
 const VETO_KEY = {
   failed: 'overview.veto.failed',
-  suggestion: 'overview.veto.suggestion',
   uncommitted: 'overview.veto.uncommitted',
 } satisfies Record<OverviewVeto, I18nKey>;
 

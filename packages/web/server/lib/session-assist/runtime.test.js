@@ -3,16 +3,10 @@ import { createSessionAssistRuntime } from './runtime.js';
 import { createSessionLineage } from '../session-lineage.js';
 
 /**
- * The recap and the suggestion live in OpenChamber's own session metadata
+ * The recap lives in OpenChamber's own session metadata
  * store, because OpenCode 2.x accepts session metadata only at create time.
  * `persistSessionAssist` is the seam. What is pinned here is the wiring: no
  * store means no work and no cost, and injecting one turns generation back on.
- *
- * The previous suite drove the whole generation through a fake v1 OpenCode
- * server. It is gone rather than rewritten: every shape it asserted on
- * (`message.parts`, `info.parentID`, `info.summary`, `PATCH /session/{id}`)
- * belongs to v1, so keeping it green would prove nothing about v2. The reader
- * itself is covered by `context.test.js`.
  */
 
 const runtimes = [];
@@ -27,7 +21,7 @@ const makeRuntime = (overrides = {}) => {
     buildOpenCodeUrl,
     getOpenCodeAuthHeaders,
     getSmallModelService,
-    getTargets: () => ({ recap: true, suggestion: true }),
+    getEnabled: () => true,
     quietMs: 1,
     ...overrides,
   });
@@ -141,7 +135,7 @@ describe('session assist runtime', () => {
       isSessionArchived: async () => false,
       getSmallModelService: async () => ({
         describeSmallModel: async () => ({ inputCharBudget: 20_000 }),
-        generateSmallModelText: async () => ({ text: '{"recap":"Did the thing.","suggestion":"Verify it."}' }),
+        generateSmallModelText: async () => ({ text: '{"recap":"Did the thing."}' }),
       }),
     });
 
@@ -151,7 +145,7 @@ describe('session assist runtime', () => {
     }
 
     expect(persistSessionAssist).toHaveBeenCalledTimes(1);
-    expect(persistSessionAssist.mock.calls[0][2]).toMatchObject({ recap: 'Did the thing.', suggestion: 'Verify it.', forMessageID: 'msg_a' });
+    expect(persistSessionAssist.mock.calls[0][2]).toMatchObject({ recap: 'Did the thing.', forMessageID: 'msg_a' });
     // The pre-write re-check must see past the idle marker as well.
     expect(listLimits.at(-1)).toBeGreaterThan(2);
 
@@ -197,7 +191,7 @@ describe('session assist runtime', () => {
         onPendingChange: (change) => changes.push(change),
         getSmallModelService: async () => ({
           describeSmallModel: async () => ({ inputCharBudget: 20_000 }),
-          generateSmallModelText: async () => ({ text: '{"recap":"Did the thing.","suggestion":"Verify it."}' }),
+          generateSmallModelText: async () => ({ text: '{"recap":"Did the thing."}' }),
         }),
         ...overrides,
       });
@@ -220,8 +214,8 @@ describe('session assist runtime', () => {
       ]);
     });
 
-    it('announces nothing when the recap and the suggestion are both off', async () => {
-      const { runtime, changes } = run({ getTargets: () => ({ recap: false, suggestion: false }) });
+    it('announces nothing when the recap is off', async () => {
+      const { runtime, changes } = run({ getEnabled: () => false });
 
       runtime.processPayload(idle(), '/chat');
       await new Promise((resolve) => setTimeout(resolve, 20));
@@ -299,7 +293,7 @@ describe('session assist runtime', () => {
       isSessionArchived,
       getSmallModelService: async () => ({
         describeSmallModel: async () => ({ inputCharBudget: 20_000 }),
-        generateSmallModelText: async () => ({ text: '{"recap":"Did the thing.","suggestion":"Verify it."}' }),
+        generateSmallModelText: async () => ({ text: '{"recap":"Did the thing."}' }),
       }),
     });
 
@@ -336,7 +330,7 @@ describe('session assist runtime', () => {
       return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
     }));
     const describeSmallModel = vi.fn(async () => ({ inputCharBudget: 20_000, ...described }));
-    const generateSmallModelText = vi.fn(async () => ({ text: '{"recap":"Did the thing.","suggestion":""}' }));
+    const generateSmallModelText = vi.fn(async () => ({ text: '{"recap":"Did the thing."}' }));
     const { runtime } = makeRuntime({
       persistSessionAssist,
       buildOpenCodeUrl: (fetchPath) => `http://opencode.test${fetchPath}`,
@@ -374,7 +368,7 @@ describe('session assist runtime', () => {
     // The reporter's setup: a loopback OpenAI-compatible proxy forwarding to a
     // hosted vendor, so the endpoint looks local to `isLocalModelEndpoint`.
     const describeSmallModel = vi.fn(async () => ({ inputCharBudget: 20_000, providerID: 'cpa', modelID: 'm', source: 'session-model', localEndpoint: true }));
-    const generateSmallModelText = vi.fn(async () => ({ text: '{"recap":"Did the thing.","suggestion":""}' }));
+    const generateSmallModelText = vi.fn(async () => ({ text: '{"recap":"Did the thing."}' }));
     const { runtime } = makeRuntime({
       persistSessionAssist,
       buildOpenCodeUrl: (fetchPath) => `http://opencode.test${fetchPath}`,
@@ -408,7 +402,7 @@ describe('session assist runtime', () => {
     runtime.processPayload(idle());
     await new Promise((resolve) => setTimeout(resolve, 30));
 
-    expect(evaluateTurn).toHaveBeenCalledWith({ sessionId: 'ses_1', directory: '', assist: { recap: true, suggestion: true } });
+    expect(evaluateTurn).toHaveBeenCalledWith({ sessionId: 'ses_1', directory: '', assist: { recap: true, suggestion: false } });
     expect(buildOpenCodeUrl).not.toHaveBeenCalled();
     expect(getSmallModelService).not.toHaveBeenCalled();
   });

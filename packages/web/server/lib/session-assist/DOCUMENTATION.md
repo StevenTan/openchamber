@@ -1,9 +1,9 @@
 # Session assist
 
-The server generates a short reminder of recent work and an optional next user
-message with Small Model. Results live in `metadata.openchamber.assist` with
-`recap`, `suggestion`, `forMessageID`, and `generatedAt`. The payload shape is
-unchanged; an empty suggestion is a successful outcome.
+The server generates a short reminder of recent work with Small Model. Results
+live in `metadata.openchamber.assist` with `recap`, `forMessageID`, and
+`generatedAt`. Composer predictions use the shared UI session sampling path;
+see `packages/ui/src/components/chat/composer/DOCUMENTATION.md`.
 
 ## Ownership
 
@@ -90,10 +90,8 @@ model context is small. Page/count bounds are not a network-byte quota.
 1. The server's existing global event fan-out calls `processPayload`. At an
    idle event the runtime first asks the injected `evaluateTurn` (the
    session-work runtime, `../session-work/DOCUMENTATION.md`): one Jev call says
-   which enabled fields are worth the Small Model. It then arms the 60-second
-   quiet window for those fields only, and arms nothing when Jev ruled both out.
-   An unknown answer (no Jev, a failure) keeps every enabled field, so without
-   Jev nothing changes. A newer event drops a pending answer. A session that
+   whether a recap is worth the Small Model. It arms the 60-second quiet window
+   unless Jev rules the recap out. An unknown answer leaves generation enabled. A newer event drops a pending answer. A session that
    `../session-lineage.js` knows to be a subsession arms nothing at all: no
    gate, no timer, no read. No history scan or
    startup backfill runs.
@@ -118,20 +116,16 @@ model context is small. Page/count bounds are not a network-byte quota.
    a local inference server by hostname alone, and the log line is the only
    thing that tells an operator why an enabled toggle produced nothing (#6173).
 5. Recap describes the substantive work and its current result, including the
-   work behind a closing commit or acknowledgment. Suggestion is independent:
-   only unfinished requested agent work should produce a sendable user message.
-   Completed work, optional offers, or a decision/action belonging to the user
-   should return an empty suggestion. This is model judgment, not authorization
-   enforcement or a guarantee that every generated field is factually correct.
+   work behind a closing commit or acknowledgment.
 6. Re-read the latest message and fresh session before writing. A moved tail,
    canceled run, changed endpoint/directory, archive, revert, or failed fresh
    read discards the result. Never merge from the old pre-generation metadata.
-7. Re-check settings, clamp the enabled fields, and merge into fresh metadata.
+7. Re-check the recap setting and merge into fresh metadata.
    The OpenCode update endpoint has no compare-and-set operation; another
    writer after the final read is not guarded atomically.
 
 `onPendingChange` reports when a session starts waiting for its assist (the
-turn end, unless the recap and the suggestion are both off) and when the wait
+turn end, unless the recap is off) and when the wait
 ends: written, ruled out by the turn-end check, failed, or dropped by a new
 turn. `index.js` broadcasts it as `openchamber:session-assist` with the
 session's directory, and clients keep a chat's OpenCode location until the
@@ -148,12 +142,10 @@ runs while a cold catalog has not published the model yet.
 
 ## Settings and consumers
 
-`sessionRecapEnabled` and `sessionSuggestionEnabled` default on and are checked
-before work and before writing. The Jev gate is a cost filter under these same
-switches, not a setting of its own: it reads the same three turns as the recap,
-so a recap still follows a closing "thanks" after real work. With both off there are no reads, model calls,
-or writes. With one on, the shared recent context is still available, but only
-that field is requested. An empty suggestion does not erase a valid recap.
+`sessionRecapEnabled` defaults on and is checked before work and before writing.
+The Jev gate is a cost filter under this switch: it reads the same three turns
+as the recap, so a recap still follows a closing "thanks" after real work.
+With recaps off there are no recap reads, model calls or writes.
 
 Freshness has one rule, `getCurrentSessionAssist` in
 `packages/ui/src/lib/sessionAssistMetadata.ts`, computed from the session
@@ -169,11 +161,9 @@ payloads written by an earlier process; the `time.idle` rule retires those.
 - `packages/ui/src/lib/sessionAssistMetadata.ts` parses the payload and owns freshness.
 - `packages/ui/src/hooks/useSessionAssist.ts` adds live-status and settings gating.
 - `SessionRecapSpacer` shows the reminder in the reserved gap under the reply.
-- `SessionSuggestionChip` fills the composer; it never sends automatically.
 - Sidebar rows (`SessionNodeItem`, Projects view) show the current recap in
   the whole-row tooltip under the same freshness rule, hidden while a turn runs
-  and when `sessionRecapEnabled` is off. The sidebar no longer marks open
-  suggestions; the "In work" block is the sidebar's attention signal.
+  and when `sessionRecapEnabled` is off.
 
 Web, Electron, hosted mobile, and Capacitor use the server watcher. VS Code's
 extension-only runtime does not generate assists; shared UI can render payloads

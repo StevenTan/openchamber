@@ -193,11 +193,11 @@ describe('session assist context', () => {
       assistant('answer', `ANSWER_START${'a'.repeat(16000)}ANSWER_END`),
     ]));
     for (const budget of [1_000, 4_000, 14_000, 32_000, 1_000_000]) {
-      const prompt = buildAssistPrompt(context.turns, { recap: true, suggestion: true }, budget);
+      const prompt = buildAssistPrompt(context.turns, budget);
       expect(prompt.text.length).toBeLessThanOrEqual(Math.min(budget, 32_000));
       for (const marker of ['REQUEST_START', 'REQUEST_END', 'ANSWER_START', 'ANSWER_END']) expect(prompt.text).toContain(marker);
     }
-    expect(buildAssistPrompt(context.turns, { recap: true }, 500)).toBeNull();
+    expect(buildAssistPrompt(context.turns, 500)).toBeNull();
   });
 
   it('excerpts from both ends so the start and the end both survive', () => {

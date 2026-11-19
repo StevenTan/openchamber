@@ -17,17 +17,13 @@ const OPENCHAMBER_SETTINGS_FILE = path.join(
   'settings.json',
 );
 
-const getSessionAssistTargets = () => {
+const getSessionRecapEnabled = () => {
   const settings = readMergedSettingsSync({ fs, path, settingsFilePath: OPENCHAMBER_SETTINGS_FILE });
-  return {
-    recap: settings.sessionRecapEnabled !== false,
-    suggestion: settings.sessionSuggestionEnabled !== false,
-  };
+  return settings.sessionRecapEnabled !== false;
 };
 
 const IDLE_QUIET_MS = 60_000;
 const RECAP_CHAR_LIMIT = 320;
-const SUGGESTION_CHAR_LIMIT = 500;
 const FETCH_TIMEOUT_MS = 5_000;
 const GENERATION_TIMEOUT_MS = 120_000;
 // Enough records to look past the idle marker and a couple of switches.
@@ -104,7 +100,7 @@ const extractUserMessage = (payload) => {
 };
 
 /**
- * The recap and the suggestion live in OpenChamber's own session metadata
+ * The recap lives in OpenChamber's own session metadata
  * store: OpenCode 2.x accepts session metadata only when a session is created.
  * `persistSessionAssist(sessionID, directory, assist)` writes it; without that
  * seam the runtime stays inert rather than generating text it cannot save.
@@ -113,15 +109,14 @@ export const createSessionAssistRuntime = ({
   buildOpenCodeUrl,
   getOpenCodeAuthHeaders,
   getSmallModelService,
-  getTargets = getSessionAssistTargets,
+  getEnabled = getSessionRecapEnabled,
   quietMs = IDLE_QUIET_MS,
   persistSessionAssist = null,
   // Archive state is OpenChamber's own in v2 (no OpenCode route sets it), so
   // the runtime asks rather than reading `time.archived` off the record.
   isSessionArchived = async () => false,
-  // Asked once when a turn ends, before the quiet window is armed: which of
-  // the enabled fields are worth the Small Model (`{ recap, suggestion }`), or
-  // null for "unknown", which keeps every enabled field. See session-work.
+  // Asked once when a turn ends, before the recap's quiet window is armed.
+  // A null result leaves the decision to the Small Model. See session-work.
   evaluateTurn = null,
   // `../session-lineage.js`: a known subsession never gets an assist, so its
   // turn end arms nothing and reads nothing.
@@ -170,8 +165,7 @@ export const createSessionAssistRuntime = ({
     announce(sessionId);
   };
 
-  // A new turn makes the stored recap and suggestion describe an older turn:
-  // delete them so "has a suggestion" in metadata means the same everywhere.
+  // A new turn retires the stored recap for the preceding turn.
   const retireStored = (sessionId, directory) => {
     if (!persisted.has(sessionId)) return;
     const storedDirectory = persisted.get(sessionId);
@@ -191,16 +185,11 @@ export const createSessionAssistRuntime = ({
     const key = `${providerID}/${modelID}`;
     if (localSkipNotices.has(key)) return;
     localSkipNotices.add(key);
-    console.log(`[session-assist] skipped: ${key} is served from a local endpoint and is the session's own model, so a side request would evict its prompt cache. Set a different Small Model to get a recap or a suggestion`);
+    console.log(`[session-assist] skipped: ${key} is served from a local endpoint and is the session's own model, so a side request would evict its prompt cache. Set a different Small Model to get a recap`);
   };
 
-  const generateAssist = async (sessionId, directory, signal, allowed) => {
-    const enabledTargets = getTargets();
-    const targets = {
-      recap: enabledTargets.recap && allowed.recap,
-      suggestion: enabledTargets.suggestion && allowed.suggestion,
-    };
-    if (!targets.recap && !targets.suggestion) return;
+  const generateAssist = async (sessionId, directory, signal) => {
+    if (!getEnabled()) return;
     const baseUrl = buildOpenCodeUrl('/', '').replace(/\/$/, '');
     const client = OpenCode.make({
       baseUrl,
@@ -221,7 +210,7 @@ export const createSessionAssistRuntime = ({
     // the revert boundary before its next idle event.
     if (session?.id === sessionId) lineage?.remember(sessionId, session.parentID ?? null);
     if (session?.id !== sessionId || session.parentID || session.revert?.messageID) return;
-    // An archived session is put away: no recap or suggestion is generated for it.
+    // An archived session is put away: no recap is generated for it.
     if (await isSessionArchived(sessionId)) return;
     const context = await loadAssistContext({
       signal,
@@ -249,8 +238,8 @@ export const createSessionAssistRuntime = ({
       reportLocalSkip(preferredProviderID, preferredModelID);
       return;
     }
-    const system = buildAssistSystemPrompt(targets);
-    const prompt = buildAssistPrompt(turns, targets, described.inputCharBudget - system.length - 512);
+    const system = buildAssistSystemPrompt();
+    const prompt = buildAssistPrompt(turns, described.inputCharBudget - system.length - 512);
     if (!prompt) return;
     let generated;
     try {
@@ -270,8 +259,7 @@ export const createSessionAssistRuntime = ({
     }
     checkCurrent();
     const structured = extractJsonObject(generated?.text);
-    let recap = targets.recap && typeof structured?.recap === 'string' ? structured.recap.trim().slice(0, RECAP_CHAR_LIMIT) : '';
-    let suggestion = targets.suggestion && typeof structured?.suggestion === 'string' ? structured.suggestion.trim().slice(0, SUGGESTION_CHAR_LIMIT) : '';
+    let recap = typeof structured?.recap === 'string' ? structured.recap.trim().slice(0, RECAP_CHAR_LIMIT) : '';
     const hasCyrillic = (text) => /[\u0400-\u04FF]/.test(text);
     const hasCjk = (text) => /[\u3040-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF]/.test(text);
     // Quoted source and assistant replies cannot authorize a different script.
@@ -279,8 +267,7 @@ export const createSessionAssistRuntime = ({
     const scriptMismatch = (text) => prompt.language && ((hasCyrillic(text) && !hasCyrillic(prompt.language))
       || (hasCjk(text) && !hasCjk(prompt.language)));
     if (recap && scriptMismatch(recap)) recap = '';
-    if (suggestion && scriptMismatch(suggestion)) suggestion = '';
-    if (!recap && !suggestion) return;
+    if (!recap) return;
     // v2 lists newest first. The answer is followed by its `idle` marker and
     // possibly a model or agent switch, so read a short tail and compare the
     // newest content record rather than the newest record.
@@ -296,28 +283,24 @@ export const createSessionAssistRuntime = ({
     // The archive check is a wait of its own: a turn that started meanwhile
     // has aborted this run, and the write below must not land.
     checkCurrent();
-    const enabled = getTargets();
-    if (!enabled.recap || !allowed.recap) recap = '';
-    if (!enabled.suggestion || !allowed.suggestion) suggestion = '';
-    if (!recap && !suggestion) return;
+    if (!getEnabled()) return;
     await persistSessionAssist(sessionId, directory, {
       recap,
-      suggestion,
       forMessageID: last.id,
       generatedAt: Date.now(),
     });
     persisted.set(sessionId, directory);
   };
 
-  const startGeneration = (sessionId, directory, armedAt, allowed) => {
+  const startGeneration = (sessionId, directory, armedAt) => {
     if (stopped) return;
     if (inflight.has(sessionId)) {
-      ready.set(sessionId, { directory, armedAt, allowed });
+      ready.set(sessionId, { directory, armedAt });
       return;
     }
     const controller = new AbortController();
     inflight.set(sessionId, { controller, armedAt });
-    generateAssist(sessionId, directory, controller.signal, allowed)
+    generateAssist(sessionId, directory, controller.signal)
       .catch(() => {
         if (!controller.signal.aborted) console.warn('[session-assist] failed to read or save assistance');
       })
@@ -326,17 +309,17 @@ export const createSessionAssistRuntime = ({
         if (ready.has(sessionId)) {
           const next = ready.get(sessionId);
           ready.delete(sessionId);
-          startGeneration(sessionId, next.directory, next.armedAt, next.allowed);
+          startGeneration(sessionId, next.directory, next.armedAt);
         }
         announce(sessionId);
       });
   };
 
-  const armTimer = (sessionId, directory, armedAt, allowed) => {
+  const armTimer = (sessionId, directory, armedAt) => {
     clearTimer(sessionId);
     const timer = setTimeout(() => {
       timers.delete(sessionId);
-      startGeneration(sessionId, directory, armedAt, allowed);
+      startGeneration(sessionId, directory, armedAt);
       announce(sessionId);
     }, quietMs);
     timer.unref?.();
@@ -344,35 +327,29 @@ export const createSessionAssistRuntime = ({
     announce(sessionId, directory);
   };
 
-  const ALL_FIELDS = { recap: true, suggestion: true };
-
-  // The quiet window is armed only for fields Jev did not rule out; with
-  // nothing left there is no timer and no Small Model call at all.
+  // Only turns eligible for a recap arm the quiet window.
   const onTurnEnd = (sessionId, directory) => {
     clearTimer(sessionId);
     const armedAt = Date.now();
-    // Both fields off: nothing to generate, so nothing waits.
-    const enabled = getTargets();
-    if (!enabled.recap && !enabled.suggestion) {
+    if (!getEnabled()) {
       gates.delete(sessionId);
       announce(sessionId);
       return;
     }
     if (typeof evaluateTurn !== 'function') {
-      armTimer(sessionId, directory, armedAt, ALL_FIELDS);
+      armTimer(sessionId, directory, armedAt);
       return;
     }
     const gate = { armedAt };
     gates.set(sessionId, gate);
     announce(sessionId, directory);
     Promise.resolve()
-      .then(() => evaluateTurn({ sessionId, directory, assist: enabled }))
+      .then(() => evaluateTurn({ sessionId, directory, assist: { recap: true, suggestion: false } }))
       .catch(() => null)
       .then((allowed) => {
         if (stopped || gates.get(sessionId) !== gate) return;
         gates.delete(sessionId);
-        const fields = allowed ?? ALL_FIELDS;
-        if (fields.recap || fields.suggestion) armTimer(sessionId, directory, armedAt, fields);
+        if (allowed?.recap !== false) armTimer(sessionId, directory, armedAt);
         announce(sessionId);
       });
   };

@@ -48,8 +48,7 @@ sidebar's one repository-thread path (`getLinkedSidebarChanges`,
   is open or of unknown state, then every linked issue closed (none open or
   unknown: "issue closed" when any was completed, "issue dropped" when every
   one was not planned or canceled), then Jev's current `suggestDoneAt`. A
-  closed unmerged PR counts neither way. A failed last turn, a current
-  assist suggestion, or uncommitted files in the session's own worktree veto
+  closed unmerged PR counts neither way. A failed last turn or uncommitted files in the session's own worktree veto
   any of them; the row stays under In work and shows the veto. No Jev call is
   made for the page.
 - Stalled is in work, idle, not done, and untouched for 3 days

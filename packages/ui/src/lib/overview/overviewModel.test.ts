@@ -117,9 +117,6 @@ describe('classifyOverviewSession', () => {
   test('a veto keeps a done session in work and says why', () => {
     const read = { idle: NOW - HOUR, viewed: NOW - HOUR };
     const merged = { prs: [pr('merged', 'merged')] };
-    const suggestion = inWork({ assist: { recap: 'r', suggestion: 'Run the tests', forMessageID: 'm', generatedAt: NOW } });
-    expect(classifyOverviewSession(facts(session('a', read, { metadata: suggestion }), merged), on))
-      .toMatchObject({ section: 'working', signal: 'merged', veto: 'suggestion' });
     expect(classifyOverviewSession(facts(session('a', read, { metadata: inWork() }), { ...merged, worktreeDirty: true }), on))
       .toMatchObject({ section: 'working', signal: 'merged', veto: 'uncommitted' });
     expect(classifyOverviewSession(facts(session('a', read, { metadata: inWork(), outcome: 'failed' }), merged), on))

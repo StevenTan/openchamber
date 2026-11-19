@@ -81,11 +81,10 @@ Signals rank by how much they can be trusted:
 3. **Jev's hint** (`suggestDoneAt`), which session work already computes once
    per turn. The page makes no Jev call of its own.
 
-Vetoes keep a session in work whatever the signal: the last turn failed, the
-assist has a current suggestion (it only suggests a next message when requested
-agent work is unfinished), or the session's own worktree has uncommitted files.
-A session in the project root cannot have files attributed to it, so there only
-the suggestion and the failed turn veto.
+Vetoes keep a session in work whatever the signal: the last turn failed or the
+session's own worktree has uncommitted files. A session in the project root
+cannot have files attributed to it, so only a failed turn vetoes there. Composer
+predictions describe likely user intent and do not determine task completion.
 
 The maintainer asked that it be visible why a session is not done: every vetoed
 row names its veto, and the bulk confirmation lists the left-out sessions with

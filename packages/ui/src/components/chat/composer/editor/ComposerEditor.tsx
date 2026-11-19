@@ -103,6 +103,7 @@ export interface ComposerEditorProps {
     onPaste?: (event: ClipboardEvent) => void;
     languageContext: ComposerLanguageContext;
     placeholder?: string;
+    prediction?: string | null;
     editable?: boolean;
     spellCheck?: boolean;
     /**
@@ -214,13 +215,14 @@ const enterKeyHintExtension = (send: boolean): Extension => {
 const composerEmptyClass = EditorView.contentAttributes.of((view) =>
     view.state.doc.length === 0 ? { class: 'cm-composer-empty' } : null);
 
-function placeholderContentAttributes(text: string) {
+function placeholderContentAttributes(text: string, prediction?: string | null) {
     return EditorView.contentAttributes.of({
-        'aria-placeholder': text,
+        'aria-placeholder': prediction || text,
+        'data-composer-prediction': prediction ? 'true' : 'false',
         // `content: attr(...)` reads the pseudo-element's own element, so the
         // text reaches `.cm-line::before` through a custom property instead.
         // JSON.stringify quotes it as a CSS string.
-        style: `--composer-placeholder: ${JSON.stringify(text)}`,
+        style: `--composer-placeholder: ${JSON.stringify(prediction || text)}`,
     });
 }
 
@@ -235,6 +237,7 @@ export const ComposerEditor = React.memo(React.forwardRef<ComposerEditorHandle, 
             value,
             languageContext,
             placeholder,
+            prediction,
             editable = true,
             spellCheck = false,
             returnKeySends = false,
@@ -388,6 +391,8 @@ export const ComposerEditor = React.memo(React.forwardRef<ComposerEditorHandle, 
                             }
                         }),
                         EditorView.domEventHandlers({
+                            compositionstart: (_event, view) => { view.contentDOM.classList.add('cm-composer-composing'); return false; },
+                            compositionend: (_event, view) => { view.contentDOM.classList.remove('cm-composer-composing'); return false; },
                             keyup: (event) => { handlersRef.current.onKeyUp?.(event); return false; },
                             focus: () => { handlersRef.current.onFocus?.(); return false; },
                             blur: () => { handlersRef.current.onBlur?.(); return false; },
@@ -497,10 +502,10 @@ export const ComposerEditor = React.memo(React.forwardRef<ComposerEditorHandle, 
         React.useEffect(() => {
             viewRef.current?.dispatch({
                 effects: placeholderCompartment.reconfigure(
-                    placeholderContentAttributes(placeholder ?? ''),
+                    placeholderContentAttributes(placeholder ?? '', prediction),
                 ),
             });
-        }, [placeholder]);
+        }, [placeholder, prediction]);
 
         React.useEffect(() => {
             viewRef.current?.dispatch({

@@ -306,7 +306,7 @@ after a release waits for the MCP servers to start again. A worktree is
 a path listed in `availableWorktreesByProject` that is not a project root. It
 checks again at that moment and keeps the location while the directory is
 selected again, shown in a side panel, has a busy or retrying session, a
-pending permission or form, a recap and suggestion the server is still to
+pending permission or form, a recap the server is still to
 write, or a running background command; a busy directory is re-checked at its
 own delay until it settles or is selected. The server writes a session's recap
 a minute after its turn ends and reads the session's directory to do it, so a
@@ -315,7 +315,7 @@ server announces both ends of that wait (`openchamber.session-assist`,
 `pending-session-assists.ts`), whether the assist was written, skipped, failed
 or dropped by a new turn; the end re-checks the waiting directory at once. A
 wait whose end this client never hears stops holding the directory after five
-minutes. With the recap and the suggestion off nothing waits. A directory
+minutes. With the recap off nothing waits. A directory
 without a store is left to OpenCode's own sweep. The directory the user is in
 is never released, and the server's reads without a directory of their own go
 to that same directory (`noteCurrentDirectory` in the server lifecycle), so a

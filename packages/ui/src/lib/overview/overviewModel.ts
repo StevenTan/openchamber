@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import type { Session } from '@/lib/opencode/model';
-import { getCurrentSessionAssist } from '@/lib/sessionAssistMetadata';
 import { isDoneSuggested, isSessionInWork } from '@/lib/sessionWorkMetadata';
 import type { PrVisualSummary } from '@/stores/useGitHubPrStatusStore';
 import { isSessionUnread } from '@/sync/session-unread';
@@ -38,7 +37,7 @@ export type OverviewSessionFacts = {
 export type OverviewWaitingReason = 'permission' | 'question' | 'error' | 'checks' | 'conflict' | 'finished';
 export type OverviewDoneSignal = 'merged' | 'issueClosed' | 'issueDropped' | 'hint';
 /** Why a session that is not running and not waiting is not done. */
-export type OverviewVeto = 'failed' | 'suggestion' | 'uncommitted';
+export type OverviewVeto = 'failed' | 'uncommitted';
 
 export type OverviewSessionRow =
   /** `pr` is the blocked change request behind a `conflict` or `checks` reason, so the page can open it. */
@@ -84,7 +83,6 @@ const doneSignalOf = (facts: OverviewSessionFacts): OverviewDoneSignal | null =>
 
 const vetoOf = (facts: OverviewSessionFacts): OverviewVeto | null => {
   if (facts.session.outcome === 'failed') return 'failed';
-  if (getCurrentSessionAssist(facts.session)?.suggestion) return 'suggestion';
   return facts.worktreeDirty === true ? 'uncommitted' : null;
 };
 

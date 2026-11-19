@@ -345,7 +345,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     id: 'chat.session-suggestion',
     page: 'chat',
     titleKey: 'settings.openchamber.visual.field.sessionSuggestion',
-    keywords: ['suggestion', 'assist', 'small model', 'follow up'],
+    keywords: ['suggestion', 'prediction', 'Tab', 'follow up'],
   },
   {
     id: 'chat.session-review-offer',

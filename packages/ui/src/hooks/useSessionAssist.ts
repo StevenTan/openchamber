@@ -4,7 +4,6 @@ import { getCurrentSessionAssist, type SessionAssistPayload } from '@/lib/sessio
 import { useUIStore } from '@/stores/useUIStore';
 
 // How long the chat must sit untouched before the recap becomes visible.
-// The suggestion has no such delay — it shows as soon as it arrives.
 const RECAP_VISIBILITY_DELAY_MS = 60 * 1000;
 
 export interface SessionAssistState {
@@ -12,8 +11,6 @@ export interface SessionAssistState {
   assist: SessionAssistPayload | null;
   /** Recap text, only when the 1-minute quiet window has elapsed. */
   visibleRecap: string | null;
-  /** Suggestion text — fresh payload, session idle; caller still gates on input emptiness. */
-  suggestion: string | null;
   /** False until the session record is in memory; the recap cannot be decided before that. */
   sessionKnown: boolean;
 }
@@ -22,7 +19,6 @@ export function useSessionAssistState(sessionId: string, directory?: string): Se
   const session = useSession(sessionId, directory);
   const status = useSessionStatus(sessionId, directory);
   const sessionRecapEnabled = useUIStore((state) => state.sessionRecapEnabled);
-  const sessionSuggestionEnabled = useUIStore((state) => state.sessionSuggestionEnabled);
 
   const isIdle = !status || status.type === 'idle';
   // Same freshness rule as the sidebar row's recap tooltip. Comparing against the
@@ -47,7 +43,6 @@ export function useSessionAssistState(sessionId: string, directory?: string): Se
   return {
     assist,
     visibleRecap: sessionRecapEnabled && assist && assist.recap && quietElapsed ? assist.recap : null,
-    suggestion: sessionSuggestionEnabled && assist && assist.suggestion ? assist.suggestion : null,
     sessionKnown: session !== undefined && session !== null,
   };
 }

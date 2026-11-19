@@ -31,6 +31,7 @@ import { ComposerAttachmentControls, type ComposerTrackerPicker } from './Compos
 
 export interface MobilePillComposerProps {
     message: string;
+    prediction?: string | null;
     sessionId: string | null;
     newSessionDraftOpen: boolean;
     hasContent: boolean;
@@ -40,7 +41,7 @@ export interface MobilePillComposerProps {
     iconSizeClass: string;
     sendIconSizeClass: string;
     stopIconSizeClass: string;
-    /** The composer's top rows (goal, queue, hints, suggested follow-up), inside the pill. */
+    /** The composer's top rows (goal, queue, hints), inside the pill. */
     topRow?: React.ReactNode;
     /** Attached files, shown inside the pill above the draft line. */
     attachments?: React.ReactNode;
@@ -63,6 +64,7 @@ export function MobilePillComposer(props: MobilePillComposerProps) {
     const shortcutOverrides = useUIStore((state) => state.shortcutOverrides);
     const {
         message,
+        prediction,
         sessionId: currentSessionId,
         newSessionDraftOpen,
         hasContent,
@@ -143,14 +145,14 @@ export function MobilePillComposer(props: MobilePillComposerProps) {
                     <span
                         className={cn(
                             'truncate typography-ui-label',
-                            message.trim() ? 'text-foreground' : 'text-muted-foreground/40',
+                            message.trim() ? 'text-foreground' : prediction ? 'text-muted-foreground' : 'text-muted-foreground/40',
                         )}
                     >
                         {message.trim()
                             ? message
-                            : currentSessionId || newSessionDraftOpen
+                            : prediction || (currentSessionId || newSessionDraftOpen
                                 ? t('chat.chatInput.placeholder.chatCompact')
-                                : t('chat.chatInput.placeholder.selectSession')}
+                                : t('chat.chatInput.placeholder.selectSession'))}
                     </span>
                 </button>
                 <div className="flex flex-shrink-0 items-center gap-x-1">
