@@ -4488,12 +4488,17 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
         : isLocalRuntimeUrl(getWindowRuntimeConfig(browserWindow).apiBaseUrl);
       const directory = z.string().nullable().parse(args.directory);
       const workspaceDir = local && directory && path.isAbsolute(directory) ? directory : undefined;
-      return runPanelPlaywright.run(target, args.input, args.requestId, workspaceDir);
+      return runPanelPlaywright.run(target, args.input, args.requestId, workspaceDir, z.boolean().parse(args.cursorVisible));
     }
 
     case 'desktop_browser_playwright_cancel': {
       runPanelPlaywright.cancel(args.requestId);
       return { cancelled: true };
+    }
+
+    case 'desktop_browser_cursor_arrived': {
+      runPanelPlaywright.cursorArrived(browserWindow.webContents, z.number().int().positive().parse(args.moveId));
+      return;
     }
 
     case 'desktop_browser_set_color_scheme': {

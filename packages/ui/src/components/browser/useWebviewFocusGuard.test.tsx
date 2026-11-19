@@ -62,6 +62,7 @@ describe('webview focus guard', () => {
       reload: () => {},
       reloadIgnoringCache: () => {},
       getZoomLevel: () => 0,
+    getZoomFactor: () => 1,
       setZoomLevel: () => {},
       stop: () => {},
       getWebContentsId: () => 1,

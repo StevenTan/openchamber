@@ -48,6 +48,7 @@ describe('webview navigation failures', () => {
       reload: () => {},
       reloadIgnoringCache: () => {},
       getZoomLevel: () => 0,
+    getZoomFactor: () => 1,
       setZoomLevel: () => {},
       stop: () => {},
       getWebContentsId: () => 1,

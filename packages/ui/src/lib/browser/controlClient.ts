@@ -622,7 +622,7 @@ const runAction = async (
       if (pending.cancelled) return { ok: false, error: 'Browser action cancelled.' };
       pending.controller = controller;
     }
-    const data = await controller.run(action, action === 'browser.playwright' ? { ...parameters, requestId } : parameters);
+    const data = await controller.run(action, action === 'browser.playwright' ? { ...parameters, requestId, contextSessionId: caller.sessionId, contextDirectory: caller.directory } : parameters);
     if (action === 'browser.snapshot' && Object(data) === data) {
       return { ok: true, data: { ...Object(data), tabs: listTabs(caller) } };
     }

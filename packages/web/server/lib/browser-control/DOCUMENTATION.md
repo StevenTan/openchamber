@@ -190,6 +190,13 @@ what the actions alone do not show (frame rate, animations).
   no browser-wide debugging port. Each view owns one in-process MCP connection;
   closing the view releases it. The official server owns element references,
   actionability, waiting, page evaluation and result encoding.
+- Page input is ordered per view. A mouse move publishes its coordinates and
+  invoking request id to that view's host window, and a click waits for the
+  cursor's arrival acknowledgement. Drag moves publish without an animation
+  wait. Only the receiving window can acknowledge a move; page disconnection
+  releases pending arrivals and stops queued input. A renderer reload has a
+  1.5 s arrival deadline. The visible overlay and coordinate projection belong
+  to `packages/ui/src/components/browser/DOCUMENTATION.md`.
 - Browser tools use the `openchamber_web` permission. Cancellation and request
   timeout disconnect Playwright from the affected view, stopping pending page
   actions; other calls on that view fail, and a later call reconnects. Native

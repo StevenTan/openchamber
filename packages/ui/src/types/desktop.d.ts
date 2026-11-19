@@ -20,6 +20,7 @@ declare global {
     reload(): void;
     reloadIgnoringCache(): void;
     getZoomLevel(): number;
+    getZoomFactor(): number;
     setZoomLevel(level: number): void;
     stop(): void;
     getURL(): string;

@@ -65,6 +65,7 @@ import { BrowserEmptyState } from './BrowserEmptyState';
 import { useAnnotationAttach, useAnnotationOverlayLabels } from './useAnnotationAttach';
 import { readEventPayload, useWebviewNavigation } from './useWebviewNavigation';
 import { isStageShown, useWebviewFocusGuard, type HoldPageFocus } from './useWebviewFocusGuard';
+import { BrowserAgentCursor } from './BrowserAgentCursor';
 
 export type BrowserPaneProps = {
   initialUrl: string;
@@ -220,7 +221,8 @@ const WebviewBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory: tab
   const panelUI = usePanelWorkspaceApi();
   const { currentTheme } = useThemeSystem();
   const webviewRef = React.useRef<WebviewElement | null>(null);
-  const playwrightRequests = React.useRef(new Map<string, AbortController>());
+  const playwrightRequests = React.useRef(new Map<string, { controller: AbortController; sessionId: string | null; directory: string }>());
+  const [cursorActivity, setCursorActivity] = React.useState(0);
   // Tracked in state as well as a ref: effects that attach listeners must re-run
   // when the view appears, which a stable ref cannot tell them.
   const [webviewElement, setWebviewElement] = React.useState<WebviewElement | null>(null);
@@ -539,13 +541,16 @@ const WebviewBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory: tab
     holdPageFocus: HoldPageFocus,
   ): Promise<unknown> => {
     if (action === 'browser.cancel') {
-      playwrightRequests.current.get(String(parameters.requestId))?.abort();
+      playwrightRequests.current.get(String(parameters.requestId))?.controller.abort();
       return;
     }
     if (action === 'browser.playwright') {
       const requestId = String(parameters.requestId);
       const controller = new AbortController();
-      playwrightRequests.current.set(requestId, controller);
+      const sessionId = z.string().nullable().parse(parameters.contextSessionId);
+      const contextDirectory = z.string().nullable().parse(parameters.contextDirectory);
+      playwrightRequests.current.set(requestId, { controller, sessionId, directory: contextDirectory ?? directory });
+      setCursorActivity(playwrightRequests.current.size);
       const cancel = () => {
         void invokeDesktopCommand('desktop_browser_playwright_cancel', { requestId })
           .catch(error => console.warn('[browser-control] cancelling action:', error));
@@ -560,10 +565,12 @@ const WebviewBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory: tab
           input: { tool: parameters.tool, arguments: parameters.arguments },
           requestId,
           directory: spaceIdOfDirectory(directory) === null ? directory : null,
+          cursorVisible: visible && isDocumentVisible() && stageRef.current !== null && isStageShown(stageRef.current),
         });
       } finally {
         controller.signal.removeEventListener('abort', cancel);
         playwrightRequests.current.delete(requestId);
+        setCursorActivity(playwrightRequests.current.size);
       }
     }
     const webview = await waitForView();
@@ -746,7 +753,7 @@ const WebviewBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory: tab
       await waitForIdle();
     }
     return result;
-  }, [annotationHost, directory, loadUrl, settlePage, waitForIdle, waitForQuiet, waitForView]);
+  }, [annotationHost, directory, loadUrl, settlePage, visible, waitForIdle, waitForQuiet, waitForView]);
 
   // The agent works this page while the user types elsewhere in the app.
   const guardAgentAction = useWebviewFocusGuard(webviewElement, stageRef);
@@ -1148,6 +1155,7 @@ const WebviewBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory: tab
               : { width: '100%', height: '100%', border: 'none' }}
           />
         ) : null}
+        <BrowserAgentCursor webview={webviewElement} stageRef={stageRef} visible={visible} activeCount={cursorActivity} requests={playwrightRequests} pageUrl={navigation.url} zoomLevel={zoomLevel} viewport={layout} />
         {initialSrc !== null && !startUrl && !navigation.url && !isLoading ? (
           <BrowserEmptyState onOpen={loadUrlFromUser} directory={directory} visible={visible} />
         ) : null}

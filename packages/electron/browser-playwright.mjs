@@ -2,9 +2,13 @@ import { chromium, createPlaywrightTools } from '@openchamber/web/server/lib/bro
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { createBrowserAgentCursor } from './browser-agent-cursor.mjs';
+import { AsyncLocalStorage } from 'node:async_hooks';
+
+const cursorRequest = new AsyncLocalStorage();
 
 /** Connects Playwright to one panel webview through Electron's page debugger. */
-async function connectPanelPage(target) {
+async function connectPanelPage(target, cursor, requests) {
   if (!target.debugger.isAttached()) target.debugger.attach('1.3');
   const { targetInfo } = await target.debugger.sendCommand('Target.getTargetInfo');
   const sessions = new Set();
@@ -13,6 +17,7 @@ async function connectPanelPage(target) {
   const fileChooserSessions = new Set();
   let dragSession;
   let interceptDrags = false;
+  let inputQueue = Promise.resolve();
   const receive = (_event, method, params, sessionId) => {
     if (method === 'Input.dragIntercepted' && !sessionId) sessionId = dragSession;
     if (method === 'Target.attachedToTarget' && !sessionId) {
@@ -27,6 +32,7 @@ async function connectPanelPage(target) {
   };
   const disconnected = () => {
     closed = true;
+    cursor.cancel(target);
     target.debugger.removeListener('message', receive);
     target.debugger.removeListener('detach', disconnected);
     target.removeListener('destroyed', disconnected);
@@ -34,8 +40,11 @@ async function connectPanelPage(target) {
   };
   const transport = {
     send({ id, method, params = {}, sessionId }) {
+      const cursorContext = cursorRequest.getStore();
+      const requestId = cursorContext?.requestId;
       const run = async () => {
         if (closed) throw new Error('Browser connection closed');
+        if (method.startsWith('Input.') && requestId && !requests.has(requestId)) throw new Error('Browser action finished');
         if (!sessionId && method === 'Target.setAutoAttach') {
           if (params.autoAttach) await target.debugger.sendCommand('Target.attachToTarget', { targetId: targetInfo.targetId, flatten: true });
           return {};
@@ -54,11 +63,18 @@ async function connectPanelPage(target) {
           dragSession = sessionId;
           interceptDrags = params.enabled;
         }
+        if (method === 'Input.dispatchMouseEvent' && params.type === 'mouseMoved') {
+          await cursor.move(target, params, requestId, cursorContext.visible);
+          if (closed) throw new Error('Browser connection closed');
+          if (!requests.has(requestId)) throw new Error('Browser action finished');
+        }
         const result = await target.debugger.sendCommand(method, params, method.startsWith('Input.') ? undefined : sessionId);
         if (result.targetInfo?.type === 'webview') result.targetInfo.type = 'page';
         return result;
       };
-      run().then(
+      const task = method.startsWith('Input.') ? inputQueue.then(run) : run();
+      if (method.startsWith('Input.')) inputQueue = task.catch(() => {});
+      task.then(
         result => transport.onmessage?.({ id, result, sessionId }),
         error => transport.onmessage?.({ id, error: { code: -32000, message: error.message }, sessionId }),
       );
@@ -90,16 +106,17 @@ async function connectPanelPage(target) {
 }
 
 export function createPanelPlaywright() {
+  const cursor = createBrowserAgentCursor();
   const pages = new WeakMap();
   const requests = new Map();
-  const run = async (target, input, requestId, workspaceDir) => {
+  const run = async (target, input, requestId, workspaceDir, cursorVisible = true) => {
     const controller = new AbortController();
     requests.set(requestId, controller);
     try {
       let pending = pages.get(target);
       if (!pending) {
         pending = (async () => {
-          const connection = await connectPanelPage(target);
+          const connection = await connectPanelPage(target, cursor, requests);
           const { browser, page } = connection;
           const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), 'openchamber-browser-'));
           let tools;
@@ -134,14 +151,17 @@ export function createPanelPlaywright() {
       await target.debugger.sendCommand('Emulation.setFocusEmulationEnabled', { enabled: true });
       await connection.setActive(true);
       try {
-        return await tools.call(input, { signal: controller.signal });
+        return await cursorRequest.run({ requestId, visible: cursorVisible }, () => tools.call(input, { signal: controller.signal }));
       } finally {
+        requests.delete(requestId);
+        cursor.releaseRequest(requestId);
         controller.signal.removeEventListener('abort', cancel);
         await connection.setActive(false);
       }
     } finally {
       requests.delete(requestId);
+      cursor.releaseRequest(requestId);
     }
   };
-  return { run, cancel(requestId) { requests.get(requestId)?.abort(); } };
+  return { run, cancel(requestId) { requests.get(requestId)?.abort(); }, cursorArrived: cursor.arrive };
 }
