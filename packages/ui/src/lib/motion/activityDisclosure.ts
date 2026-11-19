@@ -1,45 +1,38 @@
 import { flushSync } from 'react-dom';
 
-let active: { transition: ViewTransition; cleanup: () => void } | null = null;
+type ActivityViewport = HTMLElement & { startViewTransition?: Document['startViewTransition'] };
 
 /** Animate snapshots of virtual rows; their layout and scroll measurements settle once. */
 export function animateActivityDisclosure(trigger: HTMLElement, update: () => void): void {
-  if (typeof document === 'undefined' || !document.startViewTransition
+  const viewport = trigger.closest<ActivityViewport>('.chat-scroll');
+  if (!viewport || typeof viewport.startViewTransition !== 'function'
     || !CSS.supports('view-transition-name', 'match-element')
     || !CSS.supports('selector(:active-view-transition-type(oc-activity-disclosure))')
     || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     update();
     return;
   }
-  const viewport = trigger.closest<HTMLElement>('.chat-scroll');
-  if (!viewport) {
-    update();
-    return;
-  }
-  active?.transition.skipTransition();
-  active?.cleanup();
-  const root = document.documentElement;
-  const rect = viewport.getBoundingClientRect();
-  const composer = viewport.closest('[data-chat-column]')?.querySelector('[data-composer-slot]');
-  const bottom = Math.min(rect.bottom, composer?.getBoundingClientRect().top ?? rect.bottom);
-  // Snapshot pseudo-elements live in the top layer and lose ancestor overflow clipping.
-  root.style.setProperty('--oc-activity-clip', `inset(${Math.max(0, rect.top)}px ${Math.max(0, root.clientWidth - rect.right)}px ${Math.max(0, root.clientHeight - bottom)}px ${Math.max(0, rect.left)}px)`);
-  viewport.setAttribute('data-activity-transition', '');
-  const cleanup = () => {
-    viewport.removeAttribute('data-activity-transition');
-    root.style.removeProperty('--oc-activity-clip');
-  };
-  const transition = document.startViewTransition({
+  const retired: HTMLElement[] = [];
+  const transition = viewport.startViewTransition({
     types: ['oc-activity-disclosure'],
-    update: () => flushSync(update),
+    update: () => {
+      const previous = Array.from(viewport.querySelectorAll<HTMLElement>('[data-turn-row], [data-turn-id], [data-live-activity-content] ~ *'));
+      flushSync(update);
+      const removed = previous.filter((element) => !element.isConnected);
+      // Chromium prepaint needs outgoing element identities until capture is ready.
+      // Empty shells keep that identity without reconnecting tool frames or scroll targets.
+      for (const element of removed) {
+        element.replaceChildren();
+        for (const name of element.getAttributeNames()) element.removeAttribute(name);
+        element.inert = true;
+        element.style.cssText = 'position:absolute;inset:0;width:0;height:0;opacity:0;overflow:hidden;view-transition-name:none;';
+        viewport.appendChild(element);
+      }
+      retired.push(...removed);
+    },
   });
-  active = { transition, cleanup };
-  // Skipping a replaced transition rejects ready; the state update still runs.
-  void transition.ready.catch(() => undefined);
-  void transition.finished.catch(() => undefined).finally(() => {
-    if (active?.transition === transition) {
-      cleanup();
-      active = null;
-    }
+  // A skipped transition can reject ready before its update callback runs.
+  void Promise.allSettled([transition.ready, transition.updateCallbackDone]).then(() => {
+    for (const element of retired) element.remove();
   });
 }
