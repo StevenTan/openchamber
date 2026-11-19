@@ -120,6 +120,8 @@ import { buildPromptPreviewsByTurnId } from './lib/promptPreviews';
 import { resolveChatPromptReadOnly } from './chatPromptReadOnly';
 import { PermissionDock } from './PermissionDock';
 import { FormDock } from './FormDock';
+import { TranscriptForms } from './TranscriptForms';
+import { resolveFormsInChat } from './formsInChat';
 import { ensureSpaceArchives, useSpaceArchiveOf } from '@/lib/spaces/space-archives';
 import { useSpaceDirectoryStopped } from '@/lib/spaces/spaces-store';
 import { SpaceChatPlaceholder } from '@/components/session/spaces/SpaceChatPlaceholder';
@@ -232,6 +234,8 @@ type ChatViewportProps = {
     currentSessionKey: string;
     isDesktopExpandedInput: boolean;
     isMobile: boolean;
+    /** Waiting questions show as cards at the end of the transcript, not in the composer's dock. */
+    formsInChat: boolean;
     /** The composer floats over the transcript and reserves its band via
         `--chat-composer-tail-inset` on the tail spacer (composerInsetReaders). */
     floatingComposer: boolean;
@@ -285,6 +289,7 @@ const ChatViewport = React.memo(({
     currentSessionKey,
     isDesktopExpandedInput,
     isMobile,
+    formsInChat,
     floatingComposer,
     statusRowClearance,
     directory,
@@ -404,8 +409,10 @@ const ChatViewport = React.memo(({
 
     const listFooter = React.useMemo(() => (
         <>
-            {/* Permissions and forms dock above the composer (`PermissionDock`, `FormDock`). */}
+            {/* Permissions dock above the composer (`PermissionDock`); forms
+                too (`FormDock`) unless questions are set to show in the chat. */}
             <SessionErrorNotice sessionId={currentSessionId} directory={directory} />
+            {formsInChat && currentSessionId ? <TranscriptForms sessionId={currentSessionId} directory={directory} /> : null}
 
             {/* Tail spacer. With a floating composer it reserves the band the
                 composer covers, plus any panel docked above it (queue, BTW),
@@ -447,7 +454,7 @@ const ChatViewport = React.memo(({
                 ) : null}
             </div>
         </>
-    ), [currentSessionId, directory, floatingComposer, isMobile, sessionIsWorking]);
+    ), [currentSessionId, directory, floatingComposer, formsInChat, isMobile, sessionIsWorking]);
 
     const endFadeStyle: React.CSSProperties & Record<'--chat-status-row-clearance', string> = {
         '--chat-status-row-clearance': `${statusRowClearance}px`,
@@ -659,6 +666,7 @@ const ChatViewport = React.memo(({
         && prev.currentSessionKey === next.currentSessionKey
         && prev.isDesktopExpandedInput === next.isDesktopExpandedInput
         && prev.isMobile === next.isMobile
+        && prev.formsInChat === next.formsInChat
         && prev.floatingComposer === next.floatingComposer
         && prev.statusRowClearance === next.statusRowClearance
         && prev.directory === next.directory
@@ -944,6 +952,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     const promptNavigatorEnabled = useUIStore((state) => state.promptNavigatorEnabled);
     const allowPromptingSubagentSessions = useUIStore((state) => state.allowPromptingSubagentSessions);
     const chatFontSize = useUIStore((state) => state.chatFontSizePx);
+    const questionsInChat = useUIStore((state) => state.questionsInChat);
     // SAFETY: CSS custom properties are valid inline styles; React's type lists only standard ones.
     const chatTypographyStyle = React.useMemo(() => getChatTypographyStyle(chatFontSize) as React.CSSProperties, [chatFontSize]);
     // The timeline dialog of the main chat is app state (a global shortcut
@@ -1906,6 +1915,12 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         return undefined;
     })();
 
+    const formsInChat = resolveFormsInChat({
+        questionsInChat,
+        pinned,
+        transcriptShown: sessionPlaceholder === undefined && !isDesktopExpandedInput,
+    });
+
     const sessionSurface = (
         <ChatViewport
             placeholder={sessionPlaceholder}
@@ -1913,6 +1928,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
             currentSessionKey={currentSessionKey ?? currentSessionId ?? ''}
             isDesktopExpandedInput={isDesktopExpandedInput}
             isMobile={isMobile}
+            formsInChat={formsInChat}
             floatingComposer={floatingComposer}
             statusRowClearance={sessionIsWorking ? composerOverlayHeight : 0}
             directory={effectiveSessionDirectory}
@@ -2046,6 +2062,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
                             sessionId={currentSessionId}
                             directory={effectiveSessionDirectory}
                             hidden={sessionPermissions.length > 0}
+                            inChat={formsInChat}
                         />
                         <ReadOnlyPromptBanner
                             text={spaceArchive
@@ -2063,6 +2080,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
                         scrollToBottom={scrollToBottomOnSend}
                         scrollToLatest={resumeToLatestInstant}
                         draftPresentationExiting={draftPresentationExiting}
+                        formsInChat={formsInChat}
                     />
                 )}
             </div>

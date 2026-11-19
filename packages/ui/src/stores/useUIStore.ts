@@ -1141,6 +1141,9 @@ interface UIStore {
   // Desktop dock badge showing the count of sessions with unseen activity (macOS).
   dockBadgeEnabled: boolean;
   customCssEnabled: boolean;
+  // An agent's question shows as a card at the end of the chat instead of
+  // the dock above the composer. This device only.
+  questionsInChat: boolean;
 
   // Event toggles (which events trigger notifications)
   notifyOnCompletion: boolean;
@@ -1479,6 +1482,7 @@ interface UIStore {
   setNotifyOnSubtasks: (value: boolean) => void;
   setDockBadgeEnabled: (value: boolean) => void;
   setCustomCssEnabled: (value: boolean) => void;
+  setQuestionsInChat: (value: boolean) => void;
   setNotifyOnCompletion: (value: boolean) => void;
   setNotifyOnPullRequests: (value: boolean) => void;
   setNotifyOnError: (value: boolean) => void;
@@ -2356,6 +2360,7 @@ const useGlobalUIStore = create<UIStore>()(
         notifyOnSubtasks: true,
         dockBadgeEnabled: true,
         customCssEnabled: true,
+        questionsInChat: false,
 
         // Event toggles (which events trigger notifications)
         notifyOnCompletion: true,
@@ -3469,6 +3474,9 @@ const useGlobalUIStore = create<UIStore>()(
         setCustomCssEnabled: (value) => {
           set({ customCssEnabled: value });
         },
+        setQuestionsInChat: (value) => {
+          set({ questionsInChat: value });
+        },
 
         setNotifyOnCompletion: (value) => { set({ notifyOnCompletion: value }); },
         setNotifyOnPullRequests: (value) => { set({ notifyOnPullRequests: value }); },
@@ -4132,6 +4140,7 @@ const useGlobalUIStore = create<UIStore>()(
           notifyOnSubtasks: state.notifyOnSubtasks,
           dockBadgeEnabled: state.dockBadgeEnabled,
           customCssEnabled: state.customCssEnabled,
+          questionsInChat: state.questionsInChat,
           notifyOnCompletion: state.notifyOnCompletion,
           notifyOnPullRequests: state.notifyOnPullRequests,
           notifyOnError: state.notifyOnError,

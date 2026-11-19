@@ -79,6 +79,7 @@ import { subscribeMessageQueueSync } from "./message-queue-sync"
 import { subscribeAutoReviewSync } from "./auto-review-sync"
 import { subscribePrWatchSync } from "./pr-watch-sync"
 import { subscribeExtensionWaitsSync } from "./extension-waits-sync"
+import { subscribeLaterPagesSync } from "./later-pages-sync"
 import { subscribeSessionWarmingSync } from "./session-warming-sync"
 import { subscribeSessionTodosSync } from "./session-todos-sync"
 import { subscribeSessionFoldersSync } from "./session-folders-sync"
@@ -3331,6 +3332,7 @@ export function SyncProvider(props: {
     const unsubscribeAutoReviewEvents = subscribeAutoReviewSync(runtimeKey)
     const unsubscribePrWatchEvents = subscribePrWatchSync(runtimeKey)
     const unsubscribeExtensionWaitEvents = subscribeExtensionWaitsSync(runtimeKey)
+    const unsubscribeLaterPageEvents = subscribeLaterPagesSync(runtimeKey)
     const unsubscribeSessionWarming = subscribeSessionWarmingSync(runtimeKey)
     const unsubscribeSessionTodos = subscribeSessionTodosSync(runtimeKey)
     const unsubscribeFolderEvents = subscribeSessionFoldersSync(runtimeKey)
@@ -3502,6 +3504,7 @@ export function SyncProvider(props: {
       unsubscribeAutoReviewEvents()
       unsubscribePrWatchEvents()
       unsubscribeExtensionWaitEvents()
+      unsubscribeLaterPageEvents()
       unsubscribeSessionWarming()
       unsubscribeSessionTodos()
       unsubscribeFolderEvents()
@@ -4028,14 +4031,6 @@ export function useSessionPermissions(sessionID: string, directory?: string, opt
     return subscribeDirectoryPermission(store, sessionID, notify)
   }, [sessionID, store])
   return React.useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
-}
-
-/** Get pending forms for a specific session */
-export function useSessionForms(sessionID: string, directory?: string) {
-  return useDirectorySync(
-    useCallback((state: State) => state.form[sessionID] ?? EMPTY_FORM_REQUESTS, [sessionID]),
-    directory,
-  )
 }
 
 type SessionBlockingRequests = {

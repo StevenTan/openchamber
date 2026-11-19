@@ -314,6 +314,7 @@ export const createFeatureRoutesRuntime = (dependencies) => {
       autoReviewRuntime,
       prWatchRuntime = null,
       extensionWaitsRuntime = null,
+      laterPagesRuntime = null,
       mergeFollowRuntime = null,
       routingRuntime,
       globalEventHub,
@@ -404,7 +405,7 @@ export const createFeatureRoutesRuntime = (dependencies) => {
       sessionService: openChamberSessionService,
     });
 
-    registerOpenChamberControlRoutes(app, { controlService: openChamberControlService });
+    registerOpenChamberControlRoutes(app, { controlService: openChamberControlService, laterPages: laterPagesRuntime });
     if (workflowRuntime) registerWorkflowRoutes(app, workflowRuntime);
 
     registerMarkdownImageGrantRoutes(app, {
