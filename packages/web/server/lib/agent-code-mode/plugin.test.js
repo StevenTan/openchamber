@@ -13,38 +13,81 @@ async function fixture(execute = () => Effect.succeed({ content: 'FILE_CONTENT',
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'code-mode-catalog-'));
   directories.push(directory);
   const tools = new Map([
-    ['read', { id: 'read', name: 'read', description: 'Read a file.\nFULL_READ_INSTRUCTIONS', input: { type: 'object', properties: { path: { type: 'string', description: 'PATH_FIELD_INSTRUCTIONS' } }, required: ['path'] }, options: { codemode: false }, execute }],
+    ['example_file', { id: 'example_file', name: 'example_file', description: 'Read a file.\nFULL_READ_INSTRUCTIONS', input: { type: 'object', properties: { path: { type: 'string', description: 'PATH_FIELD_INSTRUCTIONS' } }, required: ['path'] }, options: { codemode: false }, execute }],
     ['patch', { id: 'patch', name: 'patch', description: 'PATCH_FORMAT_EXAMPLE\n*** Begin Patch\n*** Update File: a.txt\n*** End Patch', input: Schema.Struct({ patchText: Schema.String.annotate({ description: 'The full patch text describing add, update, and delete operations' }) }), options: { codemode: false }, execute }],
     ['openchamber_render', { id: 'openchamber_render', name: 'openchamber_render', input: {}, options: { codemode: false } }],
     ['subagent', { id: 'subagent', name: 'subagent', input: {}, options: { codemode: false } }],
   ]);
-  let hook;
+  const sessionHooks = new Map();
   const toolHooks = new Map();
   const permissions = [];
+  const skills = [];
   const ctx = {
+    skill: { list: () => Effect.succeed({ data: skills }) },
     tool: {
       list: () => Effect.sync(() => [...tools.values()]),
-      transform: run => Effect.sync(() => run({ list: () => [...tools.values()], update: (id, change) => change(tools.get(id)) })),
+      transform: run => Effect.sync(() => run({ get: id => tools.get(id), list: () => [...tools.values()], update: (id, change) => change(tools.get(id)) })),
       hook: (name, run) => Effect.sync(() => toolHooks.set(name, event => Effect.runPromise(run(event)))),
     },
     agent: { get: () => Effect.succeed({ data: { permissions: [{ action: '*', resource: '*', effect: 'allow' }] } }) },
-    session: { get: () => Effect.succeed({ permissions }), hook: (_name, run) => Effect.sync(() => { hook = event => Effect.runPromise(run(event)); }) },
+    session: { get: () => Effect.succeed({ permissions }), hook: (name, run) => Effect.sync(() => { sessionHooks.set(name, event => Effect.runPromise(run(event))); }) },
     event: { subscribe: () => Stream.never },
   };
   const materialized = await materializeCodeModePlugin(directory);
   const { default: plugin } = await import(pathToFileURL(path.join(materialized, 'index.js')).href);
   await Effect.runPromise(Effect.scoped(plugin.effect(ctx)));
-  const request = async (execute = true, messages = []) => {
+  const request = async (execute = true, messages = [], hook = 'context') => {
     const event = {
-      sessionID: 'ses_test', agent: 'build', tools: execute ? { execute: {}, openchamber_render: {}, subagent: {} } : { read: {} },
-      system: [{ type: 'text', text: 'OLD_PARTIAL_CATALOG\nENVIRONMENT', metadata: { experimental: { instructions: [{ key: 'core/codemode', text: 'OLD_PARTIAL_CATALOG' }, { key: 'core/environment', text: 'ENVIRONMENT' }] } } }],
+      sessionID: 'ses_test', agent: 'build', tools: execute ? { execute: {}, openchamber_render: {}, subagent: {} } : { example_file: {} },
+      system: [{ type: 'text', text: 'OLD_PARTIAL_CATALOG\nENVIRONMENT\nNATIVE_SKILL_GUIDANCE', metadata: { experimental: { instructions: [{ key: 'core/codemode', text: 'OLD_PARTIAL_CATALOG' }, { key: 'core/environment', text: 'ENVIRONMENT' }, { key: 'core/skill-guidance', text: 'NATIVE_SKILL_GUIDANCE' }] } } }],
       messages,
     };
-    await hook(event);
+    await sessionHooks.get(hook)(event);
     return event;
   };
-  return { tools, permissions, request, toolHooks };
+  return { tools, permissions, skills, request, toolHooks };
 }
+
+it('hides virtual skills registered after activation and rejects their loading', async () => {
+  const f = await fixture();
+  f.skills.push(
+    { id: 'virtual', name: 'Virtual', description: 'VIRTUAL_SKILL_BODY', path: 'skill://virtual/SKILL.md', content: 'BODY' },
+    { id: 'local', name: 'Local', description: 'LOCAL_SKILL_DESCRIPTION', path: '/skills/local/SKILL.md', content: 'BODY' },
+  );
+  const event = await f.request();
+  const text = event.system.map(part => part.text).join('\n');
+  expect(text).not.toContain('VIRTUAL_SKILL_BODY');
+  expect(text).toContain('LOCAL_SKILL_DESCRIPTION');
+  expect(text).toContain('ENVIRONMENT');
+  await expect(f.toolHooks.get('execute.before')({ tool: 'skill', input: { id: 'virtual' } })).rejects.toThrow("Virtual skill 'virtual' is disabled");
+  await expect(f.toolHooks.get('execute.before')({ tool: 'skill', input: { id: 'local' } })).resolves.toBeUndefined();
+  const direct = await f.request(false);
+  expect(JSON.stringify(direct.system)).not.toContain('VIRTUAL_SKILL_BODY');
+  expect(JSON.stringify(direct.system)).toContain('LOCAL_SKILL_DESCRIPTION');
+  expect(JSON.stringify(direct.messages)).toContain('supersedes historical skill catalog notices');
+  for (const name of ['compaction', 'generate']) {
+    const auxiliary = await f.request(false, [], name);
+    expect(JSON.stringify(auxiliary.system)).not.toContain('VIRTUAL_SKILL_BODY');
+    expect(JSON.stringify(auxiliary.system)).toContain('LOCAL_SKILL_DESCRIPTION');
+  }
+  await expect(f.toolHooks.get('execute.before')({ tool: 'skill', input: {} })).resolves.toBeUndefined();
+  await expect(f.toolHooks.get('execute.before')({ tool: 'skill', input: { id: 42 } })).resolves.toBeUndefined();
+});
+
+it('preserves file skill visibility rules and follows registry updates', async () => {
+  const f = await fixture();
+  f.skills.push(
+    { id: 'virtual', name: 'Virtual', description: 'VIRTUAL_SKILL_DESCRIPTION', path: 'skill://virtual/SKILL.md', content: '' },
+    { id: 'private-notes', name: 'Private', description: 'PRIVATE_SKILL_DESCRIPTION', path: '/skills/private/SKILL.md', content: '' },
+    { id: 'manual', name: 'Manual', description: 'MANUAL_SKILL_DESCRIPTION', path: '/skills/manual/SKILL.md', content: '', autoinvoke: false },
+  );
+  f.permissions.push({ action: 'skill', resource: 'private-*', effect: 'deny' });
+  const first = await f.request();
+  expect(JSON.stringify(first.system)).not.toContain('PRIVATE_SKILL_DESCRIPTION');
+  expect(JSON.stringify(first.system)).not.toContain('MANUAL_SKILL_DESCRIPTION');
+  f.skills[0].path = '/skills/virtual/SKILL.md';
+  await expect(f.toolHooks.get('execute.before')({ tool: 'skill', input: { id: 'virtual' } })).resolves.toBeUndefined();
+});
 
 it('supplies complete descriptions and parameter signatures while preserving direct cards', async () => {
   const f = await fixture();
@@ -52,13 +95,14 @@ it('supplies complete descriptions and parameter signatures while preserving dir
   const text = event.system.map(part => part.text).join('\n');
   expect(text).toContain('FULL_READ_INSTRUCTIONS');
   expect(text).toContain('PATH_FIELD_INSTRUCTIONS');
-  expect(text).toContain('tools.read(');
+  expect(text).toContain('tools.example_file(');
   expect(text).toContain('ENVIRONMENT');
+  expect(text).toContain('NATIVE_SKILL_GUIDANCE');
   expect(text).not.toContain('OLD_PARTIAL_CATALOG');
   expect(text).not.toContain('tools.openchamber_render(');
   expect(text).toContain('Direct tools: openchamber_render, subagent');
-  expect(f.tools.get('read').options.codemode).toBe(true);
-  expect(f.tools.get('read').options.pinned).toBe(true);
+  expect(f.tools.get('example_file').options.codemode).toBe(true);
+  expect(f.tools.get('example_file').options.pinned).toBe(true);
   expect(f.tools.get('subagent').options.codemode).toBe(false);
 });
 
@@ -90,14 +134,14 @@ it('keeps simultaneous calls with identical arguments associated with their own 
   const identity = { tool: 'execute', sessionID: 'session', messageID: 'message', id: 'script' };
   const input = { path: 'a.txt' };
   await f.toolHooks.get('execute.before')(identity);
-  const first = Effect.runPromise(f.tools.get('read').execute(input, identity));
-  const second = Effect.runPromise(f.tools.get('read').execute(input, identity));
+  const first = Effect.runPromise(f.tools.get('example_file').execute(input, identity));
+  const second = Effect.runPromise(f.tools.get('example_file').execute(input, identity));
   release[1]({ content: 'SECOND' });
   const two = await second;
-  await f.toolHooks.get('execute.after')({ ...identity, tool: 'read', input, status: 'completed', result: two });
+  await f.toolHooks.get('execute.after')({ ...identity, tool: 'example_file', input, status: 'completed', result: two });
   release[0]({ content: 'FIRST' });
   const one = await first;
-  await f.toolHooks.get('execute.after')({ ...identity, tool: 'read', input, status: 'completed', result: one });
+  await f.toolHooks.get('execute.after')({ ...identity, tool: 'example_file', input, status: 'completed', result: one });
   const result = {};
   await f.toolHooks.get('execute.after')({ ...identity, status: 'completed', result });
   expect(result.metadata.openchamberToolCalls.map(call => call.output)).toEqual(['FIRST', 'SECOND']);
@@ -121,39 +165,39 @@ it('identifies the current complete catalog after historical instruction updates
 it('updates descriptions and filters whole-tool permissions on every request', async () => {
   const f = await fixture();
   await f.request();
-  f.tools.get('read').description = 'UPDATED_READ_INSTRUCTIONS';
+  f.tools.get('example_file').description = 'UPDATED_READ_INSTRUCTIONS';
   expect(JSON.stringify((await f.request()).system)).toContain('UPDATED_READ_INSTRUCTIONS');
-  f.permissions.push({ action: 'read', resource: '*', effect: 'deny' });
+  f.permissions.push({ action: 'example_file', resource: '*', effect: 'deny' });
   expect(JSON.stringify((await f.request()).system)).not.toContain('UPDATED_READ_INSTRUCTIONS');
-  f.permissions.push({ action: 'read', resource: '/private/*', effect: 'ask' });
+  f.permissions.push({ action: 'example_file', resource: '/private/*', effect: 'ask' });
   expect(JSON.stringify((await f.request()).system)).toContain('UPDATED_READ_INSTRUCTIONS');
   const event = await f.request(false);
   expect(event.system).toHaveLength(1);
-  expect(event.tools).toEqual({ read: {} });
+  expect(event.tools).toEqual({ example_file: {} });
   expect(event.messages).toEqual([]);
 });
 
 it('renders opaque JSON Schema without importing its constraints into Effect', async () => {
   const f = await fixture();
-  f.tools.get('read').input = {
+  f.tools.get('example_file').input = {
     type: 'object', properties: { value: { not: { type: 'string' } } },
     patternProperties: { '^x': { type: 'string' } }, if: { required: ['value'] }, then: { required: ['other'] },
   };
-  expect(JSON.stringify((await f.request()).system)).toContain('tools.read(');
+  expect(JSON.stringify((await f.request()).system)).toContain('tools.example_file(');
 });
 
 it('records inner file results without changing the returned result or direct calls', async () => {
   const f = await fixture();
   const identity = { tool: 'execute', sessionID: 'session', messageID: 'message', id: 'script' };
   const input = { path: 'a.txt' };
-  const direct = await Effect.runPromise(f.tools.get('read').execute(input, identity));
+  const direct = await Effect.runPromise(f.tools.get('example_file').execute(input, identity));
   expect(direct.content).toBe('FILE_CONTENT');
   await f.toolHooks.get('execute.before')(identity);
-  const returned = await Effect.runPromise(f.tools.get('read').execute(input, identity));
-  await f.toolHooks.get('execute.after')({ ...identity, tool: 'read', input, status: 'completed', result: returned });
-  const result = { metadata: { toolCalls: [{ tool: 'read', status: 'completed', input }] } };
+  const returned = await Effect.runPromise(f.tools.get('example_file').execute(input, identity));
+  await f.toolHooks.get('execute.after')({ ...identity, tool: 'example_file', input, status: 'completed', result: returned });
+  const result = { metadata: { toolCalls: [{ tool: 'example_file', status: 'completed', input }] } };
   await f.toolHooks.get('execute.after')({ ...identity, status: 'completed', result });
   expect(returned).toEqual(direct);
-  expect(result.metadata.openchamberToolCalls).toMatchObject([{ tool: 'read', input, status: 'completed', output: 'FILE_CONTENT', metadata: { path: 'a.txt' } }]);
+  expect(result.metadata.openchamberToolCalls).toMatchObject([{ tool: 'example_file', input, status: 'completed', output: 'FILE_CONTENT', metadata: { path: 'a.txt' } }]);
   expect(result.metadata.openchamberToolCalls[0].time.end).toBeGreaterThanOrEqual(result.metadata.openchamberToolCalls[0].time.start);
 });

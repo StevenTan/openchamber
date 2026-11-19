@@ -21,7 +21,7 @@ export const MANAGED_CONFIG_FILE_NAME = 'opencode.managed.json';
  * unavailable instead of using `openchamber_web`. A project config that lists
  * `opencode.browser` still re-enables it, because that layer sits above ours.
  */
-const DISABLED_BUILTIN_PLUGINS = ['-opencode.browser', '-opencode-websearch'];
+const DISABLED_BUILTIN_PLUGINS = ['-opencode.browser', '-opencode-websearch', '-opencode.skill'];
 
 /**
  * OpenCode's own `experimental_image_generate` tool (2.2.1+, on by default
@@ -150,6 +150,9 @@ export const createManagedConfigRuntime = ({
     directories.push(workspace.plugin);
     const disabled = includeImage ? [...DISABLED_BUILTIN_PLUGINS, BUILTIN_IMAGE_PLUGIN] : DISABLED_BUILTIN_PLUGINS;
     const authoring = await materializeAuthoringSkill({ fsPromises, instanceDir, openchamberVersion });
+    const opencodeSkill = path.join(authoring.skillsRoot, 'opencode');
+    await fsPromises.mkdir(opencodeSkill, { recursive: true });
+    await fsPromises.copyFile(new URL('./opencode-skill.txt', import.meta.url), path.join(opencodeSkill, 'SKILL.md'));
     const skills = [authoring.skillsRoot, workspace.skillsRoot, ...await listExtensionSkillDirectories()];
     const extensionPlugins = await listExtensionPluginDirectories();
     return { disabled, directories, extensionPlugins, permissions, policies: readPluginDenials(), skills, commands: { [EXTENSION_AUTHORING_COMMAND]: authoring.command } };

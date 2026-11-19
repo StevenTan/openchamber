@@ -1562,6 +1562,15 @@ under a running child.
 
 ### Workspace PDF environment
 
+Managed configuration disables `opencode.skill`, the provider of OpenCode's
+embedded `OpenCode` and `Report` skills. Filesystem skill discovery and the native
+`skill` tool remain enabled.
+
+The managed skills directory contains a local `opencode/SKILL.md`, with the
+description and body copied from OpenCode 2.2.7's
+[OpenCode skill](https://github.com/anomalyco/opencode/blob/fedc6f208aa2bd54c1019227214568083f6380ad/packages/core/src/plugin/skill/opencode.md).
+It is discovered through the existing filesystem skill root.
+
 The managed config includes the workspace dependency locator plugin and its
 `pdf` skill root. The [workspace dependencies module](../workspace-dependencies/DOCUMENTATION.md)
 owns runtime paths, preparation and package versions. These entries follow the
@@ -1575,6 +1584,12 @@ the selected model and existing default-agent settings. OpenCode applies user
 and project agent configuration after plugin registration, so same-name custom
 agents can override the bundled definition. The plugin writes only its own
 instance directory. External OpenCode and VS Code own their agent configuration.
+
+The base behavior, writing style, communication, response formatting and work
+rules use the `gpt-6.1-sol` instructions template from
+[OpenAI's model catalog](https://github.com/openai/codex/blob/226fa88979b1a9d76dc36f339ee9c5fbdb2c8e7f/codex-rs/models-manager/models.json).
+Identity, progress delivery and tool invocation names match the OpenCode host.
+Skills, Code Mode and web research have separate host-specific instructions.
 
 ### Session title prompt
 

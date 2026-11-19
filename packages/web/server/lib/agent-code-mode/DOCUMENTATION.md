@@ -53,13 +53,30 @@ capture state. The plugin does not write or replay model-facing messages.
 
 ### File operation catalog
 
-The complete catalog includes every registered file operation. Its native executor
-validates each call; callers select the operation matching their edit.
+Text and directory reads use command tools. `view_image` accepts local PNG, JPEG,
+GIF and WebP files through the native reader, preserving file permissions and
+image attachments. Its structured result contains only the path and MIME type.
+The reader's general file entry is private to these adapters.
+
+Native mutation executors validate each call; callers select the operation matching their edit.
 `patchText` accepts file operation sections starting with an action header.
 The adapter supplies one native boundary pair before invoking the original patch
 executor. Registered descriptions and field annotations state this input contract.
 The native schema fields and checks, hunk parser, permissions and mutation logic
 retain their ownership.
+
+### Skill availability
+
+Managed agents use file-backed skills. The request hook supplies native-format
+skill guidance with virtual `skill://` entries excluded, preserving skill
+permissions and automatic-invocation settings. The `skill` before-hook rejects
+virtual entries using the current registry, including entries from plugins
+activated later. File-backed skills retain the native loader and its permissions.
+Registration remains owned by OpenCode; this policy governs model discovery and
+tool loading and does not rewrite plugin data or materialize virtual resources.
+The same directory policy covers compaction and transient generation. Current
+guidance takes precedence over persisted catalog notices. Explicit user skill
+attachments and existing transcript contents remain user-provided context.
 
 ### Catalog placement
 

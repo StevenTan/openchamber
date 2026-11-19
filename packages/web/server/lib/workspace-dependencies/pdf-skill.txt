@@ -23,9 +23,9 @@ Poppler commands.
 
 1. Prefer visual review: render PDF pages to PNGs and inspect them.
    - Use `pdftoppm` from the bundled runtime.
-   - Inspect saved PNGs with `tools.read({path: absolute_png_path})` through
-     `execute`. The image is attached to the model; print a short status instead
-     of the returned image data.
+   - Inspect saved PNGs with `tools.view_image({path: absolute_png_path})` through
+     `execute`. The image is attached to the model; the returned value contains
+     its path and MIME type.
 2. Use `reportlab` to generate PDFs when creating new documents.
 3. Use `pdfplumber` or `pypdf` for text extraction and quick checks; do not rely on text extraction for layout fidelity.
 4. After each meaningful update, re-render pages and verify alignment, spacing, and legibility.

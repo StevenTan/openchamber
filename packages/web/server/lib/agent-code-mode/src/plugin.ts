@@ -1,5 +1,5 @@
 import { CodeMode, Tool as CatalogTool } from "@opencode/codemode";
-import { Effect, Predicate, Schema, Stream, type Types } from "effect";
+import { Effect, Option, Predicate, Schema, Stream, type Types } from "effect";
 import { z } from "zod";
 import { $ZodType, toJSONSchema } from "zod/v4/core";
 import type { AgentApi, SessionApi } from "@opencode/client/effect/api";
@@ -8,6 +8,8 @@ import type { Session } from "@opencode/schema/session";
 import type { Tool } from "@opencode/schema/tool";
 import type { Permission } from "@opencode/schema/permission";
 import { createCallActivity } from "./call-activity.js";
+import { adaptFileTools, type FileToolEditor } from "./file-tools.js";
+import { assertFileSkill, filterVirtualSkillGuidance, type SkillRegistry } from "./skill-policy.js";
 
 const directTools = new Set([
   "openchamber_render", "openchamber_secret", "openchamber_image",
@@ -15,6 +17,7 @@ const directTools = new Set([
   "subagent",
 ]);
 const patchTextDescription = "File operation sections beginning with '*** Add File:', '*** Update File:' or '*** Delete File:'. The tool supplies the outer '*** Begin Patch' and '*** End Patch' lines.";
+const skillInput = Schema.Struct({ id: Schema.String });
 const patchDescription = `${patchTextDescription}
 
 Each file operation starts with its action header:
@@ -58,14 +61,15 @@ interface Request {
 }
 interface PluginContext {
   agent: Pick<AgentApi, "get">;
-  session: Pick<SessionApi, "get"> & { hook(name: "context", run: (event: Request) => Effect.Effect<void>): Effect.Effect<unknown> };
+  skill: SkillRegistry;
+  session: Pick<SessionApi, "get"> & { hook(name: "context" | "compaction" | "generate", run: (event: Request) => Effect.Effect<void>): Effect.Effect<unknown> };
   tool: {
     list(): Effect.Effect<readonly Registration[]>;
-    transform(run: (editor: {
+    transform(run: (editor: FileToolEditor & {
       list(): readonly Registration[];
       update(id: string, change: (tool: Types.Mutable<Pick<Tool.Info, "options" | "execute" | "description" | "input">>) => void): void;
     }) => void): Effect.Effect<unknown>;
-    hook(name: "execute.before", run: (event: ToolEvent) => Effect.Effect<void>): Effect.Effect<unknown>;
+    hook(name: "execute.before", run: (event: ToolEvent & { input: unknown }) => Effect.Effect<void, Tool.Error>): Effect.Effect<unknown>;
     hook(name: "execute.after", run: (event: ToolEvent & (
       { status: "completed"; input: unknown; result: { content?: Tool.Result["content"]; metadata?: Tool.Metadata } } | { status: "error"; error: { metadata?: Tool.Metadata } }
     )) => Effect.Effect<void>): Effect.Effect<unknown>;
@@ -117,6 +121,7 @@ export default {
   effect: (ctx: PluginContext) => Effect.gen(function* () {
     const activity = createCallActivity();
     yield* ctx.tool.transform(editor => {
+      adaptFileTools(editor);
       for (const tool of editor.list()) {
         if (directTools.has(tool.id)) continue;
         editor.update(tool.id, value => {
@@ -139,7 +144,11 @@ export default {
         });
       }
     });
-    yield* ctx.tool.hook("execute.before", event => Effect.sync(() => {
+    yield* ctx.tool.hook("execute.before", event => Effect.gen(function* () {
+      if (event.tool === "skill") {
+        const decoded = Schema.decodeUnknownOption(skillInput)(event.input);
+        if (Option.isSome(decoded)) yield* assertFileSkill(ctx.skill, decoded.value.id);
+      }
       if (event.tool === "execute") activity.start(event);
     }));
     yield* ctx.tool.hook("execute.after", event => Effect.sync(() => {
@@ -155,12 +164,18 @@ export default {
       Stream.runForEach(event => Effect.sync(() => activity.clear(event.data.sessionID))),
       Effect.forkScoped({ startImmediately: true }),
     );
-    yield* ctx.session.hook("context", event => Effect.gen(function* () {
-      if (!event.tools.execute) return;
-      const [registered, session, agent] = yield* Effect.all([
-        ctx.tool.list(), ctx.session.get({ sessionID: event.sessionID }), ctx.agent.get({ agentID: event.agent }),
+    for (const name of ["context", "compaction", "generate"] as const) yield* ctx.session.hook(name, event => Effect.gen(function* () {
+      const [registered, session, agent, skills] = yield* Effect.all([
+        ctx.tool.list(), ctx.session.get({ sessionID: event.sessionID }), ctx.agent.get({ agentID: event.agent }), ctx.skill.list(),
       ], { concurrency: "unbounded" });
       const rules = [...agent.data.permissions, ...(session.permissions ?? [])];
+      filterVirtualSkillGuidance(event.system, skills.data, rules);
+      if (skills.data.some(skill => skill.path.startsWith("skill://"))) {
+        event.messages.push({ role: "system", content: [{ type: "text", text:
+          "Use the current system skill directory for available skills; it supersedes historical skill catalog notices. Only file-backed skills are available through the skill tool.",
+        }] });
+      }
+      if (!event.tools.execute) return;
       const tools = registered.filter(tool => tool.options?.codemode !== false
         && !disabled(tool.options?.permission ?? tool.id, rules));
       const text = completeCatalog(tools);

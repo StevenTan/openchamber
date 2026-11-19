@@ -4,7 +4,7 @@
 
 Owns the versioned Python PDF environment, its read-only locator tool and the
 managed `pdf` skill. Command execution belongs to `agent-command`; PNG inspection
-uses OpenCode's native `read` tool. The runtime contains pypdf, pdfplumber,
+uses `view_image` and the native image attachment pipeline. The runtime contains pypdf, pdfplumber,
 reportlab and their locked dependencies, plus Poppler's `pdftoppm` and `pdfinfo`.
 
 ## Invariants
