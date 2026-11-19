@@ -81,6 +81,7 @@ export const OPENCHAMBER_WEB_ACTION_DEFINITIONS = Object.freeze([
   { action: 'browser.capture', title: 'Save a screenshot of the page', description: 'Save the visible panel as an image in the project; returns its path to cite in your answer' },
   { action: 'browser.resize', title: 'Change the page viewport', description: 'Lay the page out at viewport; fill uses the whole panel' },
   { action: 'browser.close', title: 'Close a browser tab', description: 'Close a tab this session opened; without tabId, its most recent one. Never a tab the user opened' },
+  { action: 'browser.playwright', title: 'Operate the browser page with Playwright', description: 'Runs a Playwright page tool in the selected browser panel tab' },
 ]);
 
 export const OPENCHAMBER_WEB_ACTIONS = Object.freeze(

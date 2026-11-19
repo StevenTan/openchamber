@@ -466,9 +466,37 @@ describe('managed agent tool runtime', () => {
     await prepareManagedEnv(runtime);
     const tool = await loadTools(dataDir, 'validator');
 
-    for (const entry of Object.values(tool)) {
+    for (const entry of Object.values(tool).filter(tool => tool.options.namespace !== 'browser')) {
       expect(entry.input.properties.action.enum).toBeInstanceOf(Array);
       expect(entry.input.properties.action).not.toHaveProperty('oneOf');
+    }
+  });
+
+  it('exposes upstream Playwright schemas and forwards the caller and panel tab', async () => {
+    const { runtime, dataDir } = await createRuntime();
+    const env = await prepareManagedEnv(runtime, { includeControl: false, includeWeb: true, includeMemory: false });
+    const tools = await loadTools(dataDir, 'playwright');
+    expect(tools.click.options).toEqual({ namespace: 'browser', codemode: true, permission: 'openchamber_web' });
+    expect(tools.click.input.properties.target.type).toBe('string');
+    expect(tools.click.input.properties.tabId.type).toBe('string');
+    const result = { content: [{ type: 'text', text: 'Clicked Save' }] };
+    const previousUrl = process.env.OPENCHAMBER_AGENT_TOOL_URL;
+    const previousToken = process.env.OPENCHAMBER_AGENT_TOOL_TOKEN;
+    process.env.OPENCHAMBER_AGENT_TOOL_URL = env.OPENCHAMBER_AGENT_TOOL_URL;
+    process.env.OPENCHAMBER_AGENT_TOOL_TOKEN = env.OPENCHAMBER_AGENT_TOOL_TOKEN;
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: true, data: result })));
+    try {
+      expect((await tools.click.execute({ tabId: 'panel-a', target: 'e5' }, { sessionID: 'ses_a', id: 'call_a' })).output).toEqual(result);
+      expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({
+        tool: 'openchamber_web', sessionID: 'ses_a', callID: 'call_a',
+        input: { action: 'browser.playwright', tool: 'browser_click', arguments: { target: 'e5' }, tabId: 'panel-a' },
+      });
+    } finally {
+      fetch.mockRestore();
+      if (previousUrl === undefined) delete process.env.OPENCHAMBER_AGENT_TOOL_URL;
+      else process.env.OPENCHAMBER_AGENT_TOOL_URL = previousUrl;
+      if (previousToken === undefined) delete process.env.OPENCHAMBER_AGENT_TOOL_TOKEN;
+      else process.env.OPENCHAMBER_AGENT_TOOL_TOKEN = previousToken;
     }
   });
 
@@ -477,7 +505,7 @@ describe('managed agent tool runtime', () => {
     await prepareManagedEnv(runtime, { includeControl: true, includeWeb: true, includeMemory: true, includeKnowledge: true, includeNotify: true, includeRender: true });
     const tools = await loadTools(dataDir, 'root-shape');
 
-    for (const tool of Object.values(tools)) {
+    for (const tool of Object.values(tools).filter(tool => tool.options.namespace !== 'browser')) {
       expect(Object.keys(tool.input.properties).sort()).toEqual(['action', 'parameters']);
       expect(tool.input.additionalProperties).toBe(true);
     }
@@ -653,7 +681,7 @@ describe('managed agent tool runtime', () => {
     await prepareManagedEnv(runtime, { includeControl: false, includeWeb: true, includeMemory: false });
     const tool = await loadTools(dataDir, 'web');
 
-    expect(Object.keys(tool)).toEqual(['openchamber_web']);
+    expect(Object.keys(tool).filter(name => tool[name].options.namespace !== 'browser')).toEqual(['openchamber_web']);
   });
 
   it('exposes memory as its own tool carrying only its own inputs', async () => {
@@ -890,7 +918,7 @@ describe('managed agent tool runtime', () => {
     });
     const tools = await loadTools(dataDir, 'description-length');
 
-    expect(Object.keys(tools).sort()).toEqual([
+    expect(Object.keys(tools).filter(name => tools[name].options.namespace !== 'browser').sort()).toEqual([
       'openchamber',
       'openchamber_image',
       'openchamber_knowledge',
@@ -973,14 +1001,14 @@ describe('managed agent tool runtime', () => {
     const namespaces = [];
     const { openchamber_render: render, ...behindExecute } = await loadTools(dataDir, 'codemode', {}, [], namespaces);
     const names = ['openchamber', 'openchamber_knowledge', 'openchamber_memory', 'openchamber_notify', 'openchamber_schedule', 'openchamber_web'];
-    expect(Object.keys(behindExecute).sort()).toEqual(names);
+    expect(Object.keys(behindExecute).filter(name => behindExecute[name].options.namespace !== 'browser').sort()).toEqual(names);
     for (const tool of Object.values(behindExecute)) {
-      expect(tool.options).toEqual({ codemode: true });
+      expect(tool.options).toMatchObject({ codemode: true });
     }
     expect(render.options).toEqual({ codemode: false });
     // Names stay as they are; each tool gets a namespace of its own name, so
     // its catalog row says what it is even when the catalog lists none of it.
-    expect(namespaces.map((namespace) => namespace.name).sort()).toEqual(names);
+    expect(namespaces.map((namespace) => namespace.name).sort()).toEqual(['browser', ...names]);
     expect(namespaces.find((namespace) => namespace.name === 'openchamber_web').description).toContain('browser panel');
 
     // A tool switched off takes its namespace along.

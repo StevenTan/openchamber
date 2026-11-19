@@ -9,6 +9,8 @@
  * panel, and stops it after `BROWSER_PROVIDER_IDLE_MS` without actions.
  */
 
+import type { JsonValue } from './contract.ts';
+
 /** Route on the service loopback the host posts every action to. */
 export const BROWSER_PROVIDER_PATH = '/browser-control';
 
@@ -25,6 +27,7 @@ export const BROWSER_CONTROL_ACTIONS = [
   'browser.capture',
   'browser.resize',
   'browser.close',
+  'browser.playwright',
 ] as const;
 export type BrowserControlAction = (typeof BROWSER_CONTROL_ACTIONS)[number];
 
@@ -62,6 +65,7 @@ export type BrowserInspectParameters = BrowserTabTarget & { selector: string };
 export type BrowserCaptureParameters = BrowserTabTarget & { label?: string };
 export type BrowserResizeParameters = BrowserTabTarget & { viewport: BrowserViewportMode };
 export type BrowserCloseParameters = BrowserTabTarget;
+export type BrowserPlaywrightParameters = BrowserTabTarget & { tool: string; arguments: { [key: string]: JsonValue } };
 
 /**
  * Where an action came from: the project the agent works in and the chat it
@@ -89,6 +93,7 @@ export type BrowserProviderRequest = ProviderRequestEnvelope & (
   | { action: 'browser.capture'; parameters: BrowserCaptureParameters }
   | { action: 'browser.resize'; parameters: BrowserResizeParameters }
   | { action: 'browser.close'; parameters: BrowserCloseParameters }
+  | { action: 'browser.playwright'; parameters: BrowserPlaywrightParameters }
 );
 
 export type BrowserViewportSummary = {
@@ -197,6 +202,7 @@ export type BrowserResizeData = { viewport: BrowserViewportSummary };
  * rather than reporting a close it did not do.
  */
 export type BrowserCloseData = { closed: true; tabId?: string };
+export type BrowserPlaywrightData = { content: Array<{ type: string; [key: string]: JsonValue }>; isError?: boolean };
 
 export type BrowserProviderData =
   | BrowserOpenData
@@ -209,7 +215,8 @@ export type BrowserProviderData =
   | BrowserInspectData
   | BrowserCaptureData
   | BrowserResizeData
-  | BrowserCloseData;
+  | BrowserCloseData
+  | BrowserPlaywrightData;
 
 /**
  * What the service answers. `error` is read by the agent, so it should say

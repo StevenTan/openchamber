@@ -129,6 +129,14 @@ PDF iframes also start with an opaque origin under the packaged UI protocol. The
 
 The preload bridge exposes desktop-only APIs to the web UI through `window.__OPENCHAMBER_DESKTOP__`. Privileged commands are checked in `main.mjs`, not only in the UI.
 
+`browser-playwright.mjs` binds the official Playwright MCP page tools to a
+panel webview through a local-page-gated IPC command. It uses Electron's native
+debugger as a single-page CDP transport, preserving the panel's session and page.
+Native input is routed to that view and text uses `webContents.insertText`.
+The connection has no browser-wide debug listener; app windows and other panel
+tabs are outside its target scope. OpenChamber owns tab creation and closing,
+viewport sizing and screenshot placement.
+
 Composer document cards obtain macOS and Windows thumbnails through the local-page-gated `desktop_get_file_thumbnail` command and Electron's `nativeImage.createThumbnailFromPath`. The shared runtime exposes this optional capability as `fileThumbnails`; remote OpenCode hosts do not resolve their paths against the desktop filesystem. Other runtimes render PDF thumbnails with the shared PDF.js viewer and use file-type icons for other documents.
 
 Confirmed chat application links use the local-page-gated `desktop_open_external_url`

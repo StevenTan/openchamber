@@ -101,7 +101,10 @@ export const createBrowserControlBroker = ({
         };
 
         const onAbort = signal
-          ? () => settle(requestId, { ok: false, message: 'Browser action was cancelled', status: 499 })
+          ? () => {
+            if (action === 'browser.playwright' && pending.has(requestId)) emitRequest({ requestId, action: 'browser.cancel', parameters: {}, context: context ?? { directory: null, sessionId: null } });
+            settle(requestId, { ok: false, message: 'Browser action was cancelled', status: 499 });
+          }
           : null;
         if (signal) {
           if (signal.aborted) {
@@ -112,6 +115,7 @@ export const createBrowserControlBroker = ({
         }
 
         const timer = setTimer(() => {
+          if (action === 'browser.playwright') emitRequest({ requestId, action: 'browser.cancel', parameters: {}, context: context ?? { directory: null, sessionId: null } });
           settle(requestId, {
             ok: false,
             message: `The in-app browser did not respond within ${Math.round(boundedTimeout / 1000)}s`,

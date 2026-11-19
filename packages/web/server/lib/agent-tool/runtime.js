@@ -55,6 +55,7 @@ import {
 import { createCallbackAddress } from './callback-address.js';
 import { createCommandToolRuntime } from '../agent-command/dist/runtime.js';
 import { materializeSearchPlugin } from '../agent-search/runtime.js';
+import { getPlaywrightToolDefinitions } from '../browser-control/playwright.js';
 import { registerCollaborationRoutes } from '../agent-collaboration/dist/runtime.js';
 
 const TOOL_SCHEMA_VERSION = 1;
@@ -403,7 +404,7 @@ const CONTROL_TOOL_DESCRIPTION = "OpenChamber projects, sessions and worktrees. 
 
 const SCHEDULE_TOOL_DESCRIPTION = "Scheduled tasks: prompts OpenChamber runs on a schedule, in a new session each run or in targetSessionId. A task is the user's; create or change one when the user asks. One action per call; projectId or directory scope it, default this session's directory.";
 
-const WEB_TOOL_DESCRIPTION = "OpenChamber's browser panel, to check your work by looking at it. One action per call: open, snapshot for text, selectors and errors, then click, type, select or scroll by those selectors. Close tabs you opened for your own work with browser.close; leave open the ones you opened to show the user something. The page runs with the user's real logins; treat it as their live session.";
+const WEB_TOOL_DESCRIPTION = "OpenChamber's browser panel. Open and manage tabs here; action browser.snapshot lists panel tab ids and ownership. The browser namespace provides Playwright page tools with the built-in desktop provider or an extension implementing browser.playwright. Close tabs you opened for your own work with browser.close; leave open the ones you opened to show the user something. The page runs with the user's real logins; treat it as their live session.";
 
 const MEMORY_TOOL_DESCRIPTION = "Memory that persists across sessions. One fact per entry, under a title that names what it holds, so the session index tells when to read it: \"PR lists: one or two sentences per PR\", not \"Reporting preferences\". Save what code and docs do not show: the user's corrections and preferences, people and private context, a hard-won pointer; a project's decisions, rejected alternatives and deliberate \"leave this as it is\" only when it keeps no agent docs to put them in. Never one-off task state, secrets or credentials, or what the user asked you not to keep; what the user explicitly asks you to remember, save. Project scope holds what concerns this project, global what concerns the user in every project.";
 
@@ -817,7 +818,7 @@ const CODE_MODE_CATALOG_LINES = {
  */
 const OPENCODE_TOOLS_REPLACED_BY_CONTROL = ['opencode_worktree_create', 'opencode_models'];
 
-const createPluginSource = ({ includeControl, includeSchedule, includeWeb, includeMemory, includeKnowledge, includeNotify, includeRender, includeImage, includeSecret, includeUsage, includeWorkflow }) => {
+const createPluginSource = ({ includeControl, includeSchedule, includeWeb, includeMemory, includeKnowledge, includeNotify, includeRender, includeImage, includeSecret, includeUsage, includeWorkflow, playwrightTools }) => {
   const entries = [];
   const included = { openchamber: includeControl, openchamber_schedule: includeSchedule, openchamber_web: includeWeb, openchamber_memory: includeMemory, openchamber_knowledge: includeKnowledge, openchamber_notify: includeNotify, openchamber_usage: includeUsage };
   for (const [name, description] of Object.entries(CODE_MODE_CATALOG_LINES)) {
@@ -850,10 +851,33 @@ const createPluginSource = ({ includeControl, includeSchedule, includeWeb, inclu
     entries.push(createToolEntry({
       name: 'openchamber_web',
       description: WEB_TOOL_DESCRIPTION,
-      definitions: OPENCHAMBER_WEB_ACTION_DEFINITIONS,
+      definitions: OPENCHAMBER_WEB_ACTION_DEFINITIONS.filter(entry => entry.action !== 'browser.playwright'),
       parameters: WEB_PARAMETER_PROPERTIES,
       codeMode: true,
     }));
+    entries.push(`    tools.namespace({ name: "browser", description: "Playwright controls for the existing browser panel. Open a tab with openchamber_web action browser.open, then use these tools. tabId selects a panel tab listed by openchamber_web action browser.snapshot; otherwise use this session's page. Requires the built-in desktop provider or an extension implementing browser.playwright." })
+    for (const tool of ${JSON.stringify(playwrightTools)}) tools.add({
+      name: tool.name.replace(/^browser_/, ""),
+      description: tool.description,
+      input: { ...tool.inputSchema, properties: { ...tool.inputSchema.properties, tabId: { type: "string", description: "Browser panel tab id; defaults to this session's page." } } },
+      output: { type: "object", additionalProperties: true },
+      options: { namespace: "browser", codemode: true, permission: "openchamber_web" },
+      async execute({ tabId, ...args }, context) {
+        const response = await fetch(process.env.OPENCHAMBER_AGENT_TOOL_URL, {
+          method: "POST",
+          headers: { authorization: "Bearer " + process.env.OPENCHAMBER_AGENT_TOOL_TOKEN, "content-type": "application/json" },
+          body: JSON.stringify({
+            tool: "openchamber_web", sessionID: context.sessionID, callID: context.id,
+            input: { action: "browser.playwright", tool: tool.name, arguments: args, ...(tabId ? { tabId } : {}) },
+          }),
+          signal: context.signal,
+        })
+        const result = await response.json()
+        if (!response.ok || result.ok !== true) throw new Error(result.error?.message || "Browser action failed")
+        return { output: result.data, content: JSON.stringify(result.data) }
+      },
+    })
+`);
   }
   if (includeMemory) {
     entries.push(createToolEntry({
@@ -1038,7 +1062,8 @@ export const createAgentToolRuntime = (dependencies) => {
     }
     await fsPromises.mkdir(pluginDirectory, { recursive: true });
     await fsPromises.writeFile(pluginManifestPath, PLUGIN_PACKAGE_JSON, { mode: 0o600 });
-    await fsPromises.writeFile(pluginPath, createPluginSource({ includeControl, includeSchedule, includeWeb, includeMemory, includeKnowledge, includeNotify, includeRender, includeImage, includeSecret, includeUsage, includeWorkflow }), { mode: 0o600 });
+    const playwrightTools = includeWeb ? await getPlaywrightToolDefinitions() : [];
+    await fsPromises.writeFile(pluginPath, createPluginSource({ includeControl, includeSchedule, includeWeb, includeMemory, includeKnowledge, includeNotify, includeRender, includeImage, includeSecret, includeUsage, includeWorkflow, playwrightTools }), { mode: 0o600 });
     return pluginDirectory;
   };
 

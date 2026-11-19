@@ -18,6 +18,13 @@ the user can want independently:
   actions, so the service cannot tell an agent call from a CLI one.
 - `openchamber_web` — looking at and interacting with the page in OpenChamber's
   browser panel. Enabled while `agentWebToolEnabled` is not `false`.
+  The same setting registers the `browser` Code Mode namespace from official
+  Playwright MCP descriptors, adding `tabId` for panel selection. These calls
+  use the existing authenticated callback and resolve the calling session's
+  directory before the browser broker selects a view. The generated plugin
+  carries complete upstream parameter schemas; MCP execution stays in the
+  Electron host, bound to that view. Panel tabs and navigation stay with
+  `openchamber_web`.
 - `openchamber_notify` — `notify.send`, a notification to the user through
   `lib/notifications/emit-route.js` (same limits and rate window as
   `POST /api/notifications/emit`). Off by default: enabled only while

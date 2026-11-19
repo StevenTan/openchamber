@@ -15,6 +15,7 @@ import { createWorkNamer } from '../openchamber-sessions/work-naming.js';
 import { CHATS_SCOPE_PUBLIC_ID } from '../scheduled-tasks/chats-scope.js';
 import { createWorkMembership } from '../session-work/membership.js';
 import { isPinnedMetadata, userStatePatch } from '../session-work/state.js';
+import { playwrightCallSchema } from '../browser-control/playwright.js';
 
 const DEFAULT_WAIT_TIMEOUT_SECONDS = 600;
 const MAX_WAIT_TIMEOUT_SECONDS = 86_400;
@@ -1112,6 +1113,12 @@ export const createOpenChamberControlService = (dependencies) => {
       parameters.url = parsed.toString();
     }
 
+    if (action === 'browser.playwright') {
+      const call = playwrightCallSchema.safeParse({ tool: input.tool, arguments: input.arguments });
+      if (!call.success) throw new OpenChamberControlError(call.error.message, 400);
+      Object.assign(parameters, call.data);
+    }
+
     if (action === 'browser.click') {
       const selector = asNonEmptyString(input.selector);
       const text = asNonEmptyString(input.text);
@@ -1170,10 +1177,9 @@ export const createOpenChamberControlService = (dependencies) => {
       if (direction) parameters.direction = direction;
     }
 
-    // Opening a page waits for the navigation to settle, so its budget has to
-    // exceed the client's own wait; sharing one timeout with the quick actions
-    // made a slow page indistinguishable from an unreachable browser.
-    const timeoutMs = action === 'browser.open' ? 45_000 : 20_000;
+    // Page navigation and Playwright waits need time for their own deadlines
+    // and for the browser client to deliver the result.
+    const timeoutMs = action === 'browser.open' || action === 'browser.playwright' ? 45_000 : 20_000;
     // Where the call came from, for a provider that keeps one browser per
     // project or chat. Filled by the tool plugin, never by the model.
     const context = {

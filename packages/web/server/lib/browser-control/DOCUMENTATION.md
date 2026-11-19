@@ -178,6 +178,34 @@ what the actions alone do not show (frame rate, animations).
 
 ## Invariants
 
+- The `browser` Code Mode namespace uses the pinned official Playwright MCP
+  tool schemas and executors. Calls travel through this broker as
+  `browser.playwright`, retaining tab selection, session ownership, client
+  claims and extension-provider routing. OpenChamber owns panel navigation,
+  tabs, viewport sizing and screenshot paths. Page tools operate in the
+  selected existing Electron webview and share that page's login state.
+- Playwright uses a page-scoped Electron debugger transport. The transport
+  presents the webview as a page target, routes input to the webview's native
+  input channel and inserts text through `webContents.insertText`. It exposes
+  no browser-wide debugging port. Each view owns one in-process MCP connection;
+  closing the view releases it. The official server owns element references,
+  actionability, waiting, page evaluation, dialog handling and result encoding.
+- Browser tools use the `openchamber_web` permission. Cancellation and request
+  timeout disconnect Playwright from the affected view, stopping pending page
+  actions; other calls on that view fail, and a later call reconnects. Native
+  tabs remain open. File chooser interception is active only during agent
+  actions, so an idle page retains its native file picker.
+- File operations use the mounted tab's local project directory as the MCP
+  workspace root. Remote instances and isolated spaces cannot access desktop
+  files through these tools. Generated browser output is temporary and belongs
+  to the page connection. A result larger than the callback's 2 MB limit is
+  answered with an explicit size error so the caller can narrow its request.
+- The exported page tools are an explicit allowlist. Host-process script
+  execution and tools that create or close native pages are outside it.
+  Page JavaScript evaluation has the upstream MCP execution semantics. Runtimes
+  without an Electron browser host cannot run these page tools; their existing
+  browser display behavior remains available.
+
 - Capability belongs to the connection, not to configuration. A client declares
   it can drive a page by opening its event stream with `browser=1`, which only
   a Chromium host does; the flag lives and dies with that connection, so there

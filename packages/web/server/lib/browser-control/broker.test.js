@@ -129,6 +129,18 @@ describe('browser control broker', () => {
     await expect(inflight).rejects.toThrow('cancelled');
   });
 
+  test('sends cancellation to a claimed Playwright request', async () => {
+    const { broker, emitted } = createBroker();
+    const controller = new AbortController();
+    const context = { directory: '/repo', sessionId: 'ses_a' };
+    const inflight = broker.request('browser.playwright', { tool: 'browser_click', arguments: { target: 'e5' } }, { signal: controller.signal, context });
+    expect(broker.claim(emitted[0].requestId)).toBe(true);
+    controller.abort();
+    await expect(inflight).rejects.toThrow('cancelled');
+    expect(emitted[1]).toEqual({ requestId: emitted[0].requestId, action: 'browser.cancel', parameters: {}, context });
+    expect(broker.resolve(emitted[0].requestId, { ok: true })).toBe(false);
+  });
+
   test('rejects immediately when the caller is already cancelled', async () => {
     const { broker } = createBroker();
     const controller = new AbortController();

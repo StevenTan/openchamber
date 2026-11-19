@@ -126,6 +126,7 @@ const UNKNOWN_TAB_CLAIM_DELAY_MS = 400;
 
 /** Mounted views by tab id, in registration order. */
 const controllers = new Map<string, BrowserController>();
+const pageRequests = new Map<string, { cancelled: boolean; controller?: BrowserController }>();
 /** Tabs with no view yet, by tab id. A mounted view takes precedence. */
 const sleepingTabs = new Map<string, SleepingBrowserTab>();
 /** The project on screen, keyed as the context panel keys it. */
@@ -173,10 +174,14 @@ const claimRequest = async (requestId: string): Promise<boolean> => {
 
 const postResult = async (requestId: string, outcome: { ok: boolean; data?: unknown; error?: string }): Promise<void> => {
   try {
+    let body = JSON.stringify({ requestId, ...outcome });
+    if (new TextEncoder().encode(body).byteLength > 2 * 1024 * 1024) {
+      body = JSON.stringify({ requestId, ok: false, error: 'Browser result exceeds the 2 MB response limit. Request a smaller snapshot, evaluation result or network response.' });
+    }
     const response = await runtimeFetch('/api/browser-control/result', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requestId, ...outcome }),
+      body,
     });
     if (!response.ok) {
       console.warn(
@@ -430,6 +435,24 @@ const handleCloseRequest = async (
 };
 
 const handleRequest = async (request: BrowserControlRequest): Promise<void> => {
+  if (request.action === 'browser.cancel') {
+    const pending = pageRequests.get(request.requestId);
+    if (pending) {
+      pending.cancelled = true;
+      if (pending.controller) await pending.controller.run('browser.cancel', { requestId: request.requestId });
+    }
+    return;
+  }
+  if (request.action !== 'browser.playwright') return handlePageRequest(request);
+  pageRequests.set(request.requestId, { cancelled: false });
+  try {
+    await handlePageRequest(request);
+  } finally {
+    pageRequests.delete(request.requestId);
+  }
+};
+
+const handlePageRequest = async (request: BrowserControlRequest): Promise<void> => {
   const isOpen = request.action === 'browser.open';
   const isClose = request.action === 'browser.close';
   const caller = callerOf(request.context);
@@ -561,7 +584,7 @@ const handleRequest = async (request: BrowserControlRequest): Promise<void> => {
 
     const view = await viewForTab(targetTabId!);
     await answer(request, view
-      ? await runAction(view, caller, request.action, parameters)
+      ? await runAction(view, caller, request.action, parameters, request.requestId)
       : { ok: false, error: unloadableTabError(targetTabId!) });
   } catch (error) {
     await answer(request, {
@@ -582,7 +605,7 @@ const runOnTab = async (
   rememberTab(caller, tabId);
   const view = await viewForTab(tabId);
   await answer(request, view
-    ? await runAction(view, caller, request.action, parameters)
+    ? await runAction(view, caller, request.action, parameters, request.requestId)
     : { ok: false, error: unloadableTabError(tabId) });
 };
 
@@ -591,9 +614,15 @@ const runAction = async (
   caller: Caller,
   action: string,
   parameters: BrowserControlRequest['parameters'],
+  requestId: string,
 ): Promise<{ ok: boolean; data?: unknown; error?: string }> => {
   try {
-    const data = await controller.run(action, parameters);
+    if (action === 'browser.playwright') {
+      const pending = pageRequests.get(requestId)!;
+      if (pending.cancelled) return { ok: false, error: 'Browser action cancelled.' };
+      pending.controller = controller;
+    }
+    const data = await controller.run(action, action === 'browser.playwright' ? { ...parameters, requestId } : parameters);
     if (action === 'browser.snapshot' && Object(data) === data) {
       return { ok: true, data: { ...Object(data), tabs: listTabs(caller) } };
     }
@@ -612,7 +641,7 @@ const ensureSubscribed = (): void => {
       action: event.action,
       parameters: event.parameters,
       context: event.context,
-    });
+    }).catch(error => console.warn('[browser-control] request failed:', error));
   });
 };
 

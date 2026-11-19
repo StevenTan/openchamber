@@ -63,12 +63,13 @@ describe('browser provider contract', () => {
     expect(readBrowserProviderRequest(JSON.stringify({ requestId: 'r', action: 'browser.back' }))).toBeNull();
   });
 
-  test('the action list is the tool\'s twelve browser actions', () => {
-    expect(BROWSER_CONTROL_ACTIONS).toHaveLength(12);
+  test('the action list includes panel and Playwright browser actions', () => {
+    expect(BROWSER_CONTROL_ACTIONS).toHaveLength(13);
     expect(BROWSER_CONTROL_ACTIONS).toContain('browser.select');
     expect(BROWSER_CONTROL_ACTIONS).toContain('browser.close');
     expect(isBrowserControlAction('browser.snapshot')).toBe(true);
     expect(isBrowserControlAction('browser.close')).toBe(true);
+    expect(isBrowserControlAction('browser.playwright')).toBe(true);
     expect(isBrowserControlAction('projects.list')).toBe(false);
   });
 

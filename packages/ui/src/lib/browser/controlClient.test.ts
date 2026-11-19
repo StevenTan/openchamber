@@ -79,6 +79,39 @@ const resetRequests = (): void => {
   setShownBrowserTab(REPO, null);
 };
 
+describe('Playwright request lifetime', () => {
+  beforeEach(resetRequests);
+  afterEach(() => { while (cleanups.length > 0) cleanups.pop()?.(); });
+
+  test('cancels an action while its tab is waking', async () => {
+    const ran: string[] = [];
+    cleanups.push(registerSleepingBrowserTab({
+      tabId: 'waking', directory: REPO, ownerSessionId: 'ses_a',
+      describe: () => ({ title: 'Waiting', url: 'http://127.0.0.1/' }),
+      wake: () => {
+        emit('browser.cancel', {});
+        cleanups.push(tab('waking', ran, { ownerSessionId: 'ses_a' }));
+      },
+    }));
+    emit('browser.playwright', { tabId: 'waking', tool: 'browser_click', arguments: { target: '#save' } }, { directory: REPO, sessionId: 'ses_a' });
+    await wait(50);
+    expect(ran).toEqual([]);
+    expect(posted[0]).toMatchObject({ ok: false, error: 'Browser action cancelled.' });
+  });
+
+  test('reports an oversized UTF-8 result through the result callback', async () => {
+    cleanups.push(registerBrowserController({
+      tabId: 'large', directory: REPO, ownerSessionId: 'ses_a',
+      describe: () => ({ title: 'Large', url: 'http://127.0.0.1/' }),
+      run: async () => ({ content: [{ type: 'text', text: '字'.repeat(750_000) }] }),
+    }));
+    emit('browser.playwright', { tabId: 'large', tool: 'browser_evaluate', arguments: {} }, { directory: REPO, sessionId: 'ses_a' });
+    await wait(50);
+    expect(posted[0]?.ok).toBe(false);
+    expect(posted[0]?.error).toContain('2 MB response limit');
+  });
+});
+
 describe('opening a page before any view exists', () => {
   beforeEach(resetRequests);
 

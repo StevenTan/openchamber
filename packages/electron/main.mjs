@@ -22,6 +22,7 @@ import { createTrayController } from './tray.mjs';
 import { TRAY_BREATH_FRAMES } from './tray-animation.mjs';
 import { buildDockMenuTemplate, buildUnreadJumpList, isJumpListSessionId } from './dock-menu.mjs';
 import { createSessionLinkGate } from './session-link-gate.mjs';
+import { createPanelPlaywright } from './browser-playwright.mjs';
 import { applyDevDockIdentity, applyDockBadge } from './dev-dock-identity.mjs';
 import { attachDevWindowTape } from './dev-window-tape.mjs';
 import { resolveManagedOpenCodeCwd } from './opencode-cwd.mjs';
@@ -1106,6 +1107,7 @@ const resolveBrowserPanelContents = (rawId) => {
 
 /** Panel pages the agent has worked in; their debugger session holds focus emulation. */
 const focusEmulatedPanelContents = new WeakSet();
+const runPanelPlaywright = createPanelPlaywright();
 
 /**
  * The sessions of the browser panel: the user's persistent one, and one per
@@ -4479,6 +4481,21 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
      * instead. The debugger session has to stay attached: emulation is part of
      * that session and resets the moment it detaches.
      */
+    case 'desktop_browser_playwright': {
+      const target = resolveBrowserPanelContents(args.webContentsId);
+      const runtimeKey = browserWindow.__ocRuntimeKey;
+      const local = runtimeKey ? runtimeKey === 'local' || (runtimeKey.startsWith('url:') && (isLocalRuntimeUrl(runtimeKey.slice(4)) || (isDev && sameOrigin(runtimeKey.slice(4), state.localUiUrl))))
+        : isLocalRuntimeUrl(getWindowRuntimeConfig(browserWindow).apiBaseUrl);
+      const directory = z.string().nullable().parse(args.directory);
+      const workspaceDir = local && directory && path.isAbsolute(directory) ? directory : undefined;
+      return runPanelPlaywright.run(target, args.input, args.requestId, workspaceDir);
+    }
+
+    case 'desktop_browser_playwright_cancel': {
+      runPanelPlaywright.cancel(args.requestId);
+      return { cancelled: true };
+    }
+
     case 'desktop_browser_set_color_scheme': {
       const scheme = args.scheme === 'light' || args.scheme === 'dark' ? args.scheme : 'system';
       const target = resolveBrowserPanelContents(args.webContentsId);

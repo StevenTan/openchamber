@@ -105,6 +105,8 @@ const handle = (request: BrowserProviderRequest): BrowserProviderResult => {
     return { ok: false, error: 'This browser has a single page and no tabs; omit tabId.' };
   }
   switch (request.action) {
+    case 'browser.playwright':
+      return { ok: false, error: 'This provider does not implement Playwright page tools.' };
     case 'browser.open':
       navigate(request.parameters.url);
       if (request.parameters.viewport) page.viewport = request.parameters.viewport;

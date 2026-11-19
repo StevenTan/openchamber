@@ -713,6 +713,8 @@ export type {
   BrowserTypeParameters,
   BrowserViewportMode,
   BrowserViewportSummary,
+  BrowserPlaywrightParameters,
+  BrowserPlaywrightData,
   SourceControlChangeRequestHead,
   SourceControlChangeRequestSource,
   SourceControlForge,

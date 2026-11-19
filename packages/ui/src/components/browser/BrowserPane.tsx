@@ -220,6 +220,7 @@ const WebviewBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory: tab
   const panelUI = usePanelWorkspaceApi();
   const { currentTheme } = useThemeSystem();
   const webviewRef = React.useRef<WebviewElement | null>(null);
+  const playwrightRequests = React.useRef(new Map<string, AbortController>());
   // Tracked in state as well as a ref: effects that attach listeners must re-run
   // when the view appears, which a stable ref cannot tell them.
   const [webviewElement, setWebviewElement] = React.useState<WebviewElement | null>(null);
@@ -537,6 +538,34 @@ const WebviewBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory: tab
     parameters: Record<string, unknown>,
     holdPageFocus: HoldPageFocus,
   ): Promise<unknown> => {
+    if (action === 'browser.cancel') {
+      playwrightRequests.current.get(String(parameters.requestId))?.abort();
+      return;
+    }
+    if (action === 'browser.playwright') {
+      const requestId = String(parameters.requestId);
+      const controller = new AbortController();
+      playwrightRequests.current.set(requestId, controller);
+      const cancel = () => {
+        void invokeDesktopCommand('desktop_browser_playwright_cancel', { requestId })
+          .catch(error => console.warn('[browser-control] cancelling action:', error));
+      };
+      try {
+        const view = await waitForView();
+        controller.signal.throwIfAborted();
+        if (!view) throw new Error('The browser panel is not ready');
+        controller.signal.addEventListener('abort', cancel, { once: true });
+        return await invokeDesktopCommand('desktop_browser_playwright', {
+          webContentsId: view.getWebContentsId(),
+          input: { tool: parameters.tool, arguments: parameters.arguments },
+          requestId,
+          directory: spaceIdOfDirectory(directory) === null ? directory : null,
+        });
+      } finally {
+        controller.signal.removeEventListener('abort', cancel);
+        playwrightRequests.current.delete(requestId);
+      }
+    }
     const webview = await waitForView();
     if (!webview) throw new Error('The browser panel is not ready');
 
@@ -717,7 +746,7 @@ const WebviewBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory: tab
       await waitForIdle();
     }
     return result;
-  }, [annotationHost, loadUrl, settlePage, waitForIdle, waitForQuiet, waitForView]);
+  }, [annotationHost, directory, loadUrl, settlePage, waitForIdle, waitForQuiet, waitForView]);
 
   // The agent works this page while the user types elsewhere in the app.
   const guardAgentAction = useWebviewFocusGuard(webviewElement, stageRef);
