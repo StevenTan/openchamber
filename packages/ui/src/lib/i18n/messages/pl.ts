@@ -36,6 +36,7 @@ import { openchamberToolsLayoutI18n } from './openchamber-tools-layout.i18n';
 import { openchamberToolOutputI18n } from './openchamber-tool-output.i18n';
 import { opencodeToolOutputI18n } from './opencode-tool-output.i18n';
 import { agentStatusI18n } from './agent-status.i18n';
+import { androidWidgetsI18n } from './android-widgets.i18n';
 import { selectionApprovalI18n } from './selection-approval.i18n';
 import { snippetsI18n } from './snippets.i18n';
 import { sidebarWorkI18n } from './sidebar-work.i18n';
@@ -223,6 +224,7 @@ export const dict: Record<I18nKey, string> = {
   ...openchamberToolOutputI18n.pl,
   ...opencodeToolOutputI18n.pl,
   ...agentStatusI18n.pl,
+  ...androidWidgetsI18n.pl,
   ...snippetsI18n.pl,
   ...sidebarWorkI18n.pl,
   ...sidebarSectionsI18n.pl,
@@ -3697,6 +3699,8 @@ export const dict: Record<I18nKey, string> = {
   'chat.workStatus.telemetry.toolDurationDescription': 'Czas wykonywania narzędzi, także nieudanych wywołań. Narzędzia działające równolegle liczymy czasowo tylko raz.',
   'chat.workStatus.telemetry.ttft': 'Średni TTFT',
   'chat.workStatus.telemetry.ttftDescription': 'Średnie oczekiwanie na pierwszy tekst lub rozumowanie w każdym kroku modelu. Ukryte, gdy choć jeden krok nie ma startu po utworzeniu, co często dotyczy kroków z samymi narzędziami i części oznaczonych tylko czasem utworzenia.',
+  'chat.workStatus.telemetry.firstOutput': 'Średni pierwszy wynik',
+  'chat.workStatus.telemetry.firstOutputDescription': 'Średni czas od początku każdego kroku modelu do jego pierwszego wyniku dowolnego rodzaju: tekstu, rozumowania lub wywołania narzędzia. W odróżnieniu od TTFT liczą się też kroki zaczynające się od wywołania narzędzia. Ukryte dla kroków z OpenCode starszego niż 2.3.0.',
   'chat.workStatus.telemetry.steps': 'Kroki',
   'chat.workStatus.telemetry.stepsDescription': 'Liczba wywołań modelu dla tego promptu. Odczytanie wyniku narzędzia i decyzja o dalszym działaniu zwykle wymaga kolejnego kroku.',
   'chat.workStatus.telemetry.tokens': 'Tokeny',

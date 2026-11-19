@@ -36,6 +36,7 @@ import { openchamberToolsLayoutI18n } from './openchamber-tools-layout.i18n';
 import { openchamberToolOutputI18n } from './openchamber-tool-output.i18n';
 import { opencodeToolOutputI18n } from './opencode-tool-output.i18n';
 import { agentStatusI18n } from './agent-status.i18n';
+import { androidWidgetsI18n } from './android-widgets.i18n';
 import { selectionApprovalI18n } from './selection-approval.i18n';
 import { snippetsI18n } from './snippets.i18n';
 import { sidebarWorkI18n } from './sidebar-work.i18n';
@@ -233,6 +234,7 @@ export const dict: Record<I18nKey, string> = {
   ...openchamberToolOutputI18n.uk,
   ...opencodeToolOutputI18n.uk,
   ...agentStatusI18n.uk,
+  ...androidWidgetsI18n.uk,
   ...snippetsI18n.uk,
   ...sidebarWorkI18n.uk,
   ...sidebarSectionsI18n.uk,
@@ -3683,6 +3685,8 @@ export const dict: Record<I18nKey, string> = {
   'chat.workStatus.telemetry.toolDurationDescription': 'Час виконання інструментів, включно з невдалими викликами. Паралельне виконання рахується один раз, а не додається кілька разів.',
   'chat.workStatus.telemetry.ttft': 'Середній TTFT',
   'chat.workStatus.telemetry.ttftDescription': 'Середнє очікування до початку тексту або міркувань на кожному кроці моделі. Не показуємо, якщо хоча б один крок не має початку після створення, як часто буває з кроками лише з інструментами та з частинами, позначеними часом створення.',
+  'chat.workStatus.telemetry.firstOutput': 'Середній перший вивід',
+  'chat.workStatus.telemetry.firstOutputDescription': 'Середнє очікування від початку кожного кроку моделі до її першого виводу будь-якого типу: тексту, міркувань або виклику інструмента. На відміну від TTFT, кроки, що починаються з виклику інструмента, теж рахуються. Не показуємо для кроків з OpenCode, старішого за 2.3.0.',
   'chat.workStatus.telemetry.steps': 'Кроки',
   'chat.workStatus.telemetry.stepsDescription': 'Скільки разів зверталися до моделі для цього промпту. Прочитати результат інструмента й вирішити, що робити далі, зазвичай означає ще один крок.',
   'chat.workStatus.telemetry.tokens': 'Токени',

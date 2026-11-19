@@ -34,6 +34,7 @@ import { openchamberToolsLayoutI18n } from './openchamber-tools-layout.i18n';
 import { openchamberToolOutputI18n } from './openchamber-tool-output.i18n';
 import { opencodeToolOutputI18n } from './opencode-tool-output.i18n';
 import { agentStatusI18n } from './agent-status.i18n';
+import { androidWidgetsI18n } from './android-widgets.i18n';
 import { selectionApprovalI18n } from './selection-approval.i18n';
 import { snippetsI18n } from './snippets.i18n';
 import { sidebarWorkI18n } from './sidebar-work.i18n';
@@ -223,6 +224,7 @@ export const dict = {
   ...openchamberToolOutputI18n.nl,
   ...opencodeToolOutputI18n.nl,
   ...agentStatusI18n.nl,
+  ...androidWidgetsI18n.nl,
   ...snippetsI18n.nl,
   ...sidebarWorkI18n.nl,
   ...sidebarSectionsI18n.nl,
@@ -3694,6 +3696,8 @@ export const dict = {
   'chat.workStatus.telemetry.toolDurationDescription': 'Tijd die is besteed aan het uitvoeren van tools, inclusief mislukte aanroepen. Tools die tegelijkertijd draaien tellen één keer mee en worden niet opgeteld.',
   'chat.workStatus.telemetry.ttft': 'Gemiddelde TTFT',
   'chat.workStatus.telemetry.ttftDescription': 'Gemiddelde wachttijd voordat de eerste tekst of het redeneren in elke modelstap begint. Verborgen zodra een stap na het aanmaken geen start heeft, wat vaak voorkomt bij stappen met alleen tools en bij delen die alleen hun aanmaaktijd dragen.',
+  'chat.workStatus.telemetry.firstOutput': 'Gemiddelde eerste uitvoer',
+  'chat.workStatus.telemetry.firstOutputDescription': 'Gemiddelde wachttijd vanaf het begin van elke modelstap tot de eerste uitvoer van welke soort ook: tekst, redenering of een toolaanroep. Anders dan bij TTFT tellen stappen die met een toolaanroep beginnen ook mee. Verborgen voor stappen uit OpenCode ouder dan 2.3.0.',
   'chat.workStatus.telemetry.steps': 'Stappen',
   'chat.workStatus.telemetry.stepsDescription': 'Hoe vaak het model voor deze prompt is aangeroepen. Het lezen van toolresultaten en het bepalen van de volgende stap kost meestal een extra stap.',
   'chat.workStatus.telemetry.tokens': 'Tokens',

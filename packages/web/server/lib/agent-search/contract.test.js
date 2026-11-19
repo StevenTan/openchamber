@@ -15,9 +15,13 @@ it('exposes one web.run tool with query operations only', async () => {
   const { default: plugin } = await import(pathToFileURL(path.join(directory, 'index.js')).href);
   await plugin.setup({
     options: {},
-    websearch: { transform: async transform => transform({ add() {}, default: { get: () => 'native', set() {} } }) },
-    tool: { transform: async transform => transform({ add: tool => tools.push(tool), namespace() {} }) },
+    websearch: {
+      providers: async () => ({ data: [{ id: 'native' }] }),
+      transform: async transform => transform({ add() {}, default: { get: () => 'native', set() {} } }),
+    },
+    tool: { transform: async transform => transform({ add: tool => tools.push(tool), remove() {}, namespace() {} }) },
     session: { hook: async () => {} },
+    event: { async *subscribe() {} },
   });
   expect(tools.map(tool => [tool.options.namespace, tool.name])).toEqual([['web', 'run']]);
   expect(Object.keys(tools[0].input.properties)).toEqual([

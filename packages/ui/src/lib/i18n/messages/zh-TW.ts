@@ -36,6 +36,7 @@ import { openchamberToolsLayoutI18n } from './openchamber-tools-layout.i18n';
 import { openchamberToolOutputI18n } from './openchamber-tool-output.i18n';
 import { opencodeToolOutputI18n } from './opencode-tool-output.i18n';
 import { agentStatusI18n } from './agent-status.i18n';
+import { androidWidgetsI18n } from './android-widgets.i18n';
 import { selectionApprovalI18n } from './selection-approval.i18n';
 import { snippetsI18n } from './snippets.i18n';
 import { sidebarWorkI18n } from './sidebar-work.i18n';
@@ -223,6 +224,7 @@ export const dict: Record<I18nKey, string> = {
   ...openchamberToolOutputI18n['zh-TW'],
   ...opencodeToolOutputI18n['zh-TW'],
   ...agentStatusI18n['zh-TW'],
+  ...androidWidgetsI18n['zh-TW'],
   ...snippetsI18n['zh-TW'],
   ...sidebarWorkI18n['zh-TW'],
   ...sidebarSectionsI18n['zh-TW'],
@@ -3692,6 +3694,8 @@ export const dict: Record<I18nKey, string> = {
   'chat.workStatus.telemetry.toolDurationDescription': '工具執行所用的時間，包括失敗的呼叫。多個工具同時執行的時間只計算一次，不重複相加。',
   'chat.workStatus.telemetry.ttft': '平均首字延遲',
   'chat.workStatus.telemetry.ttftDescription': '每個模型步驟開始輸出文字或推理前的平均等待時間。若任何步驟在建立後沒有開始時間，就不顯示。僅呼叫工具的步驟和只帶建立時間戳記的部分經常如此。',
+  'chat.workStatus.telemetry.firstOutput': '平均首次輸出',
+  'chat.workStatus.telemetry.firstOutputDescription': '從每個模型步驟開始到模型首次輸出任何內容（文字、推理或工具呼叫）的平均等待時間。與 TTFT 不同，以工具呼叫開始的步驟也會計入。OpenCode 2.3.0 之前的步驟不顯示。',
   'chat.workStatus.telemetry.steps': '步驟',
   'chat.workStatus.telemetry.stepsDescription': '處理這則提示時呼叫模型的次數。讀取工具結果並決定下一步通常需要再次呼叫模型。',
   'chat.workStatus.telemetry.tokens': 'Token',

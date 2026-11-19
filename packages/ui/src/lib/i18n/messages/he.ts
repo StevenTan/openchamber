@@ -34,6 +34,7 @@ import { openchamberToolsLayoutI18n } from './openchamber-tools-layout.i18n';
 import { openchamberToolOutputI18n } from './openchamber-tool-output.i18n';
 import { opencodeToolOutputI18n } from './opencode-tool-output.i18n';
 import { agentStatusI18n } from './agent-status.i18n';
+import { androidWidgetsI18n } from './android-widgets.i18n';
 import { selectionApprovalI18n } from './selection-approval.i18n';
 import { snippetsI18n } from './snippets.i18n';
 import { sidebarWorkI18n } from './sidebar-work.i18n';
@@ -3602,6 +3603,8 @@ export const dict = {
   'chat.workStatus.telemetry.toolDurationDescription': 'הזמן שבו רצו כלים, כולל קריאות שנכשלו. כלים שרצים במקביל נספרים פעם אחת ולא מתווספים זה לזה.',
   'chat.workStatus.telemetry.ttft': 'TTFT ממוצע',
   'chat.workStatus.telemetry.ttftDescription': 'ההמתנה הממוצעת עד שהטקסט או החשיבה הראשונים מתחילים בכל שלב של המודל. מוסתר כשלשלב אין התחלה אחרי שנוצר, מה שנפוץ בשלבים של כלים בלבד ובחלקים שחותמת הזמן שלהם נקבעה ברגע היצירה.',
+  'chat.workStatus.telemetry.firstOutput': 'פלט ראשון ממוצע',
+  'chat.workStatus.telemetry.firstOutputDescription': 'ההמתנה הממוצעת מתחילת כל שלב של המודל ועד הפלט הראשון שלו מכל סוג: טקסט, חשיבה או קריאה לכלי. בניגוד ל-TTFT, נספרים גם שלבים שמתחילים בקריאה לכלי. מוסתר עבור שלבים מ-OpenCode שקודם ל-2.3.0.',
   'chat.workStatus.telemetry.steps': 'שלבים',
   'chat.workStatus.telemetry.stepsDescription': 'כמה פעמים נקרא המודל עבור ההנחיה הזו. קריאת תוצאות הכלים וההחלטה מה לעשות הלאה דורשות בדרך כלל שלב נוסף.',
   'chat.workStatus.telemetry.tokens': 'טוקנים',
@@ -3951,6 +3954,7 @@ export const dict = {
   ...openchamberToolOutputI18n.he,
   ...opencodeToolOutputI18n.he,
   ...agentStatusI18n.he,
+  ...androidWidgetsI18n.he,
   ...snippetsI18n.he,
   ...sidebarWorkI18n.he,
   ...sidebarSectionsI18n.he,

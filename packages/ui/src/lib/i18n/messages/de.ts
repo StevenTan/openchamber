@@ -34,6 +34,7 @@ import { openchamberToolsLayoutI18n } from './openchamber-tools-layout.i18n';
 import { openchamberToolOutputI18n } from './openchamber-tool-output.i18n';
 import { opencodeToolOutputI18n } from './opencode-tool-output.i18n';
 import { agentStatusI18n } from './agent-status.i18n';
+import { androidWidgetsI18n } from './android-widgets.i18n';
 import { selectionApprovalI18n } from './selection-approval.i18n';
 import { snippetsI18n } from './snippets.i18n';
 import { sidebarWorkI18n } from './sidebar-work.i18n';
@@ -223,6 +224,7 @@ export const dict = {
   ...openchamberToolOutputI18n.de,
   ...opencodeToolOutputI18n.de,
   ...agentStatusI18n.de,
+  ...androidWidgetsI18n.de,
   ...snippetsI18n.de,
   ...sidebarWorkI18n.de,
   ...sidebarSectionsI18n.de,
@@ -3691,6 +3693,8 @@ export const dict = {
   'chat.workStatus.telemetry.toolDurationDescription': 'Laufzeit der Werkzeuge einschließlich fehlgeschlagener Aufrufe. Parallel laufende Werkzeuge zählen zeitlich nur einmal.',
   'chat.workStatus.telemetry.ttft': 'Mittlere TTFT',
   'chat.workStatus.telemetry.ttftDescription': 'Mittlere Wartezeit bis zum ersten Text oder Denkabschnitt jedes Modellschritts. Ausgeblendet, wenn ein Schritt nach seiner Erstellung keinen Start hat. Das ist bei reinen Werkzeugschritten häufig und bei Teilen, die nur mit ihrer Erstellungszeit versehen sind.',
+  'chat.workStatus.telemetry.firstOutput': 'Ø erste Ausgabe',
+  'chat.workStatus.telemetry.firstOutputDescription': 'Durchschnittliche Wartezeit vom Beginn jedes Modellschritts bis zur ersten Ausgabe des Modells: Text, Reasoning oder ein Tool-Aufruf. Anders als bei TTFT zählen auch Schritte, die mit einem Tool-Aufruf beginnen. Für Schritte aus OpenCode vor 2.3.0 ausgeblendet.',
   'chat.workStatus.telemetry.steps': 'Schritte',
   'chat.workStatus.telemetry.stepsDescription': 'Wie oft das Modell für diesen Prompt aufgerufen wurde. Werkzeugergebnisse lesen und den nächsten Schritt entscheiden erfordert meist einen weiteren Aufruf.',
   'chat.workStatus.telemetry.tokens': 'Tokens',

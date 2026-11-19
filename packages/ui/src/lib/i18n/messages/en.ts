@@ -34,6 +34,7 @@ import { openchamberToolsLayoutI18n } from './openchamber-tools-layout.i18n';
 import { openchamberToolOutputI18n } from './openchamber-tool-output.i18n';
 import { opencodeToolOutputI18n } from './opencode-tool-output.i18n';
 import { agentStatusI18n } from './agent-status.i18n';
+import { androidWidgetsI18n } from './android-widgets.i18n';
 import { selectionApprovalI18n } from './selection-approval.i18n';
 import { snippetsI18n } from './snippets.i18n';
 import { sidebarWorkI18n } from './sidebar-work.i18n';
@@ -223,6 +224,7 @@ export const dict = {
   ...openchamberToolOutputI18n.en,
   ...opencodeToolOutputI18n.en,
   ...agentStatusI18n.en,
+  ...androidWidgetsI18n.en,
   ...snippetsI18n.en,
   ...sidebarWorkI18n.en,
   ...sidebarSectionsI18n.en,
@@ -3694,6 +3696,8 @@ export const dict = {
   'chat.workStatus.telemetry.toolDurationDescription': 'Time spent running tools, including failed calls. Tools running at the same time are counted once, not added together.',
   'chat.workStatus.telemetry.ttft': 'Average TTFT',
   'chat.workStatus.telemetry.ttftDescription': 'Average wait before the first text or reasoning starts in each model step. Hidden when a step has no start after it was created, which is common for tool-only steps and for parts stamped at creation time.',
+  'chat.workStatus.telemetry.firstOutput': 'Average first output',
+  'chat.workStatus.telemetry.firstOutputDescription': 'Average wait from the start of each model step until the model sends anything: text, reasoning or a tool call. Unlike TTFT, steps that open with a tool call count too. Hidden for steps from OpenCode older than 2.3.0.',
   'chat.workStatus.telemetry.steps': 'Steps',
   'chat.workStatus.telemetry.stepsDescription': 'How many times the model was called for this prompt. Reading tool results and deciding what to do next usually takes another step.',
   'chat.workStatus.telemetry.tokens': 'Tokens',

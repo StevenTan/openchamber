@@ -36,6 +36,7 @@ import { openchamberToolsLayoutI18n } from './openchamber-tools-layout.i18n';
 import { openchamberToolOutputI18n } from './openchamber-tool-output.i18n';
 import { opencodeToolOutputI18n } from './opencode-tool-output.i18n';
 import { agentStatusI18n } from './agent-status.i18n';
+import { androidWidgetsI18n } from './android-widgets.i18n';
 import { selectionApprovalI18n } from './selection-approval.i18n';
 import { snippetsI18n } from './snippets.i18n';
 import { sidebarWorkI18n } from './sidebar-work.i18n';
@@ -223,6 +224,7 @@ export const dict: Record<I18nKey, string> = {
   ...openchamberToolOutputI18n.ja,
   ...opencodeToolOutputI18n.ja,
   ...agentStatusI18n.ja,
+  ...androidWidgetsI18n.ja,
   ...snippetsI18n.ja,
   ...sidebarWorkI18n.ja,
   ...sidebarSectionsI18n.ja,
@@ -3692,6 +3694,8 @@ export const dict: Record<I18nKey, string> = {
   'chat.workStatus.telemetry.toolDurationDescription': '失敗した呼び出しも含むツールの実行時間です。同時に動いたツールの時間は重複して加算しません。',
   'chat.workStatus.telemetry.ttft': '平均 TTFT',
   'chat.workStatus.telemetry.ttftDescription': '各モデルステップで最初のテキストや推論が始まるまでの平均待ち時間です。作成後に開始時刻がないステップがあれば表示しません。ツールのみのステップや、作成時刻だけが記録されたパートでよく起こります。',
+  'chat.workStatus.telemetry.firstOutput': '平均初回出力',
+  'chat.workStatus.telemetry.firstOutputDescription': '各モデルステップの開始から、テキスト・推論・ツール呼び出しのいずれかの最初の出力までの平均待ち時間。TTFT と異なり、ツール呼び出しで始まるステップも含みます。OpenCode 2.3.0 より前のステップでは表示されません。',
   'chat.workStatus.telemetry.steps': 'ステップ数',
   'chat.workStatus.telemetry.stepsDescription': 'このプロンプトでモデルを呼び出した回数です。ツールの結果を読み、次の処理を決める際は通常もう一度呼び出します。',
   'chat.workStatus.telemetry.tokens': 'トークン',

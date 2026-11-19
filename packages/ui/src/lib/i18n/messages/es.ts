@@ -36,6 +36,7 @@ import { openchamberToolsLayoutI18n } from './openchamber-tools-layout.i18n';
 import { openchamberToolOutputI18n } from './openchamber-tool-output.i18n';
 import { opencodeToolOutputI18n } from './opencode-tool-output.i18n';
 import { agentStatusI18n } from './agent-status.i18n';
+import { androidWidgetsI18n } from './android-widgets.i18n';
 import { selectionApprovalI18n } from './selection-approval.i18n';
 import { snippetsI18n } from './snippets.i18n';
 import { sidebarWorkI18n } from './sidebar-work.i18n';
@@ -233,6 +234,7 @@ export const dict: Record<I18nKey, string> = {
   ...openchamberToolOutputI18n.es,
   ...opencodeToolOutputI18n.es,
   ...agentStatusI18n.es,
+  ...androidWidgetsI18n.es,
   ...snippetsI18n.es,
   ...sidebarWorkI18n.es,
   ...sidebarSectionsI18n.es,
@@ -3683,6 +3685,8 @@ export const dict: Record<I18nKey, string> = {
   'chat.workStatus.telemetry.toolDurationDescription': 'Tiempo de ejecución de herramientas, incluidas las llamadas fallidas. Las herramientas que se ejecutan a la vez cuentan una sola vez.',
   'chat.workStatus.telemetry.ttft': 'TTFT medio',
   'chat.workStatus.telemetry.ttftDescription': 'Espera media hasta el primer texto o razonamiento de cada paso del modelo. Se oculta si algún paso no tiene un inicio posterior a su creación, algo habitual en pasos que solo llaman a herramientas y en partes marcadas con su hora de creación.',
+  'chat.workStatus.telemetry.firstOutput': 'Primera salida media',
+  'chat.workStatus.telemetry.firstOutputDescription': 'Espera media desde el inicio de cada paso del modelo hasta su primera salida de cualquier tipo: texto, razonamiento o una llamada a herramienta. A diferencia del TTFT, también cuentan los pasos que empiezan con una llamada a herramienta. Se oculta para pasos de OpenCode anteriores a 2.3.0.',
   'chat.workStatus.telemetry.steps': 'Pasos',
   'chat.workStatus.telemetry.stepsDescription': 'Cuántas veces se llamó al modelo para este prompt. Leer el resultado de una herramienta y decidir qué hacer suele requerir otro paso.',
   'chat.workStatus.telemetry.tokens': 'Tokens',
