@@ -19,6 +19,11 @@ Agent action routing and native execution are described in
   Reduced motion places the cursor directly at its target.
 - Motion updates transforms outside React. Frame work ends when the cursor
   reaches its target; resizing and later pointer events refresh its position.
+- Agent tabs share the panel's browser profile and native dialogs remain under
+  user control. Page operations use the official Playwright MCP tools.
+- Browser recency and agent activity belong to the layout across its retained
+  workspaces. Agent tabs sleep after 30 minutes without an action or a visible
+  page; opening or driving a sleeping tab loads its saved address again.
 
 ## Decisions
 

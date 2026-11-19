@@ -1117,6 +1117,7 @@ const WebviewBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory: tab
           colorScheme={colorScheme}
           onColorSchemeChange={applyColorScheme}
           scale={layout?.scale ?? 1}
+          panelSize={stageSize}
         />
       ) : null}
       <div

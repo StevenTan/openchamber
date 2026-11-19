@@ -39,6 +39,7 @@ const {
   registerBrowserOpener,
   registerSleepingBrowserTab,
   setShownBrowserTab,
+  registerBrowserTabActivity,
 } = await import('./controlClient');
 
 /** A request from an older server or a caller with no session. */
@@ -109,6 +110,16 @@ describe('Playwright request lifetime', () => {
     await wait(50);
     expect(posted[0]?.ok).toBe(false);
     expect(posted[0]?.error).toContain('2 MB response limit');
+  });
+
+  test('reports Playwright activity for the tab that runs the action', async () => {
+    const used: Array<[string, string]> = [];
+    cleanups.push(registerBrowserTabActivity((directory, tabId) => { used.push([directory, tabId]); }));
+    cleanups.push(tab('agent-active', [], { directory: '/other', ownerSessionId: 'ses_a' }));
+    emit('browser.playwright', { tabId: 'agent-active', tool: 'browser_snapshot', arguments: {} }, { directory: '/other', sessionId: 'ses_a' });
+    await wait(50);
+    expect(used).toEqual([['/other', 'agent-active']]);
+    expect(posted[0]?.ok).toBe(true);
   });
 });
 

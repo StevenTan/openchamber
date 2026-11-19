@@ -141,6 +141,7 @@ let shownTabId: string | null = null;
 const lastTabBySession = new Map<string, string>();
 let opener: BrowserOpener | null = null;
 let closer: BrowserCloser | null = null;
+let activityListener: ((directory: string, tabId: string) => void) | null = null;
 let unsubscribe: (() => void) | null = null;
 
 /**
@@ -616,6 +617,7 @@ const runAction = async (
   parameters: BrowserControlRequest['parameters'],
   requestId: string,
 ): Promise<{ ok: boolean; data?: unknown; error?: string }> => {
+  activityListener?.(controller.directory, controller.tabId);
   try {
     if (action === 'browser.playwright') {
       const pending = pageRequests.get(requestId)!;
@@ -686,6 +688,14 @@ export const registerSleepingBrowserTab = (tab: SleepingBrowserTab): (() => void
 export const setShownBrowserTab = (directory: string, tabId: string | null): void => {
   shownDirectory = directory;
   if (tabId) shownTabId = tabId;
+};
+
+/** Registers the panel's listener for agent actions run in a tab. */
+export const registerBrowserTabActivity = (listener: (directory: string, tabId: string) => void): (() => void) => {
+  activityListener = listener;
+  return () => {
+    if (activityListener === listener) activityListener = null;
+  };
 };
 
 /** Registers the app-level fallback that can open a browser tab on demand. */

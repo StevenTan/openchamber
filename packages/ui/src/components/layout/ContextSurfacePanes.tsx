@@ -16,8 +16,8 @@ import { resolvePlanRequestOwner } from '@/hooks/useProjectContextOwner';
 import { isRightToLeft, useI18n } from '@/lib/i18n';
 import { resolveProjectContextId } from '@/lib/projectContextApi';
 import { cn } from '@/lib/utils';
-import { registerBrowserCloser, registerBrowserOpener, registerSleepingBrowserTab, setShownBrowserTab } from '@/lib/browser/controlClient';
-import { pickLiveBrowserTabs, touchRecentBrowserTab } from '@/lib/browser/liveTabs';
+import { registerBrowserCloser, registerBrowserOpener, registerBrowserTabActivity, registerSleepingBrowserTab, setShownBrowserTab } from '@/lib/browser/controlClient';
+import { AGENT_TAB_IDLE_MS, dropIdleAgentTabs, pickLiveBrowserTabs, touchRecentBrowserTab } from '@/lib/browser/liveTabs';
 import { subscribeOpenchamberEvents } from '@/lib/openchamberEvents';
 import { useGuestsStore } from '@/lib/guests/store';
 import { guestHasSharedSurface, guestSurfaceDocking, type GuestSurfaceDocking } from '@/lib/guests/surfaces';
@@ -57,7 +57,12 @@ const DiffView = lazyWithChunkRecovery(() => import('@/components/views/DiffView
 const FilesView = lazyWithChunkRecovery(() => import('@/components/views/FilesView').then((m) => ({ default: m.FilesView })));
 const GuestPanelContent = React.lazy(() => import('./GuestPanelContent').then((module) => ({ default: module.GuestPanelContent })));
 
-type BrowserRecency = { recent: readonly string[]; setRecent: React.Dispatch<React.SetStateAction<readonly string[]>> };
+type BrowserRecency = {
+  recent: readonly string[];
+  setRecent: React.Dispatch<React.SetStateAction<readonly string[]>>;
+  lastUsed: Map<string, number>;
+  shown: Set<string>;
+};
 const BrowserRecencyContext = React.createContext<BrowserRecency | null>(null);
 
 /** A browser tab with the project it belongs to, which may not be the one on screen. */
@@ -71,6 +76,8 @@ type PanelBrowserTab = {
 
 /** One browser tab across projects: the same id in another project is another tab. */
 const browserTabRenderKey = (directory: string, tabId: string): string => `${directory}\u0000${tabId}`;
+/** How often idle agent tabs are put to sleep. */
+const AGENT_TAB_IDLE_SWEEP_MS = 60_000;
 
 // The editor surface's file-tree column: docked on the side the user picked
 // (`fileTreeSide`, right by default), resizable from the edge that faces the
@@ -240,7 +247,28 @@ const ZonePane: React.FC<{
 export const ContextSurfacePanes: React.FC = () => {
   const owner = useUIStore((state) => state.panelWorkspaceOwnerId);
   const [recent, setRecent] = React.useState<readonly string[]>([]);
-  const recency = React.useMemo(() => ({ recent, setRecent }), [recent]);
+  const lastUsed = React.useRef(new Map<string, number>());
+  const shown = React.useRef(new Set<string>());
+  const recency = React.useMemo(() => ({ recent, setRecent, lastUsed: lastUsed.current, shown: shown.current }), [recent]);
+  React.useEffect(() => registerBrowserTabActivity((directory, tabId) => {
+    lastUsed.current.set(browserTabRenderKey(directory, tabId), Date.now());
+  }), []);
+  React.useEffect(() => {
+    const interval = window.setInterval(() => {
+      const now = Date.now();
+      for (const key of shown.current) lastUsed.current.set(key, now);
+      const agentTabs = new Set<string>();
+      for (const workspace of Object.values(useUIStore.getState().panelWorkspaces)) {
+        for (const [directory, panel] of Object.entries(workspace.contextPanelByDirectory)) {
+          for (const tab of panel.tabs) {
+            if (tab.mode === 'browser' && tab.ownerSessionId !== null) agentTabs.add(browserTabRenderKey(directory, tab.id));
+          }
+        }
+      }
+      setRecent((current) => dropIdleAgentTabs(current, agentTabs, lastUsed.current, now - AGENT_TAB_IDLE_MS));
+    }, AGENT_TAB_IDLE_SWEEP_MS);
+    return () => window.clearInterval(interval);
+  }, []);
   const records = useUIStore((state) => state.panelWorkspaces);
   const directory = useEffectiveDirectory() ?? '';
   const workspaces = usePanelWorkspaceMounts((state) => state.entries);
@@ -387,16 +415,18 @@ const WorkspaceSurfacePanes: React.FC = () => {
   // A browser tab loads its page only once it is needed: shown in an open
   // zone, opened by the agent, or woken by an agent action. Tabs restored
   // from a previous run otherwise stay asleep, since every loaded tab costs a
-  // Chromium process. An agent's tab stays loaded until it is closed; the
+  // Chromium process. An agent's tab sleeps after `AGENT_TAB_IDLE_MS`; the
   // user's own tabs, in every project together, keep their page only while
   // among the `liveBrowserTabLimit` most recently used (`liveTabs.ts`).
   const browserRecency = React.useContext(BrowserRecencyContext);
   if (!browserRecency) throw new Error('Panel browser recency provider is missing');
-  const { recent: recentBrowserTabs, setRecent: setRecentBrowserTabs } = browserRecency;
+  const { recent: recentBrowserTabs, setRecent: setRecentBrowserTabs, lastUsed: browserTabLastUsed, shown: shownBrowserTabs } = browserRecency;
   const allWorkspaces = useUIStore((state) => state.panelWorkspaces);
   const wakeBrowserTab = React.useCallback((directory: string, tabId: string) => {
-    setRecentBrowserTabs((current) => touchRecentBrowserTab(current, browserTabRenderKey(directory, tabId)));
-  }, [setRecentBrowserTabs]);
+    const key = browserTabRenderKey(directory, tabId);
+    browserTabLastUsed.set(key, Date.now());
+    setRecentBrowserTabs((current) => touchRecentBrowserTab(current, key));
+  }, [browserTabLastUsed, setRecentBrowserTabs]);
   const liveBrowserTabLimit = useUIStore((state) => state.liveBrowserTabLimit);
 
   // The agent asked for a saved plan to be shown: it opens in place in the
@@ -510,6 +540,12 @@ const WorkspaceSurfacePanes: React.FC = () => {
   React.useEffect(() => {
     if (visibleBrowserTabId && directoryKey) wakeBrowserTab(directoryKey, visibleBrowserTabId);
   }, [directoryKey, visibleBrowserTabId, wakeBrowserTab]);
+  React.useEffect(() => {
+    if (!visibleBrowserTabId || !directoryKey) return;
+    const key = browserTabRenderKey(directoryKey, visibleBrowserTabId);
+    shownBrowserTabs.add(key);
+    return () => { shownBrowserTabs.delete(key); };
+  }, [directoryKey, shownBrowserTabs, visibleBrowserTabId]);
   // The browser tabs agents can reach: this project's, and every other
   // project's agent tabs, so a session working in a project the user is not
   // looking at keeps its page. The user's own tabs in other projects stay
@@ -537,7 +573,7 @@ const WorkspaceSurfacePanes: React.FC = () => {
         const key = browserTabRenderKey(directory, tab.id);
         const isUserTab = tab.ownerSessionId === null;
         const isLoaded = (isShownDirectory && tab.id === visibleBrowserTabId)
-          || (isUserTab ? liveUserTabs.has(key) : recent.has(key) || wasBrowserTabOpenedWithAddress(directory, tab.id));
+          || (isUserTab ? liveUserTabs.has(key) : recent.has(key) || (!browserTabLastUsed.has(key) && wasBrowserTabOpenedWithAddress(directory, tab.id)));
         if (!isLoaded && !isShownDirectory && isUserTab) continue;
         const entry = { directory, id: tab.id, targetPath: tab.targetPath, ownerSessionId: tab.ownerSessionId, targetDirectory: tab.targetDirectory };
         (isLoaded ? loaded : sleeping).push(entry);
@@ -545,13 +581,17 @@ const WorkspaceSurfacePanes: React.FC = () => {
     }
     loaded.sort((a, b) => (browserTabRenderKey(a.directory, a.id) < browserTabRenderKey(b.directory, b.id) ? -1 : 1));
     return { loadedBrowserTabs: loaded, sleepingBrowserTabs: sleeping };
-  }, [contextPanelByDirectory, directoryKey, liveBrowserTabLimit, recentBrowserTabs, visibleBrowserTabId, workspaceActive, allWorkspaces]);
+  }, [contextPanelByDirectory, directoryKey, liveBrowserTabLimit, recentBrowserTabs, visibleBrowserTabId, workspaceActive, allWorkspaces, browserTabLastUsed]);
   React.useEffect(() => {
+    for (const tab of loadedBrowserTabs) {
+      const key = browserTabRenderKey(tab.directory, tab.id);
+      if (tab.ownerSessionId && !browserTabLastUsed.has(key)) browserTabLastUsed.set(key, Date.now());
+    }
     setRecentBrowserTabs((current) => {
       const missing = loadedBrowserTabs.filter((tab) => tab.ownerSessionId && !current.includes(browserTabRenderKey(tab.directory, tab.id)));
       return missing.length ? [...current, ...missing.map((tab) => browserTabRenderKey(tab.directory, tab.id))] : current;
     });
-  }, [loadedBrowserTabs, setRecentBrowserTabs]);
+  }, [loadedBrowserTabs, setRecentBrowserTabs, browserTabLastUsed]);
   React.useEffect(() => {
     // Only a Chromium host mounts views that agents can drive, so only it may
     // offer to wake a tab; anywhere else a claimed action could never run.

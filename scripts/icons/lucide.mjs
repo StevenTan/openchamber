@@ -186,6 +186,8 @@ export const lucideIconAliases = {
   "volume-up": "volume-2",
   window: "app-window",
   worktree: "folder-git-2",
+  "anticlockwise-2": "rotate-ccw",
+  "contrast-2": "contrast",
 };
 
 /** Brand and PDF-format marks retain their dedicated geometry. */
