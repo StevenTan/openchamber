@@ -30,6 +30,8 @@ import { compactionSettingsI18n } from './compaction-settings.i18n';
 import { heapSnapshotI18n } from './heap-snapshot.i18n';
 import { consoleBudgetsI18n } from './console-budgets.i18n';
 import { imageToolI18n } from './image-tool.i18n';
+import { sharePagesI18n } from './share-pages.i18n';
+import { receivedPagesI18n } from './received-pages.i18n';
 import { memoryDreamingI18n } from './memory-dreaming.i18n';
 import { usageToolI18n } from './usage-tool.i18n';
 import { openchamberToolsLayoutI18n } from './openchamber-tools-layout.i18n';
@@ -218,6 +220,8 @@ export const dict: Record<I18nKey, string> = {
   ...heapSnapshotI18n.ko,
   ...consoleBudgetsI18n.ko,
   ...imageToolI18n.ko,
+  ...sharePagesI18n.ko,
+  ...receivedPagesI18n.ko,
   ...memoryDreamingI18n.ko,
   ...usageToolI18n.ko,
   ...openchamberToolsLayoutI18n.ko,
@@ -2546,6 +2550,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.toast.opencodeRestartInterrupted.description': '응답이 진행 중인 동안 OpenCode가 다시 시작되었습니다. 계속하려면 메시지를 보내세요.',
   'chat.toast.opencodeRestartInterrupted.autoResumeDescription': '응답이 진행 중인 동안 OpenCode가 다시 시작되었습니다. 채팅은 자동으로 이어집니다. 이어지지 않으면 메시지를 보내세요.',
   'chat.toast.opencodeRestartInterrupted.openSession': '세션 열기',
+  'chat.toast.shareAnswer.openSession': '세션 열기',
   'chat.errorBoundary.title': '채팅 오류',
   'chat.errorBoundary.description': '채팅 인터페이스에서 오류가 발생했습니다. 일시적인 네트워크 이슈 또는 손상된 메시지 데이터 때문일 수 있습니다.',
   'chat.errorBoundary.sessionLabel': '세션',
@@ -3123,8 +3128,8 @@ export const dict: Record<I18nKey, string> = {
   'projects.sharedTrust.actions': '작업',
   'projects.sharedTrust.skip': '이번에는 건너뛰기',
   'projects.sharedTrust.trust': '신뢰하고 실행',
-  'projects.opencodeTrust.title': 'OpenCode가 이 폴더의 코드를 실행하도록 허용할까요?',
-  'projects.opencodeTrust.description': 'OpenCode는 폴더를 여는 즉시 {path} 설정에 있는 플러그인과 명령을 실행합니다. 한 번 신뢰하면 OpenChamber는 변경될 때만 다시 묻습니다.',
+  'projects.opencodeTrust.title': '이 폴더의 OpenCode 설정을 신뢰할까요?',
+  'projects.opencodeTrust.description': 'OpenCode는 폴더를 여는 즉시 {path} 설정에서 아래 내용을 모두 적용합니다. 한 번 신뢰하면 OpenChamber는 이것이 변경될 때만 다시 묻습니다.',
   'projects.opencodeTrust.plugins': '플러그인',
   'projects.opencodeTrust.commands': '명령',
   'projects.opencodeTrust.kind.package': '{name} (npm 패키지)',
@@ -3133,6 +3138,12 @@ export const dict: Record<I18nKey, string> = {
   'projects.opencodeTrust.kind.lsp': '언어 서버 {name}',
   'projects.opencodeTrust.kind.formatter': '포매터 {name}',
   'projects.opencodeTrust.kind.shell': '셸',
+  'projects.opencodeTrust.kind.env': '환경 변수 {name}',
+  'projects.opencodeTrust.kind.file': '파일 {path}',
+  'projects.opencodeTrust.values': '외부로 보낼 수 있는 이 컴퓨터의 값',
+  'projects.opencodeTrust.permissions': '허용하는 권한',
+  'projects.opencodeTrust.permission.agent': '에이전트 {name}',
+  'projects.opencodeTrust.permission.everyAgent': '모든 에이전트',
   'projects.opencodeTrust.paused': '신뢰하지 않으면 이 폴더에서 에이전트가 작동하지 않지만, 파일과 Git 변경 사항은 계속 볼 수 있습니다.',
   'projects.opencodeTrust.skip': '이번에는 안 함',
   'projects.opencodeTrust.trust': '신뢰하고 열기',

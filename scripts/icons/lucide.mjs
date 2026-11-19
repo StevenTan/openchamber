@@ -20,6 +20,7 @@ export const lucideIconAliases = {
   "bank-card": "credit-card",
   "bar-chart-box": "chart-column",
   booklet: "notebook",
+  pages: "files",
   "box-3": "box",
   "brain-4": "brain",
   "brain-ai-3": "brain-circuit",

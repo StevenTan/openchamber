@@ -30,6 +30,8 @@ import { compactionSettingsI18n } from './compaction-settings.i18n';
 import { heapSnapshotI18n } from './heap-snapshot.i18n';
 import { consoleBudgetsI18n } from './console-budgets.i18n';
 import { imageToolI18n } from './image-tool.i18n';
+import { sharePagesI18n } from './share-pages.i18n';
+import { receivedPagesI18n } from './received-pages.i18n';
 import { memoryDreamingI18n } from './memory-dreaming.i18n';
 import { usageToolI18n } from './usage-tool.i18n';
 import { openchamberToolsLayoutI18n } from './openchamber-tools-layout.i18n';
@@ -218,6 +220,8 @@ export const dict: Record<I18nKey, string> = {
   ...heapSnapshotI18n['zh-TW'],
   ...consoleBudgetsI18n['zh-TW'],
   ...imageToolI18n['zh-TW'],
+  ...sharePagesI18n['zh-TW'],
+  ...receivedPagesI18n['zh-TW'],
   ...memoryDreamingI18n['zh-TW'],
   ...usageToolI18n['zh-TW'],
   ...openchamberToolsLayoutI18n['zh-TW'],
@@ -2523,6 +2527,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.toast.opencodeRestartInterrupted.description': 'OpenCode 在回覆仍在產生時重新啟動。傳送訊息以繼續。',
   'chat.toast.opencodeRestartInterrupted.autoResumeDescription': 'OpenCode 在回覆仍在產生時重新啟動。聊天將自動恢復；如果未恢復，請傳送一條訊息。',
   'chat.toast.opencodeRestartInterrupted.openSession': '開啟會話',
+  'chat.toast.shareAnswer.openSession': '開啟會話',
   'chat.errorBoundary.title': '聊天錯誤',
   'chat.errorBoundary.description': '聊天介面發生錯誤，可能是暫時網路問題或訊息資料損毀導致。',
   'chat.errorBoundary.sessionLabel': '會話',
@@ -3100,8 +3105,8 @@ export const dict: Record<I18nKey, string> = {
   'projects.sharedTrust.actions': '動作',
   'projects.sharedTrust.skip': '這次不執行',
   'projects.sharedTrust.trust': '信任並執行',
-  'projects.opencodeTrust.title': '允許 OpenCode 執行此資料夾中的程式碼？',
-  'projects.opencodeTrust.description': 'OpenCode 一開啟資料夾，就會執行 {path} 設定中的外掛與命令。信任一次後，只有在它們變更時 OpenChamber 才會再次詢問。',
+  'projects.opencodeTrust.title': '信任此資料夾中的 OpenCode 設定？',
+  'projects.opencodeTrust.description': 'OpenCode 一開啟資料夾，就會套用 {path} 設定中的以下全部內容。信任一次後，只有在這些變更時 OpenChamber 才會再次詢問。',
   'projects.opencodeTrust.plugins': '外掛',
   'projects.opencodeTrust.commands': '命令',
   'projects.opencodeTrust.kind.package': '{name}（npm 套件）',
@@ -3110,6 +3115,12 @@ export const dict: Record<I18nKey, string> = {
   'projects.opencodeTrust.kind.lsp': '語言伺服器 {name}',
   'projects.opencodeTrust.kind.formatter': '格式化工具 {name}',
   'projects.opencodeTrust.kind.shell': 'Shell',
+  'projects.opencodeTrust.kind.env': '環境變數 {name}',
+  'projects.opencodeTrust.kind.file': '檔案 {path}',
+  'projects.opencodeTrust.values': '它可能向外傳送的、你電腦上的值',
+  'projects.opencodeTrust.permissions': '它授予的權限',
+  'projects.opencodeTrust.permission.agent': '代理程式 {name}',
+  'projects.opencodeTrust.permission.everyAgent': '所有代理程式',
   'projects.opencodeTrust.paused': '不信任時，代理無法在此資料夾中工作，但仍可瀏覽其檔案與 Git 變更。',
   'projects.opencodeTrust.skip': '這次不要',
   'projects.opencodeTrust.trust': '信任並開啟',

@@ -30,6 +30,8 @@ import { compactionSettingsI18n } from './compaction-settings.i18n';
 import { heapSnapshotI18n } from './heap-snapshot.i18n';
 import { consoleBudgetsI18n } from './console-budgets.i18n';
 import { imageToolI18n } from './image-tool.i18n';
+import { sharePagesI18n } from './share-pages.i18n';
+import { receivedPagesI18n } from './received-pages.i18n';
 import { memoryDreamingI18n } from './memory-dreaming.i18n';
 import { usageToolI18n } from './usage-tool.i18n';
 import { openchamberToolsLayoutI18n } from './openchamber-tools-layout.i18n';
@@ -228,6 +230,8 @@ export const dict: Record<I18nKey, string> = {
   ...heapSnapshotI18n.es,
   ...consoleBudgetsI18n.es,
   ...imageToolI18n.es,
+  ...sharePagesI18n.es,
+  ...receivedPagesI18n.es,
   ...memoryDreamingI18n.es,
   ...usageToolI18n.es,
   ...openchamberToolsLayoutI18n.es,
@@ -2514,6 +2518,7 @@ export const dict: Record<I18nKey, string> = {
   "chat.toast.opencodeRestartInterrupted.description": "OpenCode se reinició mientras aún se estaba generando una respuesta. Envía un mensaje para continuar.",
   "chat.toast.opencodeRestartInterrupted.autoResumeDescription": "OpenCode se reinició mientras aún se estaba generando una respuesta. La conversación se reanudará automáticamente; envía un mensaje si no lo hace.",
   "chat.toast.opencodeRestartInterrupted.openSession": "Abrir sesión",
+  "chat.toast.shareAnswer.openSession": "Abrir sesión",
   "chat.errorBoundary.title": "Error en la conversación",
   "chat.errorBoundary.description": "La interfaz de la conversación encontró un error. Esto podría deberse a un problema de red temporal o a datos de mensaje corruptos.",
   "chat.errorBoundary.sessionLabel": "Sesión",
@@ -3079,8 +3084,8 @@ export const dict: Record<I18nKey, string> = {
   "projects.sharedTrust.actions": "Acciones",
   "projects.sharedTrust.skip": "Esta vez no",
   "projects.sharedTrust.trust": "Confiar y ejecutar",
-  "projects.opencodeTrust.title": "¿Permitir que OpenCode ejecute código de esta carpeta?",
-  "projects.opencodeTrust.description": "OpenCode ejecuta los plugins y comandos de la configuración de {path} en cuanto abre la carpeta. Confía una vez y OpenChamber solo volverá a preguntar cuando cambien.",
+  "projects.opencodeTrust.title": "¿Confiar en la configuración de OpenCode de esta carpeta?",
+  "projects.opencodeTrust.description": "OpenCode aplica todo lo de abajo desde la configuración de {path} en cuanto abre la carpeta. Confía una vez y OpenChamber solo volverá a preguntar cuando esto cambie.",
   "projects.opencodeTrust.plugins": "Plugins",
   "projects.opencodeTrust.commands": "Comandos",
   "projects.opencodeTrust.kind.package": "{name} (paquete npm)",
@@ -3089,6 +3094,12 @@ export const dict: Record<I18nKey, string> = {
   "projects.opencodeTrust.kind.lsp": "Servidor de lenguaje {name}",
   "projects.opencodeTrust.kind.formatter": "Formateador {name}",
   "projects.opencodeTrust.kind.shell": "Shell",
+  "projects.opencodeTrust.kind.env": "Variable de entorno {name}",
+  "projects.opencodeTrust.kind.file": "Archivo {path}",
+  "projects.opencodeTrust.values": "Valores de tu equipo que puede enviar fuera",
+  "projects.opencodeTrust.permissions": "Permisos que concede",
+  "projects.opencodeTrust.permission.agent": "Agente {name}",
+  "projects.opencodeTrust.permission.everyAgent": "Todos los agentes",
   "projects.opencodeTrust.paused": "Sin confianza, los agentes no pueden trabajar en esta carpeta, pero puedes seguir viendo sus archivos y cambios de Git.",
   "projects.opencodeTrust.skip": "Esta vez no",
   "projects.opencodeTrust.trust": "Confiar y abrir",

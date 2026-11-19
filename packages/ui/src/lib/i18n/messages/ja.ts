@@ -30,6 +30,8 @@ import { compactionSettingsI18n } from './compaction-settings.i18n';
 import { heapSnapshotI18n } from './heap-snapshot.i18n';
 import { consoleBudgetsI18n } from './console-budgets.i18n';
 import { imageToolI18n } from './image-tool.i18n';
+import { sharePagesI18n } from './share-pages.i18n';
+import { receivedPagesI18n } from './received-pages.i18n';
 import { memoryDreamingI18n } from './memory-dreaming.i18n';
 import { usageToolI18n } from './usage-tool.i18n';
 import { openchamberToolsLayoutI18n } from './openchamber-tools-layout.i18n';
@@ -218,6 +220,8 @@ export const dict: Record<I18nKey, string> = {
   ...heapSnapshotI18n.ja,
   ...consoleBudgetsI18n.ja,
   ...imageToolI18n.ja,
+  ...sharePagesI18n.ja,
+  ...receivedPagesI18n.ja,
   ...memoryDreamingI18n.ja,
   ...usageToolI18n.ja,
   ...openchamberToolsLayoutI18n.ja,
@@ -2542,6 +2546,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.toast.opencodeRestartInterrupted.description': '応答の生成中に OpenCode が再起動しました。続行するにはメッセージを送信してください。',
   'chat.toast.opencodeRestartInterrupted.autoResumeDescription': '応答の生成中に OpenCode が再起動しました。チャットは自動的に再開されます。再開しない場合はメッセージを送信してください。',
   'chat.toast.opencodeRestartInterrupted.openSession': 'セッションを開く',
+  'chat.toast.shareAnswer.openSession': 'セッションを開く',
   'chat.errorBoundary.title': 'チャットエラー',
   'chat.errorBoundary.description': 'チャットインターフェースでエラーが発生しました。一時的なネットワーク問題または破損したメッセージデータが原因の可能性があります。',
   'chat.errorBoundary.sessionLabel': 'セッション',
@@ -3122,8 +3127,8 @@ export const dict: Record<I18nKey, string> = {
   'projects.sharedTrust.actions': 'アクション',
   'projects.sharedTrust.skip': '今回は実行しない',
   'projects.sharedTrust.trust': '信頼して実行',
-  'projects.opencodeTrust.title': 'このフォルダーのコードを OpenCode に実行させますか？',
-  'projects.opencodeTrust.description': 'OpenCode はフォルダーを開いた時点で、{path} の設定にあるプラグインとコマンドを実行します。一度信頼すると、変更があった場合のみ OpenChamber が再度確認します。',
+  'projects.opencodeTrust.title': 'このフォルダーの OpenCode 設定を信頼しますか？',
+  'projects.opencodeTrust.description': 'OpenCode はフォルダーを開いた時点で、{path} の設定から以下のすべてを適用します。一度信頼すると、変更があった場合のみ OpenChamber が再度確認します。',
   'projects.opencodeTrust.plugins': 'プラグイン',
   'projects.opencodeTrust.commands': 'コマンド',
   'projects.opencodeTrust.kind.package': '{name}（npm パッケージ）',
@@ -3132,6 +3137,12 @@ export const dict: Record<I18nKey, string> = {
   'projects.opencodeTrust.kind.lsp': '言語サーバー {name}',
   'projects.opencodeTrust.kind.formatter': 'フォーマッター {name}',
   'projects.opencodeTrust.kind.shell': 'シェル',
+  'projects.opencodeTrust.kind.env': '環境変数 {name}',
+  'projects.opencodeTrust.kind.file': 'ファイル {path}',
+  'projects.opencodeTrust.values': '外部に送信される可能性のある、このマシンの値',
+  'projects.opencodeTrust.permissions': '許可される権限',
+  'projects.opencodeTrust.permission.agent': 'エージェント {name}',
+  'projects.opencodeTrust.permission.everyAgent': 'すべてのエージェント',
   'projects.opencodeTrust.paused': '信頼しない場合、このフォルダーではエージェントは動作しませんが、ファイルと Git の変更は引き続き閲覧できます。',
   'projects.opencodeTrust.skip': '今回は開かない',
   'projects.opencodeTrust.trust': '信頼して開く',

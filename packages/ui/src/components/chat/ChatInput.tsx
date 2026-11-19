@@ -5,7 +5,7 @@ import { useSourceControlDescriptorOf, useSourceControlProvider } from '@/lib/so
 import { ProviderIcon } from '@/components/sourceControl/ProviderIcon';
 import { ComposerDictation } from '@/components/dictation/ComposerDictation';
 // sessionStore removed — currentSessionId comes from useSessionUIStore
-import { useConfigStore } from '@/stores/useConfigStore';
+import { resolveModelMetadata, useConfigStore } from '@/stores/useConfigStore';
 import { filterVisibleAgents } from '@/stores/useAgentsStore';
 import { useUIStore } from '@/stores/useUIStore';
 import { isServerOwnedMessageQueue, createMessageQueueTarget, getMessageQueueKey, useMessageQueueStore, type QueuedContextPart, type QueuedMessage, type QueuedMessageGoal } from '@/stores/messageQueueStore';
@@ -257,6 +257,7 @@ import { useMessageHistory, type MessageHistoryValue } from './composer/state/us
 import type { PromptHistoryCandidate } from './composer/state/promptHistorySearch';
 import { registerPromptHistorySearchRoute } from './composer/state/promptHistorySearchRoute';
 import { useComposerDraft } from './composer/state/useComposerDraft';
+import { createComposerText, useComposerTextEffect, useComposerTextValue } from './composer/state/composerText';
 import { MentionCompletionState } from './composer/state/mentionCompletion';
 import { useFileMentionCheck } from './composer/state/useFileMentionCheck';
 import { useSessionDraftPublishing } from './composer/state/useSessionDraftPublishing';
@@ -286,6 +287,10 @@ import { PromptHistorySearchPanel } from './composer/ui/PromptHistorySearchPanel
 import { ComposerContextChips } from './composer/ui/ComposerContextChips';
 import { LargeTextPasteChoice, type LargeTextPasteChoiceAction } from './composer/ui/LargeTextPasteChoice';
 import { LinkedReferenceRow } from './composer/ui/LinkedReferenceRow';
+import { findShareLink, withoutShareLinkKeys } from '@/lib/received-pages/link';
+import { SharedPageChip } from './sharePages/received/SharedPageChip';
+import { takeShareLink, withRegisteredSharedPages } from './sharePages/received/takeShareLink';
+import { useReceivedPageBases } from './sharePages/received/useReceivedPage';
 import { usePlaceholderFitsOneLine } from './composer/ui/usePlaceholderFitsOneLine';
 import { RevertedMessagesStrip } from './RevertedMessagesStrip';
 import { SessionFolderMissingRow } from './SessionFolderMissingRow';
@@ -505,7 +510,9 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     const initialDraftRef = React.useRef<string | null>(null);
     const initialDraftIdentityRef = React.useRef<ChatDraftIdentity | null>(null);
     const initialDraftSnapshotRef = React.useRef<ChatDraftSnapshot>({ text: '', confirmedMentions: new Set() });
-    const [message, setMessage] = React.useState(() => {
+    // The draft text lives outside React state, so a keystroke re-renders only
+    // what shows a value derived from it (see composerText.ts).
+    const [composerText] = React.useState(() => {
         const identity = resolveChatDraftIdentity(chatColumnSession);
         const snapshot = readChatDraftClaimingFolderDraft(identity);
         initialDraftIdentityRef.current = identity;
@@ -513,8 +520,19 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         if (snapshot.text) {
             initialDraftRef.current = snapshot.text;
         }
-        return snapshot.text;
+        return createComposerText(snapshot.text);
     });
+    // Bumped by every text the app puts into the composer, so the editor
+    // writes it even when it equals the `value` it last rendered with.
+    const [editorValueRevision, setEditorValueRevision] = React.useState(0);
+    // Text the app puts into the composer: a restored draft, a picked command,
+    // a cleared send. Typed text reaches `composerText` from the editor.
+    const setMessage = React.useCallback((value: string) => {
+        if (value === composerText.get()) return;
+        composerText.set(value);
+        setEditorValueRevision((revision) => revision + 1);
+    }, [composerText]);
+    const hasText = useComposerTextValue(composerText, (text) => text.trim().length > 0);
     const confirmedMentionsRef = React.useRef<Set<string>>(initialDraftSnapshotRef.current.confirmedMentions);
     const [storedInputMode, setInputMode] = React.useState<'normal' | 'shell'>('normal');
     const inputModeParentRef = React.useRef<string | null>(null);
@@ -568,8 +586,6 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     const skillRef = React.useRef<SkillAutocompleteHandle>(null);
     const snippetRef = React.useRef<SnippetAutocompleteHandle>(null);
     const emojiRef = React.useRef<EmojiAutocompleteHandle>(null);
-    // Ref to track current message value without triggering re-renders in effects
-    const messageRef = React.useRef(message);
     const dictationSendInFlightRef = React.useRef(false);
     const currentChatDraftIdentityRef = React.useRef<ChatDraftIdentity | null>(initialDraftIdentityRef.current);
     const pendingPastedAttachmentFilenamesRef = React.useRef<Set<string>>(new Set());
@@ -711,10 +727,10 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     const consumePendingGuestIssue = useInputStore((s) => s.consumePendingGuestIssue);
     const pendingComposerReferenceCount = usePendingComposerReferences((s) => s.pending.length);
 
-    React.useEffect(() => {
+    useComposerTextEffect(composerText, (message) => {
         if (!newSessionDraftOpen || newSessionDraft.target !== 'chat' || message.trim().length === 0) return;
         void prepareChatDraftDirectory();
-    }, [message, newSessionDraft.target, newSessionDraftOpen, prepareChatDraftDirectory]);
+    }, [newSessionDraft.target, newSessionDraftOpen, prepareChatDraftDirectory]);
     const consumePendingSyntheticParts = useInputStore((s) => s.consumePendingSyntheticParts);
     const acknowledgeSessionAbort = useSessionUIStore((s) => s.acknowledgeSessionAbort);
     const abortCurrentOperation = React.useCallback(
@@ -749,14 +765,17 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     const configCatalogLoaded = useConfigStore((state) => state.providersLoaded && state.agentsLoaded);
     const currentProviderId = pinnedComposerSelection?.model?.providerId ?? configProviderId;
     const currentModelId = pinnedComposerSelection?.model?.modelId ?? configModelId;
-    const getModelMetadata = useConfigStore((state) => state.getModelMetadata);
-    // Subscribe to both sources read by getModelMetadata so async metadata and provider updates are observed.
-    useConfigStore((state) => state.modelsMetadata);
+    const modelsMetadata = useConfigStore((state) => state.modelsMetadata);
     const providerCatalog = useConfigStore((state) => state.providers);
     const autoReady = useRoutingStore(selectAutoReady);
-    const currentModelMetadata = currentProviderId && currentModelId
-        ? getModelMetadata(currentProviderId, currentModelId)
-        : undefined;
+    // The composer renders on every keystroke; for a model models.dev does not
+    // list, a lookup scans the whole metadata catalog and builds a new object.
+    const currentModelMetadata = React.useMemo(
+        () => currentProviderId && currentModelId
+            ? resolveModelMetadata(modelsMetadata, providerCatalog, currentProviderId, currentModelId)
+            : undefined,
+        [currentProviderId, currentModelId, modelsMetadata, providerCatalog],
+    );
     const configVariant = useConfigStore((state) => state.currentVariant);
     const currentVariant = pinnedComposerSelection ? pinnedComposerSelection.variant ?? undefined : configVariant;
     const currentVariantSelection = useConfigStore((state) => state.currentVariantSelection);
@@ -1107,13 +1126,13 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     }, [rememberSessionMentions, t]);
     // Text that comes back without a paste (a revert, a fork, a restored
     // draft, a link typed by hand) gets its chips too.
-    React.useEffect(() => {
+    useComposerTextEffect(composerText, (message) => {
         if (isVSCodeRuntime()) return;
         const pending = findSessionLinks(message, sessionLinkOrigins)
             .map((range) => range.target)
             .filter((target) => !attemptedSessionLinksRef.current.has(sessionLinkKey(target)));
         if (pending.length > 0) void resolveSessionLinks(pending, false);
-    }, [message, resolveSessionLinks, sessionLinkOrigins]);
+    }, [resolveSessionLinks, sessionLinkOrigins]);
     // Read before a send consumes anything: a second Enter while the read is
     // out does nothing, and a link the read cannot resolve goes as the text it is.
     const sessionMentionReadRef = React.useRef(false);
@@ -1279,7 +1298,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     );
     const repaintConfirmedMentions = React.useCallback(() => setConfirmedMentionsRevision((revision) => revision + 1), []);
     useFileMentionCheck({
-        text: message,
+        text: composerText,
         enabled: inputMode === 'normal' && !isBtwActive,
         confirmedMentionsRef,
         resolvePath: resolveFileMentionPath,
@@ -1417,6 +1436,8 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     const mobileComposerExpanded = mobileShell.expanded;
     const mobileTextareaFocused = mobileShell.focused;
     const linkedReferences = useDraftLinkedReferences(chatDraftIdentity);
+    // Relays whose share links turn into a page chip (none where the server opens none).
+    const receivedPageBases = useReceivedPageBases();
     const setLinkedReferencesFor = React.useCallback((
         target: ChatDraftIdentity | null,
         references: ComposerReference[],
@@ -1566,7 +1587,6 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     const applyHistoryValue = React.useCallback((value: MessageHistoryValue<AttachedFile>, selection: 'start' | 'end') => {
         const identity = promptHistorySearchIdentityRef.current;
         setMessage(value.text);
-        messageRef.current = value.text;
         useInputStore.getState().setAttachedFiles([...value.attachments], chatDraftIdentity);
         scheduleHistoryFocusFrame(() => {
             if (promptHistorySearchIdentityRef.current !== identity) return;
@@ -1576,12 +1596,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             editor.focus();
             editor.setSelection(position, position);
         });
-    }, [chatDraftIdentity, scheduleHistoryFocusFrame]);
-
-    // Keep messageRef in sync with message state
-    React.useEffect(() => {
-        messageRef.current = message;
-    }, [message]);
+    }, [chatDraftIdentity, scheduleHistoryFocusFrame, setMessage]);
 
     React.useEffect(() => {
         currentChatDraftIdentityRef.current = chatDraftIdentity;
@@ -1595,8 +1610,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         restoreDraft,
         migrateDraft,
     } = useComposerDraft({
-        message,
-        messageRef,
+        text: composerText,
         setMessage,
         confirmedMentionsRef,
         identity: chatDraftIdentity,
@@ -1630,7 +1644,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     // while it is the one on screen).
     useSessionDraftPublishing({
         identity: isBtwActive ? null : chatDraftIdentity,
-        message,
+        text: composerText,
         confirmedMentionsRef,
         projectId: newSessionDraftOpen ? newSessionDraft.selectedProjectId ?? null : null,
         enabled: newSessionDraftOpen && !currentSessionId,
@@ -1742,6 +1756,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     usePendingComposerText({
         target: mailboxTarget,
         sessionId: shownSessionId,
+        text: composerText,
         setMessage,
         focus: focusComposer,
         holdSlashCommand: isBtwActive,
@@ -1752,7 +1767,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         enabled: !isMobile && !isBtwActive,
         draftOpen: newSessionDraftOpen && newSessionDraft?.target !== 'chat',
         draftProjectId: newSessionDraft?.selectedProjectId ?? null,
-        message,
+        text: composerText,
         setMessage,
     });
     const parallelProjectId = newSessionDraft?.selectedProjectId ?? null;
@@ -1778,15 +1793,15 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     const handleRunInParallel = React.useCallback(() => {
         // The picker offers it everywhere; a run always starts from a new-session draft.
         if (newSessionDraftOpen && newSessionDraft?.target !== 'chat') enterParallel();
-        else openParallelComposer(messageRef.current);
-    }, [enterParallel, newSessionDraft?.target, newSessionDraftOpen]);
+        else openParallelComposer(composerText.get());
+    }, [composerText, enterParallel, newSessionDraft?.target, newSessionDraftOpen]);
 
     // A linked reference is attached context, not decoration: the submission
     // builder serializes it into the outgoing message, so a composer holding
     // only one of those chips is not empty and has to be sendable on its own.
     // BTW sends strip every reference, so the gate stays out of BTW.
     const hasLinkedReferences = linkedReferences.length > 0;
-    const hasContent = message.trim().length > 0 || attachedFiles.length > 0 || hasDrafts || (!isBtwActive && hasLinkedReferences);
+    const hasContent = hasText || attachedFiles.length > 0 || hasDrafts || (!isBtwActive && hasLinkedReferences);
     const composerQueuedMessages = selectComposerQueue(queuedMessages);
     const hasQueuedMessages = !isBtwActive && composerQueuedMessages.length > 0;
     const preparingBtwSend = useBtwStore((state) => Boolean(currentSessionId && state.byParent[currentSessionId]?.pendingSend));
@@ -1806,12 +1821,12 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     // Reads the text through refs, so the send and queue callbacks built on
     // it keep their identity while the user types.
     const getCurrentInputSnapshot = React.useCallback(() => {
-        const currentMessage = composerRef.current?.getValue() ?? messageRef.current;
+        const currentMessage = composerRef.current?.getValue() ?? composerText.get();
         return {
             message: currentMessage,
             hasContent: currentMessage.trim().length > 0 || attachedFiles.length > 0 || hasDrafts || (!isBtwActive && hasLinkedReferences),
         };
-    }, [attachedFiles.length, hasDrafts, hasLinkedReferences, isBtwActive]);
+    }, [attachedFiles.length, composerText, hasDrafts, hasLinkedReferences, isBtwActive]);
 
     // Keep a ref to handleSubmit so callbacks don't depend on it.
     type SubmitOptions = {
@@ -1850,7 +1865,8 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         // Queueing is the same user intent as sending, so an archived session
         // comes back once the queue accepts the message, not at delivery.
         const resumeAfterQueue = prepareUserMessageResume(queueSessionId, queueRuntimeKey);
-        const messageToQueue = inputSnapshot.message.replace(/^\n+|\n+$/g, '');
+        // A share link's key is never queued, even one the composer did not turn into a chip.
+        const messageToQueue = withoutShareLinkKeys(inputSnapshot.message.replace(/^\n+|\n+$/g, ''));
         if (!(await readSessionMentionsBeforeSend(messageToQueue))) return;
         const composerAttachments = sanitizeAttachmentsForSend(attachedFiles);
 
@@ -1896,7 +1912,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         const drafts = draftTarget ? consumeDrafts(draftTarget) : [];
         const linked = linkedReferences;
         // The chips and the items the text links; only the chips come back on a failure, the text brings its links.
-        const linkedToQueue = withReferencesFromText(linked, referenceLinksIn(messageToQueue));
+        const linkedToQueue = await withRegisteredSharedPages(withReferencesFromText(linked, referenceLinksIn(messageToQueue)));
         // Queued context is delivered as captured, so comment snippets expand now.
         const expandedDrafts = await expandCommentSnippets(drafts, useSnippetsStore.getState().expandText);
         const context = buildComposerContext({
@@ -1955,7 +1971,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             if (goalArm.armed) useSessionGoalArmStore.getState().setArmed(true, goalArm.objectiveOverride);
             // The composer was cleared on queueing; give everything back. The
             // text is appended if the user has already typed something new.
-            const currentInput = composerRef.current?.getValue() ?? messageRef.current;
+            const currentInput = composerRef.current?.getValue() ?? composerText.get();
             if (!currentInput) {
                 setMessage(messageToQueue);
             } else {
@@ -1982,12 +1998,13 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         if (inputMode !== 'shell') settleModelPick();
         void resumeAfterQueue().catch(console.warn);
         recordLinkedReferences(queueSessionId, queueTarget.directory, linkedToQueue);
-    }, [getCurrentInputSnapshot, currentSessionId, messageQueueTarget, inputMode, hasDrafts, guestCommands, attachedFiles, sanitizeAttachmentsForSend, prepareReadOnSendMentions, extractInlineFileMentions, mentionableAgents, availableSkills, consumePendingSyntheticParts, mailboxTarget, inlineDraftTarget, consumeDrafts, linkedReferences, scrollToLatest, clearAttachedFiles, chatDraftIdentity, setLinkedReferencesFor, updateLinkedReferencesFor, isMobile, isMobileCommentOpen, addToQueue, currentProviderId, currentModelId, currentAgentName, currentVariant, t, readSessionMentionsBeforeSend, sessionMentionsIn, referenceLinksIn]);
+    }, [getCurrentInputSnapshot, currentSessionId, messageQueueTarget, inputMode, hasDrafts, guestCommands, attachedFiles, sanitizeAttachmentsForSend, prepareReadOnSendMentions, extractInlineFileMentions, mentionableAgents, availableSkills, consumePendingSyntheticParts, mailboxTarget, inlineDraftTarget, consumeDrafts, linkedReferences, scrollToLatest, clearAttachedFiles, chatDraftIdentity, setLinkedReferencesFor, updateLinkedReferencesFor, isMobile, isMobileCommentOpen, addToQueue, currentProviderId, currentModelId, currentAgentName, currentVariant, t, readSessionMentionsBeforeSend, sessionMentionsIn, referenceLinksIn, composerText, setMessage]);
 
     /** Put the context a queued message was captured with back on the composer chips. */
     const restoreQueuedContext = React.useCallback((context: readonly QueuedContextPart[], content: string) => {
         const synthetic: SyntheticContextPart[] = [];
-        const restored: ComposerReference[] = [];
+        const restored: Exclude<ComposerReference, { kind: 'shared-page' }>[] = [];
+        const sharedPages: ComposerReference[] = [];
         const mentions: SessionReference[] = [];
         for (const part of context) {
             if (part.kind === 'synthetic') {
@@ -1997,7 +2014,18 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             // An instruction is derived from the text, and derived again on send.
             if (part.kind !== 'context') continue;
             const payload = part.metadata[CONTEXT_METADATA_KEY];
-            if (payload.kind === 'repository-issue') {
+            if (payload.kind === 'shared-page') {
+                // A page someone else shared goes back as its chip; its text never held the link.
+                sharedPages.push({
+                    kind: 'shared-page',
+                    shareKey: payload.receivedId ?? payload.host,
+                    receivedId: payload.receivedId,
+                    host: payload.host,
+                    title: payload.title || null,
+                    opened: payload.opened,
+                    contextText: part.text,
+                });
+            } else if (payload.kind === 'repository-issue') {
                 restored.push({
                     kind: 'repository-issue',
                     ...(payload.provider ? { provider: payload.provider } : {}),
@@ -2065,7 +2093,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         }
         // An item the text links goes back as that link's chip, the rest above the text.
         const textLinks = new Set(findWebLinks(content).map(({ link }) => link));
-        const chips = restored.filter((reference) => !textLinks.has(reference.url));
+        const chips: ComposerReference[] = [...restored.filter((reference) => !textLinks.has(reference.url)), ...sharedPages];
         if (chips.length > 0) {
             updateLinkedReferences((current) => withComposerReferences(current, chips));
         }
@@ -2100,7 +2128,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             console.warn('[queue] failed to take queued message for editing:', error);
             toast.error(t('chat.queuedMessage.toast.takeFailed'));
         });
-    }, [messageQueueTarget, popQueuedToInput, restoreQueuedContext, t]);
+    }, [messageQueueTarget, popQueuedToInput, restoreQueuedContext, t, setMessage]);
 
     const handleQueuedMessageSend = React.useCallback((messageId: string) => {
         // Force-sending from the queue during a busy session counts as steer
@@ -2555,7 +2583,8 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
 
         // The chips, then the items the text links that are not chips already.
         const sentComposerText = !queuedOnly && inputSnapshot.hasContent ? inputSnapshot.message : '';
-        const linkedReferencesToSend = withReferencesFromText(linkedReferences, referenceLinksIn(sentComposerText));
+        // A page chip whose link the server is still taking goes out with its id.
+        const linkedReferencesToSend = await withRegisteredSharedPages(withReferencesFromText(linkedReferences, referenceLinksIn(sentComposerText)));
 
         const outgoing = buildOutgoingMessage({
             queued: queuedMessagesToSend,
@@ -2613,7 +2642,6 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         // Clear input (the queue was taken above)
         if (!queuedOnly) {
             setMessage('');
-            messageRef.current = '';
             confirmedMentionsRef.current.clear();
             // Clear per-session draft on submit
             persistDraftImmediately(chatDraftIdentity, '');
@@ -2834,7 +2862,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                 const shown = currentChatDraftIdentityRef.current;
                 if (shown && getChatDraftIdentityKey(shown) === getChatDraftIdentityKey(failedSessionIdentity)) {
                     // The composer still shows the session that never was: its text moves to the draft.
-                    handoffDraft(chatDraftIdentity, messageRef.current);
+                    handoffDraft(chatDraftIdentity, composerText.get());
                 } else {
                     // The user moved on (the draft is back, or another session is
                     // open): the text typed in the session that never was joins
@@ -2941,12 +2969,12 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         // The text goes straight into the submit (see SubmitOptions.presetText)
         // instead of through the composer input — the collapsed mobile pill has
         // no mounted textarea to stage it in.
-        const draft = (composerRef.current?.getValue() ?? messageRef.current).trim();
+        const draft = (composerRef.current?.getValue() ?? composerText.get()).trim();
         // OpenCode recognizes slash commands only when their arguments follow
         // the command on the same line. Skills retain the multiline prompt form.
         const presetText = draft ? `${text}${type === 'command' ? ' ' : '\n'}${draft}` : text;
         void handleSubmitRef.current({ presetText });
-    }, []);
+    }, [composerText]);
     const handlePresetChipSubmit = React.useCallback((starter: ResolvedStarter) => {
         submitPresetPrompt(starter.submitText, starter.ref.type);
     }, [submitPresetPrompt]);
@@ -2968,15 +2996,13 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     const handleDictationInsert = React.useCallback((text: string) => {
         if (keepTranscriptForOrigin(text)) return;
         dictationSendEndRef.current?.();
-        setMessage((prev) => {
-            // The editor is controlled by this state; getCurrentInputSnapshot
-            // reads it back, so no imperative write is needed.
-            return appendInlineText(prev, text);
-        });
+        // The editor writes the new text on the render setMessage causes, so
+        // no imperative write is needed.
+        setMessage(appendInlineText(composerText.get(), text));
         setTimeout(() => {
             composerRef.current?.focus();
         }, 0);
-    }, [keepTranscriptForOrigin]);
+    }, [composerText, keepTranscriptForOrigin, setMessage]);
 
     const handleDictationInsertAndSend = React.useCallback((text: string) => {
         if (keepTranscriptForOrigin(text)) return;
@@ -2985,7 +3011,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         // already collapsed into the pill by then, so the editor is unmounted
         // and getValue() returns '' — which silently dropped the user's typed
         // text and (once the composer cleared) the transcript with it.
-        const next = appendInlineText(messageRef.current, text);
+        const next = appendInlineText(composerText.get(), text);
         // Land the composed text in the composer state first, so a failed send
         // restores exactly what the user dictated, then submit it as an
         // explicit override (the textarea may be unmounted at this point).
@@ -2994,7 +3020,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         void handleSubmitRef.current({ presetText: next }).finally(() => {
             dictationSendEndRef.current?.();
         });
-    }, [keepTranscriptForOrigin]);
+    }, [keepTranscriptForOrigin, setMessage, composerText]);
 
     // A command with an argument sends once the isolated composer owns its draft.
     React.useEffect(() => {
@@ -3035,13 +3061,12 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         const composerHolds = getCurrentInputSnapshot().hasContent
             || (useInputStore.getState().getPendingSyntheticParts(mailboxTarget)?.length ?? 0) > 0;
         if (composerHolds) {
-            setMessage((prev) => appendWithLineBreaks(prev, text));
+            setMessage(appendWithLineBreaks(composerText.get(), text));
             return;
         }
         setMessage(text);
-        messageRef.current = text;
         void handleSubmitRef.current({ presetText: text });
-    }, [columnPinned, configCatalogLoaded, currentModelId, currentProviderId, draftSubmitDraftId, getCurrentInputSnapshot, mailboxTarget, pendingDraftSubmit]);
+    }, [columnPinned, composerText, configCatalogLoaded, currentModelId, currentProviderId, draftSubmitDraftId, getCurrentInputSnapshot, mailboxTarget, pendingDraftSubmit, setMessage]);
 
     const handleKeyDown = (e: KeyboardEvent) => {
         // Early return during IME composition to prevent interference with autocomplete.
@@ -3083,6 +3108,9 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             return;
         }
 
+        // The text as it is now: a key can arrive before the render that
+        // follows the previous one.
+        const message = composerText.get();
         if (inputMode === 'shell' && e.key === 'Backspace' && message.length === 0) {
             e.preventDefault();
             setInputMode('normal');
@@ -3245,7 +3273,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
 
             // Queueing / steering only works when there's an existing busy
             // session (or an active auto-review run).
-            const canQueue = !isBtwActive && !isPageWaiting && inputMode === 'normal' && hasContent && currentSessionId && (currentSessionPhase !== 'idle' || autoReviewRunning);
+            const canQueue = !isBtwActive && !isPageWaiting && inputMode === 'normal' && getCurrentInputSnapshot().hasContent && currentSessionId && (currentSessionPhase !== 'idle' || autoReviewRunning);
 
             if (followUpBehavior === 'queue') {
                 if (isCtrlEnter || !canQueue) {
@@ -3272,7 +3300,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         fullWidth: isMobile,
         openAutocomplete,
         query: autocompleteQuery,
-        message,
+        text: composerText,
         editorRef: composerRef,
         containerRef: dropZoneRef,
     });
@@ -3363,7 +3391,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         if (!editor) {
             // No mounted editor (collapsed mobile pill): append to the state
             // the editor will be seeded from.
-            const nextValue = messageRef.current + text;
+            const nextValue = composerText.get() + text;
             setMessage(nextValue);
             updateAutocompleteState(nextValue, nextValue.length, inputSource, text);
             return;
@@ -3380,7 +3408,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         // frame where the caret sits at a stale offset.
         editor.insertText(text);
         updateAutocompleteState(nextValue, cursorPosition, inputSource, text);
-    }, [updateAutocompleteState]);
+    }, [updateAutocompleteState, setMessage, composerText]);
 
     const clearDropTextSuppression = React.useCallback(() => {
         suppressNextFileDropTextInsertRef.current = false;
@@ -3435,7 +3463,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         }
         if (shellTriggerNormalizationRef.current) {
             shellTriggerNormalizationRef.current = false;
-            setMessage(value);
+            composerText.set(value);
             return;
         }
 
@@ -3445,6 +3473,8 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             const candidateAbsolutePaths = pendingDroppedAbsolutePathsRef.current;
             if (candidateAbsolutePaths.some((path) => path.length > 0 && value.includes(path))) {
                 clearDropTextSuppression();
+                // The editor goes back to the text without the path.
+                setEditorValueRevision((revision) => revision + 1);
                 return;
             }
         }
@@ -3475,7 +3505,16 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             return;
         }
 
-        setMessage(value);
+        // A share link someone sent becomes a page chip: the link, with its
+        // key, goes to the server and never stays in the text or the draft.
+        const shareLink = !fromValueProp && !isBtwActive && inputMode === 'normal' ? findShareLink(value, receivedPageBases) : null;
+        if (shareLink && composerRef.current) {
+            updateLinkedReferences((current) => withComposerReferences(current, [takeShareLink(shareLink)]));
+            composerRef.current.replaceRange(shareLink.start, shareLink.end, '', shareLink.start);
+            return;
+        }
+
+        composerText.set(value);
         // Text the app set (a restored draft, a prepared prompt) is not a
         // trigger being typed: a `#` line in it must not open the snippet list.
         if (fromValueProp) {
@@ -3495,7 +3534,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     const insertPastedText = React.useCallback((text: string) => {
         if (!text) return;
         const editor = composerRef.current;
-        const currentMessage = editor?.getValue() ?? messageRef.current;
+        const currentMessage = editor?.getValue() ?? composerText.get();
         const selectionStart = editor?.getSelection().start ?? currentMessage.length;
         const selectionEnd = editor?.getSelection().end ?? currentMessage.length;
         const insertionText = withInlineInsertionBoundaries(
@@ -3504,7 +3543,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             currentMessage.slice(selectionEnd),
         );
         insertTextAtSelection(insertionText, getFileMentionInputSourceForInsertedText(insertionText));
-    }, [insertTextAtSelection]);
+    }, [insertTextAtSelection, composerText]);
 
     const savePastedImagesAsFiles = useUIStore((state) => state.savePastedImagesAsFiles);
     const attachFiles = React.useCallback(async (
@@ -3592,8 +3631,10 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             if (ta && selEnd > selStart) {
                 const clipboardText = e.clipboardData.getData('text');
                 const url = clipboardText.trim();
+                const message = composerText.get();
                 const selected = message.slice(selStart, selEnd);
-                if (shouldWrapSelectionAsLink(url, selected)) {
+                // A share link replaces the selection and becomes its chip; wrapped, its key would stay in the text.
+                if (shouldWrapSelectionAsLink(url, selected) && !findShareLink(url, receivedPageBases)) {
                     e.preventDefault();
                     const next = `${message.slice(0, selStart)}[${selected}](${url})${message.slice(selEnd)}`;
                     const caret = selStart + 1 + selected.length + 2 + url.length + 1;
@@ -3687,7 +3728,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                 ]);
                 const citationText = buildAttachmentCitationText([filename]);
                 const editor = composerRef.current;
-                const currentMessage = editor?.getValue() ?? messageRef.current;
+                const currentMessage = editor?.getValue() ?? composerText.get();
                 const selectionStart = editor?.getSelection().start ?? currentMessage.length;
                 const selectionEnd = editor?.getSelection().end ?? currentMessage.length;
                 const insertionText = withInlineInsertionBoundaries(
@@ -3794,7 +3835,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
 
         e.preventDefault();
         await attachFiles([...imageFiles, ...otherFiles], pastedText, true);
-    }, [addAttachedFile, attachFiles, currentSessionId, inputMode, largeTextPasteBehavior, largeTextPasteGesture, readLargeTextPasteSnapshot, markFileMentionPasteSuppression, message, mobileShell, newSessionDraftOpen, insertTextAtSelection, setMessage, t, updateAutocompleteState, resolveSessionLinks, sessionLinkOrigins, pastedSessionIds, isBtwActive, readPastedReferenceLinks]);
+    }, [addAttachedFile, attachFiles, currentSessionId, inputMode, largeTextPasteBehavior, largeTextPasteGesture, readLargeTextPasteSnapshot, markFileMentionPasteSuppression, composerText, mobileShell, newSessionDraftOpen, insertTextAtSelection, setMessage, t, updateAutocompleteState, resolveSessionLinks, sessionLinkOrigins, pastedSessionIds, isBtwActive, readPastedReferenceLinks, receivedPageBases]);
 
     // Android commits an image through the IME instead of the page (see nativeImagePaste).
     React.useEffect(() => {
@@ -3851,6 +3892,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
 
     // A session is written as its link, which draws as a chip with its title.
     const handleSessionSelect = useStableHandler((session: Session) => {
+        const message = composerText.get();
         const cursorPosition = composerRef.current?.getSelection().start ?? message.length;
         const lastAtSymbol = message.substring(0, cursorPosition).lastIndexOf('@');
         const start = lastAtSymbol === -1 ? cursorPosition : lastAtSymbol;
@@ -3891,6 +3933,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     });
 
     const handleSkillSelect = useStableHandler((skillName: string) => {
+        const message = composerText.get();
         const textarea = composerRef.current;
         const cursorPosition = textarea?.getSelection().start ?? message.length;
         const textBeforeCursor = message.substring(0, cursorPosition);
@@ -3918,6 +3961,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     });
 
     const handleSnippetSelect = useStableHandler((_snippet: unknown, trigger: string) => {
+        const message = composerText.get();
         const textarea = composerRef.current;
         const cursorPosition = textarea?.getSelection().start ?? message.length;
         const textBeforeCursor = message.substring(0, cursorPosition);
@@ -3938,12 +3982,16 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
 
     // "Save draft as #name": the draft goes into the snippet without the
     // `#name` being typed, and once saved that token leaves the composer.
-    const snippetDraftText = openAutocomplete === 'snippet' ? withoutSnippetToken(message, autocompleteQuery) : undefined;
+    const snippetDraftText = useComposerTextValue(
+        composerText,
+        (text) => (openAutocomplete === 'snippet' ? withoutSnippetToken(text, autocompleteQuery) : undefined),
+    );
     const handleSnippetDraftSaved = useStableHandler((typedName: string) => {
-        setMessage(withoutSnippetToken(messageRef.current, typedName));
+        setMessage(withoutSnippetToken(composerText.get(), typedName));
     });
 
     const handleEmojiSelect = useStableHandler((emoji: string) => {
+        const message = composerText.get();
         const cursorPosition = composerRef.current?.getSelection().start ?? message.length;
         const startIndex = Math.max(0, cursorPosition - autocompleteQuery.length - 1);
         const inserted = `${emoji} `;
@@ -4122,7 +4170,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             confirmMention(internalPath, confirmedMentionsRef.current);
             const mention = `@${internalPath}`;
             const textarea = composerRef.current;
-            const currentMessage = messageRef.current;
+            const currentMessage = composerText.get();
             if (textarea) {
                 const { start: pos, end } = textarea.getSelection();
                 const before = currentMessage.slice(0, pos);
@@ -4138,7 +4186,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                 cursorPosRef.current = pos + insert.length;
                 textarea.focus();
             } else {
-                setMessage((prev) => appendInlineText(prev, mention));
+                setMessage(appendInlineText(composerText.get(), mention));
             }
             clearDropTextSuppression();
             return;
@@ -4567,11 +4615,11 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
 
     const pickPromptHistoryCandidate = React.useCallback((candidate: PromptHistoryCandidate<AttachedFile>) => {
         if (!isPromptHistorySearchOpen || promptHistorySearchIdentityRef.current !== promptHistorySearchIdentity) return;
-        const recalled = messageHistory.jumpTo(candidate.index, { text: messageRef.current, attachments: attachedFiles }, candidate.value);
+        const recalled = messageHistory.jumpTo(candidate.index, { text: composerText.get(), attachments: attachedFiles }, candidate.value);
         if (!recalled) return;
         setPromptHistorySearch(null);
         applyHistoryValue(recalled, 'end');
-    }, [applyHistoryValue, attachedFiles, isPromptHistorySearchOpen, messageHistory, promptHistorySearchIdentity]);
+    }, [applyHistoryValue, attachedFiles, isPromptHistorySearchOpen, messageHistory, promptHistorySearchIdentity, composerText]);
     attachMobileCommentRef.current = mobileComment.submit;
 
 
@@ -4642,6 +4690,15 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                             />
                         );
                     }
+                    case 'shared-page':
+                        return (
+                            <SharedPageChip
+                                key={key}
+                                reference={reference}
+                                onChange={(next) => updateLinkedReferences((current) => withComposerReferences(current, [next]))}
+                                onRemove={remove}
+                            />
+                        );
                     case 'guest':
                         return (
                             <LinkedReferenceRow
@@ -4852,7 +4909,9 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     const goalArmed = useSessionGoalArmStore((state) => state.armed);
     // Set by the footer's desktop dictation; the mobile overlay lives outside the box.
     const [desktopDictating, setDesktopDictating] = React.useState(false);
-    const goalObjectiveLength = goalArmed ? message.length : 0;
+    const goalObjectiveLength = useComposerTextValue(composerText, (text) => (goalArmed ? text.length : 0));
+    // The collapsed phone pill shows the draft; nothing can be typed into it.
+    const pillText = useComposerTextValue(composerText, (text) => (isMobile && !mobileComposerExpanded ? text : ''));
     const waitingForOpenCode = useOpenCodeStartupStore((state) => state.waitingSends > 0);
 
     const footerPaddingClass = isMobile ? 'px-1.5 py-1.5' : (isVSCode ? 'px-1.5 py-1' : 'px-2.5 py-1.5');
@@ -5056,7 +5115,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                     />
                 ) : isMobile && !mobileComposerExpanded && !isBtwActive ? (
                     <MobilePillComposer
-                        message={message}
+                        message={pillText}
                         prediction={predictionText}
                         sessionId={currentSessionId}
                         newSessionDraftOpen={newSessionDraftOpen}
@@ -5234,7 +5293,10 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                                 ref={composerRef}
                                 viewStore={composerViewStore}
                                 data-testid="chat-input"
-                                value={message}
+                                // Read at render: the editor's own text, unless the app
+                                // just put new text in (see `setMessage`).
+                                value={composerText.get()}
+                                valueRevision={editorValueRevision}
                                 prediction={predictionText}
                                 languageContext={languageContext}
                                 onChange={handleEditorChange}

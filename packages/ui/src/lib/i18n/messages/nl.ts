@@ -28,6 +28,8 @@ import { compactionSettingsI18n } from './compaction-settings.i18n';
 import { heapSnapshotI18n } from './heap-snapshot.i18n';
 import { consoleBudgetsI18n } from './console-budgets.i18n';
 import { imageToolI18n } from './image-tool.i18n';
+import { sharePagesI18n } from './share-pages.i18n';
+import { receivedPagesI18n } from './received-pages.i18n';
 import { memoryDreamingI18n } from './memory-dreaming.i18n';
 import { usageToolI18n } from './usage-tool.i18n';
 import { openchamberToolsLayoutI18n } from './openchamber-tools-layout.i18n';
@@ -218,6 +220,8 @@ export const dict = {
   ...heapSnapshotI18n.nl,
   ...consoleBudgetsI18n.nl,
   ...imageToolI18n.nl,
+  ...sharePagesI18n.nl,
+  ...receivedPagesI18n.nl,
   ...memoryDreamingI18n.nl,
   ...usageToolI18n.nl,
   ...openchamberToolsLayoutI18n.nl,
@@ -2547,6 +2551,7 @@ export const dict = {
   'chat.toast.opencodeRestartInterrupted.description': 'OpenCode is herstart terwijl er nog een antwoord liep. Stuur een bericht om verder te gaan.',
   'chat.toast.opencodeRestartInterrupted.autoResumeDescription': 'OpenCode is herstart terwijl er nog een antwoord liep. De chat gaat automatisch verder; stuur een bericht als dat niet gebeurt.',
   'chat.toast.opencodeRestartInterrupted.openSession': 'Sessie openen',
+  'chat.toast.shareAnswer.openSession': 'Sessie openen',
   'chat.errorBoundary.title': 'Chatfout',
   'chat.errorBoundary.description': 'Er is een fout opgetreden in de chatinterface. Dit komt mogelijk door een tijdelijk netwerkprobleem of beschadigde berichtgegevens.',
   'chat.errorBoundary.sessionLabel': 'Sessie',
@@ -3124,8 +3129,8 @@ export const dict = {
   'projects.sharedTrust.actions': 'Acties',
   'projects.sharedTrust.skip': 'Nu niet',
   'projects.sharedTrust.trust': 'Vertrouwen en uitvoeren',
-  'projects.opencodeTrust.title': 'OpenCode code uit deze map laten uitvoeren?',
-  'projects.opencodeTrust.description': 'OpenCode voert de plugins en opdrachten uit de configuratie van {path} uit zodra het de map opent. Vertrouw ze één keer, en OpenChamber vraagt het pas opnieuw als ze veranderen.',
+  'projects.opencodeTrust.title': 'De OpenCode-configuratie in deze map vertrouwen?',
+  'projects.opencodeTrust.description': 'OpenCode past alles hieronder uit de configuratie van {path} toe zodra het de map opent. Vertrouw haar één keer, en OpenChamber vraagt het pas opnieuw als dit verandert.',
   'projects.opencodeTrust.plugins': 'Plugins',
   'projects.opencodeTrust.commands': 'Opdrachten',
   'projects.opencodeTrust.kind.package': '{name} (npm-pakket)',
@@ -3134,6 +3139,12 @@ export const dict = {
   'projects.opencodeTrust.kind.lsp': 'Taalserver {name}',
   'projects.opencodeTrust.kind.formatter': 'Formatter {name}',
   'projects.opencodeTrust.kind.shell': 'Shell',
+  'projects.opencodeTrust.kind.env': 'Omgevingsvariabele {name}',
+  'projects.opencodeTrust.kind.file': 'Bestand {path}',
+  'projects.opencodeTrust.values': 'Waarden van je computer die ze naar buiten kan sturen',
+  'projects.opencodeTrust.permissions': 'Rechten die ze toestaat',
+  'projects.opencodeTrust.permission.agent': 'Agent {name}',
+  'projects.opencodeTrust.permission.everyAgent': 'Alle agents',
   'projects.opencodeTrust.paused': 'Zonder vertrouwen kunnen agents niet in deze map werken, maar je kunt de bestanden en Git-wijzigingen nog steeds bekijken.',
   'projects.opencodeTrust.skip': 'Deze keer niet',
   'projects.opencodeTrust.trust': 'Vertrouwen en openen',

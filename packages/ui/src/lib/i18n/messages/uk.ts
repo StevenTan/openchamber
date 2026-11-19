@@ -30,6 +30,8 @@ import { compactionSettingsI18n } from './compaction-settings.i18n';
 import { heapSnapshotI18n } from './heap-snapshot.i18n';
 import { consoleBudgetsI18n } from './console-budgets.i18n';
 import { imageToolI18n } from './image-tool.i18n';
+import { sharePagesI18n } from './share-pages.i18n';
+import { receivedPagesI18n } from './received-pages.i18n';
 import { memoryDreamingI18n } from './memory-dreaming.i18n';
 import { usageToolI18n } from './usage-tool.i18n';
 import { openchamberToolsLayoutI18n } from './openchamber-tools-layout.i18n';
@@ -228,6 +230,8 @@ export const dict: Record<I18nKey, string> = {
   ...heapSnapshotI18n.uk,
   ...consoleBudgetsI18n.uk,
   ...imageToolI18n.uk,
+  ...sharePagesI18n.uk,
+  ...receivedPagesI18n.uk,
   ...memoryDreamingI18n.uk,
   ...usageToolI18n.uk,
   ...openchamberToolsLayoutI18n.uk,
@@ -2514,6 +2518,7 @@ export const dict: Record<I18nKey, string> = {
   "chat.toast.opencodeRestartInterrupted.description": "OpenCode перезапустився, поки відповідь ще формувалася. Надішліть повідомлення, щоб продовжити.",
   "chat.toast.opencodeRestartInterrupted.autoResumeDescription": "OpenCode перезапустився, поки відповідь ще формувалася. Чат буде відновлено автоматично; надішліть повідомлення, якщо ні.",
   "chat.toast.opencodeRestartInterrupted.openSession": "Відкрити сесію",
+  "chat.toast.shareAnswer.openSession": "Відкрити сесію",
   "chat.errorBoundary.title": "Помилка чату",
   "chat.errorBoundary.description": "В інтерфейсі чату сталася помилка. Причиною може бути тимчасова проблема з мережею або пошкоджені дані повідомлення.",
   "chat.errorBoundary.sessionLabel": "Сесія",
@@ -3079,8 +3084,8 @@ export const dict: Record<I18nKey, string> = {
   "projects.sharedTrust.actions": "Дії",
   "projects.sharedTrust.skip": "Не цього разу",
   "projects.sharedTrust.trust": "Довірити й виконати",
-  "projects.opencodeTrust.title": "Дозволити OpenCode запускати код із цієї папки?",
-  "projects.opencodeTrust.description": "OpenCode запускає плагіни й команди з конфігурації {path}, щойно відкриває папку. Довірте їм один раз, і OpenChamber спитає знову тільки тоді, коли вони зміняться.",
+  "projects.opencodeTrust.title": "Довіряти конфігурації OpenCode у цій папці?",
+  "projects.opencodeTrust.description": "OpenCode застосовує все, що нижче, з конфігурації {path}, щойно відкриває папку. Довірте їй один раз, і OpenChamber спитає знову тільки тоді, коли це зміниться.",
   "projects.opencodeTrust.plugins": "Плагіни",
   "projects.opencodeTrust.commands": "Команди",
   "projects.opencodeTrust.kind.package": "{name} (пакет npm)",
@@ -3089,6 +3094,12 @@ export const dict: Record<I18nKey, string> = {
   "projects.opencodeTrust.kind.lsp": "Мовний сервер {name}",
   "projects.opencodeTrust.kind.formatter": "Форматувальник {name}",
   "projects.opencodeTrust.kind.shell": "Оболонка",
+  "projects.opencodeTrust.kind.env": "Змінна середовища {name}",
+  "projects.opencodeTrust.kind.file": "Файл {path}",
+  "projects.opencodeTrust.values": "Значення з вашого компʼютера, які вона може надіслати назовні",
+  "projects.opencodeTrust.permissions": "Дозволи, які вона дає",
+  "projects.opencodeTrust.permission.agent": "Агент {name}",
+  "projects.opencodeTrust.permission.everyAgent": "Усі агенти",
   "projects.opencodeTrust.paused": "Без довіри агенти в цій папці не працюватимуть, але переглядати файли й зміни Git можна.",
   "projects.opencodeTrust.skip": "Не цього разу",
   "projects.opencodeTrust.trust": "Довіряти й відкрити",

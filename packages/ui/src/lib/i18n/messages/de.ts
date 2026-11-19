@@ -28,6 +28,8 @@ import { compactionSettingsI18n } from './compaction-settings.i18n';
 import { heapSnapshotI18n } from './heap-snapshot.i18n';
 import { consoleBudgetsI18n } from './console-budgets.i18n';
 import { imageToolI18n } from './image-tool.i18n';
+import { sharePagesI18n } from './share-pages.i18n';
+import { receivedPagesI18n } from './received-pages.i18n';
 import { memoryDreamingI18n } from './memory-dreaming.i18n';
 import { usageToolI18n } from './usage-tool.i18n';
 import { openchamberToolsLayoutI18n } from './openchamber-tools-layout.i18n';
@@ -218,6 +220,8 @@ export const dict = {
   ...heapSnapshotI18n.de,
   ...consoleBudgetsI18n.de,
   ...imageToolI18n.de,
+  ...sharePagesI18n.de,
+  ...receivedPagesI18n.de,
   ...memoryDreamingI18n.de,
   ...usageToolI18n.de,
   ...openchamberToolsLayoutI18n.de,
@@ -2281,6 +2285,7 @@ export const dict = {
   'chat.toast.opencodeRestartInterrupted.description': 'OpenCode wurde neu gestartet, während noch eine Antwort lief. Senden Sie eine Nachricht, um fortzufahren.',
   'chat.toast.opencodeRestartInterrupted.autoResumeDescription': 'OpenCode wurde neu gestartet, während noch eine Antwort lief. Der Chat wird automatisch fortgesetzt; senden Sie eine Nachricht, falls nicht.',
   'chat.toast.opencodeRestartInterrupted.openSession': 'Sitzung öffnen',
+  'chat.toast.shareAnswer.openSession': 'Sitzung öffnen',
   'chat.errorBoundary.title': 'Chat-Fehler',
   'chat.errorBoundary.description': 'Die Chat-Oberfläche hat einen Fehler festgestellt. Dies könnte auf ein vorübergehendes Netzwerkproblem oder beschädigte Nachrichtendaten zurückzuführen sein.',
   'chat.errorBoundary.sessionLabel': 'Sitzung',
@@ -2835,8 +2840,8 @@ export const dict = {
   'projects.sharedTrust.actions': 'Aktionen',
   'projects.sharedTrust.skip': 'Diesmal nicht',
   'projects.sharedTrust.trust': 'Vertrauen und ausführen',
-  'projects.opencodeTrust.title': 'OpenCode Code aus diesem Ordner ausführen lassen?',
-  'projects.opencodeTrust.description': 'OpenCode führt die Plugins und Befehle aus der Konfiguration von {path} aus, sobald es den Ordner öffnet. Vertraue ihnen einmal, und OpenChamber fragt erst wieder, wenn sie sich ändern.',
+  'projects.opencodeTrust.title': 'Der OpenCode-Konfiguration in diesem Ordner vertrauen?',
+  'projects.opencodeTrust.description': 'OpenCode wendet alles unten aus der Konfiguration von {path} an, sobald es den Ordner öffnet. Vertraue ihr einmal, und OpenChamber fragt erst wieder, wenn sich das ändert.',
   'projects.opencodeTrust.plugins': 'Plugins',
   'projects.opencodeTrust.commands': 'Befehle',
   'projects.opencodeTrust.kind.package': '{name} (npm-Paket)',
@@ -2845,6 +2850,12 @@ export const dict = {
   'projects.opencodeTrust.kind.lsp': 'Sprachserver {name}',
   'projects.opencodeTrust.kind.formatter': 'Formatierer {name}',
   'projects.opencodeTrust.kind.shell': 'Shell',
+  'projects.opencodeTrust.kind.env': 'Umgebungsvariable {name}',
+  'projects.opencodeTrust.kind.file': 'Datei {path}',
+  'projects.opencodeTrust.values': 'Werte von deinem Rechner, die sie nach außen senden kann',
+  'projects.opencodeTrust.permissions': 'Berechtigungen, die sie erlaubt',
+  'projects.opencodeTrust.permission.agent': 'Agent {name}',
+  'projects.opencodeTrust.permission.everyAgent': 'Alle Agenten',
   'projects.opencodeTrust.paused': 'Ohne Vertrauen können Agenten in diesem Ordner nicht arbeiten, aber Dateien und Git-Änderungen kannst du weiter ansehen.',
   'projects.opencodeTrust.skip': 'Diesmal nicht',
   'projects.opencodeTrust.trust': 'Vertrauen und öffnen',

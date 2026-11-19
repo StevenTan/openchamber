@@ -28,6 +28,8 @@ import { compactionSettingsI18n } from './compaction-settings.i18n';
 import { heapSnapshotI18n } from './heap-snapshot.i18n';
 import { consoleBudgetsI18n } from './console-budgets.i18n';
 import { imageToolI18n } from './image-tool.i18n';
+import { sharePagesI18n } from './share-pages.i18n';
+import { receivedPagesI18n } from './received-pages.i18n';
 import { memoryDreamingI18n } from './memory-dreaming.i18n';
 import { usageToolI18n } from './usage-tool.i18n';
 import { openchamberToolsLayoutI18n } from './openchamber-tools-layout.i18n';
@@ -218,6 +220,8 @@ export const dict = {
   ...heapSnapshotI18n.en,
   ...consoleBudgetsI18n.en,
   ...imageToolI18n.en,
+  ...sharePagesI18n.en,
+  ...receivedPagesI18n.en,
   ...memoryDreamingI18n.en,
   ...usageToolI18n.en,
   ...openchamberToolsLayoutI18n.en,
@@ -2547,6 +2551,7 @@ export const dict = {
   'chat.toast.opencodeRestartInterrupted.description': 'OpenCode restarted while a response was still running. Send a message to continue.',
   'chat.toast.opencodeRestartInterrupted.autoResumeDescription': 'OpenCode restarted while a response was still running. The chat will resume automatically; send a message if it does not.',
   'chat.toast.opencodeRestartInterrupted.openSession': 'Open session',
+  'chat.toast.shareAnswer.openSession': 'Open session',
   'chat.errorBoundary.title': 'Chat Error',
   'chat.errorBoundary.description': 'The chat interface encountered an error. This might be due to a temporary network issue or corrupted message data.',
   'chat.errorBoundary.sessionLabel': 'Session',
@@ -3124,8 +3129,8 @@ export const dict = {
   'projects.sharedTrust.actions': 'Actions',
   'projects.sharedTrust.skip': 'Not this time',
   'projects.sharedTrust.trust': 'Trust and run',
-  'projects.opencodeTrust.title': 'Let OpenCode run code from this folder?',
-  'projects.opencodeTrust.description': 'OpenCode runs the plugins and commands in the configuration of {path} as soon as it opens the folder. Trust them once, and OpenChamber asks again only when they change.',
+  'projects.opencodeTrust.title': 'Trust the OpenCode configuration in this folder?',
+  'projects.opencodeTrust.description': 'OpenCode applies everything below from the configuration of {path} as soon as it opens the folder. Trust it once, and OpenChamber asks again only when this changes.',
   'projects.opencodeTrust.plugins': 'Plugins',
   'projects.opencodeTrust.commands': 'Commands',
   'projects.opencodeTrust.kind.package': '{name} (npm package)',
@@ -3134,6 +3139,12 @@ export const dict = {
   'projects.opencodeTrust.kind.lsp': 'Language server {name}',
   'projects.opencodeTrust.kind.formatter': 'Formatter {name}',
   'projects.opencodeTrust.kind.shell': 'Shell',
+  'projects.opencodeTrust.kind.env': 'Environment variable {name}',
+  'projects.opencodeTrust.kind.file': 'File {path}',
+  'projects.opencodeTrust.values': 'Values from your machine it can send out',
+  'projects.opencodeTrust.permissions': 'Permissions it allows',
+  'projects.opencodeTrust.permission.agent': 'Agent {name}',
+  'projects.opencodeTrust.permission.everyAgent': 'Every agent',
   'projects.opencodeTrust.paused': 'Without trust, agents can\'t work in this folder, but you can still browse its files and Git changes.',
   'projects.opencodeTrust.skip': 'Not this time',
   'projects.opencodeTrust.trust': 'Trust and open',
