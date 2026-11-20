@@ -1,7 +1,14 @@
 import React from 'react';
-import { cn } from '@/lib/utils';
+import { cn, formatDirectoryName } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
+import { isOperatorChildSession } from '@/lib/sessionOperatorChild';
+import { resolveGlobalSessionDirectory, useGlobalSessionsStore } from '@/stores/useGlobalSessionsStore';
+import { useProjectsStore } from '@/stores/useProjectsStore';
+import { useProjectFolderMissing } from '@/components/session/sidebar/projects/useProjectFolderMissing';
+import { isSessionDirectoryAdmitted } from '@/sync/session-admission-rule';
 import { abortCurrentOperation } from '@/sync/session-actions';
+import { useSessionUIStore } from '@/sync/session-ui-store';
+import { useSession } from '@/sync/sync-context';
 import ScrollToBottomButton from '../components/ScrollToBottomButton';
 import { ChatInput } from '../ChatInput';
 import { PermissionDock } from '../PermissionDock';
@@ -40,6 +47,18 @@ const ReadOnlyComposer: React.FC<{
     sessionStatusType: string;
 }> = ({ sessionId, directory, permissionCount, spaceArchiveName, sessionStatusType }) => {
     const { t } = useI18n();
+    const listedSession = useGlobalSessionsStore((state) => (sessionId ? state.entityById.get(sessionId) : undefined));
+    const session = useSession(sessionId, directory) ?? listedSession;
+    const projects = useProjectsStore((state) => state.projects);
+    const worktrees = useSessionUIStore((state) => state.availableWorktreesByProject);
+    const ownDirectory = session ? resolveGlobalSessionDirectory(session) : null;
+    const outsideFolder = ownDirectory && !isSessionDirectoryAdmitted(ownDirectory, projects, worktrees) ? ownDirectory : null;
+    const folderMissing = useProjectFolderMissing(outsideFolder ?? undefined);
+    const sessionText = outsideFolder
+        ? t(folderMissing ? 'chat.container.readOnlyFolderMissingBanner' : 'chat.container.readOnlyFolderOutsideBanner', { name: formatDirectoryName(outsideFolder) })
+        : isOperatorChildSession(session)
+            ? t('chat.container.readOnlyOperatorChildPromptBanner')
+            : t('chat.container.readOnlySubagentPromptBanner');
     return (
         <>
             {/* The docks live inside ChatInput, which a read-only
@@ -60,7 +79,7 @@ const ReadOnlyComposer: React.FC<{
             <ReadOnlyPromptBanner
                 text={spaceArchiveName !== null
                     ? t('spaces.archive.readOnlyBanner', { name: spaceArchiveName })
-                    : t('chat.container.readOnlySubagentPromptBanner')}
+                    : sessionText}
                 onStop={spaceArchiveName === null && sessionId && sessionStatusType !== 'idle'
                     ? () => void abortCurrentOperation(sessionId)
                     : undefined}
