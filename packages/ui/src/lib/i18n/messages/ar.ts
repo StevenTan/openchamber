@@ -63,6 +63,7 @@ import { markdownOutlineI18n } from './markdown-outline.i18n';
 import { markdownGithubI18n } from './markdown-github.i18n';
 import { autocompleteScopeI18n } from './autocomplete-scope.i18n';
 import { workflowsI18n } from './workflows.i18n';
+import { subagentsI18n } from './subagents.i18n';
 import { sessionReferencesI18n } from './session-references.i18n';
 import { guestStatusViewI18n } from './guest-status-view.i18n';
 import { tooltipsDiffI18n } from './tooltips-diff.i18n';
@@ -2599,6 +2600,19 @@ export const dict = {
   'chat.messageBody.toast.copied': 'تم النسخ إلى الحافظة',
   'chat.messageBody.actions.savingImage': 'جارٍ حفظ الصورة…',
   'chat.messageBody.actions.saveAsImage': 'حفظ كصورة',
+  'chat.messageSelection.action': 'تحديد الرسائل',
+  'chat.messageSelection.count': 'المحدد: {count}',
+  'chat.messageSelection.empty': 'لم يُحدَّد شيء',
+  'chat.messageSelection.cancel': 'إلغاء',
+  'chat.messageSelection.copyMarkdown': 'نسخ Markdown',
+  'chat.messageSelection.copyMarkdownShort': 'Markdown',
+  'chat.messageSelection.saveImage': 'حفظ الصورة',
+  'chat.messageSelection.saveImageShort': 'صورة',
+  'chat.messageSelection.selectPrompt': 'تحديد الطلب',
+  'chat.messageSelection.selectAnswer': 'تحديد الرد',
+  'chat.messageSelection.toast.copied': 'تم نسخ Markdown',
+  'chat.messageSelection.toast.copyFailed': 'تعذّر النسخ إلى الحافظة',
+  'chat.messageSelection.toast.missing': 'لم تعد بعض الرسائل المحددة موجودة في هذه المحادثة، لذا أُلغي تحديدها. راجع التحديد وحاول مرة أخرى.',
   'chat.messageBody.actions.saveAsPlan': 'حفظ كخطة',
   'chat.messageBody.actions.startNewSession': 'بدء جلسة جديدة من هذه الإجابة',
   'chat.messageBody.actions.startNewMultiRun': 'بدء تشغيل متعدد جديد من هذه الإجابة',
@@ -3998,6 +4012,7 @@ export const dict = {
   ...markdownGithubI18n['ar'],
   ...autocompleteScopeI18n['ar'],
   ...workflowsI18n['ar'],
+  ...subagentsI18n['ar'],
   ...sessionReferencesI18n['ar'],
   ...guestStatusViewI18n['ar'],
   ...tooltipsDiffI18n['ar'],

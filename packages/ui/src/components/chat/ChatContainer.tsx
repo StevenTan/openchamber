@@ -128,6 +128,10 @@ import { getRuntimeKey } from '@/lib/runtime-switch';
 import { isMobileSurfaceRuntime } from '@/lib/runtimeSurface';
 import { createFirstVisibleSessionPerformanceTracker } from '@/sync/session-load-performance';
 import { isChatDirectoryPath } from '@/lib/chatDirectories';
+import { useEndMessageSelectionOnLeave } from '@/hooks/useMessageSelectionLifetime';
+import { MessageSelectionBar } from './messageSelection/MessageSelectionBar';
+import { useMessageSelectionClicks } from './messageSelection/useMessageSelectionClicks';
+import { useMessageSelecting } from '@/stores/useMessageSelectionStore';
 
 function HoistedUiPageSelection({ scrollNode, sessionId }: { scrollNode: HTMLElement; sessionId: string }) {
     const containerRef = React.useMemo(() => ({ current: scrollNode }), [scrollNode]);
@@ -320,6 +324,7 @@ const ChatViewport = React.memo(({
     onLoadEarlierPrompts,
 }: ChatViewportProps) => {
     const { t } = useI18n();
+    const messageSelection = useMessageSelectionClicks(currentSessionId, directory);
     const session = React.useMemo<ChatColumnSession>(() => ({
         sessionId: currentSessionId,
         directory: directory ?? null,
@@ -595,6 +600,8 @@ const ChatViewport = React.memo(({
                 ref={timelineRootRef}
                 style={showingTranscript ? undefined : { display: 'none' }}
                 aria-hidden={isDesktopExpandedInput}
+                data-message-selecting={messageSelection.selecting ? '' : undefined}
+                onClickCapture={messageSelection.onClickCapture}
             >
                 <div className="absolute inset-0">
                     {/* Retained by session ID: the session key also holds the
@@ -1283,6 +1290,8 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         allowPromptingSubagentSessions,
         readOnly,
     );
+    const messageSelectionActive = useMessageSelecting(currentSessionId);
+    useEndMessageSelectionOnLeave(currentSessionId);
 
 
     // Selection policy reads the live selection, not the deferred one: right
@@ -2058,7 +2067,16 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
                         />
                     </div>
                 )}
-                {promptReadOnly ? (
+                {promptReadOnly && messageSelectionActive && currentSessionId ? (
+                    <div className="chat-input-column w-full pb-4">
+                        <MessageSelectionBar
+                            sessionId={currentSessionId}
+                            directory={effectiveSessionDirectory ?? null}
+                            isMobile={isMobile}
+                            radius={isMobile ? '1.25rem' : 'var(--radius-xl)'}
+                        />
+                    </div>
+                ) : promptReadOnly ? (
                     <>
                         {/* The docks live inside ChatInput, which a read-only
                             chat does not mount. A subagent still asks for

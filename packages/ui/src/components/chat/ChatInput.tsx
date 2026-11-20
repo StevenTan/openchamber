@@ -309,6 +309,8 @@ import { useWorktreeBootstrapPending } from '@/hooks/useWorktreeBootstrapPending
 import { useShownAfter } from '@/hooks/useShownAfter';
 import { FormDock } from '@/components/chat/FormDock';
 import { PermissionDock } from '@/components/chat/PermissionDock';
+import { MessageSelectionBar } from '@/components/chat/messageSelection/MessageSelectionBar';
+import { useMessageSelecting } from '@/stores/useMessageSelectionStore';
 import { SessionGoalRow } from '@/components/chat/SessionGoalRow';
 import {
     createInputHistoryIdentity,
@@ -611,6 +613,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     // showing (see chatColumnSession.ts); elsewhere it follows the live one.
     const liveSessionId = useSessionUIStore((s) => (chatColumnSession ? null : s.currentSessionId));
     const currentSessionId = chatColumnSession ? chatColumnSession.sessionId : liveSessionId;
+    const messageSelectionActive = useMessageSelecting(currentSessionId);
     React.useEffect(() => {
         if (inputModeParentRef.current !== null && inputModeParentRef.current !== currentSessionId) {
             setInputMode('normal');
@@ -5138,7 +5141,14 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                         isMobileExpanded && 'flex min-h-0 flex-1 flex-col',
                     )}
                 >
-                {mobileCommentActive && mobileComment.draft.status === 'open' ? (
+                {messageSelectionActive && currentSessionId ? (
+                    <MessageSelectionBar
+                        sessionId={currentSessionId}
+                        directory={chatColumnSession?.directory ?? currentSessionDirectoryForSync ?? currentDirectory ?? null}
+                        isMobile={isMobile}
+                        radius={chatInputRadius}
+                    />
+                ) : mobileCommentActive && mobileComment.draft.status === 'open' ? (
                     // Keyed by generation: a replaced open remounts the shell
                     // so its dictation callbacks can never target the
                     // previous quote.
@@ -5451,7 +5461,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                     so the form's dictation events belong to that engine.
                     An in-flight recording is discarded by the swap:
                     its transcript must never reach the normal draft. */}
-                {isMobile && !isBtwActive && !mobileCommentActive ? (
+                {isMobile && !isBtwActive && !mobileCommentActive && !messageSelectionActive ? (
                     <MemoComposerDictation
                         radius={chatInputRadius}
                         isMobile={isMobile}

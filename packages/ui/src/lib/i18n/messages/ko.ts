@@ -65,6 +65,7 @@ import { markdownOutlineI18n } from './markdown-outline.i18n';
 import { markdownGithubI18n } from './markdown-github.i18n';
 import { autocompleteScopeI18n } from './autocomplete-scope.i18n';
 import { workflowsI18n } from './workflows.i18n';
+import { subagentsI18n } from './subagents.i18n';
 import { sessionReferencesI18n } from './session-references.i18n';
 import { guestStatusViewI18n } from './guest-status-view.i18n';
 import { tooltipsDiffI18n } from './tooltips-diff.i18n';
@@ -256,6 +257,7 @@ export const dict: Record<I18nKey, string> = {
   ...markdownGithubI18n['ko'],
   ...autocompleteScopeI18n['ko'],
   ...workflowsI18n['ko'],
+  ...subagentsI18n['ko'],
   ...sessionReferencesI18n['ko'],
   ...guestStatusViewI18n['ko'],
   ...tooltipsDiffI18n['ko'],
@@ -2697,6 +2699,19 @@ export const dict: Record<I18nKey, string> = {
   'chat.messageBody.toast.copied': '클립보드에 복사됨',
   'chat.messageBody.actions.savingImage': '이미지 저장 중…',
   'chat.messageBody.actions.saveAsImage': '이미지로 저장',
+  'chat.messageSelection.action': '메시지 선택',
+  'chat.messageSelection.count': '{count}개 선택됨',
+  'chat.messageSelection.empty': '선택한 항목 없음',
+  'chat.messageSelection.cancel': '취소',
+  'chat.messageSelection.copyMarkdown': 'Markdown 복사',
+  'chat.messageSelection.copyMarkdownShort': 'Markdown',
+  'chat.messageSelection.saveImage': '이미지 저장',
+  'chat.messageSelection.saveImageShort': '이미지',
+  'chat.messageSelection.selectPrompt': '프롬프트 선택',
+  'chat.messageSelection.selectAnswer': '답변 선택',
+  'chat.messageSelection.toast.copied': 'Markdown을 복사했습니다',
+  'chat.messageSelection.toast.copyFailed': '클립보드에 복사하지 못했습니다',
+  'chat.messageSelection.toast.missing': '선택한 메시지 중 일부가 더 이상 이 채팅에 없어 선택을 해제했습니다. 선택을 확인한 뒤 다시 시도하세요.',
   'chat.messageBody.actions.saveAsPlan': '플랜으로 저장',
   'chat.messageBody.actions.startNewSession': '이 응답에서 새 세션 시작',
   'chat.messageBody.actions.startNewMultiRun': '이 응답에서 새 멀티런 시작',

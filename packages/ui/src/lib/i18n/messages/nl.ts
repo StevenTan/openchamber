@@ -63,6 +63,7 @@ import { markdownOutlineI18n } from './markdown-outline.i18n';
 import { markdownGithubI18n } from './markdown-github.i18n';
 import { autocompleteScopeI18n } from './autocomplete-scope.i18n';
 import { workflowsI18n } from './workflows.i18n';
+import { subagentsI18n } from './subagents.i18n';
 import { sessionReferencesI18n } from './session-references.i18n';
 import { guestStatusViewI18n } from './guest-status-view.i18n';
 import { tooltipsDiffI18n } from './tooltips-diff.i18n';
@@ -256,6 +257,7 @@ export const dict = {
   ...markdownGithubI18n['nl'],
   ...autocompleteScopeI18n['nl'],
   ...workflowsI18n['nl'],
+  ...subagentsI18n['nl'],
   ...sessionReferencesI18n['nl'],
   ...guestStatusViewI18n['nl'],
   ...tooltipsDiffI18n['nl'],
@@ -2698,6 +2700,19 @@ export const dict = {
   'chat.messageBody.toast.copied': 'Gekopieerd naar het klembord',
   'chat.messageBody.actions.savingImage': 'Afbeelding opslaan...',
   'chat.messageBody.actions.saveAsImage': 'Opslaan als afbeelding',
+  'chat.messageSelection.action': 'Berichten selecteren',
+  'chat.messageSelection.count': 'Geselecteerd: {count}',
+  'chat.messageSelection.empty': 'Niets geselecteerd',
+  'chat.messageSelection.cancel': 'Annuleren',
+  'chat.messageSelection.copyMarkdown': 'Markdown kopiëren',
+  'chat.messageSelection.copyMarkdownShort': 'Markdown',
+  'chat.messageSelection.saveImage': 'Afbeelding opslaan',
+  'chat.messageSelection.saveImageShort': 'Afbeelding',
+  'chat.messageSelection.selectPrompt': 'Prompt selecteren',
+  'chat.messageSelection.selectAnswer': 'Antwoord selecteren',
+  'chat.messageSelection.toast.copied': 'Markdown gekopieerd',
+  'chat.messageSelection.toast.copyFailed': 'Kopiëren naar het klembord is mislukt',
+  'chat.messageSelection.toast.missing': 'Sommige geselecteerde berichten staan niet meer in deze chat en zijn gedeselecteerd. Controleer de selectie en probeer het opnieuw.',
   'chat.messageBody.actions.saveAsPlan': 'Opslaan als plan',
   'chat.messageBody.actions.startNewSession': 'Nieuwe sessie starten vanaf dit antwoord',
   'chat.messageBody.actions.startNewMultiRun': 'Nieuwe multi-run starten vanaf dit antwoord',

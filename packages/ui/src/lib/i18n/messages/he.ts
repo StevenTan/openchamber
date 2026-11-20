@@ -63,6 +63,7 @@ import { markdownOutlineI18n } from './markdown-outline.i18n';
 import { markdownGithubI18n } from './markdown-github.i18n';
 import { autocompleteScopeI18n } from './autocomplete-scope.i18n';
 import { workflowsI18n } from './workflows.i18n';
+import { subagentsI18n } from './subagents.i18n';
 import { sessionReferencesI18n } from './session-references.i18n';
 import { guestStatusViewI18n } from './guest-status-view.i18n';
 import { tooltipsDiffI18n } from './tooltips-diff.i18n';
@@ -2598,6 +2599,19 @@ export const dict = {
   'chat.messageBody.toast.copied': 'הועתק ללוח',
   'chat.messageBody.actions.savingImage': 'שומר תמונה…',
   'chat.messageBody.actions.saveAsImage': 'שמור כתמונה',
+  'chat.messageSelection.action': 'בחירת הודעות',
+  'chat.messageSelection.count': 'נבחרו: {count}',
+  'chat.messageSelection.empty': 'לא נבחר דבר',
+  'chat.messageSelection.cancel': 'ביטול',
+  'chat.messageSelection.copyMarkdown': 'העתקת Markdown',
+  'chat.messageSelection.copyMarkdownShort': 'Markdown',
+  'chat.messageSelection.saveImage': 'שמירת תמונה',
+  'chat.messageSelection.saveImageShort': 'תמונה',
+  'chat.messageSelection.selectPrompt': 'בחירת הבקשה',
+  'chat.messageSelection.selectAnswer': 'בחירת התשובה',
+  'chat.messageSelection.toast.copied': 'ה-Markdown הועתק',
+  'chat.messageSelection.toast.copyFailed': 'ההעתקה ללוח נכשלה',
+  'chat.messageSelection.toast.missing': 'חלק מההודעות שנבחרו כבר לא נמצאות בצ׳אט הזה, ולכן הבחירה בהן בוטלה. בדקו את הבחירה ונסו שוב.',
   'chat.messageBody.actions.saveAsPlan': 'שמור כתוכנית',
   'chat.messageBody.actions.startNewSession': 'התחל הפעלה חדשה מתשובה זו',
   'chat.messageBody.actions.startNewMultiRun': 'התחל הרצה מרובה חדשה מתשובה זו',
@@ -3997,6 +4011,7 @@ export const dict = {
   ...markdownGithubI18n['he'],
   ...autocompleteScopeI18n['he'],
   ...workflowsI18n['he'],
+  ...subagentsI18n['he'],
   ...sessionReferencesI18n['he'],
   ...guestStatusViewI18n['he'],
   ...tooltipsDiffI18n['he'],

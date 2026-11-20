@@ -63,6 +63,7 @@ import { markdownOutlineI18n } from './markdown-outline.i18n';
 import { markdownGithubI18n } from './markdown-github.i18n';
 import { autocompleteScopeI18n } from './autocomplete-scope.i18n';
 import { workflowsI18n } from './workflows.i18n';
+import { subagentsI18n } from './subagents.i18n';
 import { sessionReferencesI18n } from './session-references.i18n';
 import { guestStatusViewI18n } from './guest-status-view.i18n';
 import { tooltipsDiffI18n } from './tooltips-diff.i18n';
@@ -256,6 +257,7 @@ export const dict = {
   ...markdownGithubI18n['fr'],
   ...autocompleteScopeI18n['fr'],
   ...workflowsI18n['fr'],
+  ...subagentsI18n['fr'],
   ...sessionReferencesI18n['fr'],
   ...guestStatusViewI18n['fr'],
   ...tooltipsDiffI18n['fr'],
@@ -2406,6 +2408,19 @@ export const dict = {
   'chat.messageBody.toast.copied': 'Copié dans le presse-papiers',
   'chat.messageBody.actions.savingImage': 'Enregistrement de l\'image...',
   'chat.messageBody.actions.saveAsImage': 'Enregistrer sous image',
+  'chat.messageSelection.action': 'Sélectionner des messages',
+  'chat.messageSelection.count': 'Sélectionnés : {count}',
+  'chat.messageSelection.empty': 'Aucune sélection',
+  'chat.messageSelection.cancel': 'Annuler',
+  'chat.messageSelection.copyMarkdown': 'Copier le Markdown',
+  'chat.messageSelection.copyMarkdownShort': 'Markdown',
+  'chat.messageSelection.saveImage': 'Enregistrer l’image',
+  'chat.messageSelection.saveImageShort': 'Image',
+  'chat.messageSelection.selectPrompt': 'Sélectionner le prompt',
+  'chat.messageSelection.selectAnswer': 'Sélectionner la réponse',
+  'chat.messageSelection.toast.copied': 'Markdown copié',
+  'chat.messageSelection.toast.copyFailed': 'Impossible de copier dans le presse-papiers',
+  'chat.messageSelection.toast.missing': 'Certains messages sélectionnés ne sont plus dans ce chat et ont été désélectionnés. Vérifiez la sélection et réessayez.',
   'chat.messageBody.actions.saveAsPlan': 'Enregistrer comme plan',
   'chat.messageBody.actions.startNewSession': 'Démarrer une nouvelle session à partir de cette réponse',
   'chat.messageBody.actions.startNewMultiRun': 'Démarrer une nouvelle exécution multiple à partir de cette réponse',

@@ -63,6 +63,7 @@ import { markdownOutlineI18n } from './markdown-outline.i18n';
 import { markdownGithubI18n } from './markdown-github.i18n';
 import { autocompleteScopeI18n } from './autocomplete-scope.i18n';
 import { workflowsI18n } from './workflows.i18n';
+import { subagentsI18n } from './subagents.i18n';
 import { sessionReferencesI18n } from './session-references.i18n';
 import { guestStatusViewI18n } from './guest-status-view.i18n';
 import { tooltipsDiffI18n } from './tooltips-diff.i18n';
@@ -195,6 +196,7 @@ export const dict = {
   ...markdownGithubI18n['tr'],
   ...autocompleteScopeI18n['tr'],
   ...workflowsI18n['tr'],
+  ...subagentsI18n['tr'],
   ...sessionReferencesI18n['tr'],
   ...guestStatusViewI18n['tr'],
   ...tooltipsDiffI18n['tr'],
@@ -2527,6 +2529,19 @@ export const dict = {
   'chat.messageBody.toast.copied': 'Panoya kopyalandı',
   'chat.messageBody.actions.savingImage': 'Görsel kaydediliyor...',
   'chat.messageBody.actions.saveAsImage': 'Görsel olarak kaydet',
+  'chat.messageSelection.action': 'Mesajları seç',
+  'chat.messageSelection.count': 'Seçilen: {count}',
+  'chat.messageSelection.empty': 'Hiçbir şey seçilmedi',
+  'chat.messageSelection.cancel': 'İptal',
+  'chat.messageSelection.copyMarkdown': 'Markdown kopyala',
+  'chat.messageSelection.copyMarkdownShort': 'Markdown',
+  'chat.messageSelection.saveImage': 'Görseli kaydet',
+  'chat.messageSelection.saveImageShort': 'Görsel',
+  'chat.messageSelection.selectPrompt': 'İstemi seç',
+  'chat.messageSelection.selectAnswer': 'Yanıtı seç',
+  'chat.messageSelection.toast.copied': 'Markdown kopyalandı',
+  'chat.messageSelection.toast.copyFailed': 'Panoya kopyalanamadı',
+  'chat.messageSelection.toast.missing': 'Seçilen bazı mesajlar artık bu sohbette yok, bu yüzden seçimleri kaldırıldı. Seçimi kontrol edip yeniden deneyin.',
   'chat.messageBody.actions.saveAsPlan': 'Plan olarak kaydet',
   'chat.messageBody.actions.startNewSession': 'Bu yanıttan yeni session başlat',
   'chat.messageBody.actions.startNewMultiRun': 'Bu yanıttan yeni multi-run başlat',

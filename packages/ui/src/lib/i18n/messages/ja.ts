@@ -65,6 +65,7 @@ import { markdownOutlineI18n } from './markdown-outline.i18n';
 import { markdownGithubI18n } from './markdown-github.i18n';
 import { autocompleteScopeI18n } from './autocomplete-scope.i18n';
 import { workflowsI18n } from './workflows.i18n';
+import { subagentsI18n } from './subagents.i18n';
 import { sessionReferencesI18n } from './session-references.i18n';
 import { guestStatusViewI18n } from './guest-status-view.i18n';
 import { tooltipsDiffI18n } from './tooltips-diff.i18n';
@@ -256,6 +257,7 @@ export const dict: Record<I18nKey, string> = {
   ...markdownGithubI18n['ja'],
   ...autocompleteScopeI18n['ja'],
   ...workflowsI18n['ja'],
+  ...subagentsI18n['ja'],
   ...sessionReferencesI18n['ja'],
   ...guestStatusViewI18n['ja'],
   ...tooltipsDiffI18n['ja'],
@@ -2693,6 +2695,19 @@ export const dict: Record<I18nKey, string> = {
   'chat.messageBody.toast.copied': 'クリップボードにコピーしました',
   'chat.messageBody.actions.savingImage': '画像を保存中...',
   'chat.messageBody.actions.saveAsImage': '画像として保存',
+  'chat.messageSelection.action': 'メッセージを選択',
+  'chat.messageSelection.count': '{count} 件選択中',
+  'chat.messageSelection.empty': '何も選択されていません',
+  'chat.messageSelection.cancel': 'キャンセル',
+  'chat.messageSelection.copyMarkdown': 'Markdown をコピー',
+  'chat.messageSelection.copyMarkdownShort': 'Markdown',
+  'chat.messageSelection.saveImage': '画像を保存',
+  'chat.messageSelection.saveImageShort': '画像',
+  'chat.messageSelection.selectPrompt': 'プロンプトを選択',
+  'chat.messageSelection.selectAnswer': '回答を選択',
+  'chat.messageSelection.toast.copied': 'Markdown をコピーしました',
+  'chat.messageSelection.toast.copyFailed': 'クリップボードにコピーできませんでした',
+  'chat.messageSelection.toast.missing': '選択したメッセージの一部がこのチャットにもうないため、選択を解除しました。選択内容を確認して、もう一度お試しください。',
   'chat.messageBody.actions.saveAsPlan': '計画として保存',
   'chat.messageBody.actions.startNewSession': 'この回答から新しいセッションを開始',
   'chat.messageBody.actions.startNewMultiRun': 'この回答から新しいマルチランを開始',

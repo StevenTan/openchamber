@@ -65,6 +65,7 @@ import { markdownOutlineI18n } from './markdown-outline.i18n';
 import { markdownGithubI18n } from './markdown-github.i18n';
 import { autocompleteScopeI18n } from './autocomplete-scope.i18n';
 import { workflowsI18n } from './workflows.i18n';
+import { subagentsI18n } from './subagents.i18n';
 import { sessionReferencesI18n } from './session-references.i18n';
 import { guestStatusViewI18n } from './guest-status-view.i18n';
 import { tooltipsDiffI18n } from './tooltips-diff.i18n';
@@ -266,6 +267,7 @@ export const dict: Record<I18nKey, string> = {
   ...markdownGithubI18n['uk'],
   ...autocompleteScopeI18n['uk'],
   ...workflowsI18n['uk'],
+  ...subagentsI18n['uk'],
   ...sessionReferencesI18n['uk'],
   ...guestStatusViewI18n['uk'],
   ...tooltipsDiffI18n['uk'],
@@ -2665,6 +2667,19 @@ export const dict: Record<I18nKey, string> = {
   "chat.messageBody.toast.copied": "Скопійовано в буфер обміну",
   "chat.messageBody.actions.savingImage": "Збереження зображення...",
   "chat.messageBody.actions.saveAsImage": "Зберегти як зображення",
+  "chat.messageSelection.action": "Вибрати повідомлення",
+  "chat.messageSelection.count": "Вибрано: {count}",
+  "chat.messageSelection.empty": "Нічого не вибрано",
+  "chat.messageSelection.cancel": "Скасувати",
+  "chat.messageSelection.copyMarkdown": "Копіювати Markdown",
+  "chat.messageSelection.copyMarkdownShort": "Markdown",
+  "chat.messageSelection.saveImage": "Зберегти зображення",
+  "chat.messageSelection.saveImageShort": "Зображення",
+  "chat.messageSelection.selectPrompt": "Вибрати запит",
+  "chat.messageSelection.selectAnswer": "Вибрати відповідь",
+  "chat.messageSelection.toast.copied": "Markdown скопійовано",
+  "chat.messageSelection.toast.copyFailed": "Не вдалося скопіювати в буфер обміну",
+  "chat.messageSelection.toast.missing": "Деяких вибраних повідомлень уже немає в цьому чаті, тому вибір із них знято. Перевірте вибір і спробуйте ще раз.",
   "chat.messageBody.actions.saveAsPlan": "Зберегти як план",
   "chat.messageBody.actions.startNewSession": "Почати нову сесію із цієї відповіді",
   "chat.messageBody.actions.startNewMultiRun": "Почніть новий Multi-run із цієї відповіді",

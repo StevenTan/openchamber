@@ -63,6 +63,7 @@ import { markdownOutlineI18n } from './markdown-outline.i18n';
 import { markdownGithubI18n } from './markdown-github.i18n';
 import { autocompleteScopeI18n } from './autocomplete-scope.i18n';
 import { workflowsI18n } from './workflows.i18n';
+import { subagentsI18n } from './subagents.i18n';
 import { sessionReferencesI18n } from './session-references.i18n';
 import { guestStatusViewI18n } from './guest-status-view.i18n';
 import { tooltipsDiffI18n } from './tooltips-diff.i18n';
@@ -256,6 +257,7 @@ export const dict = {
   ...markdownGithubI18n['en'],
   ...autocompleteScopeI18n['en'],
   ...workflowsI18n['en'],
+  ...subagentsI18n['en'],
   ...sessionReferencesI18n['en'],
   ...guestStatusViewI18n['en'],
   ...tooltipsDiffI18n['en'],
@@ -2698,6 +2700,19 @@ export const dict = {
   'chat.messageBody.toast.copied': 'Copied to clipboard',
   'chat.messageBody.actions.savingImage': 'Saving image...',
   'chat.messageBody.actions.saveAsImage': 'Save as image',
+  'chat.messageSelection.action': 'Select messages',
+  'chat.messageSelection.count': '{count} selected',
+  'chat.messageSelection.empty': 'Nothing selected',
+  'chat.messageSelection.cancel': 'Cancel',
+  'chat.messageSelection.copyMarkdown': 'Copy Markdown',
+  'chat.messageSelection.copyMarkdownShort': 'Markdown',
+  'chat.messageSelection.saveImage': 'Save image',
+  'chat.messageSelection.saveImageShort': 'Image',
+  'chat.messageSelection.selectPrompt': 'Select prompt',
+  'chat.messageSelection.selectAnswer': 'Select answer',
+  'chat.messageSelection.toast.copied': 'Markdown copied',
+  'chat.messageSelection.toast.copyFailed': 'Could not copy to the clipboard',
+  'chat.messageSelection.toast.missing': 'Some selected messages are no longer in this chat, so they were deselected. Check the selection and try again.',
   'chat.messageBody.actions.saveAsPlan': 'Save as plan',
   'chat.messageBody.actions.startNewSession': 'Start new session from this answer',
   'chat.messageBody.actions.startNewMultiRun': 'Start new multi-run from this answer',

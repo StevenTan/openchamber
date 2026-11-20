@@ -65,6 +65,7 @@ import { markdownOutlineI18n } from './markdown-outline.i18n';
 import { markdownGithubI18n } from './markdown-github.i18n';
 import { autocompleteScopeI18n } from './autocomplete-scope.i18n';
 import { workflowsI18n } from './workflows.i18n';
+import { subagentsI18n } from './subagents.i18n';
 import { sessionReferencesI18n } from './session-references.i18n';
 import { guestStatusViewI18n } from './guest-status-view.i18n';
 import { tooltipsDiffI18n } from './tooltips-diff.i18n';
@@ -266,6 +267,7 @@ export const dict: Record<I18nKey, string> = {
   ...markdownGithubI18n['es'],
   ...autocompleteScopeI18n['es'],
   ...workflowsI18n['es'],
+  ...subagentsI18n['es'],
   ...sessionReferencesI18n['es'],
   ...guestStatusViewI18n['es'],
   ...tooltipsDiffI18n['es'],
@@ -2665,6 +2667,19 @@ export const dict: Record<I18nKey, string> = {
   "chat.messageBody.toast.copied": "Copiado al portapapeles",
   "chat.messageBody.actions.savingImage": "Guardando imagen...",
   "chat.messageBody.actions.saveAsImage": "Guardar como imagen",
+  "chat.messageSelection.action": "Seleccionar mensajes",
+  "chat.messageSelection.count": "Seleccionados: {count}",
+  "chat.messageSelection.empty": "Nada seleccionado",
+  "chat.messageSelection.cancel": "Cancelar",
+  "chat.messageSelection.copyMarkdown": "Copiar Markdown",
+  "chat.messageSelection.copyMarkdownShort": "Markdown",
+  "chat.messageSelection.saveImage": "Guardar imagen",
+  "chat.messageSelection.saveImageShort": "Imagen",
+  "chat.messageSelection.selectPrompt": "Seleccionar prompt",
+  "chat.messageSelection.selectAnswer": "Seleccionar respuesta",
+  "chat.messageSelection.toast.copied": "Markdown copiado",
+  "chat.messageSelection.toast.copyFailed": "No se pudo copiar al portapapeles",
+  "chat.messageSelection.toast.missing": "Algunos mensajes seleccionados ya no están en este chat, así que se deseleccionaron. Revisa la selección e inténtalo de nuevo.",
   "chat.messageBody.actions.saveAsPlan": "Guardar como plan",
   "chat.messageBody.actions.startNewSession": "Iniciar nueva sesión desde esta respuesta",
   "chat.messageBody.actions.startNewMultiRun": "Iniciar nuevo multi-run desde esta respuesta",

@@ -65,6 +65,7 @@ import { markdownOutlineI18n } from './markdown-outline.i18n';
 import { markdownGithubI18n } from './markdown-github.i18n';
 import { autocompleteScopeI18n } from './autocomplete-scope.i18n';
 import { workflowsI18n } from './workflows.i18n';
+import { subagentsI18n } from './subagents.i18n';
 import { sessionReferencesI18n } from './session-references.i18n';
 import { guestStatusViewI18n } from './guest-status-view.i18n';
 import { tooltipsDiffI18n } from './tooltips-diff.i18n';
@@ -256,6 +257,7 @@ export const dict: Record<I18nKey, string> = {
   ...markdownGithubI18n['zh-TW'],
   ...autocompleteScopeI18n['zh-TW'],
   ...workflowsI18n['zh-TW'],
+  ...subagentsI18n['zh-TW'],
   ...sessionReferencesI18n['zh-TW'],
   ...guestStatusViewI18n['zh-TW'],
   ...tooltipsDiffI18n['zh-TW'],
@@ -2674,6 +2676,19 @@ export const dict: Record<I18nKey, string> = {
   'chat.messageBody.toast.copied': '已複製到剪貼簿',
   'chat.messageBody.actions.savingImage': '正在儲存圖片...',
   'chat.messageBody.actions.saveAsImage': '儲存為圖片',
+  'chat.messageSelection.action': '選取訊息',
+  'chat.messageSelection.count': '已選 {count} 則',
+  'chat.messageSelection.empty': '未選取任何內容',
+  'chat.messageSelection.cancel': '取消',
+  'chat.messageSelection.copyMarkdown': '複製 Markdown',
+  'chat.messageSelection.copyMarkdownShort': 'Markdown',
+  'chat.messageSelection.saveImage': '儲存圖片',
+  'chat.messageSelection.saveImageShort': '圖片',
+  'chat.messageSelection.selectPrompt': '選取提示',
+  'chat.messageSelection.selectAnswer': '選取回答',
+  'chat.messageSelection.toast.copied': '已複製 Markdown',
+  'chat.messageSelection.toast.copyFailed': '無法複製到剪貼簿',
+  'chat.messageSelection.toast.missing': '部分已選訊息已不在此對話中，已取消選取。請檢查所選內容後再試一次。',
   'chat.messageBody.actions.saveAsPlan': '儲存為計畫',
   'chat.messageBody.actions.startNewSession': '基於此回答開始新會話',
   'chat.messageBody.actions.startNewMultiRun': '基於此回答開始新的 Multi-run',

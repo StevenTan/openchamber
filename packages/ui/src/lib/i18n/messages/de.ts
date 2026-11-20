@@ -63,6 +63,7 @@ import { markdownOutlineI18n } from './markdown-outline.i18n';
 import { markdownGithubI18n } from './markdown-github.i18n';
 import { autocompleteScopeI18n } from './autocomplete-scope.i18n';
 import { workflowsI18n } from './workflows.i18n';
+import { subagentsI18n } from './subagents.i18n';
 import { sessionReferencesI18n } from './session-references.i18n';
 import { guestStatusViewI18n } from './guest-status-view.i18n';
 import { tooltipsDiffI18n } from './tooltips-diff.i18n';
@@ -256,6 +257,7 @@ export const dict = {
   ...markdownGithubI18n['de'],
   ...autocompleteScopeI18n['de'],
   ...workflowsI18n['de'],
+  ...subagentsI18n['de'],
   ...sessionReferencesI18n['de'],
   ...guestStatusViewI18n['de'],
   ...tooltipsDiffI18n['de'],
@@ -2415,6 +2417,19 @@ export const dict = {
   'chat.messageBody.toast.copied': 'In die Zwischenablage kopiert',
   'chat.messageBody.actions.savingImage': 'Bild wird gespeichert...',
   'chat.messageBody.actions.saveAsImage': 'Als Bild speichern',
+  'chat.messageSelection.action': 'Nachrichten auswählen',
+  'chat.messageSelection.count': 'Ausgewählt: {count}',
+  'chat.messageSelection.empty': 'Nichts ausgewählt',
+  'chat.messageSelection.cancel': 'Abbrechen',
+  'chat.messageSelection.copyMarkdown': 'Markdown kopieren',
+  'chat.messageSelection.copyMarkdownShort': 'Markdown',
+  'chat.messageSelection.saveImage': 'Bild speichern',
+  'chat.messageSelection.saveImageShort': 'Bild',
+  'chat.messageSelection.selectPrompt': 'Prompt auswählen',
+  'chat.messageSelection.selectAnswer': 'Antwort auswählen',
+  'chat.messageSelection.toast.copied': 'Markdown kopiert',
+  'chat.messageSelection.toast.copyFailed': 'Kopieren in die Zwischenablage fehlgeschlagen',
+  'chat.messageSelection.toast.missing': 'Einige ausgewählte Nachrichten sind nicht mehr in diesem Chat und wurden abgewählt. Prüfe die Auswahl und versuche es erneut.',
   'chat.messageBody.actions.saveAsPlan': 'Als Plan speichern',
   'chat.messageBody.actions.startNewSession': 'Neue Sitzung von dieser Antwort starten',
   'chat.messageBody.actions.startNewMultiRun': 'Neuer Multi-Run von dieser Antwort starten',
