@@ -54,7 +54,7 @@ const blockedWait = (_input, { signal }) => new Promise((_resolve, reject) => {
 
 it('delegates follow-ups to the native background subagent and preserves completion metadata', async () => {
   const result = await tools.get('send_input').execute({ target: 'child', message: 'Continue researching' }, invocation());
-  expect(executeNative).toHaveBeenCalledWith({ agent: 'explore', description: 'Research', prompt: 'Continue researching', sessionID: 'child', background: true }, expect.objectContaining({ sessionID: 'parent' }));
+  expect(executeNative).toHaveBeenCalledWith({ agent: 'explore', description: 'Research', prompt: 'Continue researching', sessionID: 'child' }, expect.objectContaining({ sessionID: 'parent' }));
   expect(result).toEqual({ content: 'Background agent continues', metadata: { sessionID: 'child' } });
   expect(result).not.toHaveProperty('output');
 });
@@ -178,93 +178,6 @@ it('does not expose coordination tools when the native subagent tool is absent',
   dispose();
 });
 
-const spawn = { agent: 'explore', description: 'Research', prompt: 'Find the cause', background: true };
-
-it('prepares inherited history before delegating creation and preserves native structured output', async () => {
-  wait.mockResolvedValue(Response.json({ sessionID: 'inherited' }));
-  const result = await native.execute({ ...spawn, model: 'fixture/chat-model' }, invocation());
-  expect(wait).toHaveBeenCalledWith({ sessionID: 'parent', messageID: 'message', callID: 'call', title: 'Research' }, { signal: undefined });
-  expect(ctx.permission.assert).not.toHaveBeenCalled();
-  expect(executeNative).toHaveBeenCalledWith({ ...spawn, model: 'fixture/chat-model', sessionID: 'inherited', prompt: 'You are a subagent spawned by another session.\nFind the cause' }, expect.anything());
-  expect(result.output).toEqual({ sessionID: 'child' });
-});
-
-it('continues an existing child without taking another parent snapshot', async () => {
-  await native.execute({ ...spawn, sessionID: 'ses_child' }, invocation());
-  expect(wait).not.toHaveBeenCalled();
-  expect(executeNative).toHaveBeenCalledWith({ ...spawn, sessionID: 'ses_child' }, expect.anything());
-});
-
-it('uses native authorization and cleans the prepared child on rejection', async () => {
-  wait.mockResolvedValue(Response.json({ sessionID: 'inherited' }));
-  executeNative.mockRejectedValue(new Error('Permission denied'));
-  await expect(native.execute(spawn, invocation())).rejects.toThrow('Permission denied');
-  expect(ctx.permission.assert).not.toHaveBeenCalled();
-  expect(ctx.session.remove).toHaveBeenCalledWith({ sessionID: 'inherited' });
-});
-
-it('cleans up an inherited child rejected by native validation', async () => {
-  wait.mockResolvedValue(Response.json({ sessionID: 'inherited' }));
-  executeNative.mockRejectedValue(new Error('Subagent depth limit reached'));
-  await expect(native.execute(spawn, invocation())).rejects.toThrow('depth limit');
-  expect(ctx.session.remove).toHaveBeenCalledWith({ sessionID: 'inherited' });
-});
-
-it('keeps a child whose session ID was published for native execution recovery', async () => {
-  wait.mockResolvedValue(Response.json({ sessionID: 'inherited' }));
-  executeNative.mockImplementation(async (_input, context) => {
-    await context.progress({ sessionID: 'inherited', status: 'running' });
-    throw new Error('Subagent failed');
-  });
-  await expect(native.execute(spawn, invocation())).rejects.toThrow('Subagent failed');
-  expect(ctx.session.remove).not.toHaveBeenCalled();
-});
-
-it('settles preparation and cleans the child when cancelled before native execution', async () => {
-  const controller = new AbortController();
-  wait.mockImplementation(async () => { controller.abort(); return Response.json({ sessionID: 'inherited' }); });
-  await expect(native.execute(spawn, invocation(controller.signal))).rejects.toThrow();
-  expect(ctx.session.remove).toHaveBeenCalledWith({ sessionID: 'inherited' });
-  expect(executeNative).not.toHaveBeenCalled();
-});
-
-it('exposes optional all and none inheritance modes with all as the default', () => {
-  expect(native.input.properties.fork_turns).toMatchObject({ enum: ['all', 'none'], default: 'all' });
-  expect(native.input.required).not.toContain('fork_turns');
-  expect(Object.keys(native.input.properties)).toEqual(['agent', 'description', 'prompt', 'model', 'sessionID', 'background', 'fork_turns']);
-});
-
-it('starts with native fresh context when fork_turns is none', async () => {
-  await native.execute({ ...spawn, fork_turns: 'none' }, invocation());
-  expect(executeNative).toHaveBeenCalledWith(spawn, expect.anything());
-  expect(wait).not.toHaveBeenCalled();
-});
-
-it('inherits context for explicit all without forwarding the extension to the native tool', async () => {
-  wait.mockResolvedValue(Response.json({ sessionID: 'inherited' }));
-  await native.execute({ ...spawn, fork_turns: 'all' }, invocation());
-  expect(wait).toHaveBeenCalledOnce();
-  expect(executeNative.mock.calls[0][0]).toMatchObject({ sessionID: 'inherited' });
-  expect(executeNative.mock.calls[0][0]).not.toHaveProperty('fork_turns');
-});
-
-it.each(['all', 'none'])('keeps an existing child history when fork_turns is %s', async mode => {
-  await native.execute({ ...spawn, sessionID: 'ses_child', fork_turns: mode }, invocation());
-  expect(executeNative).toHaveBeenCalledWith({ ...spawn, sessionID: 'ses_child' }, expect.anything());
-  expect(wait).not.toHaveBeenCalled();
-});
-
-it('rejects an unsupported inheritance mode before any operation', async () => {
-  await expect(native.execute({ ...spawn, fork_turns: 'recent' }, invocation())).rejects.toThrow();
-  expect(wait).not.toHaveBeenCalled();
-  expect(executeNative).not.toHaveBeenCalled();
-});
-
-it('preserves the native session ID prefix constraint before performing any operation', async () => {
-  const pattern = new RegExp(native.input.properties.sessionID.pattern);
-  expect(pattern.test('ses_child')).toBe(true);
-  expect(pattern.test('invalid')).toBe(false);
-  await expect(native.execute({ ...spawn, sessionID: 'invalid' }, invocation())).rejects.toThrow();
-  expect(wait).not.toHaveBeenCalled();
-  expect(executeNative).not.toHaveBeenCalled();
+it('keeps the native subagent definition and executor', () => {
+  expect(native).toEqual({ description: 'Native subagent', execute: executeNative });
 });

@@ -3,8 +3,7 @@
 ## Ownership
 
 This managed plugin exposes `collaboration.send_input`, `wait_agent`,
-`interrupt_agent`, and `list_agents`; OpenCode flattens their names with underscores. It prepares
-inherited history for new native `subagent` calls. OpenCode owns execution,
+`interrupt_agent`, and `list_agents`; OpenCode flattens their names with underscores. OpenCode owns native `subagent` definitions, context inheritance, execution,
 persisted history and completion notifications.
 
 Web and Electron inject the plugin. Hosted and Capacitor clients use the
@@ -30,8 +29,8 @@ plugins and receive no injection.
   `resume: false`; acceptance does not imply cleanup has already completed.
 - API and permission failures surface as tool failures. No session history,
   status cache or notification queue is maintained by this module.
-- New children accept `fork_turns: "all" | "none"`, defaulting to `"all"`.
-  The `"none"` mode delegates fresh creation to the native tool. The `"all"`
+- The bundled OpenCode fork accepts `fork_turns: "all" | "none"`, defaulting to `"all"` for new children.
+  The native tool creates fresh context for `"none"`. The `"all"`
   mode inherits settled messages before the invoking assistant message and
   that message's recorded content before the invoking tool call,
   including attachments, tool results and compaction summaries. Message IDs and
@@ -40,13 +39,9 @@ plugins and receive no injection.
   supplies its own current agent instructions. Existing children keep their history.
 - The current assistant prefix keeps text, reasoning and settled tool results.
   Pending tool calls and content at or after the invoking call are excluded.
-  Only the copied prefix is marked complete for import; the parent stays unchanged.
-- Prepared children have no assigned agent and remain idle. The native tool
-  owns agent, permission, depth and model validation before executing them.
-  Rejection or cancellation before it publishes the child ID deletes the prepared
-  session; published children remain available for recovery.
+  Only the copied prefix is marked complete; the parent stays unchanged.
 - `list_agents` reads every page of the invoking session's direct children,
-  excludes preparations without an assigned agent, and checks permissions for
+  excludes sessions without an assigned agent, and checks permissions for
   each distinct child agent type. It returns `{ agents }` with `session_id`,
   `title`, `agent`, and `status` fields. Status comes from OpenCode's active
   session registry and is `running` or `idle`; it is a snapshot, not a success
@@ -57,11 +52,6 @@ child ownership again. Its SDK requests share the callback's disconnect signal
 and the invoking session's in-flight action tracking. Its Node HTTP transport
 has no socket timeout; the plugin's wait deadline governs both Web/Bun and
 packaged Electron/Node execution.
-
-The authenticated `/api/openchamber/subagent-context` callback reads the parent
-transcript up to the invoking message and tool-call IDs. Preparation writes settle before
-cancellation is reported so a cancelled import or instruction copy can be rolled
-back. Preparation failure deletes only its newly imported child.
 
 ## Decisions
 
@@ -76,13 +66,6 @@ and completion notification for every generation of child work.
 OpenCode 2.2.7's Promise plugin bridge ignores request-option signals for session
 methods. The server's HTTP SDK supports cancellation, so wait requests use that
 boundary to release the underlying wait when the plugin cancels its fetch.
-
-### Why inherited history uses import
-
-The import API accepts `parentID`, while ordinary forks have independent session
-ownership. Import creates an owned child with copied history; the existing-session
-path of the native subagent tool then selects its agent and model and registers
-the normal job observer. Ordinary forks retain their independent ownership.
 
 ### Why listing crosses the server callback
 
