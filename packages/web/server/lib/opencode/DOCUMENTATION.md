@@ -1332,9 +1332,16 @@ The managed command plugin is always registered alongside the session title
 plugin. It exposes `exec_command` and `write_stdin` and removes `shell` from the
 model's tool list. Its contract is in `../agent-command/DOCUMENTATION.md`.
 
-The managed child-agent coordination plugin adds follow-up, wait and interrupt
-tools alongside native `subagent`. Its contract is in
-`../agent-collaboration/DOCUMENTATION.md`.
+The bundled OpenCode server owns native `subagent` and `collaboration` tools.
+Collaboration targets use session IDs, absolute `/root` paths, caller-relative
+paths, or `parent` within the current root tree. `list_agents` includes parent
+relationships and current execution status. `send_input` starts or steers work;
+`send_message` admits a synthetic message without waking an idle recipient.
+`wait_agent` waits for any selected agent to become idle, while timeout and
+cancellation leave target execution unchanged. `interrupt_agent` requests an
+interrupt with `resume: false`. Completion notifications go to the agent's actual
+parent. Native agent permissions and `experimental.subagent_depth` govern access
+and spawning.
 
 The managed Code Mode plugin selects operation tools for native `execute` and
 supplies complete tool descriptions and signatures. Card tools retain direct

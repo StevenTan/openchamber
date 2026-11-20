@@ -5,7 +5,6 @@ import { isSharingAvailable } from '../share-pages/relay-client.js';
 import { materializeSessionTitlePlugin } from './session-title-plugin.js';
 import { EXTENSION_AUTHORING_COMMAND, materializeAuthoringSkill } from '../guests/agent-context.js';
 import { materializeTurnDiffPlugin } from '../turn-diffs/materialize.js';
-import { materializeCollaborationPlugin } from '../agent-collaboration/runtime.js';
 import { materializeQuotaUsagePlugin } from '../quota/response-usage.js';
 import { materializeCodeModePlugin } from '../agent-code-mode/runtime.js';
 import { materializeCodexAgentPlugin } from './codex-agent-plugin.js';
@@ -131,7 +130,6 @@ export const createManagedConfigRuntime = ({
     if (agentToolRuntime) directories.push(await agentToolRuntime.materializeSearchPlugin());
     if (agentToolRuntime) directories.push(await agentToolRuntime.materializeQuestionPlugin());
     directories.push(await materializeTurnDiffPlugin({ fsPromises, path, instanceDir }));
-    if (agentToolRuntime) directories.push(await materializeCollaborationPlugin(instanceDir));
     directories.push(await materializeQuotaUsagePlugin({ fsPromises, instanceDir }));
     if (agentToolRuntime) directories.push(await materializeCodeModePlugin(instanceDir));
     const workspace = await materializeWorkspaceDependencies({ fsPromises, path, instanceDir, env });

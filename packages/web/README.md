@@ -76,9 +76,9 @@ supports this protocol and uses the invoking model's provider API key. The
 Managed operation tools use native Code Mode with complete descriptions and
 parameter signatures. Tools that render dedicated cards keep direct entries.
 
-Managed child-agent controls live in `server/lib/agent-collaboration`. They send
-follow-ups, wait for idle, and interrupt children started by the native
-`subagent` tool. Operations are scoped to the invoking session's direct children.
+The bundled OpenCode server provides `collaboration` tools for listing agents,
+sending tasks and messages, waiting for idle, and interrupting agents in the
+current root tree. Completion notifications go to each agent's actual parent.
 
 ### Tunnel behavior notes
 

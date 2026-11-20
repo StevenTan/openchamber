@@ -111,7 +111,7 @@ describe('createDevServerWatchCommand', () => {
   });
 
   it('waits for all watchers to close when the parent receives a termination signal', async () => {
-    const children = Array.from({ length: 7 }, () => Object.assign(new EventEmitter(), {
+    const children = Array.from({ length: 6 }, () => Object.assign(new EventEmitter(), {
       kill: vi.fn(), exitCode: null, signalCode: null,
     }));
     const signals = new Map();
@@ -147,8 +147,6 @@ describe('createDevServerWatchCommand', () => {
       children[5].emit('close');
       await Promise.resolve();
       expect(kill).not.toHaveBeenCalled();
-      children[6].emit('close');
-      await Promise.resolve();
       await Promise.resolve();
       expect(kill).toHaveBeenCalledWith(process.pid, 'SIGTERM');
     } finally {
@@ -160,13 +158,13 @@ describe('createDevServerWatchCommand', () => {
   });
 
   it('stops every tool compiler when the server exits', async () => {
-    const children = Array.from({ length: 7 }, () => Object.assign(new EventEmitter(), {
+    const children = Array.from({ length: 6 }, () => Object.assign(new EventEmitter(), {
       kill: vi.fn(), exitCode: null, signalCode: null,
     }));
     let index = 0;
     runDevServerWatch({ runner: () => children[index++], env: {}, bunExecutable: 'bun' });
-    children[6].emit('exit', 0, null);
-    for (const child of children.slice(0, 6)) expect(child.kill).toHaveBeenCalledOnce();
+    children[5].emit('exit', 0, null);
+    for (const child of children.slice(0, 5)) expect(child.kill).toHaveBeenCalledOnce();
     for (const child of children) child.emit('close');
     await Promise.resolve();
     await Promise.resolve();

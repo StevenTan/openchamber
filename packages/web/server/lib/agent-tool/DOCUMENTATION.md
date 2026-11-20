@@ -355,20 +355,18 @@ default and when to set it. Field names and JSON types carry the rest.
   model sent it as a JSON string beside the action, where the schema gives it
   no type. No other field is revived, so prompts and titles that happen to look
   like JSON stay text.
-- The description draws the line against OpenCode's own `subagent` tool:
-  `subagent` when the agent delegates part of its own task and wants the
-  answer for itself, `session.*` when the user asks for a separate session
-  they will follow and talk to.
+- Internal delegation uses OpenCode's native `subagent` tool for every task
+  size. Native `collaboration` tools list and coordinate that agent tree.
+  `session.*` creates, sends to or forks a separate session when the user
+  explicitly asks for one they will follow and talk to. The model-facing schema
+  omits `ownWork`, and the agent callback refuses that parameter before dispatch.
 - The tool exposes only agent-relevant actions
   (`OPENCHAMBER_AGENT_TOOL_ACTIONS`): `schedule.status` stays CLI-only because
   `schedule.list` already returns scheduler status, and enable/disable are one
   `schedule.toggle` action driven by the `disabled` boolean.
-- The tool description frames intent: created sessions and scheduled tasks are
-  user-facing work the user follows up with. The agent must not decide on its
-  own to delegate parts of its current task, but an explicit user request to
-  create, send, or schedule always wins, even when it relates to the current
-  task (strict models otherwise read the old unconditional "never delegate" as
-  a hard ban and refused user-requested sends).
+- Created sessions and scheduled tasks are user-facing work the user follows
+  up with. Explicit user requests to create, send, or schedule apply even when
+  the work relates to the current task.
 - Optional behavior switches (`worktree`, `pullRequest`, `goal`, `agent`,
   `variant`, `returnResult`) state their default and an explicit "only when
   the user asks" rule so agents do not invent worktrees, goal mode, or result

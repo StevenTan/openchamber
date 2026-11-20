@@ -41,8 +41,6 @@
         "server/lib/agent-command/src/runtime.ts",
         "server/lib/agent-search/src/plugin.ts",
         "server/lib/agent-question/src/runtime.ts",
-        "server/lib/agent-collaboration/src/plugin.ts",
-        "server/lib/agent-collaboration/src/runtime.ts",
         "server/index.js",
         "scripts/build-server.mjs",
         "scripts/check-server-types.mjs",
@@ -63,7 +61,6 @@
         "server/lib/agent-command/src/**/*.ts",
         "server/lib/agent-search/src/**/*.ts",
         "server/lib/agent-question/src/**/*.ts",
-        "server/lib/agent-collaboration/src/**/*.ts",
         "src/**/*.{ts,tsx}"
       ]
     },

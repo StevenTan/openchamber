@@ -428,9 +428,9 @@ describe('managed agent tool runtime', () => {
     expect(tool.openchamber.input.properties.action.enum).not.toContain('schedule.status');
     expect(tool.openchamber.description).toContain('A dispatch returns at once');
     expect(tool.openchamber.description).toContain('returnResult brings its final answer back here');
-    expect(tool.openchamber.description).toContain('A session you start to get work done and collect its answer takes ownWork');
-    expect(tool.openchamber.description).toContain('go to the subagent tool');
-    expect(tool.openchamber.input.properties.parameters.properties.ownWork).toMatchObject({ type: 'boolean' });
+    expect(tool.openchamber.description).toContain('Use subagent for all delegation within your current task');
+    expect(tool.openchamber.description).toContain('collaboration tools manage those agents');
+    expect(tool.openchamber.input.properties.parameters.properties).not.toHaveProperty('ownWork');
     expect(tool.openchamber.input.properties.action.enum).toContain('session.messages');
     // An agent never blocks on a session: no wait or timeout in its schema.
     const controlParameters = tool.openchamber.input.properties.parameters.properties;
@@ -1313,7 +1313,8 @@ describe('managed agent tool runtime', () => {
     ['session.create', { prompt: 'x', timeout: 30 }, 'returnResult'],
     ['session.fork', { sessionId: 'ses_2', prompt: 'x', lastAssistant: true }, 'returnResult'],
     ['session.messages', { sessionId: 'ses_2', wait: true }, 'does not wait'],
-  ])('answers an agent asking %s to wait with what replaced it', async (action, input, hint) => {
+    ['session.create', { prompt: 'x', ownWork: true }, 'subagent'],
+  ])('reports unsupported options for %s before dispatching', async (action, input, hint) => {
     const { runtime, executeAction } = await createRuntime();
     const result = await runtime.execute({ input: { action, ...input }, sessionID: 'ses_1', tool: 'openchamber' });
 
