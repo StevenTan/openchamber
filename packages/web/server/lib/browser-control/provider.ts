@@ -9,17 +9,48 @@ import {
   serviceProvides,
 } from '@openchamber/sdk';
 import { browserProviderResultSchema } from '@openchamber/sdk/schemas';
+import type { z } from 'zod';
 
 import { GuestServiceError, proxyGuestServiceRequest } from '../guests/service.js';
 import { BrowserControlError } from './broker.js';
+import type { GuestCapability, OpenChamberContributes, ServiceContribution } from '@openchamber/sdk';
+import type { BrowserControlOptions, BrowserControlParameters, createBrowserControlBroker } from './broker.js';
+
+export interface BrowserProviderGuest extends Omit<OpenChamberContributes, 'panel'> {
+  id: string;
+  name: string;
+  packageRoot: string;
+  enabled?: boolean;
+  capabilityGrants: GuestCapability[];
+}
+
+export interface BrowserProviderReset {
+  guestId: string;
+  guestName: string;
+}
+
+export interface BrowserControlRouterOptions {
+  broker: Pick<ReturnType<typeof createBrowserControlBroker>, 'request'>;
+  readSettings: () => Promise<{ browserProvider?: unknown } | null>;
+  persistSettings: (changes: { browserProvider: string }) => void;
+  findGuest: (id: string) => Promise<BrowserProviderGuest | null>;
+  persistPath: string;
+  emitProviderReset: (event: BrowserProviderReset) => void;
+  createId: () => string;
+  proxyServiceRequest?: typeof proxyGuestServiceRequest;
+  surfaceControl?: {
+    userControls: (guestId: string) => boolean;
+    noteAgentActivity: (guestId: string) => void;
+  };
+}
 
 const BUILTIN_BROWSER_PROVIDER = 'builtin';
 
 const UNKNOWN_CONTEXT = Object.freeze({ directory: null, sessionId: null });
 
-export const isBrowserProviderGuest = (guest) => (
+export const isBrowserProviderGuest = (guest: BrowserProviderGuest | null): guest is BrowserProviderGuest & { service: ServiceContribution } => (
   Boolean(guest)
-  && guest.enabled !== false
+  && guest !== null && guest.enabled !== false
   && serviceProvides(guest.service, 'browser')
   && isGuestApproved({
     requested: requestedGuestCapabilities(guest),
@@ -27,21 +58,6 @@ export const isBrowserProviderGuest = (guest) => (
   })
 );
 
-/**
- * @param {{
- *   broker: { request: Function },
- *   readSettings: () => Promise<Record<string, unknown> | null>,
- *   persistSettings: (changes: Record<string, unknown>) => Promise<unknown>,
- *   findGuest: (id: string) => Promise<object | null>,
- *   persistPath: string,
- *   emitProviderReset: (event: { guestId: string, guestName: string }) => void,
- *   createId: () => string,
- *   proxyServiceRequest?: typeof proxyGuestServiceRequest,
- *   surfaceControl?: { userControls: (guestId: string) => boolean, noteAgentActivity: (guestId: string) => void },
- * }} deps `surfaceControl` is the shared-surface lease: an action is refused
- * while the user is driving the extension's surface, and every action the
- * provider runs counts as agent activity there.
- */
 export const createBrowserControlRouter = ({
   broker,
   readSettings,
@@ -52,7 +68,7 @@ export const createBrowserControlRouter = ({
   createId,
   proxyServiceRequest = proxyGuestServiceRequest,
   surfaceControl = { userControls: () => false, noteAgentActivity: () => undefined },
-}) => {
+}: BrowserControlRouterOptions) => {
   const selectedProviderId = async () => {
     let settings;
     try {
@@ -67,12 +83,12 @@ export const createBrowserControlRouter = ({
     return value === BUILTIN_BROWSER_PROVIDER ? null : String(value);
   };
 
-  const resetToBuiltin = async ({ guestId, guestName }) => {
+  const resetToBuiltin = async ({ guestId, guestName }: BrowserProviderReset) => {
     await persistSettings({ browserProvider: BUILTIN_BROWSER_PROVIDER });
     emitProviderReset({ guestId, guestName });
   };
 
-  const requestFromProvider = async (guest, action, parameters, { signal, timeoutMs, context }) => {
+  const requestFromProvider = async (guest: BrowserProviderGuest & { service: ServiceContribution }, action: string, parameters: BrowserControlParameters, { signal, timeoutMs, context }: BrowserControlOptions) => {
     if (surfaceControl.userControls(guest.id)) {
       throw new BrowserControlError(
         'The user is interacting with this page in the panel right now, so the action was not run. '
@@ -119,7 +135,7 @@ export const createBrowserControlRouter = ({
         502,
       );
     }
-    let parsed;
+    let parsed: z.ZodSafeParseResult<z.infer<typeof browserProviderResultSchema>> | { success: false };
     try {
       parsed = browserProviderResultSchema.safeParse(JSON.parse(proxied.body));
     } catch {
@@ -138,7 +154,7 @@ export const createBrowserControlRouter = ({
   };
 
   return {
-    async request(action, parameters = {}, options = {}) {
+    async request(action: string, parameters: BrowserControlParameters = {}, options: BrowserControlOptions = {}) {
       const providerId = await selectedProviderId();
       if (!providerId) {
         return broker.request(action, parameters, options);
@@ -159,7 +175,7 @@ export const createBrowserControlRouter = ({
       return requestFromProvider(guest, action, parameters, options);
     },
 
-    async handleGuestDeactivated({ guestId, guestName }) {
+    async handleGuestDeactivated({ guestId, guestName }: BrowserProviderReset) {
       try {
         const providerId = await selectedProviderId();
         if (providerId !== guestId) return false;
