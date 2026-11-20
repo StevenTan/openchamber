@@ -26,8 +26,10 @@ const WIDGET_ASSETS = at('packages/mobile/ios/App/OpenChamberWidget/Assets.xcass
 const TRANSPARENT = { r: 0, g: 0, b: 0, alpha: 0 };
 const TILE = '#F9FCFF';
 const INLINE_LOGO_FILES = [
-  'packages/web/index.html', 'packages/electron/early-startup.mjs',
-  'packages/vscode/src/webviewHtml.ts', 'packages/web/server/lib/opencode/static-routes-runtime.js',
+  'packages/web/index.html',
+  'packages/electron/early-startup.mjs',
+  'packages/vscode/src/webviewHtml.ts',
+  'packages/web/server/lib/server-frame/static-routes-runtime.js',
 ];
 
 const replaceMarked = (source, file) => {

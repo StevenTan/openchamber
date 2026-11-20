@@ -1,10 +1,10 @@
-import { buildExternalManualRestartResponse } from './config-mutation-response.js';
-import { ThemeImportStorageError } from './theme-runtime.js';
-import { registerThemeCatalogRoutes } from './theme-catalog.js';
+import { buildExternalManualRestartResponse } from '../opencode/config-mutation-response.js';
+import { ThemeImportStorageError } from '../appearance/theme-runtime.js';
+import { registerThemeCatalogRoutes } from '../appearance/theme-catalog.js';
 import { collectLocalFileDiagnostics } from '../diagnostics/local-files.js';
 import { serverDiagnosticJournal } from '../diagnostics/server-journal.js';
 import { getBearerTokenFromRequest } from '../ui-auth/ui-auth.js';
-import { candidateUrlType, isLocalOnlyCandidateSet, isLoopbackCandidateUrl, normalizeCandidateUrl } from './pairing-candidates.js';
+import { candidateUrlType, isLocalOnlyCandidateSet, isLoopbackCandidateUrl, normalizeCandidateUrl } from '../client-auth/pairing-candidates.js';
 
 export const registerHttpResponseDiagnostics = (app, journal = serverDiagnosticJournal) => {
   app.use((req, res, next) => {
