@@ -5,14 +5,16 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { webPackagePaths } from '../web-package-paths.js';
 
 const run = promisify(execFile);
 const installations = new Map();
 
 export function runtimeFingerprint() {
   const digest = createHash('sha256');
+  const sourceDirectory = path.join(webPackagePaths.root, 'server', 'lib', 'workspace-dependencies');
   for (const file of ['./runtime-spec.json', './requirements.txt', './poppler-notices.txt', './cache.js', '../../../scripts/prepare-workspace-runtime.mjs']) {
-    digest.update(fs.readFileSync(new URL(file, import.meta.url)));
+    digest.update(fs.readFileSync(path.resolve(sourceDirectory, file)));
   }
   return digest.digest('hex');
 }

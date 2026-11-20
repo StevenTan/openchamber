@@ -91,9 +91,13 @@ it('rejects bundles for another host architecture', async () => {
 
 it('materializes a packaged plugin without access to build scripts', async () => {
   const fixture = await bundle();
-  const packaged = path.join(fixture.directory, 'packaged');
+  const packageRoot = path.join(fixture.directory, 'packaged');
+  const packaged = path.join(packageRoot, 'server', 'lib', 'workspace-dependencies');
   await fs.mkdir(path.join(packaged, 'dist'), { recursive: true });
-  await fs.writeFile(path.join(packaged, 'package.json'), '{"type":"module"}');
+  await fs.writeFile(path.join(packageRoot, 'package.json'), JSON.stringify({
+    name: '@openchamber/web', type: 'module', main: './server/index.js', bin: { openchamber: './bin/cli.js' },
+  }));
+  await fs.copyFile(new URL('../web-package-paths.js', import.meta.url), path.join(packaged, '..', 'web-package-paths.js'));
   for (const file of ['runtime.js', 'cache.js', 'pdf-skill.txt', 'dist/plugin.js']) {
     await fs.copyFile(new URL(file, import.meta.url), path.join(packaged, file));
   }

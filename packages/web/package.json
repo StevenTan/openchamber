@@ -3,10 +3,22 @@
   "version": "2.7.2",
   "private": false,
   "type": "module",
-  "main": "./server/index.js",
-  "types": "./server/index.d.ts",
+  "main": "./build/server/index.js",
+  "types": "./build/server/index.d.ts",
   "bin": {
-    "openchamber": "./bin/cli.js"
+    "openchamber": "./build/bin/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./build/server/index.d.ts",
+      "openchamber-source": "./server/index.js",
+      "default": "./build/server/index.js"
+    },
+    "./server/*": {
+      "openchamber-source": "./server/*",
+      "default": "./build/server/*"
+    },
+    "./package.json": "./package.json"
   },
   "publishConfig": {
     "access": "public"
@@ -28,7 +40,7 @@
     "test": "bun run build:server && vitest run",
     "start": "node bin/cli.js serve",
     "type-check:server": "tsc --project tsconfig.agent-command.json",
-    "build:server": "bun run type-check:server && tsc --project tsconfig.agent-command.build.json && bun build ./server/lib/agent-search/src/plugin.ts --outfile ./server/lib/agent-search/dist/plugin.js --target node --format esm && tsc --project tsconfig.agent-question.build.json && bun build ./server/lib/agent-collaboration/src/plugin.ts ./server/lib/agent-collaboration/src/runtime.ts --outdir ./server/lib/agent-collaboration/dist --target node --format esm && bun build ./server/lib/agent-code-mode/src/plugin.ts --outfile ./server/lib/agent-code-mode/dist/plugin.js --target node --format esm && bun build ./server/lib/workspace-dependencies/src/plugin.ts --outfile ./server/lib/workspace-dependencies/dist/plugin.js --target node --format esm",
+    "build:server": "bun run type-check:server && tsc --project tsconfig.agent-command.build.json && bun build ./server/lib/agent-search/src/plugin.ts --outfile ./server/lib/agent-search/dist/plugin.js --target node --format esm && tsc --project tsconfig.agent-question.build.json && bun build ./server/lib/agent-collaboration/src/plugin.ts ./server/lib/agent-collaboration/src/runtime.ts --outdir ./server/lib/agent-collaboration/dist --target node --format esm && bun build ./server/lib/agent-code-mode/src/plugin.ts --outfile ./server/lib/agent-code-mode/dist/plugin.js --target node --format esm && bun build ./server/lib/workspace-dependencies/src/plugin.ts --outfile ./server/lib/workspace-dependencies/dist/plugin.js --target node --format esm && bun ../../scripts/build-builtin-extensions.mjs && node scripts/build-server.mjs",
     "prepare:workspace-runtime": "node ./scripts/prepare-workspace-runtime.mjs"
   },
   "dependencies": {
@@ -115,6 +127,7 @@
   },
   "files": [
     "dist",
+    "build",
     "server",
     "bin",
     "scripts/prepare-workspace-runtime.mjs",
