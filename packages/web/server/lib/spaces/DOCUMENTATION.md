@@ -109,6 +109,11 @@ Its result cannot promise that every field is a string. The place registry
 checks method presence and keeps the original place object; it establishes no
 contract for those methods' results.
 
+The manager declares the place operations it calls, including a string start
+configuration and progress callbacks that receive a step. Docker's check result
+narrows through its existing `available` test; its JavaScript return inference
+alone does not retain the success discriminant.
+
 The tools manifest reader validates versions with a coercing regular expression.
 That check alone does not prove the original JSON value was a string. A tools
 source is accepted by factory identity in a `WeakSet`, rather than by its shape.
@@ -125,6 +130,53 @@ them. Its required-entry accessor covers dense loop positions and maps populated
 earlier in the same call. A missing object-size answer retains the native
 `TypeError` for reading `size`. The external argument-array check stays in
 `buildExtUrl`; its type does not replace the runtime refusal.
+
+Record reads return a discriminated result whose successful record is inferred
+from the schema. Invalid grants, setup state and task titles retain their
+independent recovery paths. The task-title sanitizer accepts unchecked input
+and returns an empty title when its string parse fails.
+
+Environment-key reads stay unchecked until the model-grant string test. A name
+such as `constructor` can select an inherited object member, both for an initial
+grant and when a space starts again. The journey keeps both string tests.
+Creation-error lookup also keeps the object's inherited-property behavior.
+
+The manager preserves unchecked failure codes when wrapping a place error.
+`SpaceError` carries that code's inferred type rather than promising a string
+for a value the manager did not validate. Error-property access preserves
+inherited fields and the existing optional access on nullish failures.
+Required error-property reads still fail on nullish values.
+
+The command runner shares `CommandOptions` and `CommandResult` with host Git.
+Its output events carry buffers because these private child pipes never set an
+encoding. The tail window contains a first chunk while trimming and tracks the
+byte count for each of its two buffers. Required-entry accessors preserve those
+invariants under indexed-access checking. Node's general spawn declaration makes
+stdin nullable when stderr is a file descriptor; the runner always requests a
+stdin pipe and requires it before writing. Error fields remain unchecked, and
+required reads still fail for nullish errors. Both process-tree kill paths keep
+the integer-greater-than-one pid check.
+
+Dispatcher directory headers retain Node's string-or-array input type. URI
+decoding and percent-escape matching coerce arrays as before; an undecoded array
+still fails with the original `trim` TypeError. Empty header arrays are ignored.
+The directory-to-id accessor runs only after the space-directory check, so its
+normalized directory is non-null and its split always has a first element.
+Listed ids remain unchecked values in the dispatcher's set: a coercible label
+may pass label parsing without being a string, and set membership must not
+coerce it to match a request's string id.
+
+The HTTP agent's connection callback receives either an error alone or a null
+error and a duplex stream. Node's declaration requires the stream even on
+failure. The dispatcher installs its override with `Object.assign` and a named
+callback union that describes the actual Node invocation. HTTP client response
+events always carry a numeric status; Node's shared `IncomingMessage` type also
+covers server-side requests, where that property is absent.
+
+Setup output removes C0, C1 and bidi characters.
+Unicode categories express the control range without a lint suppression;
+tab, newline and carriage return remain outside that removal range. Escape
+and bell delimiters still consume complete terminal sequences.
 
 ### Why control ranges use Unicode categories
 
@@ -1258,6 +1310,11 @@ The manager verifies again after `create` and removes a space that reports viola
 ## Process rules
 
 `run-command.js` spawns the executable directly with an argv array, `shell: false`, and `windowsHide: true`. No `cmd.exe`, no shell strings. Every call has a timeout that kills the child, and an output cap. The Docker place receives the runner as a dependency, so tests pass a fake and never mock a module.
+
+libuv's [Windows process implementation](https://github.com/libuv/libuv/blob/v1.x/src/win/process.c)
+uses silent breakaway, leaving subprocesses outside Node's job object.
+[Node's detached option](https://nodejs.org/api/child_process.html#optionsdetached)
+gives a Windows child its own console, so tree-kill children detach only on POSIX.
 
 A timeout kills the `docker` CLI only. A command started with `exec` keeps running inside the space or the gatekeeper.
 

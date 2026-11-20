@@ -39,4 +39,18 @@ describe('server-owned OpenCode dispatch responses', () => {
     transport.mockResolvedValue(new Response('<html>UI</html>', { headers: { 'content-type': 'text/html' } }));
     await expect(sdk.session.wait({ sessionID: 'child' })).rejects.toThrow('runtime returned HTML');
   });
+
+  it('accepts an explicit undefined abort signal through the real client', async () => {
+    globalThis.fetch = vi.fn(async () => Response.json({ data: { id: 'ses_1' } }));
+    await expect(client().session.get({ sessionID: 'ses_1' }, { signal: undefined })).resolves.toEqual({ id: 'ses_1' });
+    expect(globalThis.fetch.mock.calls[0][1].signal).toBeUndefined();
+  });
+
+  it('serializes unchecked metadata values through the real client', async () => {
+    globalThis.fetch = vi.fn(async () => new Response(null, { status: 204 }));
+    await client().session.update({ sessionID: 'ses_1', metadata: { retained: new Map([['key', 'value']]) } });
+    const [url, init] = globalThis.fetch.mock.calls[0];
+    expect(String(url)).toBe('http://opencode.test/api/session/ses_1');
+    expect(JSON.parse(init.body)).toEqual({ metadata: { retained: {} } });
+  });
 });

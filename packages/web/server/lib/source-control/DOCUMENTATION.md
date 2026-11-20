@@ -283,21 +283,54 @@ during serialization and are then omitted by JSON. The in-memory types preserve
 both cases. Dictionary ownership checks remain in place before section access;
 missing section and credential-slot checks express parser-established occupancy.
 
-### Why binding endpoint protocols still have an untyped boundary
+### Why remote project-path protocols remain strings
 
 `git/credential-resolver.js` owns `normalizeGitRemoteEndpoint` and
 `normalizeGitCredentialEndpoint`. Their protocol check uses `in` on an ordinary
 object, so an inherited key with an explicit port can pass: the remote
 `constructor://example.com:80/team/repo` returns protocol `constructor`.
-The binding service passes that protocol to `ProviderDescriptor.projectPathOfRemote`,
-whose contract permits only `http`, `https` and `ssh`. Giving the normalizer that
-return type would overstate its checks; rejecting other protocols in the binding
-service would change behavior. The Git owner must resolve this boundary before a
-behavior-preserving conversion can type that call.
+`ProviderDescriptor.projectPathOfRemote` therefore accepts a string protocol.
+Gerrit's implementation strips `a/` only for `http` and `https` and retains the
+path for every other protocol. The declaration preserves that existing behavior
+without claiming that the normalizer checked a closed protocol union.
+
+### Why binding drafts remain separate from persisted bindings
+
+Binding mutations build remote and auxiliary records incrementally, before the
+store checks the managed credential and rejects credentials on other modes.
+`BindingDraft` describes those intermediate records. `parseBinding` establishes
+the persisted tagged union through the existing validation; a non-null
+`compareAndSwap` input returns a non-null parsed binding. Readiness projection
+also accepts drafts because provider mutation projects readiness before the store
+adds repository identity and revision.
+
+The service's mutation target contains only the project owner and name and the
+optional number, head, base and SHA it checks. The SDK's wire mutation target
+also requires project and repository identifiers; the service does not claim to
+have established those fields. Transport account user IDs include extension
+strings, while the older provider credential declaration names numeric IDs.
+Credential presentation retains its own identity and safe-text checks.
+
+Provider parsing preserves array cardinality, so parsing one provider returns
+one provider. Missing credential presentation remains unavailable. The checkout
+path control-character expression uses `String.raw` to retain the original
+character range under the TypeScript lint rule.
 
 ### Why session secrets stay outside session objects
 
 Providers keep tokens and verified CLI users in module-owned `WeakMap` entries keyed by the exact session object, so serializing or logging a session cannot expose a token. CLI identity uncertainty preserves the user's activation switch and keeps it visible for explicit deactivation; only confirmed absence or token refusal clears it.
+
+### Why PAT account contracts retain uncertain values
+
+PAT authentication uses the auth store's credential union. Verification receives
+the token field as read, including an absent token. Verified users retain numeric or string IDs, including in account
+events, and nullable profile fields. Caught error messages remain unchecked values
+in status and response bodies.
+
+Service login supplies `status`; token-based CLI login supplies `tokenResult`.
+The selected descriptor determines which callback is required. CLI invocation
+retains its receiver. Non-null accessors check those dependencies and the
+already-established login and username invariants without adding defaults.
 
 ### Why startup repair is separate from route registration
 

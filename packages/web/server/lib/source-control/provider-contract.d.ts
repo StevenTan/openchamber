@@ -51,7 +51,7 @@ export interface ProviderDescriptor {
     origin(instance: string): URL;
   };
   repositoryPath: 'owner/name' | 'namespace/name' | 'path';
-  projectPathOfRemote?(remote: { protocol: 'https' | 'http' | 'ssh'; path: string }): string;
+  projectPathOfRemote?(remote: { protocol: string; path: string }): string;
   capabilities: ProviderCapabilities;
   authMethods: { device: boolean; pat: boolean; cli: false | { tool: string; kind?: never; hint?: never } | { kind: 'service'; hint: string; tool?: never } };
   transport: {
@@ -167,7 +167,7 @@ export interface TransportCredential {
 
 export interface ConnectedAccount {
   account: AccountIdentity;
-  user: TransportCredential['user'];
+  user: Omit<TransportCredential['user'], 'id' | 'avatarUrl'> & { id: number | string; avatarUrl?: string | null };
   credential: { credentialRevision: number; providerUserId: string };
 }
 

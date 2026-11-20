@@ -3,7 +3,7 @@ import { request as httpsRequest } from "node:https";
 
 // The tool's deadline and cancellation signal own long-lived session waits.
 export const waitFetch: typeof fetch = async (input, init) => {
-  const request = new Request(input, init);
+  const request = new Request(input, { ...init, body: init?.body ?? null });
   const url = new URL(request.url);
   const body = Buffer.from(await request.arrayBuffer());
   return new Promise<Response>((resolve, reject) => {

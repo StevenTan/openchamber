@@ -1,5 +1,6 @@
 import { OpenCode } from '@opencode/client';
 import { assertOpenCodeApiResponse } from '../opencode/prompt-response.js';
+import type { SessionClient } from './opencode-client-contract.js';
 
 const buildDirectoryHeaders = (directory: string | undefined) => {
   const headers: Record<string, string> = {};
@@ -14,12 +15,15 @@ export interface OpenCodeClientOptions {
   fetch?: Parameters<typeof OpenCode.make>[0]['fetch'];
 }
 
-export const createOpenCodeClient = ({ baseUrl, headers, directory, fetch: requestFetch }: OpenCodeClientOptions) => OpenCode.make({
-  baseUrl,
-  headers: { ...headers, ...buildDirectoryHeaders(directory) },
-  fetch: async (...args) => {
-    const response = await (requestFetch ?? globalThis.fetch)(...args);
-    assertOpenCodeApiResponse(response);
-    return response;
-  },
-});
+export function createOpenCodeClient(options: OpenCodeClientOptions): SessionClient;
+export function createOpenCodeClient({ baseUrl, headers, directory, fetch: requestFetch }: OpenCodeClientOptions) {
+  return OpenCode.make({
+    baseUrl,
+    headers: { ...headers, ...buildDirectoryHeaders(directory) },
+    fetch: async (...args) => {
+      const response = await (requestFetch ?? globalThis.fetch)(...args);
+      assertOpenCodeApiResponse(response);
+      return response;
+    },
+  });
+}

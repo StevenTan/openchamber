@@ -6,7 +6,9 @@ import { hasProperty } from './contracts.js';
 import type { GitHubEnvelope } from './contracts.js';
 
 type Rest = RestEndpointMethodTypes;
-type Pull = Rest['pulls']['get']['response']['data'];
+type Pull = Pick<Rest['pulls']['get']['response']['data'] | Rest['pulls']['list']['response']['data'][number],
+  'number' | 'title' | 'html_url' | 'state' | 'draft' | 'base' | 'head' | 'body' | 'user' | 'created_at' | 'updated_at' | 'merged_at' | 'labels'
+> & Partial<Pick<Rest['pulls']['get']['response']['data'], 'merged' | 'mergeable' | 'mergeable_state'>>;
 type Issue = Rest['issues']['get']['response']['data'];
 type Comment = Rest['issues']['getComment']['response']['data'];
 type ReviewComment = Rest['pulls']['getReviewComment']['response']['data'];
