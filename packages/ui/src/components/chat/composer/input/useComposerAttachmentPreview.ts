@@ -10,9 +10,6 @@ export function useComposerAttachmentPreview() {
         content: '',
     });
 
-    // Mount the lazy preview dialog only after its first open; rendering it
-    // closed would fetch the ToolOutputDialog chunk (with the @pierre/diffs
-    // stack) on the draft screen before any preview is requested.
     const [attachmentPreviewMounted, setAttachmentPreviewMounted] = React.useState(false);
 
     React.useEffect(() => {

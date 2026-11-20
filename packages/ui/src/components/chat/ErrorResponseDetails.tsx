@@ -4,7 +4,6 @@ import { useI18n } from '@/lib/i18n';
 import { ScrollableOverlay } from '@/components/ui/ScrollableOverlay';
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 
-/** A JSON body pretty-printed; anything else as the provider sent it. */
 const formatResponseBody = (body: string): string => {
   try {
     return JSON.stringify(JSON.parse(body), null, 2);
@@ -13,12 +12,6 @@ const formatResponseBody = (body: string): string => {
   }
 };
 
-/**
- * The raw provider response behind a failed turn, collapsed by default. The
- * short message above it is what most people need; the body is there for the
- * cases where that message says too little (an unrecognised error code, a
- * proxy's HTML page).
- */
 export const ErrorResponseDetails: React.FC<{ body: string; className?: string }> = ({ body, className }) => {
   const { t } = useI18n();
   const [open, setOpen] = React.useState(false);

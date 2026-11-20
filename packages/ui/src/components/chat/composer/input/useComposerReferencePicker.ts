@@ -46,7 +46,6 @@ export function useComposerReferencePicker({
     const descriptorOf = useSourceControlDescriptorOf();
     const addLinkedReferences = React.useCallback((references: ComposerReference[]) => {
         if (isBtwActive) return;
-        // The picker keeps this callback while context loads, including across a session switch.
         updateLinkedReferencesFor(chatDraftIdentity, (current) => withComposerReferences(current, references));
     }, [chatDraftIdentity, isBtwActive, updateLinkedReferencesFor]);
 

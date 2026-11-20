@@ -187,12 +187,10 @@ export const ActiveEditorFileSuggestion = memo(() => {
 
   const { filePath, fileName, relativePath, selection, fileSize } = activeEditorFile;
 
-  // Normalize to forward slashes for comparison
   const isFileAttached = attachedFiles.some(
     (f) => f.source === 'vscode' && f.vscodeSource === 'file' && (f.vscodePath || '') === filePath
   )
 
-  // Compute selection label using a compact range (single line shown as "N" not "N-N")
   let selectionRange = ''
   if (selection) {
     selectionRange = selection.startLine === selection.endLine
@@ -204,18 +202,15 @@ export const ActiveEditorFileSuggestion = memo(() => {
     (f) => f.source === 'vscode' && f.vscodeSource === 'selection' && f.filename === selectionLabel && f.vscodePath === filePath
   )
 
-  // Nothing to show — file is already attached and there's no (or already-attached) selection
   if (isFileAttached && (!selection || isSelectionAttached)) return null;
 
   const ext = fileName.split('.').pop() || '';
-  // Always show only the filename in the suggestion UI
   const displayName = fileName;
 
   const handleAddFile = () => {
     try {
       addVSCodeFileAttachment(filePath, fileName, fileSize);
     } catch (error) {
-      // The store names the cause (a file too large to send).
       if (error instanceof Error) toast.error(error.message);
     }
   };
@@ -227,7 +222,6 @@ export const ActiveEditorFileSuggestion = memo(() => {
     await addVSCodeSelectionAttachment(filePath, file);
   };
 
-  // If there is a selection, prefer showing the pin-selection UI only.
   const showSelectionPin = !!selection && !isSelectionAttached;
   const showFileAdd = !showSelectionPin && !isFileAttached;
 
@@ -298,7 +292,6 @@ const issueLinkIcon = (kind: Exclude<IssueLinkKind, 'repository-issue' | 'tracke
   kind === 'guest-issue' ? 'attachment-2' : 'git-pull-request'
 );
 
-/** An issue or PR link chip's mark: a repository issue wears its provider's, a tracker item its tracker's. */
 const IssueLinkIcon: React.FC<{ file: { mime?: string }; kind: IssueLinkKind; className?: string }> = ({ file, kind, className }) => {
   const provider = useSourceControlProvider(getRepositoryIssueLinkProvider(file));
   if (kind === 'repository-issue') return <ProviderIcon descriptor={provider} className={className} />;
@@ -310,7 +303,6 @@ interface MessageFilesDisplayProps {
   files: FilePart[];
   onShowPopup?: (content: ToolPopupContent) => void;
   compact?: boolean;
-  /** Compact only: replaces the default top margin, for placement above content. */
   className?: string;
 }
 
@@ -341,7 +333,6 @@ export const MessageFilesDisplay = memo(({ files, onShowPopup, compact = false, 
   const imageFiles = fileItems.filter(f => f.mime?.startsWith('image/') && f.url);
   const otherFiles = fileItems.filter(f => !f.mime?.startsWith('image/'));
 
-  // What a compact chip or thumbnail opens; a preview needs the message's popup.
   const resolveOpenTarget = (file: FilePart) => {
     const target = resolveAttachmentOpenTarget(file, fileItems);
     return target?.kind === 'popup' && !onShowPopup ? null : target;

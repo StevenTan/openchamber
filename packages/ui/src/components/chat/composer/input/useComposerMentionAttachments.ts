@@ -86,7 +86,6 @@ export function useComposerMentionAttachments({
         onConfirmed: repaintConfirmedMentions,
     });
 
-    /** An agent the user turned back into text is not asked for by its mention. */
     const mentionableAgents = React.useCallback(
         () => agents.filter((agent) => !isMentionDismissed(agent.name.toLowerCase(), confirmedMentionsRef.current)),
         [agents, confirmedMentionsRef],
@@ -155,8 +154,6 @@ export function useComposerMentionAttachments({
                 const mention = resolveInlineFileMention(token.name);
                 return mention && isReadOnSendMentionFilename(mention.filename) ? [mention] : [];
             });
-            // `@logo.png` in pasted text names no file: it stays text and the
-            // message goes. Reading can only fail for a file that is there.
             const missing = await findMissingPaths(mentions.map((mention) => mention.serverPath), opencodeClient);
             if (getRuntimeKey() !== runtimeKey) return { status: 'runtime-changed' };
             for (const mention of mentions) {
@@ -168,7 +165,6 @@ export function useComposerMentionAttachments({
                     continue;
                 }
                 try {
-                    // The directory bounds the read, and sends it to the space that holds the file.
                     const response = await runtimeFetch('/api/fs/raw', {
                         query: { path: mention.serverPath, directory: mention.root || undefined },
                     });

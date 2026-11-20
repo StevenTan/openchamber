@@ -14,11 +14,9 @@ export const readColumnWidth = (scroller: HTMLElement | null): number => {
     return Math.min(width, cap) - 32;
 };
 
-// A touch device: raised tap targets (mobile.css) and native scroll momentum.
 export const isTouchLayout = (): boolean => {
     const root = document.documentElement;
     return root.classList.contains('mobile-pointer') && !root.classList.contains('desktop-runtime');
 };
 
-// A tool, reasoning or file line: 36 px where touch targets are raised, 32 px elsewhere.
 export const readToolLineHeight = (): number => (isTouchLayout() ? 36 : 32);

@@ -98,16 +98,12 @@ export function useComposerSessionLifecycle({
         queueMicrotask(() => focusColumnInput());
     }, [btwSessionId, consumePendingBtwComposerRequest, currentSessionId, focusColumnInput, inlineDraftTarget, isBtwActive, pendingBtwComposerRequest, t]);
 
-    // Focus textarea when new session draft is opened
     const prevNewSessionDraftOpenRef = React.useRef(newSessionDraftOpen);
 
     React.useEffect(() => {
-        // The draft opens in the main chat; a pinned composer stays out of it.
         if (!prevNewSessionDraftOpenRef.current && newSessionDraftOpen && !columnPinned) {
-            // New session draft just opened - focus the textarea
             requestAnimationFrame(() => {
                 if (isMobile) {
-                    // On mobile, use preventScroll to avoid viewport jumping
                     composerRef.current?.focus({ preventScroll: true });
                 } else {
                     composerRef.current?.focus();
@@ -117,12 +113,6 @@ export function useComposerSessionLifecycle({
         prevNewSessionDraftOpenRef.current = newSessionDraftOpen;
     }, [columnPinned, newSessionDraftOpen, isMobile, composerRef]);
 
-    // Session activity for queue availability and controls. In btw mode the
-    // composer controls the temporary fork, so the stop button and send-button
-    // state follow the FORK's activity; the queue affordance stays tied to the
-    // main session (queued messages always belong to the main chat).
-    // The column's session: a chat pinned in the side panel shows its own
-    // send/stop state, not the main chat's.
     const { phase: currentSessionPhase } = useSessionActivity(currentSessionId, currentSessionDirectoryForSync ?? currentDirectory ?? undefined);
 
     const { phase: btwSessionPhase } = useSessionActivity(btwSessionId, btwDirectory ?? undefined);
@@ -140,10 +130,6 @@ export function useComposerSessionLifecycle({
         if (!isMobile) {
             return;
         }
-        // Set the panel state BEFORE blurring: the collapse watcher and the
-        // overlay-host observer must already see the overlay as open when the
-        // keyboard-close lands, otherwise the composer folds into the pill
-        // under the sheet.
         setMobileControlsPanel(panel);
         composerRef.current?.blur();
     }, [isMobile, composerRef, setMobileControlsPanel]);

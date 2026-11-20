@@ -21,7 +21,6 @@ export function useComposerInlineContext({
     const { columnPinned } = column;
     const { isMobile } = preferences;
 
-    // Inline comment drafts
     const inlineDraftSessionKey = isBtwActive ? btwComposerSessionId ?? '' : currentSessionId ?? (newSessionDraftOpen ? 'draft' : '');
 
     const inlineDraftDirectory = currentSessionDirectoryForSync ?? currentDirectory;
@@ -37,9 +36,6 @@ export function useComposerInlineContext({
         ? getInlineCommentDraftKey(activeRuntimeKey, inlineDraftTarget.directory, inlineDraftTarget.sessionKey)
         : null;
 
-    // Publish where the composer on screen files what other surfaces hand it:
-    // inline drafts (file, diff, plan, terminal, PR and browser comments) and
-    // attachments (a comment's image, an annotation's screenshot).
     const composerAddress = React.useMemo<ComposerAddress | null>(
         () => ({ inline: inlineDraftTarget, attachments: chatDraftIdentity }),
         [chatDraftIdentity, inlineDraftTarget],
@@ -62,9 +58,6 @@ export function useComposerInlineContext({
 
     const hasDrafts = draftCount > 0;
 
-    // Mobile comment mode (see composer/comment/): read imperatively here so
-    // the send/queue guards below see the live state; rendering and lifecycle
-    // live in useMobileCommentComposerMode further down.
     const mobileCommentController = useMobileCommentComposerController();
 
     const isMobileCommentOpen = React.useCallback(

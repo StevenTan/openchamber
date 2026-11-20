@@ -35,7 +35,6 @@ import {
 
 interface FormCardProps {
     form: FormRequest;
-    /** Set when this card re-asks a question whose turn died before it was answered. */
     recovered?: RecoveredQuestion;
     asyncForms?: FormRequest[];
     inChat?: boolean;
@@ -75,7 +74,6 @@ const GenericFormCard: React.FC<FormCardProps> = ({ form, recovered, asyncForms,
     const fields = form.fields;
     const fieldsSignature = fields.map((field) => `${field.key}:${field.type}`).join('|');
     const recoveryDirectory = recovered?.directory;
-    // The same key the dock uses, so switching between card and dock keeps the answer.
     const draftScope = React.useMemo(
         () => (recoveryDirectory !== undefined || asyncForms || inChat ? formDraftScope(form, recoveryDirectory ?? directory ?? transcriptDirectory ?? undefined) : null),
         [asyncForms, transcriptDirectory, form, recoveryDirectory, directory, inChat],
@@ -108,10 +106,6 @@ const GenericFormCard: React.FC<FormCardProps> = ({ form, recovered, asyncForms,
         // oxlint-disable-next-line react-hooks/exhaustive-deps
     }, [fieldsSignature, form.id]);
 
-    // A location-scoped form shows in every session of its directory, and a
-    // retained session keeps its card mounted while hidden. Shown again, the
-    // card takes up an answer another surface saved meanwhile, before its
-    // own save below could put back what it held.
     const savedValuesRef = React.useRef<FormValues | null>(restored?.values ?? null);
     React.useLayoutEffect(() => {
         if (!draftScope) return;
@@ -143,7 +137,6 @@ const GenericFormCard: React.FC<FormCardProps> = ({ form, recovered, asyncForms,
             setShowErrors(true);
             return;
         }
-        // Enter follows the button: in the chat, every question first.
         if (inChat && !allAnswered) return;
         respondingRef.current = true;
         setIsResponding(true);
@@ -236,8 +229,6 @@ const GenericFormCard: React.FC<FormCardProps> = ({ form, recovered, asyncForms,
         />
     );
 
-    // The question travels to other tools as Markdown (to read) or JSON (to
-    // feed a script); both leave the routing ids behind.
     const handleCopy = React.useCallback(async (format: 'markdown' | 'json') => {
         const text = format === 'markdown' ? serializeFormAsMarkdown(form) : serializeFormAsJson(form);
         const result = await copyTextToClipboard(text);

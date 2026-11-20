@@ -54,7 +54,6 @@ export function useComposerReferenceActions({
             setAttachDialogGuestId(guestId);
             return;
         }
-        // The phone's panel is the extension's workspace tab.
         if (isMobileSurfaceRuntime()) {
             openGuestSurface({ mode: pluginModeFromId(guestId), directory: currentDirectory || null, supported: true });
             return;
@@ -62,9 +61,6 @@ export function useComposerReferenceActions({
         useUIStore.getState().openContextSurface(currentDirectory || '', pluginModeFromId(guestId));
     }, [currentDirectory, guestAttachItems, setAttachDialogItem, setAttachDialogGuestId]);
 
-    // Clicking the guest chip reopens that guest with the chip as `ready.item`,
-    // so it can show the item's details instead of its whole list. A panel
-    // guest gets it through the rail hand-off store; a dialog guest as a prop.
     const reopenGuestItem = React.useCallback((reference: Extract<ComposerReference, { kind: 'guest' }>) => {
         const issue: AttachIssueRequest = {
             providerId: reference.providerId,
@@ -79,10 +75,6 @@ export function useComposerReferenceActions({
             issue.branches = { head: reference.head, base: reference.base };
         }
         if (reference.data !== undefined) issue.data = reference.data;
-        // A chip can outlive the place it was attached in: the session may be
-        // open in VS Code, where extensions never load, or the extension may
-        // be paused or removed here. Say so instead of opening
-        // an empty surface.
         const installed = useGuestsStore.getState().guests.find((entry) => entry.id === issue.providerId);
         if (!installed || !isGuestActive(installed)) {
             const supported = useGuestsStore.getState().status !== 'unsupported';
@@ -91,7 +83,6 @@ export function useComposerReferenceActions({
                 : installed ? 'chat.chatInput.toast.guestOff' : 'chat.chatInput.toast.guestRemoved'));
             return;
         }
-        // The phone opens an extension's panel or dialog only when it opted into the phone.
         if (!guestPanelOpensHere(installed)) {
             toast.info(t('chat.chatInput.toast.guestNotOnPhone', { name: installed.name }));
             return;
@@ -101,10 +92,6 @@ export function useComposerReferenceActions({
             return;
         }
         const guest = guestAttachItems.find((entry) => entry.id === issue.providerId);
-        // Only an extension that declared a dialog gets one; everything else
-        // (panel mode, no attach declared) opens the rail with the item.
-        // The panel opens and stays open; a second chip click on an open panel
-        // must not toggle it closed with the item still parked.
         if (guest?.mode !== 'dialog') {
             if (!openGuestWithItem({ id: issue.providerId, attach: undefined }, issue, currentDirectory)) {
                 toast.info(t('chat.guestLink.noProject', { name: installed.name }));

@@ -394,7 +394,7 @@ export function getSessionMaterializationStatus(
 
   return {
     hasMessages: true,
-    renderable: missingPartMessageIDs.length === 0,
+    renderable: options.historyCovered !== false && missingPartMessageIDs.length === 0,
     missingPartMessageIDs,
   }
 }

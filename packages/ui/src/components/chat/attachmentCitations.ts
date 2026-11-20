@@ -146,7 +146,6 @@ export const assignImageAttachmentFilenames = (
     });
 };
 
-/** Next unused `pasted-context-N.txt` name for a large text paste attachment. */
 export const nextPastedContextFilename = (existingFilenames: string[]): string => {
     const used = new Set(existingFilenames.map(normalizeFilenameKey));
 
@@ -160,7 +159,6 @@ export const nextPastedContextFilename = (existingFilenames: string[]): string =
     return `pasted-context-${Date.now()}.txt`;
 };
 
-/** The attachment carries the name its citation uses. */
 export const renameFileForAttachmentCitation = (file: File, filename: string): File => {
     if (file.name === filename) {
         return file;
@@ -214,8 +212,6 @@ export const findAttachmentCitationRanges = (text: string, filenames: string[]):
             break;
         }
 
-        // Markdown links keep their normal link highlighting; attachment citations
-        // are plain bracket references like [desktop.png].
         if (text[end + 1] !== '(') {
             const name = text.slice(start + 1, end).trim();
             if (known.has(normalizeFilenameKey(name))) {

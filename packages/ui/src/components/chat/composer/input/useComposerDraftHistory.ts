@@ -95,9 +95,6 @@ export function useComposerDraftHistory({
         if (!isPromptHistorySearchOpen && promptHistorySearch) setPromptHistorySearch(null);
     }, [isPromptHistorySearchOpen, promptHistorySearch, setPromptHistorySearch]);
 
-    // The one deferred composer focus that history work may have pending. A
-    // newer schedule replaces it; opening the search or unmounting cancels it,
-    // so a stale frame cannot pull focus out of a search that opened since.
     const historyFocusFrameRef = React.useRef<number | null>(null);
 
     const cancelHistoryFocusFrame = React.useCallback(() => {
@@ -137,8 +134,6 @@ export function useComposerDraftHistory({
         currentChatDraftIdentityRef.current = chatDraftIdentity;
     }, [chatDraftIdentity, currentChatDraftIdentityRef]);
 
-    // Draft persistence: identity switching, debounced writes and the
-    // flush-on-hide edges live in the hook.
     const {
         persistNow: persistDraftImmediately,
         handoffDraft,
@@ -176,9 +171,6 @@ export function useComposerDraftHistory({
 
     useUnconfirmedSendRecovery(columnPinned ? null : activeRuntimeKey, restoreDraft, currentChatDraftIdentityRef);
 
-    // A project's new draft is shared with the server, which lists it in the
-    // sidebar once the user leaves it (the chat identity carries its key only
-    // while it is the one on screen).
     useSessionDraftPublishing({
         identity: isBtwActive ? null : chatDraftIdentity,
         text: composerText,
