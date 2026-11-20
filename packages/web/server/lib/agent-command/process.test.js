@@ -34,7 +34,10 @@ describe('command shell launch', () => {
       console.log(launched.pid);
       process.exit(0);
     `;
-    const { stdout } = await promisify(execFile)(process.execPath, ['--input-type=module', '-e', source]);
+    const { stdout } = await promisify(execFile)(process.execPath, [
+      '--import', new URL('../../../scripts/register-server-sources.mjs', import.meta.url).href,
+      '--input-type=module', '-e', source,
+    ]);
     const pid = Number(stdout.trim());
     expect(pid).toBeGreaterThan(0);
     try {

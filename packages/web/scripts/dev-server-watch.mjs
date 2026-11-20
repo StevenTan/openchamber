@@ -5,7 +5,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 
 import { resolveBunExecutable } from '../../../scripts/lib/bun-executable.mjs';
-import { assignInjectedEnv, injectedEnvKeys, withoutInjectedEnv } from '../server/lib/injected-env.js';
+if (!process.versions.bun) await import('./register-server-sources.mjs');
+const { assignInjectedEnv, injectedEnvKeys, withoutInjectedEnv } = await import('../server/lib/injected-env.js');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

@@ -4,6 +4,7 @@
     "allowJs": false,
     "noEmit": false,
     "noCheck": true,
+    "noResolve": true,
     "rootDir": "server/lib/agent-command/src",
     "outDir": "server/lib/agent-command/dist"
   },
