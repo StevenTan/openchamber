@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { createUsageReadAction } from './usage-read.js';
+import { QUOTA_PROVIDERS } from '../../../../ui/src/lib/quota/providers/index.ts';
 
 const PAGE = [
   { providerId: 'claude', providerName: 'Claude' },

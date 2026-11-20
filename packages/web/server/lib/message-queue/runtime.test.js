@@ -1055,6 +1055,7 @@ describe('message queue runtime', () => {
     });
 
     it('sends nothing while the ids cannot be saved, since a crash would mint them again', async () => {
+      vi.useFakeTimers();
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const { runtime, openCode, emit } = createRuntime({ retryDelayMs: () => 60_000 });
       runtime.start();
@@ -1065,7 +1066,7 @@ describe('message queue runtime', () => {
       const rename = vi.spyOn(fs.promises, 'rename').mockRejectedValueOnce(new Error('disk full'));
       idle(emit);
       await vi.waitFor(() => expect(rename).toHaveBeenCalled());
-      await settle();
+      await vi.waitFor(() => expect(runtime.sessionSnapshot(SESSION).sendingId).toBeNull());
       expect(openCode.state.sent).toEqual([]);
       expect(runtime.sessionSnapshot(SESSION).items).toHaveLength(1);
       rename.mockRestore();
