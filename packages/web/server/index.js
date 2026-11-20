@@ -9,6 +9,7 @@ import { spawn, spawnSync } from 'child_process';
 import fs from 'fs';
 import http from 'http';
 import net from 'net';
+import { webPackagePaths } from './lib/web-package-paths.js';
 import { fileURLToPath } from 'url';
 import os from 'os';
 import crypto from 'crypto';
@@ -235,9 +236,6 @@ applyConnectAttemptTimeout();
 applySystemCertificates();
 applyOutboundProxyFromEnv();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const DEFAULT_PORT = 3000;
 const DESKTOP_NOTIFY_PREFIX = '[OpenChamberDesktopNotify] ';
 const uiNotificationClients = new Set();
@@ -302,7 +300,7 @@ function shouldSkipCompression(req, res) {
 
 const OPENCHAMBER_VERSION = (() => {
   try {
-    const packagePath = path.resolve(__dirname, '..', 'package.json');
+    const packagePath = webPackagePaths.packageJson;
     const raw = fs.readFileSync(packagePath, 'utf8');
     const pkg = JSON.parse(raw);
     if (pkg && typeof pkg.version === 'string' && pkg.version.trim().length > 0) {
@@ -1637,7 +1635,6 @@ const staticRoutesRuntime = createStaticRoutesRuntime({
   fs,
   path,
   process,
-  __dirname,
   express,
   resolveProjectDirectory,
   buildOpenCodeUrl,
@@ -2744,7 +2741,6 @@ async function main(options = {}) {
     os,
     path,
     server,
-    __dirname,
     openchamberDataDir: OPENCHAMBER_DATA_DIR,
     modelsDevApiUrl: MODELS_DEV_API_URL,
     modelsMetadataCacheTtl: MODELS_METADATA_CACHE_TTL,
@@ -3118,7 +3114,7 @@ async function main(options = {}) {
 
 runCliEntryIfMain({
   process,
-  currentFilename: __filename,
+  currentFilename: fileURLToPath(import.meta.url),
   parseServeCliOptions,
   defaultPort: DEFAULT_PORT,
   cloudflareProvider: TUNNEL_PROVIDER_CLOUDFLARE,
