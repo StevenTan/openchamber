@@ -1188,6 +1188,7 @@ interface UIStore {
   agentKnowledgeToolEnabled: boolean;
   agentNotifyToolEnabled: boolean;
   agentUsageToolEnabled: boolean;
+  agentTerminalToolEnabled: boolean;
   agentImageToolEnabled: boolean;
   /** `provider/model` the image tool draws with; empty until the user picks one. */
   agentImageModel: string;
@@ -1510,6 +1511,7 @@ interface UIStore {
   setAgentKnowledgeToolEnabled: (value: boolean) => void;
   setAgentNotifyToolEnabled: (value: boolean) => void;
   setAgentUsageToolEnabled: (value: boolean) => void;
+  setAgentTerminalToolEnabled: (value: boolean) => void;
   setAgentImageToolEnabled: (value: boolean) => void;
   setAgentImageModel: (value: string) => void;
   setAgentMemoryDreamingEnabled: (value: boolean) => void;
@@ -2402,6 +2404,7 @@ const useGlobalUIStore = create<UIStore>()(
         agentKnowledgeToolEnabled: true,
         agentNotifyToolEnabled: false,
         agentUsageToolEnabled: false,
+        agentTerminalToolEnabled: false,
         agentImageToolEnabled: false,
         agentImageModel: '',
         agentMemoryDreamingEnabled: false,
@@ -3542,6 +3545,9 @@ const useGlobalUIStore = create<UIStore>()(
         setAgentUsageToolEnabled: (value) => {
           set({ agentUsageToolEnabled: value });
         },
+        setAgentTerminalToolEnabled: (value) => {
+          set({ agentTerminalToolEnabled: value });
+        },
         setAgentImageToolEnabled: (value) => {
           set({ agentImageToolEnabled: value });
         },
@@ -4178,6 +4184,7 @@ const useGlobalUIStore = create<UIStore>()(
           agentKnowledgeToolEnabled: state.agentKnowledgeToolEnabled,
           agentNotifyToolEnabled: state.agentNotifyToolEnabled,
           agentUsageToolEnabled: state.agentUsageToolEnabled,
+          agentTerminalToolEnabled: state.agentTerminalToolEnabled,
           agentImageToolEnabled: state.agentImageToolEnabled,
           agentImageModel: state.agentImageModel,
           agentMemoryDreamingEnabled: state.agentMemoryDreamingEnabled,

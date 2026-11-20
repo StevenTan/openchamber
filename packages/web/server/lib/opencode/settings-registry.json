@@ -189,6 +189,9 @@
     "agentUsageToolEnabled": {
       "scope": "instance"
     },
+    "agentTerminalToolEnabled": {
+      "scope": "instance"
+    },
     "agentImageToolEnabled": {
       "scope": "instance"
     },

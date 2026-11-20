@@ -1008,6 +1008,9 @@ export const createSettingsHelpers = (dependencies) => {
     if (candidate.agentUsageToolEnabled === true || candidate.agentUsageToolEnabled === false) {
       result.agentUsageToolEnabled = candidate.agentUsageToolEnabled;
     }
+    if (candidate.agentTerminalToolEnabled === true || candidate.agentTerminalToolEnabled === false) {
+      result.agentTerminalToolEnabled = candidate.agentTerminalToolEnabled;
+    }
     if (typeof candidate.isolatedSpacesEnabled === 'boolean') {
       result.isolatedSpacesEnabled = candidate.isolatedSpacesEnabled;
     }

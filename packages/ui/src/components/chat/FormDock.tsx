@@ -342,7 +342,7 @@ const FormDockPanel: React.FC<{
         setIsResponding(true);
         try {
             if (recovered) {
-                noteLocalFormCancelled(recovered.form.id);
+                noteLocalFormCancelled(recovered.sessionID, recovered.form.id);
             } else if (asyncForms) {
                 await sessionActions.resolveAsyncQuestions(asyncForms);
             } else {
@@ -496,7 +496,7 @@ const FormDockPanel: React.FC<{
                 <div onKeyDown={handlePanelKeyDown}>
                     {recovered ? (
                         <div className="typography-micro mx-1.5 mb-1 rounded bg-[var(--status-warning-background)] px-2 py-1.5 text-[var(--status-warning-text)]">
-                            {t('chat.formCard.recoveredNotice')}
+                            {t(recovered.evidence === 'deferred-on-send' ? 'chat.formCard.deferredNotice' : 'chat.formCard.recoveredNotice')}
                         </div>
                     ) : null}
                     <ScrollableOverlay
