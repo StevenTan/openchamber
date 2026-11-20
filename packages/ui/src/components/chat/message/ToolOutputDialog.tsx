@@ -483,7 +483,7 @@ const MermaidPreviewDialog: React.FC<{
             if (!resolvedUrl || (resolvedUrl.protocol !== 'http:' && resolvedUrl.protocol !== 'https:')) {
                 sourcePromise = Promise.reject(mermaidLoadFailure('chat.toolOutputDialog.mermaid.unsupportedUrlProtocol'));
             } else {
-                sourcePromise = fetch(resolvedUrl.toString())
+                sourcePromise = runtimeFetch(resolvedUrl)
                     .then((response) => {
                         if (!response.ok) {
                             return Promise.reject(mermaidLoadFailure('chat.toolOutputDialog.mermaid.loadFailedWithStatus', { status: response.status }));

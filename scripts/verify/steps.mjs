@@ -114,6 +114,29 @@ const scratchFiles = (files, ctx) => files.map(({ name, content }) => {
 })
 
 const ACTIONS = {
+  async "clipboard.permission"(step, ctx) {
+    if (!["granted", "denied", "prompt"].includes(step.state)) fail("clipboard.permission needs state granted, denied or prompt")
+    await ctx.page.client.send("Browser.setPermission", {
+      permission: { name: "clipboard-read" },
+      setting: step.state,
+      origin: ctx.stand.uiUrl,
+      browserContextId: ctx.page.browserContextId,
+    })
+  },
+  async "terminal.expect"(step, ctx) {
+    const target = resolveTarget(step, ctx)
+    const deadline = Date.now() + timeoutOf(step)
+    let actual = ""
+    do {
+      await ctx.page.evaluate("navigator.clipboard.writeText('verify: no terminal selection')")
+      if (await ctx.page.copyVisibleTerminal(target, Math.max(1, deadline - Date.now()))) {
+        actual = await ctx.page.evaluate("navigator.clipboard.readText()")
+        if (actual !== "verify: no terminal selection" && !expectText(actual, step, "the visible terminal")) return
+      }
+      await wait(150)
+    } while (Date.now() < deadline)
+    fail(expectText(actual, step, "the visible terminal") ?? "the terminal had no selectable output")
+  },
   async "session.create"(step, ctx) {
     const created = ctx.stand.cli(["create", "--title", step.title ?? `verify ${step.as}`])
     ctx.vars[step.as] = created.sessionId
@@ -383,6 +406,22 @@ const ACTIONS = {
     const name = `inspect-${++ctx.shots}.json`
     writeFileSync(join(ctx.dir, name), JSON.stringify({ selector: step.selector, found }, null, 2))
     ctx.artifacts.push(name)
+  },
+  async style(step, ctx) {
+    if (!step.property || step.equals === undefined) fail("style needs a CSS property and an equals value")
+    const target = resolveTarget(step, ctx)
+    const deadline = Date.now() + timeoutOf(step)
+    let actual = null
+    do {
+      actual = await ctx.page.evaluate(`(() => {
+        const element = ${ctx.page.query(target)}[${target.index}]
+        return element ? getComputedStyle(element).getPropertyValue(${JSON.stringify(step.property)}).trim() : null
+      })()`)
+      if (actual === step.equals) return
+      if (Date.now() >= deadline) break
+      await wait(150)
+    } while (Date.now() < deadline)
+    fail(`${describe(step)} ${step.property} is ${JSON.stringify(actual)}, expected ${JSON.stringify(step.equals)}`)
   },
   async pause(step) {
     await wait(step.ms)

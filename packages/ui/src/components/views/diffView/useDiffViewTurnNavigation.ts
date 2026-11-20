@@ -44,7 +44,6 @@ export function useDiffViewTurnNavigation({
             setPendingTurnDiffFile(null);
             return;
         }
-        // Entering the scope resets what is expanded, so wait for that first.
         if (!turnDiffSettled || activeDiffScope !== 'turn') return;
         setOpenedTurn({ sessionId: pendingTurnDiffFile.sessionId, turnId: pendingTurnDiffFile.turnId });
         setPendingTurnDiffFile(null);

@@ -128,7 +128,6 @@ export function useFileOperations({ fileDirectory, fileDocument, layout, scope, 
       const newName = dialogInputValue.trim();
       const newPath = normalizePath(`${prefix}${newName}`);
 
-      // Open tabs and the editor, unsaved edits included, follow the new name.
       try {
         const result = await moveWorkspacePath(files, { tabs: panelRoot, files: root, workspaceOwner: panelUI.getState().panelWorkspaceOwnerId }, oldPath, newPath);
         if (result === 'moved') {
