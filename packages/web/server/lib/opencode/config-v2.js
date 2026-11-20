@@ -542,15 +542,9 @@ const AISDK_PREFIX = 'aisdk:';
 function toProviderPackage(value) {
   const trimmed = trimmedString(value);
   if (!trimmed) return undefined;
-  if (trimmed.startsWith('@opencode/ai/providers/')) return trimmed;
+  // OpenCode bundles this namespace; `aisdk:` would select its installation path.
+  if (trimmed.startsWith('@opencode/ai/')) return trimmed;
   return trimmed.includes(':') ? trimmed : `${AISDK_PREFIX}${trimmed}`;
-}
-
-/** Strip the `aisdk:` prefix for editors that speak npm package names. */
-function toNpmPackage(value) {
-  const trimmed = trimmedString(value);
-  if (!trimmed) return undefined;
-  return trimmed.startsWith(AISDK_PREFIX) ? trimmed.slice(AISDK_PREFIX.length) : trimmed;
 }
 
 function toModelVariants(value) {
@@ -645,7 +639,7 @@ function toProviderModelEntity(raw) {
   ]);
 }
 
-/** Canonical v2 provider entry: native or `aisdk:` package, `settings.baseURL`, split overlays. */
+/** Canonical v2 provider entry: `package`, `settings.baseURL`, split overlays. */
 function toProviderEntity(raw) {
   const source = isRecord(raw) ? raw : {};
   const legacyOptions = isRecord(source.options) ? { ...source.options } : {};
@@ -984,7 +978,6 @@ export {
   deleteMcpEntry,
   toModelVariants,
   toProviderPackage,
-  toNpmPackage,
   toProviderEntity,
   readStoredProviderEntry,
   toPluginEntity,

@@ -30,6 +30,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { AnimatePresence, motion, useIsPresent, useReducedMotion } from 'motion/react';
 import { TabMotion } from '@/components/ui/tab-motion';
 import { TAB_SPRING, tabLayoutRect, tabScrollRange } from '@/lib/motion/tabTransition';
+import { scrollTabsWithWheel } from './tab-strip-wheel';
 
 export type SortableTabsStripItem = {
   id: string;
@@ -66,6 +67,7 @@ type SortableTabsStripProps = {
   onReorder?: (activeId: string, overId: string) => void;
   onDoubleClickTab?: (id: string) => void;
   layoutMode?: 'scrollable' | 'fit';
+  scrollWithWheel?: boolean;
   variant?: 'default' | 'active-pill' | 'animated';
   activePillInsetClassName?: string;
   activePillButtonClassName?: string;
@@ -167,6 +169,7 @@ export const SortableTabsStrip: React.FC<SortableTabsStripProps> = ({
   onReorder,
   onDoubleClickTab,
   layoutMode = 'scrollable',
+  scrollWithWheel = false,
   variant = 'default',
   activePillInsetClassName,
   activePillButtonClassName,
@@ -502,6 +505,7 @@ export const SortableTabsStrip: React.FC<SortableTabsStripProps> = ({
       <motion.div
         layoutScroll
         ref={scrollRef}
+        onWheel={isScrollable && scrollWithWheel ? scrollTabsWithWheel : undefined}
         className={cn(
           'relative flex min-w-0 flex-1',
           usesActivePillIndicator ? 'h-auto min-h-7' : 'h-full',

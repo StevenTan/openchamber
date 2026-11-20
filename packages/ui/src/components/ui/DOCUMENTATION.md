@@ -76,7 +76,13 @@ This folder owns runtime-independent controls and their Base UI integration, inc
 - Enabled buttons, links, tabs and semantic actions use the pointer cursor.
   The base-layer rule lets controls keep explicit text, drag and resize cursors.
 
+- Tab strips keep their scrollbar hidden. `SortableTabsStrip` maps vertical mouse wheels to horizontal scrolling only when `scrollWithWheel` is enabled and the layout is scrollable. Scrolling never selects a tab. Horizontal gestures, Shift+wheel and Ctrl/Cmd+wheel keep their native behavior. The shared `tab-strip-wheel.ts` handler also serves the header session tabs.
+
 ## Decisions
+
+### Why wheel scrolling checks the DOM target
+
+React wheel events from a tab's portalled context menu bubble through the strip even while the pointer is over the popup. The shared wheel handler checks DOM containment so scrolling the menu leaves the tabs behind it unchanged.
 
 ### Which tooltip a control takes
 

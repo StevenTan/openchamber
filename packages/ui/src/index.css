@@ -330,7 +330,6 @@ button,
 .markdown-content :where(
   pre, code, kbd, samp,
   [data-streamdown="code-block"],
-  [data-streamdown="table-wrapper"],
   [data-streamdown="mermaid-block"],
   .katex,
   [data-openchamber-file-link="true"],
@@ -933,6 +932,16 @@ svg.animate-spin {
 
 @media (forced-colors: active) {
   *, *:hover, *:active { scrollbar-color: auto; }
+}
+
+/* Clips an element to its own box and rounded corners without making it a
+   scroll container. `overflow: hidden` does, and the touch rules in
+   styles/mobile.css turn every such element into a vertical scroller, where a
+   drag that starts inside it scrolls it instead of the list around it. Without
+   `clip` support the `hidden` line applies, as it did before. */
+.oc-row-clip {
+  overflow: hidden;
+  overflow: clip;
 }
 
 /* Fully hidden scrollbar for small mobile overlays (session switcher etc.)
@@ -2024,6 +2033,8 @@ diffs-container {
   max-width: 100%;
   min-width: 0;
   margin: var(--markdown-paragraph-spacing) 0;
+  margin-inline-end: auto;
+  unicode-bidi: isolate;
   padding: 0;
   gap: 0;
   border: 0;

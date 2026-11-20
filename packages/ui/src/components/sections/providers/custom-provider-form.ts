@@ -19,7 +19,8 @@ export const CUSTOM_PROVIDER_PROTOCOLS = {
   'anthropic-messages': 'aisdk:@ai-sdk/anthropic',
 } as const;
 export type CustomProviderProtocol = keyof typeof CUSTOM_PROVIDER_PROTOCOLS;
-export type CustomProviderPackage = (typeof CUSTOM_PROVIDER_PROTOCOLS)[CustomProviderProtocol];
+export type CustomProviderPackage = (typeof CUSTOM_PROVIDER_PROTOCOLS)[CustomProviderProtocol]
+  | keyof typeof NATIVE_CUSTOM_PROVIDER_PACKAGES;
 export const CUSTOM_PROVIDER_ID = '__custom_provider__';
 export const CODEX_API_PRESET_ID = '__codex_api_preset__';
 const PROVIDER_ID_PATTERN = /^[a-z0-9][a-z0-9-_]*$/;
@@ -106,6 +107,8 @@ export type CustomProviderFormState = {
   logo: File | 'removed' | null;
   protocol: CustomProviderProtocol;
   protocolLocked?: boolean;
+  /** Bundled adapters load differently from the default for the same protocol. */
+  package?: CustomProviderPackage;
   baseURL: string;
   apiKey: string;
   models: ModelRow[];
@@ -455,15 +458,23 @@ export const storedClientCertificateOf = (
  * package (`aisdk:@ai-sdk/openai` is served as `@opencode/ai/providers/openai`),
  * so both spellings map to the protocol the form saved.
  */
-const NATIVE_CUSTOM_PROVIDER_PACKAGES: Record<string, CustomProviderProtocol> = {
+const NATIVE_CUSTOM_PROVIDER_PACKAGES = {
   '@opencode/ai/providers/openai-compatible': 'openai-chat',
+  '@opencode/ai/providers/openai-compatible/responses': 'openai-responses',
+  '@opencode/ai/providers/openai-compatible-responses': 'openai-responses',
   '@opencode/ai/providers/openai': 'openai-responses',
+  '@opencode/ai/providers/openai/chat': 'openai-chat',
+  '@opencode/ai/providers/openai/responses': 'openai-responses',
   '@opencode/ai/providers/anthropic': 'anthropic-messages',
-};
+  '@opencode/ai/providers/anthropic-compatible': 'anthropic-messages',
+} as const;
+
+function isNativeCustomProviderPackage(pkg: string | undefined): pkg is keyof typeof NATIVE_CUSTOM_PROVIDER_PACKAGES {
+  return pkg !== undefined && Object.hasOwn(NATIVE_CUSTOM_PROVIDER_PACKAGES, pkg);
+}
 
 function protocolFromPackage(pkg: string | undefined): CustomProviderProtocol {
-  const native = pkg ? NATIVE_CUSTOM_PROVIDER_PACKAGES[pkg] : undefined;
-  if (native) return native;
+  if (isNativeCustomProviderPackage(pkg)) return NATIVE_CUSTOM_PROVIDER_PACKAGES[pkg];
   switch (pkg) {
     case 'aisdk:@ai-sdk/openai':
     case '@ai-sdk/openai':
@@ -715,6 +726,7 @@ export function providerToEditFormState(
     icon,
     logo: null,
     protocol: stored.package ? storedState.protocol : liveState.protocol,
+    package: isNativeCustomProviderPackage(stored.package) ? stored.package : undefined,
     baseURL: storedState.baseURL || liveState.baseURL,
     // The live `env` and headers may come from a built-in provider this one
     // inherits from; only what the entry itself stores is edited here.
@@ -888,6 +900,7 @@ export function validateCustomProvider(input: ValidateCustomProviderInput): Vali
       ...(!env && !key ? { keepsStoredCredential: true } : {}),
       config: buildCustomProviderConfig({
         protocol: input.form.protocol,
+        package: input.form.package,
         name,
         env,
         baseURL,
@@ -917,6 +930,7 @@ function parsePositiveInteger(value: string): number | undefined {
 
 function buildCustomProviderConfig(input: {
   protocol: CustomProviderProtocol;
+  package?: CustomProviderPackage;
   name: string;
   env?: string;
   baseURL: string;
@@ -926,7 +940,9 @@ function buildCustomProviderConfig(input: {
   nativeCompaction?: boolean;
 }): CustomProviderConfig {
   const config: CustomProviderConfig = {
-    package: CUSTOM_PROVIDER_PROTOCOLS[input.protocol],
+    package: input.package && protocolFromPackage(input.package) === input.protocol
+      ? input.package
+      : CUSTOM_PROVIDER_PROTOCOLS[input.protocol],
     name: input.name,
     settings: { baseURL: input.baseURL },
     models: input.models,
