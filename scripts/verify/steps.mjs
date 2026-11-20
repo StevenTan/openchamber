@@ -209,6 +209,23 @@ const ACTIONS = {
     fail(problem)
   },
   async settings(step, ctx) {
+    if (step.expect !== undefined) {
+      if (step.values !== undefined) fail("settings needs values or expect, not both")
+      const expected = Object.entries(step.expect)
+      if (!expected.length) fail("settings expect needs at least one field")
+      const deadline = Date.now() + timeoutOf(step)
+      let problem
+      do {
+        const response = await fetch(`${ctx.stand.apiUrl}/api/config/settings`, { signal: AbortSignal.timeout(Math.max(1, deadline - Date.now())) })
+        if (!response.ok) fail(`reading settings answered ${response.status}`)
+        const actual = await response.json()
+        problem = expected.filter(([key, value]) => JSON.stringify(actual?.[key]) !== JSON.stringify(value))
+          .map(([key, value]) => `${key} is ${JSON.stringify(actual?.[key])}, expected ${JSON.stringify(value)}`).join("; ")
+        if (!problem) return
+        await wait(150)
+      } while (Date.now() < deadline)
+      fail(problem)
+    }
     const values = step.values ?? {}
     const unknown = Object.keys(values).filter((key) => !PROFILE_KEYS.includes(key))
     if (unknown.length) fail(`settings ${unknown.join(", ")} are not profile settings, so the reset could not undo them`)
@@ -358,12 +375,39 @@ const ACTIONS = {
     }
   },
   async editor(step, ctx) {
+    if (step.caret !== undefined && !["start", "end"].includes(step.caret)) fail("editor caret needs start or end")
     const selector = "[data-chat-input] .cm-content"
     const deadline = Date.now() + timeoutOf(step)
     let problem = null
     do {
       const actual = await ctx.page.evaluate(`${EDITOR_TEXT}(document.querySelector(${JSON.stringify(selector)}))`)
       problem = actual === null ? `no editor at ${selector}` : step.empty ? (actual === "" ? null : `the editor holds ${JSON.stringify(actual)}`) : expectText(actual, step, "the editor")
+      if (!problem && step.caret) {
+        const atEdge = await ctx.page.evaluate(`(() => {
+          const editor = document.querySelector(${JSON.stringify(selector)})
+          const selection = getSelection()
+          if (!editor || document.activeElement !== editor || !selection?.isCollapsed || !editor.contains(selection.anchorNode)) return false
+          const range = document.createRange()
+          range.selectNodeContents(editor)
+          range[${JSON.stringify(step.caret === "start" ? "setEnd" : "setStart")}](selection.anchorNode, selection.anchorOffset)
+          const content = range.cloneContents()
+          for (const placeholder of content.querySelectorAll(".cm-placeholder")) placeholder.remove()
+          return content.textContent.length === 0
+        })()`)
+        if (!atEdge) problem = `the editor caret is not at the ${step.caret}`
+      }
+      if (!problem) return
+      await wait(150)
+    } while (Date.now() < deadline)
+    fail(problem)
+  },
+  async field(step, ctx) {
+    const target = resolveTarget(step, ctx)
+    const deadline = Date.now() + timeoutOf(step)
+    let problem = null
+    do {
+      const actual = await ctx.page.evaluate(`(${ctx.page.query(target)}[${target.index}] ?? null)?.value ?? null`)
+      problem = actual === null ? `no field at ${describe(step)}` : expectText(actual, step, describe(step))
       if (!problem) return
       await wait(150)
     } while (Date.now() < deadline)

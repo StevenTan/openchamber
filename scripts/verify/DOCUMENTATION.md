@@ -128,13 +128,14 @@ Every step waits up to 20 s (`"timeout"` in seconds changes it) and fails with w
 | `see` `on`, `count`, `disabled`, `inView` | Waits until the element shows (exactly `count` of them; `count: 0` asserts none; `inView` on screen: some innermost element holding `text` intersects the viewport) |
 | `gone` `on` | Waits until no such element shows |
 | `steady` `on`, `count`, `ms` | Fails if the count changes during `ms` |
-| `editor` `equals`, `contains`, `empty` | Waits for the composer's text |
+| `editor` `equals`, `contains`, `empty`, `caret` | Waits for the composer's text; `caret: "start"` or `"end"` also waits for the focused, collapsed cursor at that edge |
 | `terminal.expect` `on`, `contains` or `equals` | Selects the visible canvas grid with a real drag and copies it with Cmd/Ctrl+C until its text matches; replaces the clipboard and leaves the output selected |
+| `field` `on`, `equals` or `contains` | Waits for an input or textarea's current value, such as a commit message retained after a failed save |
 | `url` `contains` | Waits for the address; `{var}` placeholders allowed |
 | `remember` `on`, `attr`, `as` | Stores an attribute of the element in a variable |
 | `clipboard` `equals`, `contains`, or `set` | Waits for the clipboard text, `{var}` placeholders allowed; `set` writes a marker first, so a copy that does nothing cannot pass on old content |
 | `clipboard.permission` `state` | Sets this browser context's clipboard-read permission to `granted`, `denied` or `prompt`, as a browser permission choice; the next scenario starts with fresh permissions |
-| `settings` `values` | Saves OpenChamber settings as another client would, before `open`: `{"showTurnChangedFiles": true}`; only profile settings, which the reset drops back to the stand's |
+| `settings` `values` or `expect` | `values` saves profile settings before `open`, such as `{"showTurnChangedFiles": true}`; `expect` only reads settings and waits for the named saved values, including global switches changed through the UI |
 | `server.stop`, `server.start` | Stops the stand's OpenChamber server (and the OpenCode it runs) and starts it again from the checkout's current server code; not with `--attach` |
 | `network.block` `urls`; `network.allow` | Refuses matching browser requests using Chrome's URL patterns, then clears the block. Variable placeholders such as `{s}` resolve to scenario variables. A fresh browser context clears the block between scenarios. |
 | `screenshot` `name` | Saves a screenshot next to the result |
@@ -148,8 +149,8 @@ Every step waits up to 20 s (`"timeout"` in seconds changes it) and fails with w
 
 - Nothing touches the user's data: the stand runs from a fresh folder under `/private/tmp` on macOS or the OS temp directory elsewhere with its own `HOME`, `XDG_*` and `OPENCHAMBER_DATA_DIR`, and its processes get only `PATH`, `USER`, `LOGNAME`, `SHELL`, `TMPDIR`, `LANG` and `TERM` from the shell. Windows also keeps `SystemRoot`, `ComSpec`, `PATHEXT`, `TEMP` and `TMP`, and redirects `USERPROFILE`, `APPDATA` and `LOCALAPPDATA` into the stand. No provider key, token or app variable reaches it or `stand.json`. It refuses to start, and `--attach` refuses to run, when the server lists sessions of the checkout itself. Ports are free ones picked per run.
 - A `settings` step refuses a key that is not a profile setting (`scope: "profile"` in `settings-registry.json`), since the reset drops only those.
-- The reset deletes only sessions under the stand's folder; a server holding any other session is not this stand, and the run stops before deleting anything.
-- Every scenario starts from the same state: all sessions deleted, linked worktrees and scenario branches removed, the project reset to its first commit and cleaned, the server's settings put back as they were when the stand started and the user's profile settings (Settings > Chat and the like) dropped back to the stand's, the sidebar's folders removed, a fresh browser context. A scenario's result does not depend on which ran before it, so one that changes a setting needs no step to change it back. Worktree cleanup refuses any linked directory outside the stand before removing anything.
+- The reset deletes only sessions under the stand's folder; a server holding any other session is not this stand, and the reset refuses before deleting anything.
+- Every scenario starts from the same state: all sessions deleted, linked worktrees removed, unfinished rebases and merges cleared, the project's starting branch and commit restored with a clean index and tree, scenario branches and stashes removed, the repository configuration restored, the server's settings put back as they were when the stand started and the user's profile settings (Settings > Chat and the like) dropped back to the stand's, the sidebar's folders removed, a fresh browser context. A scenario's result does not depend on which ran before it, so one that changes a setting needs no step to change it back. Worktree cleanup refuses any linked directory outside the stand before removing anything. A failed Git reset rebuilds the fixture and records the reason as a failed scenario; later scenarios still run. Other reset failures also become scenario results.
 - The model is the fixture provider, so answers are the same every run. `offline/no-answer` is a provider whose server refuses connections. No scenario calls a real model.
 - Tools run without asking, except a read of a `*.secret` file and a web fetch: those ask, so a scenario can raise a permission request by having the agent read such a file, or hold a session on the user with a scripted fetch.
 - A stopped run leaves nothing: the API, Vite, OpenCode, PTY daemons, fixture, Chrome and its helpers are tracked through OS process identities and the stand's isolated directories. Cleanup continues after a wrapper or group leader exits, escalates remaining processes, and removes the stand folder, Chrome profile and port-specific Vite cache only after the tree is gone. Failure in browser cleanup still runs stand cleanup. Startup errors and both runner signals take the same path.
@@ -166,6 +167,8 @@ A session can stay busy while a steered follow-up moves from admission to execut
 The queue scenario allows 60 s for that request to start because the first fixture response stays silent for 30 s before OpenCode can consume the steer. Stop still has to make the session idle within 10 s after the follow-up request starts.
 
 Ctrl+Enter cleanup uses the same request precondition before Stop.
+
+The request-control test keeps each streamed `Response` until teardown. An unreferenced response can be garbage-collected, closing its request before the test aborts it. `node --expose-gc --test scripts/verify/fixture-request.test.mjs` forces that collection while the follow-up must remain active.
 
 ### Why Windows stops process trees
 
@@ -217,7 +220,7 @@ Sessions created and prompts sent through `openchamber session` reach the app th
 
 ### Why waits are on conditions
 
-Every check polls until it holds or times out, and clicks wait until the target stops moving and is the topmost element at its centre. A fixed sleep either flakes on a slow machine or wastes time on a fast one; the few `pause` steps left are the behavior under test (a debounced draft save, the 1.2 s Git status cache).
+Every check polls until it holds or times out, and clicks and hovers wait until the target stops moving, stays the same node (a list or diff that re-renders its rows after opening replaces them in place), and is the topmost element at its centre. A fixed sleep either flakes on a slow machine or wastes time on a fast one; the few `pause` steps left are the behavior under test (a debounced draft save, the 1.2 s Git status cache).
 
 ### Why session-load retry fails only the message request
 
@@ -238,6 +241,32 @@ Some choices made in the app live on the server, not in the browser: Don't ask a
 ### Why the reset removes worktrees and their branches
 
 Deleting sessions leaves their worktrees behind. A repeat then creates a suffixed branch, while a selector for the original branch opens an empty old worktree's menu. Removing the stand's linked worktrees and non-main branches gives every scenario the same topology and names.
+
+The reset cleans the index and tree and checks out the starting branch before deleting scenario branches. A failed scenario can leave its branch checked out, so deleting branches first would stop the run. The starting commit and repository configuration come from stand creation, since resetting to `HEAD` preserves scenario commits and configuration edits.
+
+### Why a failed reset rebuilds the fixture
+
+A leftover Git lock or damaged metadata can prevent ordinary cleanup. Rebuilding the stand-owned project and removing its linked directories makes the next reset usable, while a failed scenario result keeps the cleanup failure visible. The isolation check reads Git's worktree registry directly, so an invalid Git configuration cannot bypass it. Worktrees outside the stand or an unreadable registry prevent both reset and recovery.
+
+### Why Git scenarios wait for completed actions
+
+Staging can leave Commit disabled while the index refreshes. A branch header can update before branch creation finishes and closes its form. Creating a stash shows its row before Apply is re-enabled, and Apply restores a stashed file before its refresh finishes and re-enables Pop. The scenarios wait for enabled actions and for the creation form to disappear before the next action, so faster steps in a warmed-up run cannot click a disabled button or close a picker that is still completing creation.
+
+### Why prompt history waits for its caret
+
+Recalling a prompt changes the editor's text before the next animation frame puts the cursor at the start. The Arrow Down scenario waits for that cursor before moving it to the end, so the pending recall cannot move it back between End and Arrow Down. The driver reads the browser's selection without accessing editor or application state.
+
+### Why Copy link waits for its answer
+
+Opening a session waits for its composer and selected sidebar row. Its messages can arrive afterward. Copy link waits for the answer before remembering its message id, so a read made before the transcript arrives cannot fail as a missing attribute.
+
+### Why the subagent permission scenario waits for the request
+
+The arriving permission request can replace the subagent's tool-row elements. A pointer pressed on the open-subtask arrow and released during that replacement lands on the row, so the browser does not click the arrow. The scenario waits for the parent's Allow once button before opening the subagent's chat, then answers the request in that read-only chat.
+
+### Why agent permission scenarios wait for the file
+
+An added rule's text can reach disk before its effect does, and a removed rule disappears from the editor before autosave finishes. The pattern scenario waits for the saved effect and removal before reopening the agent. Permission scenarios scroll the Shell row up before editing, keeping the default and rule controls clear of the update notification at the bottom of the page.
 
 ### Why a shared file is found through imports and not listed
 
@@ -270,6 +299,20 @@ A change whose files no feature reaches selects nothing and exits green. Without
 ### Why terminal text is read through Copy
 
 The terminal renders into a canvas with no DOM text. `terminal.expect` drags across the visible grid and copies it through the keyboard, so it reads the same output a user can select without accessing the emulator or its store. It also waits for the first shell prompt before typing: a mounted canvas can precede the shell connection. The terminal Copy scenario waits 600 ms before its triple-click because the terminal counts nearby clicks within 500 ms; the earlier focus click must expire before the selection gesture starts.
+
+History scenarios also wait for the restored or newly revealed output with `terminal.expect`. The canvas can mount before replay has finished. Its drag leaves the restored text selected; each scenario then replaces the clipboard marker and uses the context menu's enabled Copy action to prove that path too.
+
+### Why a reload scenario closes Settings first
+
+Settings has its own URL, so a reload can restore the open Settings page. The MCP creation and provider editing scenarios close Settings before reloading, then open it again to read the saved configuration. Their sidebar Settings button is reachable on the chat page.
+
+### Why MCP advanced options reopen after autosave
+
+Saving a timeout reloads the server definition and can close Advanced after the file has changed. The scenario reloads the page and reopens the server before changing Code mode, so callbacks from the earlier save cannot remove the next selector. The summary and field both have to show the saved timeout.
+
+### Why workflows wait for the saved switches
+
+The Workflow tool and approval switches change visually before their settings request finishes. A prompt from another client can reach the server while the tool is still disabled there. The scenarios read back the saved flags before sending that prompt. `settings expect` is read-only; `settings values` still refuses global fields.
 
 ### Why clipboard refusal changes the browser permission
 

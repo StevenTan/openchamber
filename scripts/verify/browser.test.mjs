@@ -7,6 +7,40 @@ import test from "node:test"
 
 import { CdpClient, resolveChrome } from "../perf/cdp.mjs"
 import { startBrowser } from "./browser.mjs"
+import { runStep } from "./steps.mjs"
+
+test("editor caret assertions distinguish the focused cursor from matching text", async (t) => {
+  try { resolveChrome() } catch { t.skip("Chrome is not installed"); return }
+  const browser = await startBrowser({})
+  try {
+    const page = await browser.newPage()
+    try {
+      await page.evaluate(`document.body.innerHTML = '<div data-chat-input><div class="cm-content" contenteditable="true"><div class="cm-line">Recalled then dropped</div></div></div><button>Elsewhere</button>'`)
+      const caretAt = async (offset) => page.evaluate(`(() => {
+        const editor = document.querySelector(".cm-content")
+        editor.focus()
+        getSelection().collapse(editor.firstChild.firstChild, ${offset})
+      })()`)
+      const ctx = { page }
+      const step = { do: "editor", equals: "Recalled then dropped", timeout: 0.001 }
+      await caretAt(0)
+      await runStep({ ...step, caret: "start" }, ctx)
+      await assert.rejects(runStep({ ...step, caret: "end" }, ctx), /caret/)
+      await caretAt(step.equals.length)
+      await runStep({ ...step, caret: "end" }, ctx)
+      await assert.rejects(runStep({ ...step, caret: "start" }, ctx), /caret/)
+      await page.evaluate("getSelection().setBaseAndExtent(document.querySelector('.cm-line').firstChild, 0, document.querySelector('.cm-line').firstChild, 20)")
+      await assert.rejects(runStep({ ...step, caret: "start" }, ctx), /caret/)
+      await page.evaluate("document.querySelector('button').focus()")
+      await assert.rejects(runStep({ ...step, caret: "end" }, ctx), /caret/)
+      await assert.rejects(runStep({ ...step, caret: "middle" }, ctx), /caret needs start or end/)
+    } finally {
+      await page.dispose()
+    }
+  } finally {
+    await browser.stop()
+  }
+})
 
 test("Windows browser shutdown releases every owned temporary profile", { skip: process.platform !== "win32" }, async (t) => {
   try { resolveChrome() } catch { t.skip("Chrome is not installed"); return }
@@ -65,6 +99,41 @@ test("Windows priority failures remove the owned Chrome profile", { skip: proces
   } finally {
     t.mock.restoreAll()
     syncBuiltinESMExports()
+  }
+})
+
+test("hover waits until the page stops replacing the target in place", async (t) => {
+  try { resolveChrome() } catch { t.skip("Chrome is not installed"); return }
+  const browser = await startBrowser({})
+  try {
+    const page = await browser.newPage()
+    try {
+      // Like a diff settling after it opens: the row is rebuilt at the same
+      // place for a while, and hover state lives on the node the pointer entered.
+      await page.evaluate(`(() => {
+        const row = () => {
+          const element = document.createElement("div")
+          element.className = "row"
+          element.style.cssText = "width:200px;height:40px"
+          element.addEventListener("pointermove", () => { element.dataset.hovered = "" })
+          return element
+        }
+        document.body.replaceChildren(row())
+        let rebuilds = 0
+        const timer = setInterval(() => {
+          document.body.replaceChildren(row())
+          globalThis.__rebuilds = ++rebuilds
+          if (rebuilds === 12) clearInterval(timer)
+        }, 60)
+      })()`)
+      await page.hover({ selector: ".row" }, 5000)
+      assert.equal(await page.evaluate("globalThis.__rebuilds"), 12)
+      assert.equal(await page.evaluate("document.querySelector('.row').hasAttribute('data-hovered')"), true)
+    } finally {
+      await page.dispose()
+    }
+  } finally {
+    await browser.stop()
   }
 })
 
