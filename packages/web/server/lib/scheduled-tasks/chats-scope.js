@@ -23,7 +23,6 @@ export const createChatsScope = (chatsRoot, { legacyRoot } = {}) => {
     return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
   });
 
-  // Same layout the UI uses for a new chat: <root>/<yyyy-mm-dd>/session-<uuid>.
   const createChatDirectory = async (now = new Date()) => {
     const date = [
       now.getFullYear(),
@@ -35,8 +34,6 @@ export const createChatsScope = (chatsRoot, { legacyRoot } = {}) => {
     return directory;
   };
 
-  // Only for a run that never got a session: the directory is still empty,
-  // and a non-recursive removal refuses to touch anything that is not.
   const discardChatDirectory = (directory) => fs.rmdir(directory).catch(() => undefined);
 
   return {

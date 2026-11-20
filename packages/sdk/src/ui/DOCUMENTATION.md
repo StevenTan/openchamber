@@ -32,6 +32,13 @@ Every `mountX(root, props)` returns `{ update(partial), dispose() }`.
 
 ## Invariants
 
+- Text updates preserve an unchanged text node so repaints do not disturb selection or layout.
+- Menu and select close paths clear the popup slot before disposing rows. Disposing a focused row can synchronously fire `focusout` and re-enter close; the cleared slot prevents a second removal from interrupting `onChange`.
+- Popover anchors accept pointer movement as fresh hover intent because crossing opaque iframe documents can omit an enter transition. A keyboard click after a cancelled touch keeps the element's own click behavior.
+- Untinted completed progress uses the host's green completion state. An explicitly tinted bar keeps its chosen tone so the bundle and the host-served look agree.
+- Inline SVG attributes supply usable sizes without kit styles; CSS scales those icons with the frame's text when kit styles are present.
+- Applying a host theme sets the root font, text size and foreground as well as variables so plain guest DOM inherits the app's typography instead of browser defaults.
+
 - Each primitive is the twin of the app's own in `packages/ui/src/components/ui` (button, input, dropdown trigger, select item, checkbox, tabs, badge). A change to the app's sizes, radii, or states changes the twin here in the same change, then the example bundles are rebuilt.
 - Text buttons, inputs, picker triggers and tabs use minimum heights and
   font-relative padding so their text can increase the control height.

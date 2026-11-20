@@ -1,11 +1,7 @@
 import { GUEST_SCROLLBAR_CSS } from '@openchamber/sdk';
 import { GUEST_UI_LOOK_CSS } from '@openchamber/sdk/ui';
 
-// The panel iframe inherits the host's dark color scheme, and a document that
-// does not declare one gets an opaque white canvas until its own theme loads:
-// a white flash on every mount (issue #4017). The declaration has to precede
-// the first paint, so it goes first: right after a leading doctype (matched
-// only at the very start, never inside authored markup), else before all.
+// external: #4017 Declare the inherited color scheme before first paint to prevent a white iframe canvas.
 const GUEST_COLOR_SCHEME_META = '<meta name="color-scheme" content="light dark">';
 const LEADING_DOCTYPE = /^\s*<!doctype[^>]*>/i;
 

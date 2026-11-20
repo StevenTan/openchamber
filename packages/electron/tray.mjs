@@ -1,19 +1,3 @@
-// Native tray/menu bar controller.
-//
-// Surfaces a glanceable, always-visible view of OpenChamber's live state:
-//  1. an aggregate activity indicator (idle / busy / error+retry) in the icon
-//     title, rendered as a monochrome template image plus a text counter so it
-//     adapts to light/dark menu bars (colour can't be shown in template mode);
-//  2. pending approvals (permission + question requests) that block agents,
-//     with inline Allow/Deny actions;
-//  3. the list of active sessions with status + branch, click to focus;
-//  4. quick actions (new session, show window, quit).
-//
-// The live state lives in the renderer (Zustand). It is pushed here over the
-// existing IPC bridge via the `desktop_tray_update` command; this module owns
-// only presentation. Tray clicks call back through `onAction`, which main.mjs
-// routes to the renderer (focus-session, respond-permission, …) or handles
-// natively (show-main-window, quit).
 
 import { Tray, Menu, nativeImage } from 'electron';
 import { buildTrayMenuTemplate, trayMenuKey } from './tray-menu.mjs';
@@ -21,19 +5,12 @@ import { TRAY_BREATH_INTERVAL_MS } from './tray-animation.mjs';
 
 const isMac = process.platform === 'darwin';
 const isLinux = process.platform === 'linux';
-// Linux StatusNotifier hosts often blank or drop oversized tray images; keep
-// the icon at a panel-typical size so AppImage trays stay visible.
 const LINUX_TRAY_ICON_PX = 22;
 const MAC_TRAY_GUID = '82177a19-0c65-4e9a-8b24-c0fbd99ecac8';
 
-// Text shown next to the icon — reserved for the two states where a precise
-// count is actionable: pending approvals and errors. Busy and unread are
-// conveyed by the icon itself (animated / filled faces), so they add no text.
-// Glyphs come from the Geometric Shapes block so macOS renders them monochrome
-// (not colour emoji) and tints them with the menu bar like the template icon.
 const computeTitle = (counts) => {
-  if (counts.approvals > 0) return `◆ ${counts.approvals}`; // decision needed
-  if (counts.error > 0) return `▲ ${counts.error}`;         // problem
+  if (counts.approvals > 0) return `◆ ${counts.approvals}`;
+  if (counts.error > 0) return `▲ ${counts.error}`;
   return '';
 };
 
@@ -83,12 +60,9 @@ export const createTrayController = ({ idleIconPath, unseenIconPath, breathIconP
   let lastTooltip = null;
   let lastMenuKey = null;
 
-  // macOS auto-picks the @2x file next to each path and tints the alpha.
-  // Windows uses the regular app icon and ignores template tinting.
   const idleFrame = toTemplateImage(idleIconPath);
   const unseenFrame = toTemplateImage(unseenIconPath);
   const breathFrames = breathIconPaths.map(toTemplateImage);
-  // Per-row status icons (template images, tinted + vertically centred by macOS).
   const statusIcons = {};
   for (const [key, p] of Object.entries(statusIconPaths || {})) {
     statusIcons[key] = toTemplateImage(p);
@@ -143,8 +117,6 @@ export const createTrayController = ({ idleIconPath, unseenIconPath, breathIconP
     tray = new Tray(idleFrame, isMac ? MAC_TRAY_GUID : undefined);
     tray.setIgnoreDoubleClickEvents(true);
     if (!isMac) {
-      // Windows: left-click shows. Linux: left-click toggles show/hide so the
-      // panel icon stays useful when the window is already open.
       tray.on('click', () => onAction({
         type: isLinux ? 'toggle-main-window' : 'show-main-window',
       }));
@@ -154,7 +126,6 @@ export const createTrayController = ({ idleIconPath, unseenIconPath, breathIconP
 
   const buildMenu = (snapshot) => {
     const menu = Menu.buildFromTemplate(buildTrayMenuTemplate(snapshot, { onAction, statusIcons }));
-    // Menu lifecycle covers native tray opening, including keyboard activation.
     menu.on('menu-will-show', () => onAction({ type: 'menu-opened' }));
     return menu;
   };

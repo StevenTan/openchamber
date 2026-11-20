@@ -7,7 +7,6 @@ import { useContext } from 'react';
 import { useChatColumnSession } from '@/components/chat/chatColumnSession';
 import { PanelWorkspaceDraftRequestContext } from '@/lib/workspace/panelOwner';
 
-/** Where the open draft runs commands while it waits for a new space; null for any other view. */
 export const useDraftSpaceTarget = (): DraftSpaceTarget | null => {
   const workspaceRequest = useContext(PanelWorkspaceDraftRequestContext);
   const column = useChatColumnSession();
