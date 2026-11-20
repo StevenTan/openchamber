@@ -90,3 +90,22 @@ describe('top-level project PR sources', () => {
   });
 });
 
+describe('source input compatibility', () => {
+  const HASH = 'A'.repeat(40);
+
+  it('preserves coercion before normalizing commit hashes', () => {
+    expect(parseSource({ kind: 'commit', hash: new String(HASH) }))
+      .toEqual({ kind: 'commit', hash: HASH.toLowerCase() });
+    for (const hash of [[HASH], 1e39, undefined]) {
+      expect(() => parseSource({ kind: 'commit', hash })).toThrow('full commit hash');
+    }
+    expect(() => parseSource({ kind: 'commit', hash: Symbol('hash') })).toThrow(TypeError);
+  });
+
+  it('keeps invalid reader failures at the dependency boundary', async () => {
+    for (const getPullRequestDiff of [undefined, {}, true]) {
+      await expect(loadSourceSections('/repo', { kind: 'pr', number: 3 }, { getPullRequestDiff }))
+        .rejects.toMatchObject({ statusCode: 500, message: 'Pull request diffs are unavailable' });
+    }
+  });
+});

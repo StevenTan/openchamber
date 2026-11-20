@@ -315,7 +315,12 @@ The client's branch PR state is `useGitHubPrStatusStore`, a provider-neutral sto
   remaining storage boundary.
 - `accounts.js` depends on the auth-store boundary above. The
   `AccountEvents.connected` contract now permits nullable profile `name` and
-  `email`, so those fields no longer block conversion.
+  `email`, so those fields no longer block conversion. Its device completion
+  also forwards the truthy `access_token` from `exchangeDeviceCode` to
+  `createOctokit` without a string check. That response remains unknown;
+  declaring its token a string would overstate the validation. Octokit's
+  credential digest passes the token to Node's `Hash.update`, which does not
+  accept arbitrary truthy JSON values.
 - `provider.js` forwards the gh credential's unchecked profile as its transport
   user. `TransportCredential.user` requires a validated numeric identity and
   string profile fields. The shared contract must distinguish an unchecked
@@ -336,23 +341,47 @@ The client's branch PR state is `useGitHubPrStatusStore`, a provider-neutral sto
   and perform: creation needs `head` and `base`, existing numbered operations
   need `number`, and merge and review operations use `headSha`. A provider
   cannot assert those fields merely because a replay record was read.
-- `merge-follow.js` consumes successful merge receipts. The shared
-  `mutation-storage.ts:MutationRecord` makes `result` and `target.headSha`
-  optional independently of `kind` and `state`. Its owner must expose the
-  successful merge-receipt variant before the follow hook can rely on those
-  fields without new checks.
-- `change-request-patch.js` checks raw diff text with Node's `assert.match`.
-  `@types/node:assert.match` accepts an already-typed string and returns `void`;
-  it cannot validate and narrow an unknown raw response with the same call.
-  That declaration would need to accept unknown and assert string. Declaring
-  Octokit's unchecked media-dependent response to be a string would conceal the
-  boundary.
-  The contents endpoint also returns either a collection or an entry. Its
-  unchecked `entry.data?.sha` goes straight to the blob endpoint's required
-  `file_sha`; replacing that access with `in` changes the null-response failure.
 
 The nested repository-network helper now supplies its host and its
 `origin`/`upstream` source union.
+
+### Why merge follows distinguish fresh success from replay
+
+The success hook ignores replayed records before reading their result. A fresh
+GitHub merge returns a result object on every successful path, including cancel,
+classic merge, queued merge and auto-merge. The local callback contract describes
+that fresh result separately from the general replay record; it does not claim
+that mutation storage validates a result for every successful record. The target
+retains its optional `headSha`, as does the snapshot schema.
+
+The tracked-item parser's thread overload describes its existing dispatch:
+an explicit pull, issue or discussion kind returns a thread or null, never a
+work item. A file entry's unknown item first uses the same plain-record predicate
+the parser already applies. Snapshot fields retain the schema's inferred types.
+
+Attaching sets the tracked service before queuing the initial refresh. Its
+accessor checks that invariant after loading, while still reading the latest
+attached service if attachment changes during the wait. Error-field access
+retains unchecked values, inherited and synthesized properties, primitive boxing
+and the TypeError for null or undefined thrown values.
+
+### Why patch text is unknown until the existing assertions pass
+
+Octokit's response depends on the requested media type. Diff and raw file
+responses enter as unknown values. The local Node declaration lets
+`assert.match` express its existing runtime string validation. File text uses
+the original `assert.equal(typeof content, 'string', message)` in an assertion
+function, preserving its error code, actual value and expected value.
+The contents lookup still forwards `entry.data?.sha` directly to the blob
+endpoint. A missing SHA and a null contents response retain their existing
+failure behavior. The contents API omits content above 1 MB, so binary reads
+use the blob's base64 bytes.
+Commit references keep the unchecked provider-envelope type: the SHA assertions
+validate `String(ref)`, while the contents endpoint still receives the original
+value. A string declaration would promise more than those assertions check.
+The exact-account lookup retains an absent session's undefined account id.
+`RegExp.exec` coerces that value to text at runtime; its local overload admits
+the existing call without replacing it or changing the optional session input.
 
 ### Why rate-limit fields remain unchecked
 

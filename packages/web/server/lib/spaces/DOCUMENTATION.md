@@ -111,6 +111,18 @@ Their optional fields may explicitly contain `undefined`, because failed field
 parses use `.catch(undefined)`. A window is derived only after URL and header
 checks; reading a catalog entry alone does not establish that it has a window.
 
+Provider configuration and login renewal share the auth and provider entity
+contracts owned by `opencode`. Chat exports retain the export schema's inferred
+type, including unchecked message fields kept by `passthrough`. Archive imports
+add only the archive-owned time, location and deny permissions. A null login
+still fails on its first `methodID` read after the old credential rows are removed.
+
+Config layers contain checked objects with unchecked field values. Provider
+settings remain unchecked until the key schema or URL parser consumes them.
+URL parsing preserves JavaScript's string-hint coercion, including a refusal
+when coercion throws. The keeper's renewal map contains its promise before a
+read, and its per-space fingerprint map exists before a fingerprint is stored.
+
 `opencode/config-v2.js` constructs custom provider entities through
 `Object.fromEntries` without a typed per-field contract. In particular, provider
 settings pass through as an arbitrary configuration object. Callers must not
@@ -192,6 +204,32 @@ Setup output removes C0, C1 and bidi characters.
 Unicode categories express the control range without a lint suppression;
 tab, newline and carriage return remain outside that removal range. Escape
 and bell delimiters still consume complete terminal sequences.
+
+Space event payloads retain the SSE parser's JSON contract. Queue items stay
+unchecked after the queue schema's array check. Event source callbacks and the
+session index share their owning contracts; session records remain unchecked
+after the JavaScript proxy sanitizer. The index reads only their id field and
+does not claim that the sanitizer validates every retained field.
+
+### Why space streams accept Node web streams
+
+The space transport uses `Readable.toWeb` on an HTTP client response. Node's
+web-stream declarations differ from the DOM declarations on completed reads,
+but the upstream reader consumes both through `getReader`, `read` and `cancel`.
+Its response contract accepts both stream types. HTTP client responses have a
+numeric status code; the dispatcher's response type distinguishes them from
+server-side requests covered by Node's general `IncomingMessage` declaration.
+
+### Why unchecked Docker consumers remain JavaScript
+
+`hardening.js` calls `filter`, `map`, `some` and `includes` on nested inspect
+fields without checking their shapes. `docker-engine.inspect` returns an
+unchecked first entry. Declaring its `Config.Env`, `HostConfig` arrays, mounts
+or network entries as validated objects would overstate that boundary.
+`host.js` also passes the Docker label parser's unchecked ids and project values
+into string-only space and directory operations. The label parser deliberately
+accepts coercible ids and passes other label values through. Neither boundary
+can become a checked shape through a type-only correction.
 
 ### Why control ranges use Unicode categories
 

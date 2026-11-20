@@ -82,6 +82,21 @@ This module provides Git repository operations for the web server runtime, inclu
   `Object.prototype.toString`; substituting it would change the service's
   input acceptance. MIME lookup runs only after the image/office-extension
   check, so its closed key set excludes inherited object names.
+- Network execution contracts live in `network-execution-contracts.ts`.
+  Sync planning copies the original JSON refs and remote record; execution
+  narrows those copied values without trimming or replacing them with the
+  normalized public target. Contributor-source resolution remains JSON until
+  the existing field comparisons run. Non-null field access establishes no
+  promise about a provider response's individual values.
+- Execution errors retain unchecked metadata and the original thrown value.
+  Completion validation remains the registry's responsibility. Redaction
+  accepts undefined secret entries because its existing string conversion
+  maps them to empty strings and omits them.
+- Clone binding receives explicit undefined credential, confirmation and
+  provider-account fields. Its owner contract permits these values because
+  the binding implementation checks their values, not property presence.
+- Local integration retains the host line-ending settings and canonical LFS
+  clean filter so a clean checkout stays recognizable during rebase.
 
 - The 3 process-launched Git helper paths stay JavaScript bootstraps with only
   Node builtin static imports. They register source resolution before loading
@@ -111,6 +126,15 @@ This module provides Git repository operations for the web server runtime, inclu
 
 ### Network execution and recovery
 
+- The durable network store exports its validated record and snapshot shapes
+  from `network-storage-contracts.ts`. Snapshot scrubbing and JSON cloning stay
+  unchecked until the existing record parser validates them. Unknown operation
+  names retain their opaque JSON targets instead of acquiring a known-operation
+  target type. Error-message replacement still requires an own dictionary key;
+  state-specific error-code lookup keeps its existing optional method call.
+- Stored nullable timestamps keep JavaScript's numeric-null behavior in
+  expiration and eviction arithmetic. Persisted input still passes the original
+  boolean, integer, endpoint, exact-key and vocabulary checks.
 - Server-generated digests are opaque values, never CLI arguments. Base64url digests may begin with `-`, so option-shaped argument validation does not apply to them.
 - Expiring an unstarted operation cancels its durable record before dropping it from memory. Otherwise its persisted `planned` state holds a capacity slot indefinitely.
 - Durable recovery identifies the process that claims an operation. Multiple servers can share the data directory, and another live server's operation is still running.

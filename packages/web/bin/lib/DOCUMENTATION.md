@@ -101,16 +101,16 @@ Command modules implement user-facing commands and preserve output contracts acr
 
 These modules hold reusable, non-presentational logic for commands.
 
-- `cli-args.js`
+- `cli-args.ts`
   - Argument parsing, defaults, help text, completion script generation, and typo suggestions.
   - `COMMAND_OWNED_FLAGS` lists flags only one family of commands reads (schedule, session, tunnel, logs). Such a flag on any other command is an `Unknown option for <command>` error in every output mode instead of being ignored; global and shared flags are not listed and stay accepted everywhere. Add a new command-specific flag there.
   - `--port` accepts a leading `-` (`-p -1`) so an out-of-range value reaches the range check and reports a clear error instead of `Unknown option`. `--daemon` stays accepted as a no-op because daemon mode is the default and older clients still pass it.
   - An inline empty `--target-session=` (an empty shell variable) is missing like a bare flag and must not consume the next word as the target.
 
-- `cli-errors.js`
+- `cli-errors.ts`
   - CLI exit codes and typed tunnel CLI errors.
 
-- `cli-paths.js`
+- `cli-paths.ts`
   - Data, run, log, settings, tunnel profile, and managed-local config paths.
 
 - `cli-settings-accessors.js`
@@ -140,7 +140,7 @@ These modules hold reusable, non-presentational logic for commands.
   - Instance discovery, live health probing, attachability checks, provider discovery, and status aggregation used by lifecycle/status/tunnel commands.
   - A live pid file is only the right instance when the recorded port also answers as OpenChamber. Command-line identity alone can match a recycled pid from another OpenChamber process on a different port. Probe all plausible hosts; when identity is matched or unknown but the port still cannot be confirmed, keep the registry files and report the instance as not running.
 
-- `cli-http.js`
+- `cli-http.ts`
   - HTTP helpers for health checks, shutdown requests, JSON API calls, tunnel provider fetches, and system info fetches.
   - Owns local desktop bearer auth and managed CLI-instance UI password retry for control-plane requests.
   - `requestJson` passes only `method`, `headers` and `body` to `fetch`. Control commands hand it their parsed CLI options, and Bun, which runs the CLI in the Docker image, reads `session` as its own fetch option and rejects `--session`.
@@ -169,10 +169,10 @@ These modules hold reusable, non-presentational logic for commands.
 - `cli-log-files.js`
   - Log rotation, tail reads, and file-follow streaming.
 
-- `cli-executables.js`
+- `cli-executables.ts`
   - Executable path resolution and PATH lookup helpers.
 
-- `cli-startup.js`
+- `cli-startup.ts`
   - Native startup service detection, install/uninstall/status helpers, and platform-specific startup command execution.
   - The service runs the CLI by its resolved path. A pnpm global install resolves into a versioned `.pnpm` store directory that an update leaves behind, so the entrypoint is mapped back to the stable `node_modules/@openchamber/web` link when it exists.
   - pnpm 11 and later install every global update into a new `global/v11/<dir>` and delete the old one; the link `global/v11/<hash>` beside it moves to each new directory, and pnpm's shim starts the CLI through it. When the CLI was started through that link, the service keeps the unresolved path, so a pnpm upgrade does not leave the unit pointing at a deleted directory (#5727).
@@ -185,7 +185,7 @@ These modules hold reusable, non-presentational logic for commands.
   - The environment snapshot drops the variables a running OpenChamber put into the enabling shell, read from the `OPENCHAMBER_INJECTED_ENV` record (`server/lib/injected-env.js`), so a service enabled from the desktop app's terminal or an agent's shell does not inherit that instance's runtime flags, UI password, or managed OpenCode password (#4604). The user's own exports, `OPENCODE_HOST` included, still carry over. `cli-args.js` applies the same record to the `OPENCHAMBER_UI_PASSWORD` default. Shell and session variables (`PS1`-style prompts, `TERM`, `PWD`, virtualenv and conda state) are implementation details, not app configuration, so the snapshot drops them too.
   - The snapshot never holds `PATH`. The service starts with the platform default, and the server puts the login shell's `PATH` in front at start (`server/lib/opencode/env-runtime.js`), so a toolchain the user installed or removed after `startup enable` shows up in the terminal and agent commands. A saved `PATH` stayed in every child's `PATH` long after its folders were gone, and when the login-shell probe failed it was the whole `PATH`. A user who needs a fixed `PATH` entry for the service sets it as a user variable in Environment settings. The OpenCode check in `../cli.js` runs before the server, so when `opencode` is not on the default `PATH` (a saved `OPENCODE_BINARY` that moved, or none saved) it applies the login shell's environment and looks again.
 
-- `cli-tunnel-profiles.js`
+- `cli-tunnel-profiles.ts`
   - Tunnel profile normalization, token resolution/redaction, profile storage, migration, file-permission warnings, and managed-remote pair persistence.
 
 - `cli-tunnel-utils.js`
@@ -204,6 +204,95 @@ These modules hold reusable, non-presentational logic for commands.
 - Do not import `cli.js` from modules in this directory. The dependency direction is `cli.js` -> command modules -> helper modules.
 
 ## Decisions
+
+### Why startup error messages remain unchecked
+
+Startup command failures and injected task callbacks can throw values other
+than `Error`. Their `message` field stays unknown until string interpolation;
+inherited and non-string messages keep their existing output. A null or
+undefined failure still raises the original property-access `TypeError`.
+
+### Why startup lookup accepts an instance without a pid
+
+Discovery can return a live server with a null pid. Service ownership preserves
+the supplied instance shape and compares only its pid with the manager's numeric
+process ids. A null pid never matches the Windows task's process list.
+
+### Why startup checks process text before parsing
+
+An ignored or inherited child-process output stream can have null stdout.
+The lingering parser retains its string check before using string methods.
+The other process-output parsers keep their existing string coercion and regex
+acceptance rules. Regex capture defaults cover only slots that their matching
+patterns always populate.
+
+Environment values retain their string checks before path normalization and
+snapshot filtering. If `os.userInfo()` fails because the uid has no passwd entry,
+the username lookup falls back to `USER` and `LOGNAME`.
+
+### Why the startup uid accessor has no fallback
+
+Node declares `getuid` optional for Windows. The macOS service paths require it;
+an unavailable method keeps the original `TypeError` instead of writing a
+launchd target containing an undefined uid.
+
+### Why HTTP discovery types stop at the checked fields
+
+System-info discovery checks a string runtime and a finite numeric pid. Negative
+and fractional pids retain the old acceptance rule. Provider discovery checks
+only that the provider list is an array; its entries remain unchecked. The JSON
+request helper forwards arbitrary parsed JSON, including scalar responses, and
+does not claim a route-specific response contract.
+
+### Why HTTP headers keep the per-port cookie pattern
+
+The server can name a UI session cookie `oc_ui_session` or append a port.
+The CLI accepts both forms when retrying an authenticated request. Cookie
+values, stored UI passwords and system-info fields retain their boundary checks.
+
+### Why profile inputs and stored profiles have different types
+
+Files supply unchecked fields. `TunnelProfilesInput` promises no element shape;
+the sanitizer checks the list, each record, normalized text, and finite
+timestamps before returning `TunnelProfile` entries. The list check also
+rejects inherited object members such as `constructor`. Finite fractional and
+negative timestamps remain valid. Redaction and token-status formatting also
+accept unchecked token fields; revealing a token preserves its original value,
+while masking and status formatting check it before using string methods.
+Permission warnings ignore failed file stats because the profile file may not
+exist yet.
+
+### Why tunnel state keeps unchecked fields
+
+The CLI reads only the saved config path and preserves every other property
+when writing it back. Its state predicate establishes a non-array object, not
+the type of that path. The string check stays at the read, and the spread keeps
+unrecognized properties.
+
+### Why CLI errors declare their exit code without emitting a field
+
+The constructor assigns `name` before `exitCode`. A declaration-only field keeps
+that own-property order and leaves the runtime constructor unchanged.
+
+### Why parser defaults have required undefined-valued fields
+
+`CliOptions` preserves the parser's object shape. Defaulted value flags are own
+properties even when their value is `undefined`; `worktree`, `branch`,
+`startRef`, `setUpstream` and `relay` are absent until their flag is handled.
+An empty `--config` produces `null`, distinct from the default `undefined`.
+
+### Why text guards remain on the exported argument helpers
+
+Completion and typo-suggestion helpers are also called from JavaScript.
+Their shared text predicate preserves rejection of non-string values before
+using string methods. Parser-internal values already come from a string
+argument vector and use undefined checks for missing values.
+
+### Why edit-distance indexing checks occupancy
+
+The edit-distance matrix allocates every row and cell before the loops use it.
+Local accessors express that invariant under unchecked-index checking without
+casts. They leave the matrix, loop order and first-match tie behavior intact.
 
 ### Why `schedule update` omits unset boolean flags instead of sending `false`
 

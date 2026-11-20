@@ -36,7 +36,7 @@ export interface WorktreeEntry {
 export interface HydrationPart {
   path: string;
   status: string;
-  endpoint?: { displayUrl: string; fingerprint: string };
+  endpoint?: { displayUrl: string; fingerprint: string } | undefined;
   error?: { code: string; message: string };
 }
 export interface CheckoutHydration {
@@ -211,6 +211,27 @@ export interface RangeOptions extends DiffOptions {
 export interface RepositoryGitContext {
   repoRoot: string;
   git: SimpleGit;
+}
+export type RepositoryGitPaths = { supported: false; reason: string } | {
+  supported: true;
+  gitDirectory: string;
+  commonDirectory: string;
+  bare: boolean;
+};
+
+export interface ErrorFields {
+  code?: unknown;
+  stdout?: unknown;
+  stderr?: unknown;
+  message?: unknown;
+  killed?: unknown;
+  reason?: unknown;
+  statusCode?: unknown;
+  hydration?: unknown;
+  bootstrapStatus?: unknown;
+  status?: unknown;
+  branch?: unknown;
+  parent?: unknown;
 }
 export interface GitFileContext {
   absolutePath: string;

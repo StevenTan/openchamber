@@ -242,6 +242,21 @@ A provider is a new destination for a token and for what the user writes into is
 
 ## Decisions
 
+### Why repository resolution keeps separate result types
+
+Git path resolution distinguishes an unsupported repository from a successful
+read with both Git directories and the bare flag. Repository ID reads add the
+filesystem identity and retain the worktree's Git directory. Public topology
+reads omit raw endpoints and transport revision; private reads include them
+only through the existing private resolver.
+
+The extension reconciler's provider-ID accessor checks the invariant established
+by eligibility before storing a map key. Guest contributions remain owned by the
+catalog contract. Status cache data retains its caller's shape and gains only
+the checked or generated `fetchedAt`; invalidation keeps its original property
+comparison. Error messages remain unchecked until redaction converts them with
+`String(value || '')`.
+
 ### Why source-control input guards are folder-local
 
 The binding contract also compiles in UI projects, which cannot import the
@@ -331,6 +346,30 @@ Service login supplies `status`; token-based CLI login supplies `tokenResult`.
 The selected descriptor determines which callback is required. CLI invocation
 retains its receiver. Non-null accessors check those dependencies and the
 already-established login and username invariants without adding defaults.
+
+Extension response types come from each SDK response schema. The generic
+forwarder preserves the method-to-schema relationship: pass-through resources
+return the JSON object or array that was checked, while head, status, source and
+mutation responses retain their schema's checked fields. A resource read does
+not establish a patch or file DTO merely by forwarding JSON.
+
+Schema-parsed profile fields can contain explicit `undefined`. Auth input and
+account-event types retain it; the auth parser omits those fields when storing
+the user. A null credential revision matches no stored revision. Failure kinds
+remain unchecked error metadata until a caller interprets them.
+
+### Why mutation tables retain ownership checks
+
+Mutation routes are dictionary keys supplied by callers. `Object.hasOwn`
+rejects inherited names such as `constructor` before selecting a normalizer.
+Normalized inputs describe the fields each normalizer copies and the digest it
+assembles; they do not acquire a provider response type.
+
+Outbound evidence starts as an array of `{ method, status }` records with a null
+status until dispatch settles. Error classification retains its array check and
+integer-status check because an error's evidence is unchecked. It does not
+assume that an array check validated each member. User IDs retain the separate
+primitive-string and safe-integer checks before forwarding an account.
 
 ### Why startup repair is separate from route registration
 

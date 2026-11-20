@@ -24,8 +24,28 @@ result construction; `../credentials` owns managed credential storage.
 - xAI accepts flat protobuf usage fields and nested response envelopes. The
   current-period percentage paths are `[1]` and `[1, 1]`, following the
   billing responses documented by https://github.com/steipete/CodexBar.
+- Copilot reads only the premium-interaction snapshot. Fractional
+  `quota_remaining` takes precedence over `remaining` when deriving spent credits,
+  matching `CopilotUserQuotaInfo` in `microsoft/vscode-copilot-chat`.
 
 ## Decisions
+
+### Why Copilot fields remain unknown
+
+Copilot's HTTP payload and normalized credentials do not validate their fields.
+The local field parsers preserve null, undefined, arrays, primitives and inherited
+properties without copying or filtering them. Each numeric or string conversion
+retains its existing acceptance rules. In particular, string `credits_used`
+values are trimmed before numeric conversion so blank strings remain unavailable.
+
+### Why MiniMax's shared reader remains JavaScript
+
+`pickChatModel` calls `m.model_name.toLowerCase()` after checking only truthiness.
+A truthy number or object can reach that call and throw the native method-call
+error, which `fetchQuota` returns to the caller. The HTTP response has not
+established a string or a callable method. Declaring either would overpromise;
+adding validation or coercion would change the result for malformed model names.
+Type-only changes to neighbouring modules cannot establish that missing check.
 
 ### Why MiniMax status fields remain unknown
 
@@ -58,3 +78,16 @@ VS Code imports this reader directly. Converting it exposes
 `asNonEmptyString(value: unknown): string | null` before VS Code can check the
 converted reader. The reader's returned percentages must also retain their
 checked numeric type when using the broader `toUsageWindow` result.
+
+### Why OpenCode Go response fields remain unknown
+
+The object parsers establish only a non-null object, including arrays, without
+copying it or checking its properties. Each optional field stays unknown until
+the existing string, number, timestamp or nested-object check. Inherited fields
+remain readable, matching the shared `asObject` contract.
+
+Console meters retain fractional usage that the API-key usage endpoint floors.
+An ended Go subscription may retain its product while omitting access; it keeps
+the absent-subscription error. A captured Console failure keeps its unchecked
+thrown value so the expired-key fallback preserves both its identity and its
+truthiness rule.
