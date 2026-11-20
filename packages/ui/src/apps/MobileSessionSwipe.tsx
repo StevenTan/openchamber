@@ -36,6 +36,7 @@ export const MobileSwipeActionsRow: React.FC<{
   /** Marks the row as the current session so the sheet's open-time
       auto-scroll can find it. */
   dataActiveSession?: boolean;
+  sessionId?: string;
   /** Classes for the transformed content element. The default suits a plain
       header row; session rows pass their own layout and active background. */
   contentClassName?: string;
@@ -46,6 +47,7 @@ export const MobileSwipeActionsRow: React.FC<{
   revealed,
   onRevealedChange,
   dataActiveSession,
+  sessionId,
   contentClassName = 'relative flex w-full items-center bg-background',
   children,
 }) => {
@@ -112,6 +114,7 @@ export const MobileSwipeActionsRow: React.FC<{
   return (
     <div
       data-active-session={dataActiveSession || undefined}
+      data-mobile-session-row={sessionId}
       // Rounded as the desktop's rows are: the list is inset from the screen's
       // edges, and the selection and a swipe's actions keep the row's shape.
       // `oc-row-clip` and not `overflow-hidden`: on a phone that class becomes

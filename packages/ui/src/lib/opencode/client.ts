@@ -73,6 +73,7 @@ import { runningImageJobFromWire, type RunningImageJob } from "./background-imag
 import { recordedTurnDiffSchema } from './turn-file-diffs'
 import { subagentCancellationNote } from "./subagent-run"
 import { toJsonRecord } from "./json"
+import { withZenName } from "./providerDisplayName"
 import { readMessageThroughAncestors } from "./message-ownership"
 import {
   deniesAnyProvider,
@@ -1194,18 +1195,16 @@ class OpencodeService {
     return true
   }
 
-  /**
-   * Renames the session. OpenCode 2.0.8 folded `session.rename` into
-   * `session.update`, where an empty title asks the server to regenerate one.
-   */
+  /** An empty title asks OpenCode's `session.update` to generate one. */
   async renameSession(id: string, title: string, directory?: string | null): Promise<void> {
     await call("session.update", () => this.clientFor(directory).session.update({ sessionID: id, title }))
   }
 
-  /**
-   * Records that the turn which ended at `idle` was seen. OpenCode keeps the
-   * watermark monotone and leaves a turn that ended later unread.
-   */
+  async setSessionPermissions(id: string, permissions: NonNullable<Session["permissions"]>, directory?: string | null): Promise<void> {
+    await call("session.update", () => this.clientFor(directory).session.update({ sessionID: id, permissions }))
+  }
+
+  /** Records the turn that ended at `idle` as seen; OpenCode keeps the watermark monotone, so a later turn stays unread. */
   async viewSession(id: string, idle: number, directory?: string | null): Promise<void> {
     await call("session.view", () => this.clientFor(directory).session.view({ sessionID: id, idle }))
   }
@@ -2293,7 +2292,7 @@ class OpencodeService {
         call("provider.list", () => providerClient.provider.list().then((r) => r.data)),
       ])
       return compact({
-        providers,
+        providers: providers.map(withZenName),
         models: models.map((model) => (
           Array.isArray(model.variants) ? model : { ...model, variants: [] }
         )),
