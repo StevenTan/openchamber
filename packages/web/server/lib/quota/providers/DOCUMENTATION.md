@@ -40,13 +40,14 @@ JSON guard retains that acceptance; expiry checks and `toNumber` keep their
 existing treatment of those numbers. A finite-number schema would change both
 token refresh and meter fallback behavior.
 
-### Why the registry remains JavaScript
+### Saved usage configurations
 
-`../extension-registry.js` stores providers in an untyped `Map`. Its
-`extensionQuotaProvider` and `extensionQuotaProviderEntries` exports need an
-owner-defined provider contract covering IDs, names, configuration checks and
-quota results before the registry can consume them without unchecked types.
-`../utils/auth.js` also leaves `getAuthEntry` and `normalizeAuthEntry` untyped;
+Account entries select a built-in reader by template ID. Provider-bound entries
+read response usage. Public results carry the saved entry's ID and name;
+attached extension providers retain their own IDs. Pending requests for a saved
+entry are keyed by its ID and revision.
+
+`../utils/auth.js` leaves `getAuthEntry` and `normalizeAuthEntry` untyped;
 credential readers must narrow their results before promising credential fields.
 
 ### Why the Cursor summary remains JavaScript
