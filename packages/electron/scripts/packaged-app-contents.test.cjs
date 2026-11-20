@@ -22,6 +22,8 @@ const completeApp = () => [
   `${web}/build/server/index.js`,
   `${web}/build/server/index.js.map`,
   `${web}/build/bin/cli.js`,
+  `${web}/server/lib/workspace-dependencies/cache.js`,
+  `${web}/server/lib/workspace-dependencies/requirements.txt`,
 ].map((filePath) => ({ path: filePath, unpacked: false }))
   .concat(helpers.map((filePath) => ({ path: filePath, unpacked: true })))
   .concat(process.platform === 'win32' ? [{ path: `node_modules/7zip-bin/win/${process.arch}/7za.exe`, unpacked: true }] : []);
@@ -92,6 +94,11 @@ test('packaging keeps only the target Windows decoder and no decoders on macOS o
 test('the web build output inside the archive is rejected', () => {
   const files = [...completeApp(), { path: `${web}/dist/assets/index.js`, unpacked: false }];
   assert.deepEqual(findPackagedAppContentProblems(files), [`${web}/dist must not be packaged (1 files found)`]);
+});
+
+test('server source outside workspace dependencies is rejected', () => {
+  const files = [...completeApp(), { path: `${web}/server/index.js`, unpacked: false }];
+  assert.deepEqual(findPackagedAppContentProblems(files), [`${web}/server must not be packaged (1 files found)`]);
 });
 
 test('ripgrep platform packages inside the archive are rejected', () => {

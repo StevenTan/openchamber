@@ -77,7 +77,8 @@ const findPackagedAppContentProblems = (files, target) => {
     problems.push(`${strayAppFiles.length} unexpected files outside node_modules (${examples})`);
   }
   for (const directory of FORBIDDEN_DIRECTORIES) {
-    const count = files.filter((file) => file.path.startsWith(`${directory}/`)).length;
+    const count = files.filter((file) => file.path.startsWith(`${directory}/`)
+      && !file.path.startsWith(`${WEB_PACKAGE}/server/lib/workspace-dependencies/`)).length;
     if (count > 0) problems.push(`${directory} must not be packaged (${count} files found)`);
   }
   const platformPackageFiles = files.filter((file) => RIPGREP_PLATFORM_PACKAGE.test(file.path)).length;

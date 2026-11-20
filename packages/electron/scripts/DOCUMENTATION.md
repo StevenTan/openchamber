@@ -14,7 +14,9 @@ These scripts own desktop asset staging, Electron bundling and native-module rep
   behind `.js` specifiers; packaged builds continue to read emitted JavaScript.
 
 - The web package contributes `build/server` and `build/bin` to the archive.
-  Its original source trees stay out. Server source maps remain packaged while
+  Runtime fingerprint inputs under `server/lib/workspace-dependencies` remain
+  packaged with `scripts/prepare-workspace-runtime.mjs`; other source trees stay out.
+  Server source maps remain packaged while
   maps from other dependencies are stripped.
 
 - Packaging rebuilds the SDK before the web server is bundled because the server imports its built exports. Asset-copy failure removes partially staged output so a later package cannot consume it.
