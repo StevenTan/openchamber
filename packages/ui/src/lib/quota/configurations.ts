@@ -2,8 +2,8 @@ import { z } from 'zod';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import type { BuiltInQuotaProviderId, QuotaProviderId } from '@/types';
 import { QUOTA_PROVIDERS } from './providers';
-export type { QuotaConfiguration, QuotaConfigurationInput, QuotaConfigurationStatus } from '../../../../web/server/lib/quota/configurations.js';
-import type { QuotaConfigurationInput, QuotaConfigurationStatus } from '../../../../web/server/lib/quota/configurations.js';
+export type { QuotaConfiguration, QuotaConfigurationInput, QuotaConfigurationStatus } from '@/types/quota';
+import type { QuotaConfigurationInput, QuotaConfigurationStatus } from '@/types/quota';
 
 const templateId = z.custom<BuiltInQuotaProviderId>((value) => QUOTA_PROVIDERS.some((entry) => entry.id === value));
 const customConfigurationId = z.string().regex(/^quota-[a-z0-9-]+$/);

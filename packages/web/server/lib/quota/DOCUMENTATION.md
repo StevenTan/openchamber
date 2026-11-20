@@ -5,7 +5,9 @@ This module fetches quota and usage signals for supported providers in the web s
 
 ## Usage configurations
 
-`templates.js` defines the built-in usage templates shared with the UI. Each
+`templates.js` defines the server's built-in usage templates. The UI lists
+their IDs and names in `lib/quota/providers`; configuration types live in
+`packages/ui/src/types/quota.ts`. Each
 saved configuration has an ID, name, template, data source, a provider ID and
 source revision. `GET/POST /api/quota/configurations` and
 `PUT/DELETE /api/quota/configurations/:id` own the catalog in

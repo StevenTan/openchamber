@@ -35,6 +35,25 @@ export type ExtensionQuotaProviderId = `ext-${string}`;
 
 export type QuotaProviderId = BuiltInQuotaProviderId | ExtensionQuotaProviderId | `quota-${string}`;
 
+export interface QuotaConfigurationInput {
+  name: string;
+  templateId: BuiltInQuotaProviderId;
+  providerId: string | null;
+  source: 'account' | 'provider';
+}
+
+export interface QuotaConfiguration extends QuotaConfigurationInput {
+  id: QuotaProviderId;
+  revision: string;
+}
+
+export interface QuotaConfigurationStatus {
+  configurations: QuotaConfiguration[];
+  catalogRevision: number;
+  providerResponseTemplates: BuiltInQuotaProviderId[];
+  configuration?: QuotaConfiguration;
+}
+
 export interface UsageWindowGiftReset {
   recordId: number;
   expireAt: number;

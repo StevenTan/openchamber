@@ -1,21 +1,6 @@
-import type { BuiltInQuotaProviderId, QuotaProviderId } from '../../../../ui/src/types/quota';
+import type { BuiltInQuotaProviderId, QuotaProviderId, QuotaConfiguration, QuotaConfigurationInput, QuotaConfigurationStatus } from '../../../../ui/src/types/quota';
 import type { ZodType } from 'zod';
-export interface QuotaConfigurationInput {
-  name: string;
-  templateId: BuiltInQuotaProviderId;
-  providerId: string | null;
-  source: 'account' | 'provider';
-}
-export interface QuotaConfiguration extends QuotaConfigurationInput {
-  id: QuotaProviderId;
-  revision: string;
-}
-export interface QuotaConfigurationStatus {
-  configurations: QuotaConfiguration[];
-  catalogRevision: number;
-  providerResponseTemplates: BuiltInQuotaProviderId[];
-  configuration?: QuotaConfiguration;
-}
+export type { QuotaConfiguration, QuotaConfigurationInput, QuotaConfigurationStatus } from '../../../../ui/src/types/quota';
 export const configurationInputSchema: ZodType<QuotaConfigurationInput>;
 export function readQuotaConfigurations(): QuotaConfiguration[];
 export function readQuotaConfiguration(id: string): QuotaConfiguration | null;
