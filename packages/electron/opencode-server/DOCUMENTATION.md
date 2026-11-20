@@ -2,11 +2,11 @@
 
 ## Ownership
 
-This folder is the OpenCode the desktop app ships: `opencode serve` assembled from OpenCode's npm packages (`@opencode/server` and the packages it imports), pinned by the exact `@opencode/server` version in `packages/electron/package.json`. `scripts/prepare-opencode-server.mjs` bundles it with Bun into `resources/opencode-server/` and stages beside the bundle, under `assets/`, the native files OpenCode loads from disk, taken from the npm packages for the target platform and architecture. `scripts/verify-opencode-server.mjs` checks a staged or packaged copy.
+This folder is the OpenCode the desktop app ships: `opencode serve` compiled from the fork in the `vendor/opencode` Git submodule. The parent repository pins its source commit; its server version matches `@opencode/server` in `packages/electron/package.json`. `prepare:opencode-server` installs the source server's locked dependencies, then `scripts/prepare-opencode-server.mjs` bundles its TypeScript with Bun into `resources/opencode-server/`. Native files OpenCode loads from disk are staged beside the bundle under `assets/`, taken from npm packages for the target platform and architecture. `scripts/verify-opencode-server.mjs` checks a staged or packaged copy.
 
 The web server owns starting and stopping it. `lib/opencode/env-runtime.js` resolves `resources/opencode-server/serve.mjs` (or `OPENCHAMBER_BUNDLED_OPENCODE_SERVER_DIR`) as the `bundled` OpenCode and runs it through `resolveManagedOpenCodeLaunchSpec` on the host's own Node: Electron's executable with `ELECTRON_RUN_AS_NODE=1` in the app, the dev machine's Node under HMR. From there `lib/opencode/lifecycle.js` treats it like any OpenCode binary.
 
-- `serve.mjs`: the entry. Answers `--version` without loading OpenCode, refuses every command but `serve`, sets the native paths, then loads the server. It runs as a bundle; the bundler defines `__OPENCODE_SERVER_VERSION__` from the pinned `@opencode/server` version.
+- `serve.mjs`: the entry. Answers `--version` without loading OpenCode, refuses every command but `serve`, sets the native paths, then loads the server. It runs as a bundle; the bundler defines `__OPENCODE_SERVER_VERSION__` from the source server version.
 - `args.mjs`: the command line, `serve [--stdio] [--hostname] [--port] [--cors]...` and `--version`.
 - `assets.mjs`: points OpenCode at the staged natives (`OPENCODE_NODE_PTY_PATH`, `OPENCODE_PARCEL_WATCHER_PATH`, `OPENCODE_PHOTON_WASM_PATH`, `FFF_BINARY_PATH`, `OPENCODE_FFF_FFI_PATH`, `OPENCODE_PTY_BIN`) from `assets/manifest.json`.
 - `plugin-runtime.mjs`: publishes OpenCode's plugin SDK so plugins that import `@opencode/plugin` get the host's copy.
@@ -42,7 +42,7 @@ The bundle splits into chunks, and an entry's statically imported chunks run bef
 
 ### Why some loaders are rewritten during bundling
 
-`ffi-rs`, FFF's binary finder, photon's wasm loader and Turndown look for files next to their own package at run time, which a bundle no longer has; `jsonc-parser`'s `main` is a UMD build that requires its parts at run time. The plugin in `prepare-opencode-server.mjs` makes the same rewrites as OpenCode's Node build (`packages/cli/vite.node.config.ts`) and takes `jsonc-parser`'s ESM entry, so each loader reads the staged file or bundled module instead.
+`ffi-rs`, FFF's binary finder and Turndown look for files next to their own package at run time, which a bundle no longer has; `jsonc-parser`'s `main` is a UMD build that requires its parts at run time. The plugin in `prepare-opencode-server.mjs` makes the same rewrites as OpenCode's Node build (`packages/cli/vite.node.config.ts`) and takes `jsonc-parser`'s ESM entry, so each loader reads the staged file or bundled module instead. The fork's locked `photon-node` patch supplies its staged wasm path.
 
 ### Why a missing FFF binding allows startup
 

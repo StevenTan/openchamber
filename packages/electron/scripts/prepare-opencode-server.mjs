@@ -22,12 +22,13 @@ const packageDir = (name, fromDir) => {
 
 const readManifest = (dir) => JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
 
-const serverDir = packageDir('@opencode/server', electronRoot);
-const coreDir = packageDir('@opencode/core', serverDir);
+const sourceRoot = path.resolve(electronRoot, '..', '..', 'vendor', 'opencode');
+const serverDir = path.join(sourceRoot, 'packages', 'server');
+const coreDir = path.join(sourceRoot, 'packages', 'core');
 const pinnedVersion = readManifest(electronRoot).devDependencies['@opencode/server'];
 const serverVersion = readManifest(serverDir).version;
 if (serverVersion !== pinnedVersion) {
-  throw new Error(`Installed @opencode/server ${serverVersion} does not match the pinned ${pinnedVersion}; run bun install.`);
+  throw new Error(`OpenCode source ${serverVersion} does not match the pinned ${pinnedVersion}.`);
 }
 
 const optionalVersion = (parentDir, name) => {
@@ -99,6 +100,15 @@ const claudeAgentSdkPlugin = (sdkEntry) => ({
   },
 });
 
+const sourcePackagesPlugin = {
+  name: 'opencode-source-packages',
+  setup(build) {
+    build.onResolve({ filter: /^(?:@opencode\/|@effect\/|effect(?:\/|$))/ }, (args) => ({
+      path: Bun.resolveSync(args.path, args.importer.startsWith(`${sourceRoot}${path.sep}`) ? path.dirname(args.importer) : serverDir),
+    }));
+  },
+};
+
 const nativeLoaderPlugin = {
   name: 'opencode-native-loaders',
   setup(build) {
@@ -130,12 +140,6 @@ ${code.slice(start)}`,
       const contents = code.replace('export function findBinary() {', 'export function findBinary() { if (process.env.FFF_BINARY_PATH) return process.env.FFF_BINARY_PATH;');
       if (contents === code) throw new Error('Failed to rewrite the FFF binary loader');
       return { loader: 'js', contents };
-    });
-    build.onLoad({ filter: /[/\\]photon-node[/\\]photon_rs\.js$/ }, async (args) => {
-      const code = await Bun.file(args.path).text();
-      const original = "const path = require('path').join(__dirname, 'photon_rs_bg.wasm');";
-      if (!code.includes(original)) throw new Error('Failed to rewrite the photon wasm loader');
-      return { loader: 'js', contents: code.replace(original, `const path = globalThis.__OPENCODE_PHOTON_WASM_PATH || require('path').join(__dirname, 'photon_rs_bg.wasm');`) };
     });
     build.onLoad({ filter: /[/\\]turndown[/\\]lib[/\\]turndown\.es\.js$/ }, async (args) => {
       const code = await Bun.file(args.path).text();
@@ -172,7 +176,8 @@ const main = async () => {
       __OPENCODE_SERVER_VERSION__: JSON.stringify(serverVersion),
       'process.env.WS_NO_BUFFER_UTIL': JSON.stringify('1'),
     },
-    plugins: [claudeAgentSdkPlugin(claudeAgentSdkEntry), nativeLoaderPlugin],
+    plugins: [claudeAgentSdkPlugin(claudeAgentSdkEntry), nativeLoaderPlugin, sourcePackagesPlugin],
+    loader: { '.txt': 'text', '.md': 'text' },
   });
   if (!result.success) {
     for (const message of result.logs) console.error(message);

@@ -41,7 +41,7 @@
     "build:web-assets": "node ./scripts/build-web-assets.mjs",
     "build": "bun -e \"process.exit(0)\"",
     "ensure:electron": "node ./scripts/ensure-electron.mjs",
-    "prepare:opencode-server": "bun ./scripts/prepare-opencode-server.mjs",
+    "prepare:opencode-server": "bun install --cwd ../../vendor/opencode --frozen-lockfile --filter @opencode/server && bun ./scripts/prepare-opencode-server.mjs",
     "prepare:ripgrep": "node ./scripts/prepare-ripgrep.mjs",
     "prepare:workspace-runtime": "node ./scripts/prepare-workspace-runtime.mjs",
     "verify:opencode-server": "node ./scripts/verify-opencode-server.mjs --staged",
