@@ -515,21 +515,26 @@ describe('capturing composer context for the queue', () => {
     });
 });
 
-const chatInputSource = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'ChatInput.tsx'), 'utf-8');
+const composerInputDirectory = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'input');
+const composerSendSource = [
+    'useComposerSendAvailability.ts',
+    'useComposerSubmission.ts',
+    'useComposerQueueActions.ts',
+].map((file) => readFileSync(join(composerInputDirectory, file), 'utf-8')).join('\n');
 
 const LINKED_REFERENCE_KINDS = ['linkedReferences'];
 
 /** Lift one predicate out of the composer source: the code under test is the parameter source. */
 const gateExpression = (pattern: RegExp, what: string): string => {
-    const match = pattern.exec(chatInputSource);
-    if (!match) throw new Error('ChatInput.tsx no longer holds ' + what);
+    const match = pattern.exec(composerSendSource);
+    if (!match) throw new Error('The composer submission modules no longer hold ' + what);
     return match[1];
 };
 
 /** Every value in the file that is derived from the linked references. */
 const linkedReferenceValues = (): string[] => {
     const names: string[] = [];
-    for (const match of chatInputSource.matchAll(/const (\w+) = ([^;\n]*);/g)) {
+    for (const match of composerSendSource.matchAll(/const (\w+) = ([^;\n]*);/g)) {
         const [, name, expression] = match;
         if (LINKED_REFERENCE_KINDS.every((kind) => expression.includes(kind))) names.push(name);
     }
