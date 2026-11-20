@@ -31,3 +31,7 @@ Agent action routing and native execution are described in
 
 The app overlay shares neither DOM nor styles with the visited page. The page
 keeps its own event handling, and the pointer stays visible on arbitrary content.
+
+### Why error pages wait only while a project action runs
+
+A local proxy such as portless listens before the app behind it and answers 404 until the app registers, so the page loads and never fails. The webview's own document status, from `did-navigate`, covers `*.localhost` names the host probe refuses. A 404 is also a real app's answer, so it is retried only while the action that opened the page runs and for at most 2 minutes; without the cap, an app whose start page is a 404 would reload for as long as its action lives.

@@ -272,6 +272,29 @@ export const isActiveProjectActionTab = (tab: TerminalTab): boolean =>
   && tab.purpose.executionId !== null
   && ACTIVE_PROJECT_ACTION_LIFECYCLES.has(tab.lifecycle);
 
+const originOf = (url: string): string | null => {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null;
+  }
+};
+
+export const isProjectActionRunningAtOrigin = (
+  sessions: ReadonlyMap<string, DirectoryTerminalState>,
+  url: string,
+): boolean => {
+  const origin = originOf(url);
+  if (origin === null) return false;
+  for (const state of sessions.values()) {
+    for (const tab of state.tabs) {
+      if (tab.previewUrl === null || tab.lifecycle === 'stopping' || !isActiveProjectActionTab(tab)) continue;
+      if (originOf(tab.previewUrl) === origin) return true;
+    }
+  }
+  return false;
+};
+
 const isLiveRunningTerminal = (tab: TerminalTab | undefined): boolean =>
   Boolean(tab && tab.terminalSessionId !== null && tab.lifecycle === 'running');
 
