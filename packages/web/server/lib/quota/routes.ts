@@ -8,10 +8,57 @@ import { fetchQuota as fetchZenmuxQuota } from './providers/zenmux.js';
 import { listExtensionQuotaProviders } from './extension-registry.js';
 import { QuotaRouteError } from './route-error.js';
 import { configureQuotaResponseSupport, quotaConfigurationStatus, mutateQuotaConfiguration, readQuotaConfiguration, quotaConfigurationsNeedMigration } from './configurations.js';
+import type { Application, Request, Response } from '../shared/http-contracts.js';
+import type { CredentialJson, CursorCredential, ExeDevCredential, ManagedCredentialProvider, ZenmuxCredential } from './credentials/contracts.js';
+import type { listConfiguredQuotaProviders, fetchQuotaForProvider } from './index.js';
 
-// Keyed by the same provider ids as `normalizers`: a provider with a normalizer
-// but no validator would be stored without ever being checked.
-const validators = {
+interface Credentials {
+  'exe-dev': ExeDevCredential;
+  cursor: CursorCredential;
+  zenmux: ZenmuxCredential;
+}
+
+type CredentialValidators = { [Provider in ManagedCredentialProvider]: (credential: Credentials[Provider]) => Promise<void | Awaited<ReturnType<typeof fetchExeDevUsage>>> };
+
+export interface QuotaRoutesDependencies {
+  getQuotaProviders: () => Promise<{
+    listConfiguredQuotaProviders: typeof listConfiguredQuotaProviders;
+    fetchQuotaForProvider: typeof fetchQuotaForProvider;
+    initializeQuotaConfigurations: typeof import('./providers/index.js').initializeQuotaConfigurations;
+  }>;
+  supportsCodexProviderBinding?: () => boolean;
+  emitChanged?: () => void;
+}
+
+const isManagedProvider = (value: unknown): value is ManagedCredentialProvider =>
+  typeof value === 'string' && Object.hasOwn(normalizers, value);
+
+const hasMessage = (value: unknown): value is { message?: unknown } =>
+  value !== null && value !== undefined;
+
+const errorMessage = (cause: unknown) => {
+  if (!hasMessage(cause)) throw new TypeError(`Cannot read properties of ${cause} (reading 'message')`);
+  return cause.message;
+};
+
+const isCredentialJson = (value: unknown): value is CredentialJson => {
+  const pending = [value];
+  while (pending.length > 0) {
+    const entry = pending.pop();
+    if (entry === null || typeof entry === 'string' || typeof entry === 'number' || typeof entry === 'boolean') continue;
+    if (typeof entry !== 'object') return false;
+    pending.push(...Object.values(entry));
+  }
+  return true;
+};
+
+const hasGiftResetFields = (value: unknown): value is { recordId?: unknown; resetType?: unknown; grantType?: unknown } =>
+  value !== null && value !== undefined;
+
+const isGiftResetType = (value: unknown): value is string =>
+  typeof value === 'string' && zaiGiftResetTypes.includes(value);
+
+const validators: CredentialValidators = {
   'exe-dev': fetchExeDevUsage,
   cursor: validateCursorCredential,
   zenmux: async (credential) => {
@@ -20,21 +67,24 @@ const validators = {
   },
 };
 
-const getProvider = (req, res) => {
+const validateCredential = <Provider extends ManagedCredentialProvider>(providerId: Provider, credential: Credentials[Provider]) =>
+  validators[providerId](credential);
+
+const getProvider = (req: Request, res: Response) => {
   const providerId = req.params.providerId;
-  if (!Object.hasOwn(normalizers, providerId)) {
+  if (!isManagedProvider(providerId)) {
     res.status(404).json({ code: 'UNSUPPORTED_PROVIDER', error: 'Unsupported credential provider' });
     return null;
   }
   return providerId;
 };
 
-const credentialError = (res, error) => res.status(400).json({
+const credentialError = (res: Response, cause: unknown) => res.status(400).json({
   code: 'INVALID_CREDENTIAL',
-  error: error instanceof Error ? error.message : 'Credential validation failed',
+  error: cause instanceof Error ? cause.message : 'Credential validation failed',
 });
 
-export function registerQuotaRoutes(app, { getQuotaProviders, supportsCodexProviderBinding = () => false, emitChanged = () => {} }) {
+export function registerQuotaRoutes(app: Application, { getQuotaProviders, supportsCodexProviderBinding = () => false, emitChanged = () => {} }: QuotaRoutesDependencies) {
   configureQuotaResponseSupport(supportsCodexProviderBinding);
   app.get('/api/quota/configurations', async (_req, res) => {
     try {
@@ -42,7 +92,7 @@ export function registerQuotaRoutes(app, { getQuotaProviders, supportsCodexProvi
       res.json(quotaConfigurationStatus());
     } catch { res.status(500).json({ error: 'Could not read usage configurations' }); }
   });
-  const mutate = async (req, res) => {
+  const mutate = async (req: Request, res: Response) => {
     try {
       if (quotaConfigurationsNeedMigration()) await (await getQuotaProviders()).initializeQuotaConfigurations();
       const result = mutateQuotaConfiguration(req.method, req.params.id, req.body);
@@ -69,7 +119,7 @@ export function registerQuotaRoutes(app, { getQuotaProviders, supportsCodexProvi
       res.json({ providers: await listConfiguredQuotaProviders() });
     } catch (error) {
       console.error('Failed to list quota providers:', error);
-      res.status(500).json({ error: error.message || 'Failed to list quota providers' });
+      res.status(500).json({ error: errorMessage(error) || 'Failed to list quota providers' });
     }
   });
 
@@ -81,10 +131,10 @@ export function registerQuotaRoutes(app, { getQuotaProviders, supportsCodexProvi
   app.put('/api/quota/credentials/:providerId', express.json({ limit: '16kb' }), async (req, res) => {
     const providerId = getProvider(req, res);
     if (!providerId) return;
-    const credential = normalizers[providerId](req.body);
+    const credential = normalizers[providerId](isCredentialJson(req.body) ? req.body : undefined);
     if (!credential) return credentialError(res, new Error('Invalid credential'));
     try {
-      await validators[providerId](credential);
+      await validateCredential(providerId, credential);
       res.json(writeManagedCredential(providerId, credential));
     } catch (error) {
       credentialError(res, error);
@@ -97,7 +147,7 @@ export function registerQuotaRoutes(app, { getQuotaProviders, supportsCodexProvi
     const credential = readManagedCredential(providerId);
     if (!credential) return res.status(404).json({ code: 'NOT_CONFIGURED', error: 'Not configured' });
     try {
-      await validators[providerId](credential);
+      await validateCredential(providerId, credential);
       res.json({ valid: true });
     } catch (error) {
       credentialError(res, error);
@@ -132,7 +182,7 @@ export function registerQuotaRoutes(app, { getQuotaProviders, supportsCodexProvi
       // An extension's answer OpenChamber cannot use (`extension-quota.js`): the UI shows the message as the refresh failure, never an empty result.
       if (error instanceof QuotaRouteError) return res.status(error.status).json({ code: error.code, error: error.message });
       console.error('Failed to fetch quota:', error);
-      res.status(500).json({ error: error.message || 'Failed to fetch quota' });
+      res.status(500).json({ error: errorMessage(error) || 'Failed to fetch quota' });
     }
   });
 
@@ -142,9 +192,9 @@ export function registerQuotaRoutes(app, { getQuotaProviders, supportsCodexProvi
       if (!zaiAliases.includes(providerId)) {
         return res.status(404).json({ code: 'UNSUPPORTED_PROVIDER', error: 'Unsupported quota provider' });
       }
-      const { recordId, resetType, grantType } = req.body ?? {};
+      const { recordId, resetType, grantType } = hasGiftResetFields(req.body) ? req.body : {};
       if (!Number.isFinite(recordId)
-        || !zaiGiftResetTypes.includes(resetType)
+        || !isGiftResetType(resetType)
         || (grantType !== undefined && asNonEmptyString(grantType) === null)) {
         return res.status(400).json({ code: 'INVALID_REQUEST', error: 'Invalid gift reset request' });
       }

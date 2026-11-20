@@ -77,10 +77,8 @@ This module provides Git repository operations for the web server runtime, inclu
 - A nonempty integration queue and a matched Git record establish occupied
   array slots. A missing submodule status field still throws instead of
   returning an apparently clean submodule.
-- The service's primitive-string predicate preserves `typeof value === 'string'`.
-  `shared/guards.js` recognizes boxed and tagged strings through
-  `Object.prototype.toString`; substituting it would change the service's
-  input acceptance. MIME lookup runs only after the image/office-extension
+- The service's primitive-string predicate and `shared/guards.js` both preserve
+  `typeof value === 'string'`. MIME lookup runs only after the image/office-extension
   check, so its closed key set excludes inherited object names.
 - Network execution contracts live in `network-execution-contracts.ts`.
   Sync planning copies the original JSON refs and remote record; execution
@@ -88,6 +86,14 @@ This module provides Git repository operations for the web server runtime, inclu
   normalized public target. Contributor-source resolution remains JSON until
   the existing field comparisons run. Non-null field access establishes no
   promise about a provider response's individual values.
+- The operation registry keeps in-memory snapshots separate from validated
+  durable snapshots. Runtime identity and transport may be absent before
+  persistence validates them, and progress callbacks can return either shape.
+  Audit result construction copies the current state without establishing that
+  it is terminal; the audit store validates that requirement before writing.
+  Registry completion keeps the state-specific optional `has` call and the
+  existing plain-object, string and exact-key checks. Its checkout-path
+  expression excludes UTF-16 code units 0 through 31 and 127.
 - Execution errors retain unchecked metadata and the original thrown value.
   Completion validation remains the registry's responsibility. Redaction
   accepts undefined secret entries because its existing string conversion
@@ -97,6 +103,21 @@ This module provides Git repository operations for the web server runtime, inclu
   the binding implementation checks their values, not property presence.
 - Local integration retains the host line-ending settings and canonical LFS
   clean filter so a clean checkout stays recognizable during rebase.
+- Credential subprocess options and resolver dependencies are declared in
+  `credential-contracts.ts`; the snapshot implementation exports `SshKeySnapshot`.
+  Endpoint parsing keeps the original prototype-inclusive protocol lookup and
+  validates the resulting port as an integer before accepting it.
+- Credential error metadata remains unchecked until compared with the existing
+  error codes. Membership checks read the error's code once, including when the
+  field is a getter. Missing passphrase dependencies retain their property-access
+  `TypeError` instead of silently omitting passphrase creation, reading or removal.
+  A missing snapshot root still fails after reading the key, with Node's path
+  argument `TypeError` and `ERR_INVALID_ARG_TYPE` code.
+- SSH key verification ignores stdin `EPIPE`: ssh-keygen may close stdin after
+  reading the key, and its exit code and verified output remain authoritative.
+  Async directory iteration closes its directory before inventory cleanup;
+  cleanup ignores only `ERR_DIR_CLOSED` and preserves every other close failure.
+  Import cleanup failures still replace a pending result or failure.
 
 - The 3 process-launched Git helper paths stay JavaScript bootstraps with only
   Node builtin static imports. They register source resolution before loading

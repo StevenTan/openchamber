@@ -25,7 +25,7 @@ export interface ChangeRequestPatchDependencies {
   resolveRepoNetwork?: typeof resolveRepoNetwork;
   getOctokitForHost?: typeof getOctokitForHost;
   getOctokitForAccountId?: typeof getOctokitForAccountId;
-  onAccountUnavailable?: (identity: SourceControlIdentity) => void | Promise<void>;
+  onAccountUnavailable?: ((identity: SourceControlIdentity) => void | Promise<void>) | undefined;
 }
 
 export function readGitHubChangeRequestPatch(input: ChangeRequestPatchInput, dependencies?: ChangeRequestPatchDependencies): Promise<{
