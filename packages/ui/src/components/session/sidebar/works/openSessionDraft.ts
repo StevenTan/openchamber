@@ -5,20 +5,11 @@ import { hasUnsyncedSessionDraft, readSessionDraftAttachment, type SessionDraft 
 import { useInputStore } from '@/sync/input-store';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 
-/** Whether the composer still shows this draft, after the user had time to move on. */
 const isDraftOpen = (draftId: string): boolean => {
   const state = useSessionUIStore.getState();
   return !state.currentSessionId && state.newSessionDraft.open && state.newSessionDraft.workDraftId === draftId;
 };
 
-/**
- * Opens a draft from the sidebar in the composer, under its own id, so typing
- * there updates the same draft. The draft opens at once with its text and the
- * server files it names; attachments stored on the server follow when they
- * have downloaded, if the user is still on the draft. A draft this device
- * failed to store keeps this device's newer copy. Resolves false when an
- * attachment could not be read; the draft still opens with the rest.
- */
 export async function openSessionDraft(draft: SessionDraft): Promise<boolean> {
   useSessionUIStore.getState().openNewSessionDraft({
     selectedProjectId: draft.projectId ?? undefined,

@@ -16,12 +16,6 @@ import { FormDock } from '../FormDock';
 import { MessageSelectionBar } from '../messageSelection/MessageSelectionBar';
 import { ReadOnlyPromptBanner } from './ReadOnlyPromptBanner';
 
-/**
- * One zero-height anchor on the slot's top edge for everything that floats
- * above the composer, so the mobile keyboard slide and the pill morph move
- * them as one rider with the box instead of leaving them to jump when the
- * slot resizes (see mobileComposerMorph).
- */
 const ComposerRiders: React.FC<{
     showScrollToBottom: boolean;
     sessionIsWorking: boolean;
@@ -38,7 +32,6 @@ const ComposerRiders: React.FC<{
     </div>
 );
 
-/** A chat that takes no prompts: its docks stay answerable, and a banner says why. */
 const ReadOnlyComposer: React.FC<{
     sessionId: string | null;
     directory: string | undefined;
@@ -61,11 +54,6 @@ const ReadOnlyComposer: React.FC<{
             : t('chat.container.readOnlySubagentPromptBanner');
     return (
         <>
-            {/* The docks live inside ChatInput, which a read-only
-                chat does not mount. A subagent still asks for
-                permissions and answers, and they must be answerable
-                where the user is looking; the parent shows the same
-                requests, and answering one clears it in both. */}
             <PermissionDock
                 sessionId={sessionId}
                 directory={directory}
@@ -138,7 +126,6 @@ export const ComposerSlot: React.FC<{
 }) => (
     <div
         ref={attachComposerSlot}
-        // The mobile pill morph pins a floating slot for its tween.
         data-composer-slot={floatingComposer ? 'floating' : 'flow'}
         className={cn(
             'z-10 flex min-h-0',

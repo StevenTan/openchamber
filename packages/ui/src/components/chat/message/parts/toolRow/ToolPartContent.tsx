@@ -59,8 +59,6 @@ export const ToolPartContent: React.FC<ToolPartProps & { header?: ToolRowHeader;
 
     const normalizedPartTool = normalizeToolName(part.tool);
     const isTaskTool = isSubagentTool(normalizedPartTool);
-    // The registry sees the full name OpenCode reported (`jira_search`);
-    // the built-in switches below keep the normalized one.
     const presentation = useGuestToolPresentation(part.tool);
 
     const status = state?.status as string | undefined;
@@ -85,7 +83,6 @@ export const ToolPartContent: React.FC<ToolPartProps & { header?: ToolRowHeader;
     const normalizedPart = normalizedPartTool !== part.tool ? ({ ...part, tool: normalizedPartTool } as ToolPartType) : part;
     const descriptionPath = getToolDescriptionPath(normalizedPart, state, currentDirectory);
     const stateOutput = typeof stateWithData.output === 'string' ? stateWithData.output : undefined;
-    // A script whose calls all went to one namespace is titled by it.
     const scriptNamespace = isExecuteTool(part.tool) ? executeNamespace(metadata) : undefined;
     const plainDescription = getToolDescription(normalizedPart, state, currentDirectory, t, scriptNamespace);
     const builtInDescription = describeOpenChamberRow(normalizedPart, input, stateOutput, t)
@@ -99,11 +96,8 @@ export const ToolPartContent: React.FC<ToolPartProps & { header?: ToolRowHeader;
     const rowTool = scriptNamespace ?? (normalizedPartTool || part.tool);
     const displayName = guestHeader?.title ?? toolDisplayName(rowTool, t);
 
-    // Opened, the body already carries the whole error and output.
     const failureDetail = isError && !isExpanded ? failureReason : undefined;
 
-    // Tool title/description — shown inline as context. A subtitle the
-    // extension declared replaces it, since both land in the same slot.
     const guestSubtitle = guestHeader?.subtitle ?? null;
     const justificationText = React.useMemo(() => {
         if (guestSubtitle) {
@@ -214,9 +208,6 @@ export const ToolPartContent: React.FC<ToolPartProps & { header?: ToolRowHeader;
                     ) : (
                         <>
                             <div
-                                // h-5 matches StaticToolRow's icon column, so expandable
-                                // and static rows come out the same height (the 14px
-                                // icon alone left these rows ~2px shorter).
                                 className="relative h-5 w-3.5 flex-shrink-0 cursor-pointer"
                                 onClick={(event) => { event.stopPropagation(); onToggle(part.id); }}
                             >
@@ -309,7 +300,6 @@ export const ToolPartContent: React.FC<ToolPartProps & { header?: ToolRowHeader;
                                     <Text
                                         variant={animateTailText ? 'generate-effect' : 'static'}
                                         className={cn('min-w-0 truncate', TOOL_ROW_DESCRIPTION_CLASS)}
-                                        // The argument is what the row is about: foreground.
                                         style={{ color: 'var(--tools-title)' }}
                                         title={description}
                                     >
@@ -338,9 +328,6 @@ export const ToolPartContent: React.FC<ToolPartProps & { header?: ToolRowHeader;
                             )}
                         </div>
                         {header?.stop ? (
-                            // A labelled red action, the same one the composer's
-                            // background commands strip offers. The negative
-                            // margin keeps the header row at its text height.
                             <HoverTooltip label={header.stop.ariaLabel}>
                                 <Button
                                     type="button"
@@ -355,10 +342,6 @@ export const ToolPartContent: React.FC<ToolPartProps & { header?: ToolRowHeader;
                                 </Button>
                             </HoverTooltip>
                         ) : null}
-                        {/* An expanded file change puts its actions here (ToolExpandedContent).
-                            They keep their room and fade in on the row's hover and keyboard
-                            focus; touch screens have no hover and show them always. The
-                            negative margin keeps the row at its text height. */}
                         <span
                             ref={setHeaderActionsSlot}
                             className="-my-0.5 flex flex-shrink-0 items-center gap-1 opacity-0 transition-opacity empty:hidden group-hover/tool:opacity-100 group-focus-within/tool:opacity-100 [@media(hover:none)]:opacity-100"

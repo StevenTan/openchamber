@@ -57,7 +57,6 @@ const TurnChangedFilePillButton = React.memo(({
             onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                // Keep a filename selection selectable instead of opening the file.
                 if (hasTextSelectionInside(event.currentTarget)) return;
                 onOpen(file.file);
             }}
@@ -129,7 +128,6 @@ export const TurnChangedFilePills = React.memo(({ files, turnId }: { files?: Tur
     React.useLayoutEffect(() => {
         const toggle = toggleRef.current;
         if (!expanded && toggle && toggle.ownerDocument.activeElement === toggle) {
-            // Keep the focused control visible after a long list shrinks.
             toggle.scrollIntoView({ block: 'nearest', inline: 'nearest' });
         }
     }, [expanded]);
@@ -158,7 +156,6 @@ export const TurnChangedFilePills = React.memo(({ files, turnId }: { files?: Tur
                 >
                     <span className={cn(CHANGED_FILE_CHIP_CLASS_NAME, CHANGED_FILE_CHIP_HOVER_CLASS_NAME)} style={CHANGED_FILE_CHIP_STYLE}>
                         {expanded ? (
-                            // A text line tall, so the icon-only chip matches the file chips.
                             <span className="inline-flex h-[round(1.35em,1px)] items-center">
                                 <Icon name="arrow-up-s" className="h-3.5 w-3.5" />
                             </span>

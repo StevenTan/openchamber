@@ -33,7 +33,6 @@ interface UseInlineCommentControllerOptions<TRange extends LineRangeBase> {
   getCodeForRange: (range: TRange) => string;
   toStoreRange: (range: TRange) => StoreRange;
   fromDraftRange: (draft: InlineCommentDraft) => TRange;
-  /** The diff these comments are written on; absent for uncommitted changes. */
   origin?: DiffCommentOrigin;
 }
 
@@ -126,8 +125,6 @@ export function useInlineCommentController<TRange extends LineRangeBase>(
     }
   }, [editingDraftId, removeDraft, reset, target]);
 
-  // True when the editor is done with the text. False keeps it open: a refused
-  // comment exists nowhere but in the field.
   const saveComment = React.useCallback((textToSave: string, rangeOverride?: TRange): boolean => {
     const targetRange = rangeOverride ?? selection;
     const trimmedText = textToSave.trim();
@@ -138,7 +135,6 @@ export function useInlineCommentController<TRange extends LineRangeBase>(
       return false;
     }
 
-    // The edited comment was sent or removed meanwhile: nothing left to save to.
     if (editingDraftId && !useInlineCommentDraftStore.getState().getDrafts(target).some((draft) => draft.id === editingDraftId)) {
       reset();
       return true;

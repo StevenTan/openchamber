@@ -20,7 +20,6 @@ export interface ToolPopupContent {
         mimeType?: string;
         filename?: string;
         size?: number;
-        /** The image's own bytes, to save it; without it only a `data:` or `blob:` URL can be saved. */
         load?: () => Promise<Blob>;
         /** The mounted thumbnail used for the zoom transition and keyboard focus. */
         origin?: HTMLElement;

@@ -1,6 +1,3 @@
-// Background session assistance. Only live idle events arm generation; there
-// is no backfill. A new turn deletes the assist this process wrote; clients
-// retire any other payload older than the session's `time.idle`.
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -27,25 +24,15 @@ const IDLE_QUIET_MS = 60_000;
 const RECAP_CHAR_LIMIT = 320;
 const FETCH_TIMEOUT_MS = 5_000;
 const GENERATION_TIMEOUT_MS = 120_000;
-// Enough records to look past the idle marker and a couple of switches.
 const TAIL_RECHECK_LIMIT = 8;
 const QUIET_FAILURE_CODES = new Set(['context-too-small', 'output-exhausted']);
 
-/**
- * A one-line cause for a generation failure: the status, code, and a bounded
- * message. A bare "generation failed" hides whether this was a cold-start 503,
- * a provider rejection, or a bug, which is what tells a transient startup
- * failure from a permanent one.
- */
 const describeGenerationFailure = (error) => {
   const parts = [];
   const status = Number(error?.statusCode);
   if (Number.isFinite(status)) parts.push(`status ${status}`);
   const code = isString(error?.code) ? error.code.trim() : '';
   if (code) parts.push(`code ${code}`);
-  // The small-model service rethrows raw SDK rejections, which are tagged
-  // objects rather than Errors. Read the message from either shape, and keep
-  // the tag when the SDK only carries that.
   const message = isString(error?.message) ? error.message.trim() : '';
   if (message) parts.push(message.replace(/\s+/g, ' ').slice(0, 300));
   const tag = isString(error?._tag) ? error._tag.trim() : '';
@@ -113,33 +100,21 @@ export const createSessionAssistRuntime = ({
   getEnabled = getSessionRecapEnabled,
   quietMs = IDLE_QUIET_MS,
   persistSessionAssist = null,
-  // Archive state is OpenChamber's own in v2 (no OpenCode route sets it), so
-  // the runtime asks rather than reading `time.archived` off the record.
   isSessionArchived = async () => false,
   // Asked once when a turn ends, before the recap's quiet window is armed.
   // A null result leaves the decision to the Small Model. See session-work.
   evaluateTurn = null,
-  // `../session-lineage.js`: a known subsession never gets an assist, so its
-  // turn end arms nothing and reads nothing.
   lineage = null,
-  // Called with `{ sessionId, directory, pending }` when a session's assist
-  // starts waiting (turn end) and when it is written, skipped, failed or
-  // dropped. Clients keep a chat's OpenCode location until then: the assist
-  // reads the session's directory, and reading a stopped one starts it again.
   onPendingChange = () => {},
 }) => {
   const timers = new Map();
-  // Turn ends waiting for `evaluateTurn`; a newer event replaces or drops the entry.
   const gates = new Map();
   const inflight = new Map();
   const ready = new Map();
-  // Sessions holding an assist this process wrote, keyed to their directory.
   const persisted = new Map();
-  // Sessions announced as waiting for an assist, keyed to their directory.
   const announced = new Map();
   let stopped = false;
 
-  // Announces only transitions, after every change to the four maps above.
   const announce = (sessionId, directory = '') => {
     const pending = !stopped && (gates.has(sessionId) || timers.has(sessionId)
       || inflight.has(sessionId) || ready.has(sessionId));
@@ -175,12 +150,6 @@ export const createSessionAssistRuntime = ({
       .catch(() => console.warn('[session-assist] failed to retire a stale assist'));
   };
 
-  // A loopback host does not prove that no model runs here: CLIProxyAPI,
-  // LiteLLM and one-api all listen on 127.0.0.1 and forward to a hosted
-  // vendor, where a side request evicts nothing. The skip stays on the safe
-  // side of that ambiguity, but it used to return without a word, which made
-  // an enabled toggle look broken (#6173). One line per model pair keeps a
-  // genuine local server from repeating it every turn.
   const localSkipNotices = new Set();
   const reportLocalSkip = (providerID, modelID) => {
     const key = `${providerID}/${modelID}`;
@@ -196,7 +165,7 @@ export const createSessionAssistRuntime = ({
       baseUrl,
       headers: {
         ...getOpenCodeAuthHeaders(),
-        // v2 scopes by header and rejects non-ASCII header values.
+        // external: #3837 v2 scopes sessions by the x-opencode-directory header and rejects non-ASCII header values.
         ...(directory ? { 'x-opencode-directory': encodeURIComponent(directory) } : {}),
       },
     });
@@ -207,11 +176,8 @@ export const createSessionAssistRuntime = ({
     };
     const session = await client.session.get({ sessionID: sessionId }, requestOptions());
     checkCurrent();
-    // Reverted history is not the active conversation. A new prompt clears
-    // the revert boundary before its next idle event.
     if (session?.id === sessionId) lineage?.remember(sessionId, sessionParentId(session));
     if (session?.id !== sessionId || sessionParentId(session) || session.revert?.messageID) return;
-    // An archived session is put away: no recap or suggestion is generated for it.
     if (await isSessionArchived(sessionId)) return;
     const context = await loadAssistContext({
       signal,
@@ -229,10 +195,6 @@ export const createSessionAssistRuntime = ({
     const described = await describeSmallModel({ directory, preferredProviderID, preferredModelID });
     checkCurrent();
     if (!described) return;
-    // A local server keeps one prompt cache per slot: a side request on the
-    // session's own model evicts it, and the next turn reprocesses the whole
-    // history. There only a different model may write the assist, however the
-    // session's model was picked (fallback or an explicit Small Model).
     if (described.localEndpoint
       && described.providerID === preferredProviderID
       && described.modelID === preferredModelID) {
@@ -251,9 +213,6 @@ export const createSessionAssistRuntime = ({
       });
     } catch (error) {
       if (!signal.aborted && Number(error?.statusCode) !== 404 && !QUIET_FAILURE_CODES.has(error?.code)) {
-        // Keep the cause: a bare "generation failed" hides whether this was a
-        // cold-start 503, a provider rejection, or a bug, which is exactly what
-        // the operator needs to tell a transient startup from a permanent one.
         console.warn('[session-assist] generation failed', describeGenerationFailure(error));
       }
       return;
@@ -263,8 +222,6 @@ export const createSessionAssistRuntime = ({
     let recap = typeof structured?.recap === 'string' ? structured.recap.trim().slice(0, RECAP_CHAR_LIMIT) : '';
     const hasCyrillic = (text) => /[\u0400-\u04FF]/.test(text);
     const hasCjk = (text) => /[\u3040-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF]/.test(text);
-    // Quoted source and assistant replies cannot authorize a different script.
-    // With no authored language sample, leave the decision to the prompt.
     const scriptMismatch = (text) => prompt.language && ((hasCyrillic(text) && !hasCyrillic(prompt.language))
       || (hasCjk(text) && !hasCjk(prompt.language)));
     if (recap && scriptMismatch(recap)) recap = '';
@@ -275,14 +232,10 @@ export const createSessionAssistRuntime = ({
     const latestPage = await client.message.list({ sessionID: sessionId, limit: TAIL_RECHECK_LIMIT, order: 'desc' }, requestOptions());
     checkCurrent();
     if (newestContentId(latestPage?.data) !== last.id) return;
-    // Never fall back to the pre-generation metadata snapshot after a failed
-    // fresh read: doing so overwrites dismissals and unrelated metadata.
     const freshSession = await client.session.get({ sessionID: sessionId }, requestOptions());
     checkCurrent();
     if (freshSession?.id !== sessionId || freshSession.revert?.messageID || freshSession.location?.directory !== session.location?.directory) return;
     if (await isSessionArchived(sessionId)) return;
-    // The archive check is a wait of its own: a turn that started meanwhile
-    // has aborted this run, and the write below must not land.
     checkCurrent();
     if (!getEnabled()) return;
     await persistSessionAssist(sessionId, directory, {
@@ -378,7 +331,6 @@ export const createSessionAssistRuntime = ({
     }
     const userMessage = extractUserMessage(payload);
     if (userMessage) {
-      // Ignore old message.updated events re-emitted after completion.
       const since = timers.get(userMessage.sessionId)?.armedAt
         ?? gates.get(userMessage.sessionId)?.armedAt
         ?? inflight.get(userMessage.sessionId)?.armedAt;

@@ -93,8 +93,6 @@ const usePierreThemeConfig = (): PierreThemeConfig => {
         [availableThemes, darkThemeId, fallbackDarkTheme],
     );
 
-    // Registered during render, as in the tool diff preview: an edited theme
-    // gets a new name, and the dialog must not render with one not yet known.
     const lightThemeName = ensurePierreThemeRegistered(lightTheme);
     const darkThemeName = ensurePierreThemeRegistered(darkTheme);
 
@@ -595,7 +593,6 @@ const MermaidPreviewDialog: React.FC<{
         });
 
         if (mermaidPreviewRef.current) {
-            // A new SVG needs sizing; pointer-driven viewBox changes do not.
             observer.observe(mermaidPreviewRef.current, { childList: true, subtree: true });
         }
 
@@ -654,7 +651,6 @@ const MermaidPreviewDialog: React.FC<{
                     style={{ width: `${dialogSize.width}px` }}
                     onMouseDown={(event) => event.stopPropagation()}
                 >
-                    {/* The diagram puts its zoom controls in this row, beside close. */}
                     <div className="flex items-center justify-end gap-0.5">
                         <div ref={setToolbarSlot} className="flex items-center gap-0.5" />
                         <ToolbarTooltipButton
@@ -783,7 +779,6 @@ const ToolOutputDialog: React.FC<ToolOutputDialogProps> = ({ popup, onOpenChange
                                   const val = input[key];
                                   return typeof val === 'string' ? val : (typeof val === 'number' ? String(val) : null);
                                 };
-                                // v2 file tools report `path`.
                                 const writeTarget = getInputValue('path') || getInputValue('filePath') || getInputValue('file_path') || '';
                                 return (
                                 <div className="border-b border-edge-muted p-4 -mx-3">
@@ -900,7 +895,6 @@ const ToolOutputDialog: React.FC<ToolOutputDialogProps> = ({ popup, onOpenChange
                                     return <DialogReadContent popup={popup} pierreThemeConfig={pierreThemeConfig} />;
                                 }
 
-                                // JSON tree viewer for generic JSON outputs
                                 const jsonResult = popup.content ? tryParseJsonOutput(popup.content) : { data: null, isJson: false };
                                 if (jsonResult.isJson) {
                                     return (
@@ -936,6 +930,4 @@ const ToolOutputDialog: React.FC<ToolOutputDialogProps> = ({ popup, onOpenChange
     );
 };
 
-// Mounted by every chat message, which re-renders on each streamed chunk
-// while the popup state and handlers stay the same.
 export default React.memo(ToolOutputDialog);

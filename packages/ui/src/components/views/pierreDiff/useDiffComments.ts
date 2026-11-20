@@ -63,10 +63,8 @@ export const useDiffComments = ({
     startEdit,
     deleteDraft,
   } = diffCommentController;
-  // Whole-file comments have no lines to sit under; the file header shows them.
   const fileDrafts = useMemo(() => diffDrafts.filter((draft) => !isWholeFileComment(draft)), [diffDrafts]);
 
-  // A change request's review: its cards on this file's lines, and the field's way into it.
   const review = useChangeRequestReviewContext();
   const reviewItems = useMemo<ReviewLineItem[]>(() => {
     if (!review?.state || !fileName) return [];
@@ -92,7 +90,6 @@ export const useDiffComments = ({
     };
   }, [incomingFileDiff, modified, original]);
   const selectionSide = selection?.side;
-  // A selection across both sides has two sets of line numbers; a review comment takes one.
   const selectionCrossesSides = Boolean(selection?.endSide && selection.endSide !== selection.side);
   const reviewField = useMemo(() => {
     if (!review || !fileName || selectionCrossesSides) return undefined;
@@ -111,7 +108,6 @@ export const useDiffComments = ({
         if (added) cancel();
         return added;
       },
-      // A suggestion replaces lines of the new side.
       suggestionCode: selectionSide === 'deletions' ? undefined : () => {
         const target = selectionRef.current;
         return target ? extractSelectedCode(original, modified, incomingFileDiff, target) : '';
@@ -122,8 +118,6 @@ export const useDiffComments = ({
   const selectionRef = useRef<SelectedLineRange | null>(null);
   const editingDraftIdRef = useRef<string | null>(null);
   const commentTextRef = useRef('');
-  // Use a ref to track if we're currently applying a selection programmatically
-  // to avoid loop with onLineSelected callback
   const isApplyingSelectionRef = useRef(false);
   const lastAppliedSelectionRef = useRef<SelectedLineRange | null>(null);
 
@@ -144,7 +138,6 @@ export const useDiffComments = ({
       return;
     }
 
-    // Ignore callbacks while we're programmatically applying selection
     if (isApplyingSelectionRef.current) {
       return;
     }
@@ -155,7 +148,6 @@ export const useDiffComments = ({
       return;
     }
 
-    // Mobile tap-to-extend: if selection exists and new tap is on same side, extend range
     if (isMobile && prevSelection && range && range.side === prevSelection.side) {
       const start = Math.min(prevSelection.start, range.start);
       const end = Math.max(prevSelection.end, range.end);
@@ -163,11 +155,8 @@ export const useDiffComments = ({
     } else {
       setSelection(range);
     }
-    // Pierre holds this selection too: closing the field has to clear it there,
-    // or the next click on the line would read as taking it back.
     lastAppliedSelectionRef.current = range;
 
-    // Clear editing state when selection changes user-driven
     if (range) {
       if (!editingDraftIdRef.current) {
         setCommentText('');

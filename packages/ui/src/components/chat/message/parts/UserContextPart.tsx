@@ -29,11 +29,9 @@ import { ReceivedPageCard } from '../../sharePages/received/ReceivedPageCard';
 const ContextCard: React.FC<{
     icon: IconName;
     summary: string;
-    /** Full untruncated context, shown on hover. */
     title?: string;
     body: string;
     text: string;
-    /** Render the quote in the code font (code, terminal output, CI logs). */
     mono?: boolean;
     /**
      * Message-level collapse: with collapsible messages on, the whole user
@@ -45,7 +43,6 @@ const ContextCard: React.FC<{
     onExpand?: () => void;
     /** Scroll to where the quote came from, with the button's label. */
     reveal?: { label: string; onReveal: () => void };
-    /** The message's file names: `[name]` in the user's comment renders as a file chip. */
     attachmentFilenames: readonly string[];
 }> = ({ icon, summary, title, body, text, mono, collapsed, onExpand, reveal, attachmentFilenames }) => {
     const [expanded, setExpanded] = React.useState(false);
@@ -141,14 +138,12 @@ const basename = (path: string): string => {
 
 const UserContextPart: React.FC<{
     payload: ContextPartPayload;
-    /** Message-level collapse state, shared with the text parts. */
     collapsed?: boolean;
     onExpand?: () => void;
     attachmentFilenames: readonly string[];
 }> = ({ payload, collapsed, onExpand, attachmentFilenames }) => {
     const { t } = useI18n();
     const quoteHighlights = useChatQuoteHighlightApi();
-    // A part without a provider was written before providers other than GitHub existed: a pull request.
     const changeRequestTerm = useChangeRequestTerm(payload.kind === 'pr-comment' || payload.kind === 'pr-check' ? payload.provider : null);
     const shared = { collapsed, onExpand, attachmentFilenames };
 
@@ -251,7 +246,6 @@ const UserContextPart: React.FC<{
         case 'guest-pr':
         case 'session':
         case 'session-message':
-            // Rendered as link attachments by normalizeUserDisplayParts.
             return null;
         case 'shared-page':
             return <ReceivedPageCard payload={payload} />;

@@ -246,6 +246,17 @@ what the actions alone do not show (frame rate, animations).
   re-checked against the catalog on every action, and the grant list handed to
   the service proxy is the catalog's effective list, so a version that widened
   its permissions is refused until re-approved.
+- `isBrowserProviderGuest` mirrors what the Settings dropdown offers: enabled,
+  fully approved, and declaring the browser role. Full approval implies the
+  `service` grant, so the check does not look at it separately.
+- `browserProvider` is sanitized when written (trimmed, a non-empty string), so
+  this module only has to decide builtin or not.
+- A caller without a scope (tests, the CLI) is unknown, not empty: its
+  `directory` and `sessionId` reach the provider as null, and nothing invents
+  them.
+- Agent-facing failure text is written for the model that reads it, not the
+  user: it states what happened and whether the page changed, and leaves the
+  decision to the agent instead of naming a step only the user could take.
 - The provider's answer shapes are the desktop panel's own
   (`packages/sdk/src/service-providers.ts`); `browser.capture` still returns
   `base64`/`mime` and the control service writes the file, so the agent sees

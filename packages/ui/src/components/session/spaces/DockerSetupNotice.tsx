@@ -60,7 +60,6 @@ const REMEDIES = {
   windows_start: { text: 'spaces.setup.remedy.windowsStart' },
 } satisfies Record<DockerRemedy, Remedy>;
 
-/** What the screen shows for a remedy: its text, and the action, link or command it offers. */
 const remedyOf = (remedy: DockerRemedy): Remedy => REMEDIES[remedy];
 
 const RUNNING_TEXT = {
@@ -77,13 +76,11 @@ const FAILED_TEXT = {
   start_desktop: 'spaces.setup.failed.startDesktop',
 } satisfies Record<DockerSetupAction, I18nKey>;
 
-/** Memory as people read it: binary gigabytes, one decimal at most. */
 const formatMemory = (bytes: number): string => {
   const number = new Intl.NumberFormat(getCurrentIntlLocale(), { maximumFractionDigits: 1 }).format(bytes / 1024 ** 3);
   return `${number} GB`;
 };
 
-/** A command the user runs in their own terminal, with a button that copies it. */
 const CommandLine: React.FC<{ command: string }> = ({ command }) => {
   const { t } = useI18n();
   const [copied, setCopied] = React.useState(false);
@@ -94,7 +91,6 @@ const CommandLine: React.FC<{ command: string }> = ({ command }) => {
   }, [copied]);
   return (
     <div className="flex max-w-md items-center gap-1 rounded bg-muted/50 ps-2">
-      {/* A shell command reads left to right in every language. */}
       <ScrollableOverlay as="code" dir="ltr" outerClassName="overlay-scrollbar-wrapper--no-gutter min-w-0 flex-1" fillContainer={false} className="typography-code whitespace-nowrap py-1 text-xs text-foreground">{command}</ScrollableOverlay>
       <Button
         variant="ghost"
@@ -110,7 +106,6 @@ const CommandLine: React.FC<{ command: string }> = ({ command }) => {
   );
 };
 
-/** The state of the action as the host last said it, read again every two seconds while it runs. */
 const useSetupJob = (initial: DockerSetupJob | null, onFinished: () => void) => {
   const [job, setJob] = React.useState<DockerSetupJob | null>(initial);
   React.useEffect(() => { setJob(initial); }, [initial]);
@@ -127,10 +122,8 @@ const useSetupJob = (initial: DockerSetupJob | null, onFinished: () => void) => 
           if (controller.signal.aborted) return;
           setJob(next);
           if (next?.running) read();
-          // Ended well: Docker answers now, which the place's own check shows.
           else if (next === null) finished.current();
         }, () => {
-          // The host went away mid-action: stop reading and check the place, which says what is wrong.
           if (!controller.signal.aborted) { setJob(null); finished.current(); }
         });
       }, JOB_POLL_MS);
@@ -143,9 +136,7 @@ const useSetupJob = (initial: DockerSetupJob | null, onFinished: () => void) => 
 
 type DockerSetupNoticeProps = {
   place: SpacePlace;
-  /** Checks the places again, after an action ended or when the user asks. */
   onRecheck: () => void;
-  /** Whether the notice carries its own "Check again"; Settings has one beside it already. */
   withCheck?: boolean;
 };
 
@@ -193,7 +184,6 @@ export const DockerSetupNotice: React.FC<DockerSetupNoticeProps> = ({ place, onR
     <div className="space-y-2">
       {remedy ? (
         <>
-          {/* What the user can do about it: one line with the info mark, as Settings' own notes read. */}
           <p className="flex items-start gap-1.5 typography-meta text-foreground" role="status">
             <Icon name="information" className="mt-[0.2em] h-3.5 w-3.5 shrink-0 text-[var(--status-info)]" />
             <span>{t(remedy.text)}</span>
@@ -219,7 +209,6 @@ export const DockerSetupNotice: React.FC<DockerSetupNoticeProps> = ({ place, onR
                 {t('spaces.setup.action.details')}
                 <DisclosureChevron expanded={showOutput} className="ms-0.5 inline h-3.5 w-3.5" />
               </button>
-              {/* The command's own output, as it printed it: text to show. */}
               {showOutput ? <ScrollableOverlay as="pre" dir="ltr" outerClassName="max-h-40 max-w-md rounded bg-muted/50" className="typography-code whitespace-pre-wrap break-words px-2 py-1 text-xs text-muted-foreground" disableHorizontal>{job.failure.output}</ScrollableOverlay> : null}
             </>
           ) : null}

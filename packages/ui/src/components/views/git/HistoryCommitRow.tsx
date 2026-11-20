@@ -248,7 +248,6 @@ export const HistoryCommitRow = React.memo(({
     }
   };
 
-  // Single confirm handler dispatches to the right action based on pendingAction
   const confirmPendingAction = async () => {
     if (!pendingAction) return;
     const action = pendingAction;
@@ -261,7 +260,7 @@ export const HistoryCommitRow = React.memo(({
       case 'rebase':     return handleRebase();
       case 'resetSoft':  return handleReset('soft');
       case 'resetMixed': return handleReset('mixed');
-      case 'resetHard':  return handleReset('hard', true); // force=true: user already confirmed
+      case 'resetHard':  return handleReset('hard', true);
     }
   };
 
@@ -335,15 +334,13 @@ export const HistoryCommitRow = React.memo(({
     const isOpen = openDiffPaths.has(key);
 
     if (isOpen && cached && cached !== 'error') {
-      // Close it
       setOpenDiffPaths(prev => { const next = new Set(prev); next.delete(key); return next; });
       return;
     }
 
-    // Open it (or re-fetch on error)
     setOpenDiffPaths(prev => { const next = new Set(prev); next.add(key); return next; });
 
-    if (cached && cached !== 'error') return; // Already loaded
+    if (cached && cached !== 'error') return;
 
     const changedLines = file.insertions + file.deletions;
     if (changedLines > HISTORY_DIFF_LARGE_CHANGED_LINES && !forceRenderLargePaths.has(key)) {
@@ -377,7 +374,6 @@ export const HistoryCommitRow = React.memo(({
           />
         )}
         <div className="min-w-0 flex-1">
-          {/* Ref badges */}
           {isGraphMode ? (() => {
             const badges = parseRefBadges(entry.refs);
             return badges.length > 0 ? (
@@ -438,9 +434,7 @@ export const HistoryCommitRow = React.memo(({
 
       {isExpanded && (
         <div className="oc-tile-inset px-3 pb-2 ps-8">
-          {/* Action buttons */}
           {isGraphMode && pendingAction ? (
-            /* Confirmation banner — replaces the button row while an action is pending */
             <div className="flex items-center gap-2 py-2 border-b border-edge-muted mb-2">
               <span className="typography-micro text-muted-foreground flex-1 min-w-0">
                 {t(`gitView.history.actions.${pendingAction}Confirm` as never)}
@@ -524,7 +518,6 @@ export const HistoryCommitRow = React.memo(({
                 </Button>
               </ButtonTooltip>
 
-              {/* Reset: dropdown first to pick mode, then confirmation banner */}
               <DropdownMenu>
                 <ButtonTooltip sideOffset={8} label={t('contextTooltips.git.resetToCommit')}>
                   <DropdownMenuTrigger asChild>
@@ -592,7 +585,6 @@ export const HistoryCommitRow = React.memo(({
                   <button
                     type="button"
                     onClick={() => toggleFileDiff(file)}
-                    // An open file needs no fill: its diff opens right below.
                     className="oc-tile-hover w-full flex items-center gap-2 typography-micro text-start cursor-pointer rounded px-1"
                   >
                     <span

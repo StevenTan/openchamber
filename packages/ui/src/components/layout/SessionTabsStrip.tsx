@@ -63,7 +63,6 @@ export type SessionTabMenuArgs = {
   isActive: boolean;
   select: () => void;
   closeOtherTabs: () => void;
-  /** Menu primitives for the surface the menu opens in. */
   components: SessionMenuSlots;
 };
 
@@ -78,7 +77,6 @@ const SessionTabItem: React.FC<{
   tab: SessionTab;
   tabNumber: number;
   isActive: boolean;
-  /** The replaceable preview tab: italic title, pinned by double-click. */
   isPreview: boolean;
   suppressControls: boolean;
   onSelect: (tab: SessionTab) => void;
@@ -102,7 +100,6 @@ const SessionTabItem: React.FC<{
 
   const title = tab.session.title?.trim() || t('sessions.sidebar.session.untitled');
 
-  // Session state for the dot and the hover tooltip.
   const isAiRenaming = useIsSessionAiRenamePending(tab.id, resolveGlobalSessionDirectory(tab.session));
   const turnActivity = useSessionTurnActivity(tab.id);
   const isStreaming = turnActivity !== null;
@@ -145,8 +142,6 @@ const SessionTabItem: React.FC<{
                   aria-selected={isActive}
                   tabIndex={isActive ? undefined : 0}
                   onClick={(event) => {
-                    // Alt toggles the unread mark, Shift opens the session
-                    // in the side panel, as on a sidebar row.
                     if (event.altKey) {
                       toggleSessionRead(tab.id, isUnread, t);
                       return;
@@ -189,22 +184,15 @@ const SessionTabItem: React.FC<{
                     <div className={cn(
                       'min-w-0 flex-1 overflow-hidden whitespace-nowrap',
                       !suppressControls && 'session-tab-title',
-                      // Not while renaming: the rename field stays upright.
                       isPreview && !suppressControls && 'italic',
                     )}
                     >
-                      {/* Same box as the active content the header renders
-                          (a centered column with a block title), so the
-                          title sits at the same height before and after
-                          activation and does not jump when the tab swaps
-                          its content. */}
                       {isActive ? children : (
                         <div className="flex min-w-0 flex-col justify-center">
                           <span dir="auto" className="block max-w-full overflow-hidden whitespace-nowrap oc-ui-start-align text-[length:var(--text-ui-compact)] font-medium leading-[max(1rem,1.25em)]">{title}</span>
                         </div>
                       )}
                     </div>
-                    {/* The state mark takes room only while there is one. */}
                     {isAiRenaming ? (
                       <Icon name="loader-4" className="ms-1.5 size-3 shrink-0 animate-spin text-primary" aria-label={t('sessions.aiRename.generating')} />
                     ) : showDot ? (
@@ -246,7 +234,6 @@ const SessionTabItem: React.FC<{
         </TooltipTrigger>
         <TooltipContent side="bottom" sideOffset={6}><TooltipLabelWithShortcut label={title} shortcut={tabShortcut} /></TooltipContent>
         </Tooltip>
-        {/* The shared menu: its glass, keyboard navigation and redraw guard. */}
         <ContextMenuContent finalFocus={() => menuReturnsFocus?.() ?? true} className="min-w-[190px]">
           {renderMenu(menuArgs)}
         </ContextMenuContent>
@@ -255,28 +242,10 @@ const SessionTabItem: React.FC<{
   );
 };
 
-/**
- * The header's horizontal working set of sessions (web/desktop only).
- *
- * A session the user opens shows in the italic preview tab until pinned (see
- * `useSessionTabsStore`); the tab whose session is current renders `children` — the header's title/rename block — inside a
- * selected pill. An open new-session draft shows as a selected tab at the end.
- * Closing a tab only removes it from the strip; closing the active one
- * activates its neighbour. Ids whose session has not loaded (or
- * was archived/deleted) stay in the store but do not render, so a partial
- * session list never destroys the working set.
- */
 export const SessionTabsStrip: React.FC<{
-  /** Menu items for one tab's session, supplied by the header. */
   renderMenu: (args: SessionTabMenuArgs) => React.ReactNode;
-  /** Fires when a tab menu finishes opening/closing (deferred rename hook). */
   onMenuOpenChangeComplete?: (open: boolean) => void;
-  /** While the active tab renames, its hover controls stay hidden. */
   suppressActiveTabControls?: boolean;
-  /**
-   * Whether a closing tab menu gives focus back to its tab. False while a
-   * Rename from the menu opens the title field, which takes the focus.
-   */
   menuReturnsFocus?: () => boolean;
   children: React.ReactNode;
 }> = ({ renderMenu, onMenuOpenChangeComplete, suppressActiveTabControls = false, menuReturnsFocus, children }) => {
@@ -295,8 +264,6 @@ export const SessionTabsStrip: React.FC<{
   const setCurrentSession = useSessionUIStore((state) => state.setCurrentSession);
   const activeSessions = useGlobalSessionsStore((state) => state.activeSessions);
 
-  // With separate tabs per workspace the strip shows the working set of the
-  // place the user is: the open session's folder, else the open draft's.
   const perWorkspace = useUIStore((state) => state.sessionTabsPerWorkspace);
   const enterScope = useSessionTabsStore((state) => state.enterScope);
   const sessionsLoaded = useGlobalSessionsStore((state) => state.hasLoaded);
@@ -311,16 +278,11 @@ export const SessionTabsStrip: React.FC<{
     return state.projects.find((project) => project.id === projectId)?.path ?? null;
   });
 
-  // Opening a session anywhere (sidebar, palette, deep link) shows it in the
-  // preview tab. The lanes of one multi-run share a tab: opening another lane
-  // reuses it.
   const currentRunMemberIds = useMultiRunMemberIds(currentSessionId);
   React.useEffect(() => {
     if (!perWorkspace) {
       enterScope(GLOBAL_SESSION_TAB_SCOPE, () => []);
     } else {
-      // A first visit seeds a worktree's or space's tabs from its sessions,
-      // which need the complete session list; until then nothing moves.
       if (!sessionsLoaded) return;
       const runtimeKey = getRuntimeKey();
       const chatDraft = !currentSessionId && draftOpen && draftIsChat;
@@ -342,7 +304,6 @@ export const SessionTabsStrip: React.FC<{
     return map;
   }, [activeSessions]);
 
-  // Only tabs with a known live session render; unknown ids stay stored.
   const tabs = React.useMemo<SessionTab[]>(() => {
     const list: SessionTab[] = [];
     for (const id of tabIds) {
@@ -360,9 +321,6 @@ export const SessionTabsStrip: React.FC<{
     closeSessionTabAndActivateNeighbour(id);
   }, []);
 
-  // A new session's draft is a tab of its own while it is open, at the end of
-  // the strip: the start of its text once saved, else "New session". Leaving
-  // it removes the tab; the draft itself stays in the sidebar.
   const showDraftTab = !currentSessionId && draftOpen;
   const draftFirstLine = useSessionDraftsStore((state) => {
     if (!showDraftTab || !workDraftId) return '';
@@ -370,12 +328,6 @@ export const SessionTabsStrip: React.FC<{
     return text.split(/\r?\n/).find((line) => line.trim())?.trim() ?? '';
   });
 
-  // Cmd/Ctrl+W in the desktop app closes the open tab, unless the user last
-  // worked in a zone with tabs of its own. Closing the draft's tab moves to
-  // the last session tab. With nothing to close it closes the window, as
-  // before.
-  // The "+" after the tabs starts a session where these tabs are: the open
-  // session's folder, or the open draft's.
   const shortcutOverrides = useUIStore((state) => state.shortcutOverrides);
   const openNewSessionHere = React.useCallback(() => {
     const { currentSessionId: openId, newSessionDraft, openNewSessionDraft } = useSessionUIStore.getState();
@@ -413,7 +365,6 @@ export const SessionTabsStrip: React.FC<{
     }
   }, [reorderTabs]);
 
-  // Soft fade at the edges while more tabs hide behind them.
   const scrollRef = React.useRef<HTMLDivElement | null>(null);
   const [edges, setEdges] = React.useState({ left: false, right: false });
   const updateEdges = React.useCallback(() => {
@@ -437,8 +388,6 @@ export const SessionTabsStrip: React.FC<{
     return () => observer.disconnect();
   }, [updateEdges, tabs.length]);
 
-  // Keep the active tab in view when it changes, stopping short of the edge
-  // fades so the tab's own controls stay readable.
   React.useEffect(() => {
     const node = scrollRef.current;
     const tab = node?.querySelector<HTMLElement>('[data-active-session-tab]:not([inert] *)');
@@ -462,8 +411,6 @@ export const SessionTabsStrip: React.FC<{
 
   const tabIdsInOrder = React.useMemo(() => tabs.map((tab) => tab.id), [tabs]);
 
-  // The pill covers just the moment a current session has not reached its
-  // tab yet.
   const showPendingTab = Boolean(currentSessionId) && !tabs.some((tab) => tab.id === currentSessionId);
   // Reordering is animated by the drag controller, independently of membership.
   const tabLayoutKey = [...tabIdsInOrder, ...(showDraftTab ? ['draft'] : []), ...(showPendingTab ? ['pending'] : [])].sort().join('\0');

@@ -14,10 +14,6 @@
 import React from 'react';
 import { usePresence, useReducedMotion } from 'motion/react';
 
-// Mostly a fade with a short rise from below. No scale: the wrapper's origin
-// is a corner, so scaling read as a diagonal slide.
-// `brief` is for lists that come and go with every keystroke (autocomplete):
-// they must keep up with typing.
 const TIMING = {
     standard: { enter: 140, exit: 100 },
     brief: { enter: 90, exit: 60 },
@@ -33,7 +29,6 @@ export function GlassPopupMotion({ children, pace = 'standard', ...rest }: React
 
     const play = React.useCallback((entering: boolean): Animation[] => {
         const wrapper = wrapperRef.current;
-        // Test DOMs may lack the Web Animations API; the popup then just appears.
         if (!wrapper || !('animate' in wrapper)) return [];
         for (const animation of runningRef.current) animation.cancel();
         const timing = entering
@@ -64,7 +59,6 @@ export function GlassPopupMotion({ children, pace = 'standard', ...rest }: React
     React.useEffect(() => {
         if (isPresent) return;
         const wrapper = wrapperRef.current;
-        // A popup on its way out must not take clicks meant for what is below.
         if (wrapper) wrapper.style.pointerEvents = 'none';
         const animations = play(false);
         if (animations.length === 0) {
@@ -74,7 +68,6 @@ export function GlassPopupMotion({ children, pace = 'standard', ...rest }: React
         let cancelled = false;
         void Promise.all(animations.map((animation) => animation.finished)).then(
             () => { if (!cancelled) safeToRemove?.(); },
-            // Cancelled because the popup came back before it finished.
             () => undefined,
         );
         return () => { cancelled = true; };

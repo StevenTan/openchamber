@@ -110,9 +110,6 @@ export const useTimelineReveal = ({
             };
             frame = window.requestAnimationFrame(settle);
         };
-        // Holds are taken in layout effects, including those of rows the list
-        // mounts in a nested synchronous pass; a microtask runs after all of
-        // them and still before the browser paints this commit.
         queueMicrotask(() => {
             if (finished) return;
             revealGate.close();

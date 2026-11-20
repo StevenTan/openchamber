@@ -33,17 +33,11 @@ export const useFileTreeListing = ({
   const [childrenByDir, setChildrenByDir] = React.useState<Record<string, FileNode[]>>({});
   const [loadErrorsByDir, setLoadErrorsByDir] = React.useState<Record<string, string>>({});
   const loadedDirsRef = React.useRef<Set<string>>(new Set());
-  // Raw entry count of each folder's last listing, before hidden/ignored filtering.
   const entryCountByDirRef = React.useRef<Map<string, number>>(new Map());
   const directoryRequests = React.useMemo(() => new DirectoryRequests(), []);
   React.useEffect(() => () => directoryRequests.clear(), [directoryRequests]);
   const refreshAbortRef = React.useRef<AbortController | null>(null);
 
-  // Hydrate the per-root cache on mount or root change. The cache is
-  // module-scoped so it survives close-and-reopen of the right sidebar;
-  // expanded paths are already persisted via useFilesViewTabsStore, so
-  // combining the two means the tree re-paints with cached data instead
-  // of blanking out and re-listing every directory.
   React.useEffect(() => {
     if (!root) {
       setChildrenByDir({});
@@ -53,9 +47,6 @@ export const useFileTreeListing = ({
     }
     const cached = touchCache(root);
     if (cached) {
-      // Shallow-clone so the state and cache hold independent references.
-      // This protects the cache from accidental in-place mutation of state
-      // (a future contributor could otherwise break the contract silently).
       setChildrenByDir({ ...cached.childrenByDir });
       setLoadErrorsByDir({ ...cached.loadErrorsByDir });
       loadedDirsRef.current = new Set(cached.loadedDirs);
@@ -66,9 +57,6 @@ export const useFileTreeListing = ({
     }
   }, [root]);
 
-  // Mirror local state into the per-root cache. Don't bump touchedAt here:
-  // writes are frequent and the LRU should reflect user attention, not
-  // background re-renders.
   React.useEffect(() => {
     if (!root) return;
     const cache = getOrCreateCache(root);
@@ -81,21 +69,12 @@ export const useFileTreeListing = ({
     cache.loadErrorsByDir = loadErrorsByDir;
   }, [root, loadErrorsByDir]);
 
-  // The ref's contents must be persisted to the cache so a remount (e.g.
-  // close-and-reopen of the right sidebar) skips re-listing already-known
-  // directories. Mirror on every change of `root` so the ref → cache sync
-  // happens once per directory; the ref itself updates synchronously inside
-  // `loadDirectory` and isn't tracked by React otherwise.
   React.useEffect(() => {
     if (!root) return;
     const cache = getOrCreateCache(root);
     cache.loadedDirs = new Set(loadedDirsRef.current);
   }, [root, childrenByDir, loadErrorsByDir]);
 
-  // Drop the cache entry for this root on unmount when no data was loaded
-  // (e.g. user opened the tab and immediately switched projects before any
-  // listDirectory round-trip). A populated entry stays so the next mount
-  // rehydrates instantly.
   React.useEffect(() => () => {
     if (!root) return;
     const cache = fileTreeCacheByRoot.get(cacheKey);
@@ -164,8 +143,6 @@ export const useFileTreeListing = ({
   const refreshRoot = React.useCallback(async () => {
     if (!root) return;
 
-    // Cancel any previous refresh so stale results for the old root don't
-    // land after the user switches projects.
     refreshAbortRef.current?.abort();
     const controller = new AbortController();
     refreshAbortRef.current = controller;
@@ -204,8 +181,6 @@ export const useFileTreeListing = ({
 
       const isCancelled = () => controller.signal.aborted;
 
-      // Load root first, then expanded children with the same 3-at-a-time
-      // concurrency limit used on startup to avoid API stampede.
       await loadDirectory(root, isCancelled);
       for (let i = 0; i < normalizedExpanded.length && !controller.signal.aborted; i += 3) {
         const batch = normalizedExpanded.slice(i, i + 3);
@@ -221,11 +196,6 @@ export const useFileTreeListing = ({
     }
   }, [directoryRequests, loadDirectory, root, filesTabsApi]);
 
-  /**
-   * Incrementally refresh a single directory without nuking the rest of the
-   * tree.  Only the given directory is reloaded in-place; every other expanded
-   * directory keeps its cached children so the UI does not flash/reset.
-   */
   const refreshDirectory = React.useCallback(async (dirPath: string) => {
     if (!dirPath) {
       await refreshRoot();
@@ -240,8 +210,6 @@ export const useFileTreeListing = ({
   React.useEffect(() => {
     if (!root) return;
 
-    // Cancel any pending refresh so stale directory listings don't land after
-    // the user switches projects or toggles showHidden / showGitignored.
     refreshAbortRef.current?.abort();
     loadedDirsRef.current = new Set();
     directoryRequests.clear();
@@ -253,7 +221,6 @@ export const useFileTreeListing = ({
   React.useEffect(() => {
     if (!visible || !root || expandedPaths.length === 0) return;
 
-    // Sort by depth so parent dirs load before children
     const toLoad = expandedPaths
       .map((p) => normalizePath(p))
       .filter((normalized): normalized is string =>
@@ -267,9 +234,6 @@ export const useFileTreeListing = ({
 
     if (toLoad.length === 0) return;
 
-    // Load with concurrency limit to avoid API stampede on startup.
-    // Cancellation stops queued batches. Already-started, shared reads still
-    // populate the same-scope cache; scope changes and unmount invalidate them.
     let cancelled = false;
     const isCancelled = () => cancelled;
     void (async () => {
@@ -288,10 +252,6 @@ export const useFileTreeListing = ({
     if (resumed) void refreshRoot();
   }, [refreshRoot, visible]);
 
-  // Agent and app file changes re-list only what they touched. A listing on
-  // screen reloads now, unless it is too large to resend; a loaded one out of
-  // sight (collapsed, or inside a collapsed folder) is only forgotten, so
-  // expanding it reads it again.
   const applyFileTreeChanges = React.useCallback(({ directories }: FileTreeChangeBatch) => {
     if (!root) return;
     const expanded = new Set(

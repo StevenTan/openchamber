@@ -44,7 +44,6 @@ export const useAnnotationRenderer = ({
       button.dataset.ocTrailingExpand = '';
       button.textContent = showLinesBelowLabel;
       button.addEventListener('click', (event) => {
-        // Keep the click away from Pierre's line selection.
         event.stopPropagation();
         requestTrailingExpansionRef.current();
       });
@@ -52,9 +51,7 @@ export const useAnnotationRenderer = ({
       return div;
     }
 
-    // Pierre rebuilds an annotation whenever its index shifts. Handing back the
-    // same node keeps the card portalled into it mounted and its height in the
-    // layout, so the rebuild neither unmounts a comment nor moves the diff.
+    // external: https://github.com/pierrecomputer/pierre Annotation index changes rebuild wrappers; stable portal nodes preserve mounted cards and layout height.
     const id = toPierreAnnotationId(annotation.metadata);
     const existing = commentHostsRef.current.get(id);
     if (existing) return existing;

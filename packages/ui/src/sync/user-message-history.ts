@@ -8,10 +8,8 @@ type UserMessageHistoryRecord = {
   parts: Part[];
 };
 
-/** One prompt the user sent in a session, as the visible transcript shows it. */
 export type TranscriptPrompt = {
   text: string;
-  /** `message.time.created`, milliseconds. */
   createdAt: number;
 };
 
@@ -19,7 +17,6 @@ export type UserMessageHistorySnapshot = {
   sessionID: string;
   revertMessageID?: string;
   records: UserMessageHistoryRecord[];
-  /** Oldest first. */
   history: TranscriptPrompt[];
 };
 

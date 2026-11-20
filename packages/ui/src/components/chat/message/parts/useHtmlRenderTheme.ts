@@ -8,14 +8,11 @@ import { htmlRenderTheme, type HtmlRenderMetrics, type HtmlRenderTheme } from '.
 const DEFAULT_SANS = '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
 const DEFAULT_MONO = 'ui-monospace, "SFMono-Regular", Menlo, monospace';
 
-// The phone text sizes in mobile.css are !important, so the chat's own scale,
-// set inline on its column, does not reach the chat where they apply.
 const usesPhoneTextSizes = () => (
     document.documentElement.matches('.mobile-pointer:not(.desktop-runtime)')
     && window.matchMedia('(max-width: 1024px)').matches
 );
 
-/** The user's font settings, as they land on the root and the chat column. */
 const readRootMetrics = (chatFontSize: number): HtmlRenderMetrics => {
     const style = getComputedStyle(document.documentElement);
     const rem = Number.parseFloat(style.fontSize) || 16;
@@ -32,17 +29,12 @@ const sameMetrics = (a: HtmlRenderMetrics, b: HtmlRenderMetrics) => (
     a.rem === b.rem && a.text === b.text && a.sans === b.sans && a.mono === b.mono
 );
 
-/** The app theme as the page's variables, following theme, interface and chat size and font switches live. */
 export function useHtmlRenderTheme(): HtmlRenderTheme {
     const { currentTheme } = useThemeSystem();
     const interfaceSize = useUIStore((state) => state.interfaceFontSizePx);
     const chatFontSize = useUIStore((state) => state.chatFontSizePx);
     const { uiFont, monoFont, customUiFont, customMonoFont, chatFont, customChatFont } = useFontPreferences();
     const [metrics, setMetrics] = React.useState(() => readRootMetrics(chatFontSize));
-    // The interface size and fonts reach the root in layout effects
-    // (ThemeProvider, useAppFontEffects) that run after this component
-    // renders, so a read during the render a setting change causes still
-    // sees the old values. A passive effect runs after every layout effect.
     React.useEffect(() => {
         const next = readRootMetrics(chatFontSize);
         setMetrics((current) => (sameMetrics(current, next) ? current : next));
