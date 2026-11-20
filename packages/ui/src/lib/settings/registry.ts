@@ -758,6 +758,7 @@ export const LOCAL_DEVICE_KEYS = [
   'diffFileTreeWidth',
   'showTerminalQuickKeysOnDesktop',
   'dockBadgeEnabled',
+  'mobileKeepScreenAwake',
   'questionsInChat',
   'agentMemoryViewedAt',
   'appZoom',
