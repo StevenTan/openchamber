@@ -60,8 +60,10 @@ const { getSessionMaterializationStatus } = await import('@/sync/materialization
 import type { State } from '@/sync/types';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const chatContainerSource = readFileSync(join(__dirname, '..', 'ChatContainer.tsx'), 'utf-8');
-const syncContextSource = readFileSync(join(__dirname, '..', '..', '..', 'sync', 'sync-context.tsx'), 'utf-8');
+const readSource = (...segments: string[]) => readFileSync(join(__dirname, '..', ...segments), 'utf-8');
+const sessionPlaceholderSource = readSource('column', 'sessionPlaceholder.tsx');
+const composerSlotSource = readSource('column', 'ComposerSlot.tsx');
+const syncContextSource = readSource('..', '..', 'sync', 'sync-context.tsx');
 
 const SESSION_ID = 'ses_subagent_2903';
 const DIRECTORY = '/repo';
@@ -250,13 +252,13 @@ describe('issue #2903 busy subagent status-line-only', () => {
   test('the empty idle viewport leaves the floating action to the composer', () => {
     // The composer rider owns the floating action; an empty, idle viewport
     // renders no action of its own.
-    expect(chatContainerSource).toContain('if (sessionMessages.length === 0 && !sessionIsWorking)');
-    expect(chatContainerSource).toContain('<ScrollToBottomButton');
+    expect(sessionPlaceholderSource).toContain('if (messageCount === 0 && !sessionIsWorking)');
+    expect(composerSlotSource).toContain('<ScrollToBottomButton');
 
-    const emptyIdleGuard = 'if (sessionMessages.length === 0 && !sessionIsWorking)';
-    const emptyIdleReturn = chatContainerSource.indexOf(emptyIdleGuard);
+    const emptyIdleGuard = 'if (messageCount === 0 && !sessionIsWorking)';
+    const emptyIdleReturn = sessionPlaceholderSource.indexOf(emptyIdleGuard);
     expect(emptyIdleReturn).toBeGreaterThan(-1);
-    const emptyIdleBlock = chatContainerSource.slice(
+    const emptyIdleBlock = sessionPlaceholderSource.slice(
       emptyIdleReturn,
       emptyIdleReturn + 1600,
     );
