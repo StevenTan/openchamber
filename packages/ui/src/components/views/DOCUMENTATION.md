@@ -54,6 +54,11 @@ click-outside handler skips it (`isDragReleaseClick`) and the range stays.
 
 Pierre keys its annotation wrappers by index in the list, so an annotation that comes or goes rebuilds every one after it. A card is portalled into its annotation's node, so a new node would unmount the card and drop its height for a frame, which moves the diff and the scroll. `renderAnnotation` hands back the same node per annotation id, and the open comment field goes last in the list, so opening or closing it shifts nothing.
 
+Row rebuilds retain the focused comment field and restore its focus after rendering.
+The diff instance owns the focus and pointer listeners that cancel this restoration
+when the user leaves the field. Rebuilt instances also receive the current line
+selection because Pierre paints selected rows from its own selection state.
+
 ### Why Pierre owns diff line-number selection
 
 `PierreDiffViewer` receives number-column selections through Pierre's

@@ -16,7 +16,7 @@ const ALLOWED = [
   { file: 'index.css', declaration: 'animation: webkit-spin 1s linear infinite !important;' },
   { file: 'index.css', declaration: 'animation: oc-trailing-expand-spin 0.8s linear infinite;' },
   { file: 'index.css', declaration: 'animation: marquee-scroll 5s linear infinite alternate;' },
-  { file: 'components/views/PierreDiffViewer.tsx', declaration: 'animation: oc-expand-spin 0.8s linear infinite;' },
+  { file: 'components/views/pierreDiff/css.ts', declaration: 'animation: oc-expand-spin 0.8s linear infinite;' },
   // Three stepped, transform-only dots in the visible working scroll action.
   // They unmount when hidden and remain static with reduced motion.
   { file: 'styles/fork-defaults.css', declaration: 'animation: oc-scroll-working-dot-wave 1s steps(3, end) infinite;' },
