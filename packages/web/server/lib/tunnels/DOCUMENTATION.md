@@ -39,13 +39,15 @@ variables, filesystem stat/access results, request/default fields and registered
 provider implementations. Providers own process output parsing; the service
 owns the normalized start request and the controller returned by a provider.
 
-`routes.js` remains JavaScript. Express has no declarations in this checkout.
-In `../opencode/tunnel-auth.js`, `createTunnelAuth().setActiveTunnel` infers
+`routes.js` uses the Express and HTTP contracts in `../shared`.
+In `../opencode/tunnel-auth.js`, `createTunnelAuth().setActiveTunnel` still infers
 `mode` as `null | undefined` from its default, although routes pass a string.
-The owner needs a `string | null` mode contract with an optional argument.
-Importing Express types currently produces TS7016; passing a string mode to
-the real auth controller produces TS2322. A folder-local replacement contract
-would hide these outside boundaries.
+The owner needs `setActiveTunnel` to accept
+`{ tunnelId: string; publicUrl: string; mode?: string | null }` and
+`activeTunnelMode` to store `string | null`, so `getActiveTunnelMode` exposes
+the same state. Passing a string mode to the real auth controller produces
+TS2322. A folder-local replacement for this controller contract would conceal
+the mismatch.
 
 `managed-config.js` remains JavaScript. In
 `../opencode/settings-runtime.js`, preset-token updates can forward entries
@@ -61,6 +63,8 @@ updates to `{ id: string; name: string; hostname: string; token: string }`
 before calling `upsertManagedRemoteTunnelToken`. Declaring those raw callback
 inputs validated, or hiding them behind an unknown-input alias, would weaken
 the boundary. The existing runtime guards remain until that owner is typed.
+Forwarding raw presets with an explicit `unknown` parameter also fails
+`anti-slop/no-unknown-parameters`; the parser belongs at the settings boundary.
 
 ### Why boundary guards remain
 

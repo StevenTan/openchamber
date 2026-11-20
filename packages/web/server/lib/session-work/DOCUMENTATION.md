@@ -68,12 +68,9 @@ external Jev values parsed individually as numeric scores.
 Missing or malformed scores keep assist allowed and prevent a done hint.
 Question wording and thresholds remain unchanged.
 
-`runtime.js` remains JavaScript until its dependencies expose accurate types.
-`../opencode/settings-files.js` infers `{}` from `readMergedSettingsSync`,
-omitting the two settings this runtime reads. Its result needs a dictionary of
-unvalidated settings values, such as `Record<string, unknown>`, so the runtime can
-keep comparing `sessionWorkEnabled` to `false` and `sessionReviewOfferEnabled`
-to `true` without claiming that file values are booleans.
+`../opencode/settings-files.d.ts` exposes the merged settings as unchecked JSON.
+The runtime keeps comparing `sessionWorkEnabled` to `false` and
+`sessionReviewOfferEnabled` to `true` without treating file values as booleans.
 
 `../session-assist/context.js` infers turn `changedFiles` and `assistant` as
 `null` even though collection fills them. `loadAssistContext` needs to describe
@@ -85,6 +82,16 @@ inference makes the runtime's `changedFiles.size` branch `never` and its final
 `assistant.text` access nullable. Typing this runtime requires those owners to
 describe their existing results; local casts or new rejection paths would hide
 the mismatch or change behavior.
+
+`../session-assist/contracts.ts` already declares `AssistTurn` with the nullable
+set and assistant fields, but `loadAssistContext` does not use that contract.
+Its owner must type collection with `AssistTurn` and expose a successful
+`turns` result whose `at(-1)` returns an existing turn with a non-null assistant.
+A plain `AssistTurn[]` return, or a non-empty tuple alone, still leaves `at(-1)`
+possibly undefined and its assistant nullable. Until that boundary is typed, `runtime.js` remains
+JavaScript; its final-turn accesses cannot compile without additional runtime
+branches or assertions. A focused compile-time probe reproduces TS2339 on
+`changedFiles.size`, TS18048 on the final turn and TS18047 on its assistant.
 
 ## Invariants
 

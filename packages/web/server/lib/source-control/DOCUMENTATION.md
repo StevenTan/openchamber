@@ -13,6 +13,18 @@ Binding DTOs belong to `binding-types.ts`, using `ProviderId` from
 also pulls those implementations into TypeScript's emit program. The UI keeps
 its existing independent contract until a shared owner is chosen.
 
+Descriptor arrays are readonly because built-in descriptors freeze them.
+`identity.noReplyEmail` accepts an explicit undefined numeric ID, matching
+identity provisioning before a provider identity is available. Connected
+profile names and emails may be null. Version probes may return a null version
+and an optional edition; neither field establishes that an instance is supported.
+`ProviderReadContext` describes the authority returned by `validateReadContext`,
+including the optional linked-read marker. `ProviderMutationContext` adds the
+validated idempotency key and mutation target. `ProviderMutations` exposes the
+non-null mutation API for providers that implement it. Providers specialize its
+normalized-input and provider-target type parameters with the shapes established
+by their own normalizers. Both default to JSON for unconverted providers.
+
 The route shell's optional `onMutationSucceeded` callback receives the validated context, normalized input and durable record after executor completion, including whether this is a replay. The GitHub user-merge follower uses it to establish server interest for a waiting merge. It makes no provider write and leaves worktree cleanup to the existing merged-worktree owner. A callback failure is warned without failing the already accepted provider mutation; notifications are best effort, as with session notifications.
 
 - `provider-id.js` defines the open provider id (`^[a-z][a-z0-9-]{0,31}$`) and the ids no registry may take (`guest`, `link`, `external`, `repository`). `provider-descriptors.js` lists the built-in descriptors in priority order (GitHub, GitLab, Gitea, Gerrit, then Forgejo); each provider's `descriptor.js` is static and SDK-free: instance form, `normalize` and `origin`, capabilities, auth methods, Git transport policy, limits, settings fields and the client presentation. `provider-instance.js` normalizes an instance through its descriptor and refuses an unknown id. `provider-contract.d.ts` types the descriptor, the implementation and the published descriptor.
@@ -253,6 +265,35 @@ GitLab refresh tokens are single-use, so renewal holds a separate lock across th
 ### Why auth versions inspect unparsed provider sections
 
 Version selection inspects every serialized instance, including opaque sections this process never parses, because an `sshUrl` in any section requires version 5. Choosing from parsed sections alone can write a snapshot the store itself refuses to read.
+
+### Why auth parsing keeps raw JSON separate from credentials
+
+The auth store reads JSON, injected filesystem results and OAuth renewal responses.
+Its file guards retain the version, exact-key, account, integer, boolean and SSH
+normalization checks before exposing credentials. Unknown provider sections remain
+JSON until their provider requests them. Their contents do not acquire credential
+types merely by surviving a read. Shared instance helpers return the credential
+union, including extension string user IDs, rather than promising numeric IDs or
+one provider's secret field.
+
+A version-5 instance may contain `sshUrl: null`: normalization accepts it and the
+existing parser retains it, while public reads and writes omit a falsy address.
+Missing credential invalidation reasons may be assigned as explicit `undefined`
+during serialization and are then omitted by JSON. The in-memory types preserve
+both cases. Dictionary ownership checks remain in place before section access;
+missing section and credential-slot checks express parser-established occupancy.
+
+### Why binding endpoint protocols still have an untyped boundary
+
+`git/credential-resolver.js` owns `normalizeGitRemoteEndpoint` and
+`normalizeGitCredentialEndpoint`. Their protocol check uses `in` on an ordinary
+object, so an inherited key with an explicit port can pass: the remote
+`constructor://example.com:80/team/repo` returns protocol `constructor`.
+The binding service passes that protocol to `ProviderDescriptor.projectPathOfRemote`,
+whose contract permits only `http`, `https` and `ssh`. Giving the normalizer that
+return type would overstate its checks; rejecting other protocols in the binding
+service would change behavior. The Git owner must resolve this boundary before a
+behavior-preserving conversion can type that call.
 
 ### Why session secrets stay outside session objects
 

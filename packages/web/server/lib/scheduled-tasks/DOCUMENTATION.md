@@ -5,7 +5,7 @@ Server-owned scheduled task runtime and routes for OpenChamber-only automation.
 ## Scope
 
 - Per-project scheduled task persistence is owned by `packages/web/server/lib/projects/project-config.js`.
-- Markdown loop discovery/parsing is owned by `packages/web/server/lib/scheduled-tasks/loops.js`.
+- Markdown loop discovery/parsing is owned by `packages/web/server/lib/scheduled-tasks/loops.ts`.
 - Runtime orchestration and execution is owned by `packages/web/server/lib/scheduled-tasks/runtime.js`.
 - This module is OpenChamber feature logic; it is intentionally separate from OpenCode proxy/runtime internals.
 - The chats scope is owned by `packages/web/server/lib/scheduled-tasks/chats-scope.ts`.
@@ -388,10 +388,15 @@ last closing parenthesis before selecting the start-time field.
 
 ### Why some implementations remain JavaScript
 
-`loops.js` imports `parseMdFile`, `writeMdFile`, `getAncestors` and
-`findWorktreeRoot` from `../opencode/shared.js`. Its paired `shared.d.ts`
-declares only `readWorktreeDirectorySetting`, so TypeScript cannot see those
-exports. That declaration belongs to the OpenCode module.
+`loops.ts` imports `parseMdFile`, `writeMdFile`, `getAncestors` and
+`findWorktreeRoot` from `../opencode/shared.js`. That owner's declaration exposes
+these helpers, with unvalidated YAML frontmatter and a parsed string body.
+The frontmatter guard preserves the original acceptance of any non-null object,
+including arrays, and leaves every field unknown until its individual check.
+Enabling a loop reads the file again after validation. That second read remains
+unchecked and its enumerable fields are spread as before, including scalar
+string indices if the file changes between reads. Nullish frontmatter contributes
+no properties.
 
 `existing-session.js`, `runtime.js` and `service.js` consume project-config
 tasks and state-write results through the untyped `withProjectWriteLock`
@@ -412,11 +417,6 @@ rejection rules.
 
 The remaining conversions require these owner-provided contracts:
 
-- `../opencode/shared.d.ts` must expose `parseMdFile`, `writeMdFile`,
-  `getAncestors` and `findWorktreeRoot`. The markdown reader must describe
-  unvalidated YAML frontmatter and the parsed body honestly; declaring
-  frontmatter as a validated loop definition would overstate what it checks.
-  This blocks `loops.js`.
 - `../projects/project-config.js` must preserve the callback result through
   `withProjectWriteLock<T>(projectID: string, mutate: () => Promise<T>): Promise<T>`.
   Currently `upsertScheduledTask`, `updateScheduledTaskState` and
@@ -428,20 +428,26 @@ The remaining conversions require these owner-provided contracts:
   would conceal the missing owner contract. This blocks `existing-session.js`,
   `service.js` and `runtime.js`; `routes.js` depends on those same service and
   runtime results.
-- `@opencode/client`'s `CommandInfo` must describe the optional command
+  Emitted declarations also expose `deleteScheduledTask`, `reconcileLoopTasks`,
+  `setLoopApproval` and `saveScheduledWorktreeCleanup` as `Promise<any>`.
+  `listScheduledTasks` needs the complete normalized task contract: its inferred
+  result omits the conditionally added `targetSessionId`, `runInWorktree`,
+  `baseBranch` and `cleanupWorktree` fields and leaves identity, enablement and
+  parts of state untyped.
+- `@opencode/schema`'s `Command.Info`, returned by the pinned
+  `@opencode/client`, must describe the optional command
   `template` actually read by `resolveScheduledCommand`, or its owner must
   supply a template-reading boundary that preserves the current absent-value
   fallback. The installed client contract has no such member. This separately
   blocks `runtime.js`.
-- `../openchamber-control/error.ts`'s `ControlErrorDetails` lacks the `task`
-  and `busy` fields supplied by `service.js` and forwarded by `routes.js`.
-  It must describe the existing task result and `'queued' | 'running'` busy
-  values accepted by the constructor's `Object.assign`. Its
+- `../openchamber-control/error.ts`'s `ControlErrorDetails` exposes the unchecked
+  `task` and `'queued' | 'running'` busy fields supplied by `service.js`.
+  Its
   `ControlErrorFields` correctly leaves unvalidated `message`, `status` and
   `statusCode` as `unknown`; those fields cannot be passed to string or HTTP
   status parameters as though an error shape had already been checked.
 
-No runtime guards can be removed while these implementations remain JavaScript.
+No runtime guards are removed from the implementations that remain JavaScript.
 In particular, the route payload checks still handle HTTP input, loop checks
 still handle YAML input, and error-field handling must retain its current
 acceptance and fallback behavior.
@@ -455,7 +461,7 @@ acceptance and fallback behavior.
   - Session create + prompt_async execution
   - Emits OpenChamber task-run events
 
-- `packages/web/server/lib/scheduled-tasks/loops.js`
+- `packages/web/server/lib/scheduled-tasks/loops.ts`
   - Discovery of `.agents/loops/*.md` (project scope, ancestors up to the worktree root) and `~/.agents/loops/*.md` (user scope)
   - Frontmatter parsing into scheduled-task definitions
   - `syncProject` reconciles discovered loops with the persisted task list on every project sync (startup, task list load, task save/delete)

@@ -357,21 +357,21 @@ retain the existing sanitization and timestamp defaults while producing the
 typed lists used by mutations. Record guards establish only that fields can be
 read; each field remains untrusted until its existing validation runs.
 
-### Why route registration remains JavaScript
+### Route conversion contracts
 
-The Express dependency has no installed type declarations. Route registration
-keeps its existing JavaScript implementation until the dependency owner supplies
-that contract, without a folder-local Express shim.
+`registerProjectContextRoutes` imports application and response types
+from `../shared/http-contracts.js`. The shared Express declaration supplies the
+existing JSON middleware factory. Route parameters name the fields Express
+matches; request bodies remain unknown until their existing checks pass.
 
-The blocking outside symbols are `express.json`, which needs the Express 5 JSON
-middleware signature, and the Express `Application`, `Request` and `Response`
-contracts used by `registerProjectContextRoutes`. The application must type route
-registration and middleware, requests must expose route parameters and untrusted
-JSON bodies, and responses must type the chained `status(...).json(...)` calls.
-`packages/web/package.json` declares `express` but no `@types/express`; the
-installed Express package supplies no declarations of its own. Converting
-`routes.js` requires the dependency owner to supply those types outside this
-folder first.
+### Why store tokens remain unchecked until comparison
+
+The route's regular expression coerces a supplied store token to text. A list
+such as `["local:token"]` can pass that check, but the runtime compares the
+original value strictly with the current token and refuses it with `409`.
+`saveTodos` therefore accepts an unchecked store value until that comparison;
+declaring it a string or coercing the value passed to the runtime would
+misrepresent or change this behavior.
 
 ## Cross-module contract
 

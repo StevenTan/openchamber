@@ -78,8 +78,19 @@ For forks initiated in the VS Code UI, the shared fork action refreshes the exte
 
 `modes.ts` owns `PermissionMode`. `isPermissionMode` validates raw settings and file values; mode conversion accepts modes and legacy booleans, with null or absence producing no mode.
 
-### Why the runtime remains JavaScript
+### Runtime conversion contracts
 
-The event hub and translator are typed, and translated properties expose `info`, `directory` and `requestID`. The remaining boundary is the safety-net callback: `translateWireEvent` in `../event-stream/translate-v2.ts` produces permission properties with optional `action`, optional `resources: JsonValue[]` and `metadata: JsonValue | undefined`. After checking only that `id` and `sessionID` are present, the runtime passes these properties unchanged to `evaluatePermission` in `../routing/runtime.ts`.
+The event hub and translator are typed, and translated properties expose `info`,
+`directory` and `requestID`. Pending permissions also arrive directly from HTTP
+JSON. That path checks only that the list is an array and the request ids are
+truthy. The runtime passes permission properties unchanged to
+`evaluatePermission`, including unchecked `action` and `resources`.
 
-That consumer takes `RoutingPermission` from `../routing/jev.ts`, which requires `action: string`, `resources: string[]` and optional object metadata. Its input contract would need to represent the actual forwarded values: checked string ids, optional action, optional JSON-valued resources and arbitrary JSON metadata. Declaring the stricter consumer type here would promise unchecked fields; filtering or coercing those fields would change behavior. The routing owner must resolve this contract before the runtime converts.
+`RoutingPermission` in `../routing/jev.ts`, consumed by `evaluatePermission` in
+`../routing/runtime.ts`, requires string ids, an optional string action and an
+optional JSON-valued resources array. The HTTP path does not establish those
+types. Its action and resources can each be any JSON value; its truthy ids can
+also be non-string JSON values. That external contract must represent the
+unchecked input before this runtime can convert without stronger validation or
+coercion. `runtime.test.js` pins forwarding of a numeric action and string
+resources from the HTTP pending list.
