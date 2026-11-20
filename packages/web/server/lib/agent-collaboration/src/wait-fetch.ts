@@ -15,14 +15,16 @@ export const waitFetch: typeof fetch = async (input, init) => {
       timeout: 0,
     }, incoming => {
       const headers = new Headers();
-      for (let index = 0; index < incoming.rawHeaders.length; index += 2) {
-        headers.append(incoming.rawHeaders[index], incoming.rawHeaders[index + 1]);
+      let name = "";
+      for (const [index, value] of incoming.rawHeaders.entries()) {
+        if (index % 2 === 0) name = value;
+        else headers.append(name, value);
       }
       const chunks: Buffer[] = [];
       incoming.on("data", chunk => chunks.push(Buffer.from(chunk)));
       incoming.once("error", reject);
-      incoming.once("end", () => {
-        const status = incoming.statusCode!;
+      incoming.once("end", function (this: { statusCode: number }) {
+        const status = this.statusCode;
         resolve(new Response(status === 204 ? null : Buffer.concat(chunks), { status, headers }));
       });
     });

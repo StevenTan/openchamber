@@ -66,6 +66,11 @@ OpenCode and the fixture provider on Ctrl-C. Pass `--dir tmp/perf-serve/project`
 to the session commands. Every command except `profile:animation` and
 `profile:startup` without `--url` needs a running server.
 
+The isolated Node launcher preloads a checkout's server source resolver when
+it exists, before loading the source CLI. This preserves `.js` specifiers as
+server and CLI folders convert to TypeScript; older comparison checkouts keep
+their original arguments.
+
 ## Running An Isolated Copy
 
 Any server, dev shell or Electron an agent starts for a check runs beside the
@@ -366,6 +371,16 @@ processes, with the trace events that spent it. `--save-trace` writes the raw
 timeline for the DevTools Performance panel.
 
 ### Deterministic stimulus
+
+`scripts/verify` starts the provider with `--verify-control`. In that mode,
+`GET /__verify/active?session=<id>&prompt=<text>` reports only whether a matching
+streaming request is active, using `x-opencode-session-id` and the latest user
+message. Closed requests are removed immediately. Normal profiling launches
+have no control endpoint.
+
+The verification stand also supplies `startFixture`'s optional `onSpawn`
+callback to record process ownership before the fixture starts listening.
+Profiling callers retain their existing fixture lifecycle.
 
 A hosted model returns a different length at a different speed on every run,
 and streaming cost follows the rate of deltas, not the amount of text. Two

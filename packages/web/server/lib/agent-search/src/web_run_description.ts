@@ -1,4 +1,4 @@
-Tool for accessing the internet.
+export default `Tool for accessing the internet.
 
 
 ---
@@ -6,13 +6,13 @@ Tool for accessing the internet.
 ## Examples of different commands available in this tool
 
 Examples of different commands available in this tool:
-* `search_query`: {"search_query": [{"q": "What is the capital of France?"}, {"q": "What is the capital of belgium?"}]}. Searches the internet for a given query (and optionally with a domain or recency filter)
-* `image_query`: {"image_query":[{"q": "waterfalls"}]}.
-* `open`: {"open": [{"ref_id": "turn0search0"}, {"ref_id": "https://www.openai.com", "lineno": 120}]}
-* `click`: {"click": [{"ref_id": "turn0fetch3", "id": 17}]}
-* `find`: {"find": [{"ref_id": "turn0fetch3", "pattern": "Annie Case"}]}
-* `finance`: {"finance":[{"ticker":"AMD","type":"equity","market":"USA"}]}, {"finance":[{"ticker":"BTC","type":"crypto","market":""}]}
-* `time`: {"time":[{"utc_offset":"+03:00"}]}
+* \`search_query\`: {"search_query": [{"q": "What is the capital of France?"}, {"q": "What is the capital of belgium?"}]}. Searches the internet for a given query (and optionally with a domain or recency filter)
+* \`image_query\`: {"image_query":[{"q": "waterfalls"}]}.
+* \`open\`: {"open": [{"ref_id": "turn0search0"}, {"ref_id": "https://www.openai.com", "lineno": 120}]}
+* \`click\`: {"click": [{"ref_id": "turn0fetch3", "id": 17}]}
+* \`find\`: {"find": [{"ref_id": "turn0fetch3", "pattern": "Annie Case"}]}
+* \`finance\`: {"finance":[{"ticker":"AMD","type":"equity","market":"USA"}]}, {"finance":[{"ticker":"BTC","type":"crypto","market":""}]}
+* \`time\`: {"time":[{"utc_offset":"+03:00"}]}
 
 ---
 
@@ -21,8 +21,8 @@ To use this tool efficiently:
 * Use multiple commands and queries in one call to get more results faster; e.g. {"search_query": [{"q": "bitcoin news"}], "finance":[{"ticker":"BTC","type":"crypto","market":""}], "find": [{"ref_id": "turn0search0", "pattern": "Annie Case"}, {"ref_id": "turn0search1", "pattern": "John Smith"}]}
 * Use "response_length" to control the number of results returned by this tool, omit it if you intend to pass "short" in
 * Only write required parameters; do not write empty lists or nulls where they could be omitted.
-* `search_query` must have length at most 4 in each call. If it has length > 3, response_length must be medium or long
-* If you find yourself in a situation where you accidentally call the `web.run` tool, it's best just to send an empty query: {"search_query": [{"q": ""}]}.
+* \`search_query\` must have length at most 4 in each call. If it has length > 3, response_length must be medium or long
+* If you find yourself in a situation where you accidentally call the \`web.run\` tool, it's best just to send an empty query: {"search_query": [{"q": ""}]}.
 
 ---
 
@@ -47,15 +47,15 @@ Below is a list of scenarios where browsing the internet MUST be used. PAY CLOSE
 
 ## Citations
 
-Results from `web.run` include internal reference IDs such as `turn2search5`. Use
-those reference IDs only in calls to `web.run`; do not expose them in the final
+Results from \`web.run\` include internal reference IDs such as \`turn2search5\`. Use
+those reference IDs only in calls to \`web.run\`; do not expose them in the final
 response.
 
 Cite sources in the final response using Markdown links:
 
-- Cite a single source as `[descriptive source title](https://example.com/page)`.
+- Cite a single source as \`[descriptive source title](https://example.com/page)\`.
 - Cite multiple sources with separate Markdown links, for example
-  `[first source](https://example.com/one), [second source](https://example.com/two)`.
+  \`[first source](https://example.com/one), [second source](https://example.com/two)\`.
 - Link directly to the page that supports the claim. Do not link to search result
   pages or use bare URLs.
 
@@ -100,3 +100,4 @@ Responses may not excessively quote or draw on a specific source. There are seve
   - You must avoid providing full articles, long verbatim passages, or extensive direct quotes due to copyright concerns.
   - If the user asked for a verbatim quote, the response should provide a short compliant excerpt and then answer with paraphrases and summaries.
   - Again, this limit does not apply to reddit content, as long as it's appropriately indicated that those are direct quotes and you link to the source.
+`;

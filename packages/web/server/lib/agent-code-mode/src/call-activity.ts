@@ -7,7 +7,7 @@ const callIndex = Symbol("openchamberCallIndex");
 type Identity = Pick<Tool.Context, "sessionID" | "messageID" | "id">;
 type Call = {
   tool: string;
-  input?: z.infer<typeof inputSchema>;
+  input?: z.infer<typeof inputSchema> | undefined;
   status: "running" | "completed" | "error";
   time: { start: number; end?: number };
   output?: string;

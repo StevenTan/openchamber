@@ -13,8 +13,8 @@ export function truncateOutput(text: string, maxTokens: number) {
   let prefixEnd = leftBudget;
   let suffixStart = bytes.length - rightBudget;
   // Keep both cuts on complete UTF-8 characters.
-  while ((bytes[prefixEnd] & 0xc0) === 0x80) prefixEnd--;
-  while (suffixStart < bytes.length && (bytes[suffixStart] & 0xc0) === 0x80)
+  while ((bytes.readUInt8(prefixEnd) & 0xc0) === 0x80) prefixEnd--;
+  while (suffixStart < bytes.length && (bytes.readUInt8(suffixStart) & 0xc0) === 0x80)
     suffixStart++;
   const removedTokens = Math.ceil((bytes.length - maxBytes) / APPROX_BYTES_PER_TOKEN);
   const marker = `…${removedTokens} tokens truncated…`;

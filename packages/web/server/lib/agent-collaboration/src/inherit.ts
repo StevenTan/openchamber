@@ -60,15 +60,18 @@ export async function inheritContext(
   signal.throwIfAborted();
   const sessionID = `ses_${randomUUID().replaceAll("-", "")}`;
   const now = Date.now();
+  let info: Parameters<InheritanceClient["experimental"]["session"]["import"]>[0]["info"] = {
+    id: sessionID, parentID: parent.id, projectID: parent.projectID,
+    title: input.title, location: parent.location,
+    cost: 0, tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    time: { created: now, updated: now },
+  };
+  if (parent.model !== undefined) info = { ...info, model: parent.model };
+  if (parent.metadata !== undefined) info = { ...info, metadata: parent.metadata };
+  if (parent.permissions !== undefined) info = { ...info, permissions: parent.permissions };
   await api.experimental.session.import({
     location: parent.location,
-    info: {
-      id: sessionID, parentID: parent.id, projectID: parent.projectID,
-      title: input.title, location: parent.location, model: parent.model,
-      metadata: parent.metadata, permissions: parent.permissions,
-      cost: 0, tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-      time: { created: now, updated: now },
-    },
+    info,
     messages: copies,
   });
   try {

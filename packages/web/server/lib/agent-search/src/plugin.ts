@@ -4,7 +4,7 @@ import { commands, options } from "./commands.js";
 import { requestSearch, searchContext } from "./request.js";
 import { registerSelectedSearch } from "./selection.js";
 import type { SearchSelectionContext } from "./selection.js";
-import description from "./web_run_description.md" with { type: "text" };
+import description from "./web_run_description.js";
 
 interface PluginContext extends SearchSelectionContext {
   options: unknown;

@@ -1,11 +1,13 @@
 import { z } from "zod";
 
-export const questionInput = z.object({
-  questions: z.array(z.object({
-    title: z.string().trim().min(1),
-    options: z.array(z.string().trim().min(1)).min(1).optional(),
-  }).strict()).min(1),
+const option = z.string().trim().min(1);
+const options = z.tuple([option], option);
+const question = z.object({
+  title: z.string().trim().min(1),
+  options: options.optional(),
 }).strict();
+const questions = z.tuple([question], question);
+export const questionInput = z.object({ questions }).strict();
 
 const questionOutput = z.object({
   question_id: z.string(),
@@ -31,7 +33,11 @@ export default {
         name: 'request_user_input_async',
         description: 'Creates user questions and immediately returns a receipt object containing question_id, status: "pending", and message. Awaiting this call waits for question creation; execution then continues in the same turn while the user answers. Answers arrive later as a new message in this session. Use for missing information, preferences, constraints, clarification, or approval. Continue independent work after the receipt; use required answers before dependent work. List only suggested answers as options, with the recommended option first; free-text entry is provided automatically.',
         options: { codemode: false, permission: 'question' },
-        input: ${JSON.stringify(z.toJSONSchema(questionInput))},
+        input: ${JSON.stringify(z.toJSONSchema(questionInput, {
+          override: ({ zodSchema, jsonSchema }) => {
+            if (zodSchema === questions || zodSchema === options) delete jsonSchema.prefixItems;
+          },
+        }))},
         output: ${JSON.stringify(z.toJSONSchema(questionOutput))},
         async execute(input, context) {
           await ctx.permission.assert({

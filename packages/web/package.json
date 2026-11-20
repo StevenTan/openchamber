@@ -36,12 +36,15 @@
     "build:watch": "bun ../../scripts/build-builtin-extensions.mjs && vite build --watch",
     "prepack": "bun run build:server && bun ../../scripts/build-builtin-extensions.mjs",
     "type-check": "bun check -b && bun run type-check:server",
-    "lint": "oxlint -c ../../oxlint.config.ts --report-unused-disable-directives src server/lib/agent-command/src server/lib/agent-search/src server/lib/agent-question/src server/lib/agent-collaboration/src server/lib/agent-code-mode/src server/lib/workspace-dependencies/src",
+    "lint": "oxlint -c ../../oxlint.config.ts --report-unused-disable-directives src server/lib/agent-command/src server/lib/agent-search/src server/lib/agent-question/src server/lib/agent-collaboration/src server/lib/agent-code-mode/src server/lib/workspace-dependencies/src && bun run lint:server",
     "test": "bun run build:server && vitest run",
     "start": "node bin/cli.js serve",
-    "type-check:server": "tsc --project tsconfig.agent-command.json",
+    "type-check:server": "node scripts/check-server-types.mjs",
     "build:server": "bun run type-check:server && tsc --project tsconfig.agent-command.build.json && bun build ./server/lib/agent-search/src/plugin.ts --outfile ./server/lib/agent-search/dist/plugin.js --target node --format esm && tsc --project tsconfig.agent-question.build.json && bun build ./server/lib/agent-collaboration/src/plugin.ts ./server/lib/agent-collaboration/src/runtime.ts --outdir ./server/lib/agent-collaboration/dist --target node --format esm && bun build ./server/lib/agent-code-mode/src/plugin.ts --outfile ./server/lib/agent-code-mode/dist/plugin.js --target node --format esm && bun build ./server/lib/workspace-dependencies/src/plugin.ts --outfile ./server/lib/workspace-dependencies/dist/plugin.js --target node --format esm && bun ../../scripts/build-builtin-extensions.mjs && node scripts/build-server.mjs",
-    "prepare:workspace-runtime": "node ./scripts/prepare-workspace-runtime.mjs"
+    "prepare:workspace-runtime": "node ./scripts/prepare-workspace-runtime.mjs",
+    "lint:server": "node scripts/check-server-types.mjs --lint",
+    "conversion:waves": "node scripts/server-conversion-waves.mjs",
+    "smoke:server-build": "node scripts/smoke-server-build.mjs"
   },
   "dependencies": {
     "7zip-bin": "5.2.0",

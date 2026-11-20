@@ -148,7 +148,9 @@ export default {
             agent: child.agent, description: child.title ?? args.target,
             prompt: args.message, sessionID: args.target, background: true,
           }, { ...context, signal });
-          return { content: result.content, metadata: result.metadata };
+          const response: Awaited<ReturnType<NativeSubagent["execute"]>> = { content: result.content };
+          if (result.metadata !== undefined) response.metadata = result.metadata;
+          return response;
         },
       });
       editor.add<z.infer<typeof waitInput>, z.infer<typeof waitOutput>>({

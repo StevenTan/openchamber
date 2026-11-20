@@ -52,8 +52,8 @@ export interface SearchBackend {
   baseURL: string;
   apiKey: string;
   model: string;
-  headers?: Record<string, string>;
-  timeout?: number;
+  headers?: Record<string, string> | undefined;
+  timeout?: number | undefined;
 }
 
 // OpenAI Codex http-client/src/retry_after.rs and codex-client/src/retry.rs.

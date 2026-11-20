@@ -20,7 +20,7 @@ import { cpSync, createWriteStream, existsSync, mkdirSync, readFileSync, rmSync,
 import { connect } from "node:net"
 import { platform } from "node:os"
 import { basename, dirname, join, resolve } from "node:path"
-import { fileURLToPath } from "node:url"
+import { fileURLToPath, pathToFileURL } from "node:url"
 import process from "node:process"
 
 import { wait } from "./cdp.mjs"
@@ -100,6 +100,14 @@ const alive = (pid) => {
 /** Stops a process tree this module started: the process group, then any child left. */
 const stopTree = async (child) => {
   if (!child.pid || child.exitCode !== null) return []
+  if (platform() === "win32") {
+    try {
+      execFileSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" })
+    } catch (error) {
+      if (alive(child.pid)) throw error
+    }
+    return []
+  }
   const children = childPids(child.pid)
   try { process.kill(-child.pid, "SIGTERM") } catch { child.kill("SIGTERM") }
   for (let attempt = 0; attempt < 40 && alive(child.pid); attempt += 1) await wait(250)
@@ -108,13 +116,14 @@ const stopTree = async (child) => {
 }
 
 /** Starts the fixture provider unless one already listens on `port`. */
-export const startFixture = async ({ port, logFile }) => {
+export const startFixture = async ({ port, logFile, verifyControl = false, onSpawn }) => {
   if (await portInUse(port)) return { pid: null, reused: true, stop: async () => undefined }
-  const child = spawn(process.execPath, [FIXTURE_SCRIPT, String(port)], {
+  const child = spawn(process.execPath, [FIXTURE_SCRIPT, String(port), ...(verifyControl ? ["--verify-control"] : [])], {
     detached: true,
     stdio: ["ignore", logFile ? "pipe" : "ignore", logFile ? "pipe" : "ignore"],
     env: isolatedEnv(),
   })
+  onSpawn?.(child)
   if (logFile) {
     const log = createWriteStream(logFile)
     child.stdout.pipe(log)
@@ -205,7 +214,9 @@ export const startIsolatedServer = async ({ repo, dist, state, project, port, fi
     ...extraEnv,
   }
   if (opencodeBinary) env.OPENCODE_BINARY = opencodeBinary
-  const child = spawn(process.execPath, [join(repo, "packages/web/bin/cli.js"), "serve", "--port", String(port), "--foreground"], {
+  const sourceResolver = join(repo, "packages/web/scripts/register-server-sources.mjs")
+  const preload = existsSync(sourceResolver) ? ["--import", pathToFileURL(sourceResolver).href] : []
+  const child = spawn(process.execPath, [...preload, join(repo, "packages/web/bin/cli.js"), "serve", "--port", String(port), "--foreground"], {
     cwd: project ?? join(state, "home"),
     env,
     // Its own process group, so stopping it stops the OpenCode it manages.

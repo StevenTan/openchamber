@@ -27,6 +27,11 @@ const replySchema = z.discriminatedUnion("status", [
 ]);
 const batchSchema = z.object({ sessionID: z.string().min(1), replies: z.array(replySchema).min(1) });
 type BatchResolution = z.input<typeof batchSchema>;
+interface QuestionRequest {
+  sessionID: string;
+  callID: string;
+  input: z.input<typeof questionInput>;
+}
 interface EventHub {
   subscribeEvent(listener: (event: { payload: unknown }) => void): () => void;
   subscribeStatus(listener: (status: { type: string }) => void): () => void;
@@ -44,10 +49,10 @@ const settlementEvent = z.discriminatedUnion("type", [
   z.object({ type: z.literal("form.cancelled"), data: z.object({ id: z.string(), sessionID: z.string() }) }),
 ]);
 const declaredStatuses = { FormNotFoundError: 404, SessionNotFoundError: 404, ConflictError: 409, FormAlreadySettledError: 409 };
-const errorStatus = (error: unknown) => {
-  const declared = z.object({ _tag: z.enum(["FormNotFoundError", "SessionNotFoundError", "ConflictError", "FormAlreadySettledError"]) }).safeParse(error);
+const errorStatus = (cause: unknown) => {
+  const declared = z.object({ _tag: z.enum(["FormNotFoundError", "SessionNotFoundError", "ConflictError", "FormAlreadySettledError"]) }).safeParse(cause);
   if (declared.success) return declaredStatuses[declared.data._tag];
-  return z.object({ status: z.number() }).safeParse(error).data?.status;
+  return z.object({ status: z.number() }).safeParse(cause).data?.status;
 };
 const usageError = (message: string) => Object.assign(new Error(message), { status: 400 });
 
@@ -96,11 +101,11 @@ export function createQuestionRuntime({ dataDir, client, globalEventHub, isSessi
       await fs.rm(temporary, { force: true });
     }
   };
-  const field = (question: Entry["input"]["questions"][number], index: number) => ({
-    key: `q${index}`, type: "string" as const, title: question.title,
-    required: true, custom: true,
-    ...(question.options ? { options: question.options.map(value => ({ value, label: value })), default: question.options[0] } : {}),
-  });
+  const field = (question: Entry["input"]["questions"][number], index: number) => {
+    const result = { key: `q${index}`, type: "string" as const, title: question.title, required: true, custom: true };
+    if (question.options) return { ...result, options: question.options.map(value => ({ value, label: value })), default: question.options[0] };
+    return result;
+  };
   const formInput = (entry: Entry) => ({
     id: entry.id,
     sessionID: entry.sessionID,
@@ -141,7 +146,7 @@ export function createQuestionRuntime({ dataDir, client, globalEventHub, isSessi
       } else if (detail.state.status === "cancelled") await commit([resolvedEntry(entry, createMessageId(Date.now()))]);
     }
   };
-  const deliver = async (group: ResolvedEntry[]) => {
+  const deliver = async (group: [ResolvedEntry, ...ResolvedEntry[]]) => {
     const first = group[0];
     const resolution = first.resolution;
     const api = client().session;
@@ -159,10 +164,11 @@ export function createQuestionRuntime({ dataDir, client, globalEventHub, isSessi
     }
     const responses = group.map(entry => {
       const reply = entry.resolution;
-      return {
+      if (reply.status === "answered") return {
         question_id: entry.id, status: reply.status,
-        ...(reply.status === "answered" ? { answers: entry.input.questions.map((question, index) => ({ question: question.title, answer: reply.answer[`q${index}`] })) } : {}),
+        answers: entry.input.questions.map((question, index) => ({ question: question.title, answer: reply.answer[`q${index}`] })),
       };
+      return { question_id: entry.id, status: reply.status };
     });
     try {
       await api.synthetic({
@@ -190,14 +196,14 @@ export function createQuestionRuntime({ dataDir, client, globalEventHub, isSessi
         else { failed = true; console.error("[agent-question] reconciliation failed:", error); }
       }
     }
-    const groups = new Map<string, ResolvedEntry[]>();
+    const groups = new Map<string, [ResolvedEntry, ...ResolvedEntry[]]>();
     for (const entry of entries.values()) {
       const resolution = entry.resolution;
       if (resolution.status === "pending") continue;
       const key = JSON.stringify([entry.sessionID, resolution.messageID]);
-      const group = groups.get(key) ?? [];
-      group.push({ ...entry, resolution });
-      groups.set(key, group);
+      const group = groups.get(key);
+      if (group) group.push({ ...entry, resolution });
+      else groups.set(key, [{ ...entry, resolution }]);
     }
     for (const group of groups.values()) {
       try { await deliver(group.sort((left, right) => left.order - right.order)); }
@@ -228,7 +234,7 @@ export function createQuestionRuntime({ dataDir, client, globalEventHub, isSessi
       await fs.writeFile(path.join(directory, "index.js"), createQuestionPluginSource(), { mode: 0o600 });
       return directory;
     },
-    ask(payload: unknown) {
+    ask(payload: QuestionRequest) {
       return run(async () => {
         if (!isEnabled()) throw usageError("Asynchronous questions require managed OpenCode.");
         const { sessionID, callID, input } = z.object({ sessionID: z.string().min(1), callID: z.string().min(1), input: questionInput }).parse(payload);
@@ -265,21 +271,20 @@ export function createQuestionRuntime({ dataDir, client, globalEventHub, isSessi
         const sources = replies.map(reply => {
           const entry = entries.get(reply.questionID);
           if (!entry || entry.sessionID !== sessionID) throw Object.assign(new Error("Question not found."), { status: 404 });
-          return entry;
+          return { entry, reply };
         });
-        const existing = sources.filter(entry => entry.resolution.status !== "pending");
-        const firstResolution = existing[0]?.resolution;
+        const existing = sources.filter(({ entry }) => entry.resolution.status !== "pending");
+        const firstResolution = existing[0]?.entry.resolution;
         const messageID = firstResolution && firstResolution.status !== "pending" ? firstResolution.messageID : createMessageId(Date.now());
-        if (existing.length && (existing.length !== sources.length || existing.some(entry => entry.resolution.status === "pending" || entry.resolution.messageID !== messageID))) {
+        if (existing.length && (existing.length !== sources.length || existing.some(({ entry }) => entry.resolution.status === "pending" || entry.resolution.messageID !== messageID))) {
           throw Object.assign(new Error("The question group has changed. Refresh pending questions before submitting."), { status: 409 });
         }
-        const updates = sources.map((entry, index) => {
-          const reply = replies[index];
+        const updates = sources.map(({ entry, reply }) => {
           return resolvedEntry(entry, messageID, reply.status === "answered" ? reply.answer : undefined);
         });
         await commit(updates);
         schedule();
-        return { sessionID, questionIDs: sources.map(entry => entry.id) };
+        return { sessionID, questionIDs: sources.map(({ entry }) => entry.id) };
       });
     },
     start() {

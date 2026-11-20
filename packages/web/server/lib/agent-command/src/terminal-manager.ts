@@ -13,17 +13,17 @@ interface CommandOptions {
   workdir: string;
   login?: boolean;
   tty?: boolean;
-  shell?: string;
+  shell?: string | undefined;
   signal?: AbortSignal;
 }
 interface ProcessStartResult {
   pid: number;
   isBlocked: boolean;
-  processState: CommandProcessState;
+  processState: CommandProcessState | null;
 }
 interface CommandProcessState extends ProcessState {
-  exitCode?: number | null;
-  signal?: number;
+  exitCode?: number | null | undefined;
+  signal?: number | undefined;
 }
 
 /** A child process's output pipes. */
@@ -45,7 +45,7 @@ interface TerminalSession {
   process: CommandProcess;
   outputLines: string[];
   lastReadIndex: number;
-  lastReadOpenLine: string;
+  lastReadOpenLine: string | undefined;
   startTime: Date;
   bufferedChars: number;
   evictedLines: number;
@@ -62,7 +62,7 @@ interface ManagedSession extends TerminalSession {
 interface CompletedSession {
   session: ManagedSession;
   exitCode: number | null;
-  signal?: number;
+  signal?: number | undefined;
   endTime: Date;
 }
 interface OutputSnapshot {
@@ -77,9 +77,9 @@ interface PaginatedOutputResult {
   readCount: number; // Number of lines returned
   remaining: number; // Lines remaining after this read
   isComplete: boolean; // Whether process has finished
-  exitCode?: number | null; // Exit code if completed
+  exitCode?: number | null | undefined; // Exit code if completed
   signal?: number | undefined; // Signal that ended it, if completed by one (exitCode is then null)
-  runtimeMs?: number; // Runtime in milliseconds (for completed processes)
+  runtimeMs?: number | undefined; // Runtime in milliseconds (for completed processes)
   evictedLines?: number; // Lines dropped by the buffer cap; when > 0, line numbers are relative to the retained buffer
 }
 
@@ -105,7 +105,7 @@ export class TerminalManager {
 
   constructor({
     getEnvironment = () => process.env,
-  }: { getEnvironment?: () => NodeJS.ProcessEnv } = {}) {
+  }: { getEnvironment?: (() => NodeJS.ProcessEnv) | undefined } = {}) {
     this.getEnvironment = getEnvironment;
     this.closing = false;
   }
@@ -134,7 +134,7 @@ export class TerminalManager {
     return {
       pid: session.pid,
       isBlocked: this.sessions.has(session.pid),
-      processState: this.getProcessState(session.pid)!,
+      processState: this.getProcessState(session.pid),
     };
   }
   private async startCommand(
@@ -198,8 +198,10 @@ export class TerminalManager {
         session, exitCode, signal: exitSignal, endTime: new Date(),
       });
       if (this.completedSessions.size > 100) {
-        const oldestKey = this.completedSessions.keys().next().value!;
-        this.completedSessions.delete(oldestKey);
+        for (const oldestKey of this.completedSessions.keys()) {
+          this.completedSessions.delete(oldestKey);
+          break;
+        }
       }
       this.sessions.delete(childProcess.pid);
       completion.abort();
@@ -235,15 +237,14 @@ export class TerminalManager {
 
     const lines = text.split("\n");
 
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
+    for (const [i, line] of lines.entries()) {
 
       if (session.outputLines.length === 0) {
         // First line ever
         session.outputLines.push(line);
       } else if (i === 0) {
         // First fragment - append to last line (might be partial)
-        session.outputLines[session.outputLines.length - 1] += line;
+        session.outputLines.push(session.outputLines.pop() + line);
       } else {
         // Subsequent lines - add as new lines
         session.outputLines.push(line);
@@ -257,10 +258,11 @@ export class TerminalManager {
     // eviction can't bound — force-split so no line exceeds MAX_LINE_CHARS.
     // Each inserted break adds one separator to the joined length.
     let lastIndex = session.outputLines.length - 1;
-    while (session.outputLines[lastIndex].length > MAX_LINE_CHARS) {
-      const overlong = session.outputLines[lastIndex];
+    let overlong = session.outputLines.slice(-1).join("");
+    while (overlong.length > MAX_LINE_CHARS) {
       session.outputLines[lastIndex] = overlong.slice(0, MAX_LINE_CHARS);
-      session.outputLines.push(overlong.slice(MAX_LINE_CHARS));
+      overlong = overlong.slice(MAX_LINE_CHARS);
+      session.outputLines.push(overlong);
       session.bufferedChars += 1;
       lastIndex++;
     }
@@ -272,11 +274,9 @@ export class TerminalManager {
     // every shift() copies the whole array, and a line-by-line shift() stalled
     // the event loop for seconds per chunk once a session reached the cap.
     let evicted = 0;
-    while (
-      session.bufferedChars > MAX_BUFFERED_OUTPUT_CHARS &&
-      evicted < session.outputLines.length - 1
-    ) {
-      const droppedJoinedChars = session.outputLines[evicted].length + 1; // +1 for its join separator
+    for (const line of session.outputLines) {
+      if (session.bufferedChars <= MAX_BUFFERED_OUTPUT_CHARS || evicted >= session.outputLines.length - 1) break;
+      const droppedJoinedChars = line.length + 1; // +1 for its join separator
       session.bufferedChars -= droppedJoinedChars;
       session.evictedChars += droppedJoinedChars;
       evicted++;

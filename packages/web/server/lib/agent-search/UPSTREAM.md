@@ -6,7 +6,7 @@ licensed under Apache-2.0; its license is in `codex-LICENSE`.
 - `src/commands.ts` adapts the supported command definitions and descriptions
   from `codex-rs/codex-api/src/search.rs` into Zod schemas. The supported catalog
   is search, images, page opening, links, text lookup, finance and time.
-- `src/web_run_description.md` copies
+- `src/web_run_description.ts` copies
   `codex-rs/ext/web-search/web_run_description.md`, restricted to that catalog.
 - `src/request.ts` adapts conversation selection from
   `codex-rs/ext/web-search/src/history.rs` and

@@ -99,7 +99,7 @@ interface CommandResult {
   truncated: boolean;
   read_from: number;
   total_lines: number;
-  exit_code?: number | null;
+  exit_code?: number | null | undefined;
   signal?: number;
 }
 interface CallbackResponse extends ServerResponse {
@@ -144,7 +144,7 @@ export function createCommandToolRuntime({
   const readResult = (
     manager: TerminalManager,
     pid: number,
-    input: { offset?: number; length?: number; max_output_tokens: number },
+    input: { offset?: number | undefined; length?: number | undefined; max_output_tokens: number },
   ): CommandResult => {
     const result = manager.readOutputPaginated(
       pid,
@@ -199,7 +199,7 @@ export function createCommandToolRuntime({
         }) + "\n",
       ],
       ["index.js", source],
-    ]) {
+    ] as const) {
       const file = path.join(pluginDirectory, name);
       const previous = await fs
         .readFile(file, "utf8")

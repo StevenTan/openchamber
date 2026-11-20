@@ -207,13 +207,13 @@ export function createShellScanner() {
 
   type BashHeredoc = {
     delimiter: string;
-    dashDelimiter?: string;
+    dashDelimiter?: string | undefined;
     quoted: boolean;
     tabs: boolean;
     binding?: boolean;
     owned?: true;
     command?: Command;
-    start?: number;
+    start?: number | undefined;
   };
 
   type BashState = {
@@ -459,8 +459,8 @@ export function createShellScanner() {
         ZSH_PRECOMMANDS.has(state.words[name] ?? ""))
     ) {
       const precommand = state.words[name++];
-      while (precommand !== "-" && state.words[name]?.startsWith("-")) {
-        if (precommand === "exec" && /^-[cl]*a$/.test(state.words[name]))
+      for (let flag = state.words[name]; precommand !== "-" && flag?.startsWith("-"); flag = state.words[name]) {
+        if (precommand === "exec" && /^-[cl]*a$/.test(flag))
           name++;
         name++;
       }
@@ -492,8 +492,8 @@ export function createShellScanner() {
         rawWords: state.rawWords.slice(name),
         ...(name === 0 &&
         !state.hasRedirect &&
-        BASH_DECLARATIONS.has(state.rawWords[0]) &&
-        resource.startsWith(state.rawWords[0])
+        state.rawWords.slice(0, 1).some(word =>
+          BASH_DECLARATIONS.has(word) && resource.startsWith(word))
           ? { declaration: true as const }
           : {}),
         ...(state.redirectWordCount !== undefined &&
@@ -662,7 +662,7 @@ export function createShellScanner() {
     for (let index = start; index < input.length; index++) {
       if (--context.remaining < 0)
         return { kind: "opaque", reason: "invalid-structure" };
-      const char = input[index];
+      const char = input.charAt(index);
       // Line continuations are removed before tokens are read.
       if (char === "\\" && input[index + 1] === "\n") {
         index++;
@@ -713,9 +713,8 @@ export function createShellScanner() {
         state.word.endsWith("=") &&
         !state.word.endsWith("==") &&
         (state.commandWordIndex < 0 ||
-          BASH_ASSIGNMENT_DECLARATIONS.has(
-            state.rawWords[state.commandWordIndex],
-          ));
+          state.rawWords.slice(state.commandWordIndex, state.commandWordIndex + 1)
+            .some(word => BASH_ASSIGNMENT_DECLARATIONS.has(word)));
       if (
         char === "=" &&
         (!state.wordStarted || array) &&
@@ -746,7 +745,7 @@ export function createShellScanner() {
             "word",
             !state.assignmentWord &&
               state.commandWordIndex >= 0 &&
-              !BASH_DECLARATIONS.has(state.rawWords[0]),
+              !state.rawWords.slice(0, 1).some(word => BASH_DECLARATIONS.has(word)),
             state,
           )
         : undefined;
@@ -814,7 +813,7 @@ export function createShellScanner() {
         if (
           array &&
           end + 1 < input.length &&
-          !" \t\n;&|<>)".includes(input[end + 1])
+          !" \t\n;&|<>)".includes(input.charAt(end + 1))
         )
           return { kind: "opaque", reason: "invalid-structure" };
         state.wordStarted = true;
@@ -902,7 +901,7 @@ export function createShellScanner() {
     context: BashContext,
   ): number | Opaque {
     const input = state.input;
-    const char = input[index];
+    const char = input.charAt(index);
     const redirect = "<>&".includes(char)
       ? bashOperator(input, index, BASH_REDIRECTS)
       : undefined;
@@ -1088,7 +1087,7 @@ export function createShellScanner() {
     context: BashContext,
   ): number | Opaque | undefined {
     const input = state.input;
-    const char = input[index];
+    const char = input.charAt(index);
     const structure = state.structures.at(-1);
     if (
       structure?.phase === "pattern" &&
@@ -1267,7 +1266,7 @@ export function createShellScanner() {
     context: BashContext,
   ): number | Opaque | undefined {
     const input = state.input;
-    const char = input[index];
+    const char = input.charAt(index);
     if (!(
       (char >= "A" && char <= "Z") ||
       (char >= "a" && char <= "z") ||
@@ -1441,7 +1440,7 @@ export function createShellScanner() {
       return 0;
     // Blanks, comments, and newlines before the body stay for the caller, where newlines start heredoc bodies.
     return testAt(FUNCTION_BODY_RE, input, start + head[0].length)
-      ? head[0].length - head[4].length
+      ? head[0].length - head.slice(4).join("").length
       : 0;
   }
 
@@ -1778,7 +1777,7 @@ export function createShellScanner() {
     for (let index = start; index < input.length; index++) {
       if (--context.remaining < 0)
         return { kind: "opaque", reason: "invalid-structure" };
-      const char = input[index];
+      const char = input.charAt(index);
       if (char === span.close && !nesting) return index;
       // A `#` after a digit is a base prefix, and after `$` the parameter $#.
       if (
@@ -2082,7 +2081,7 @@ export function createShellScanner() {
     for (let index = start; index < input.length; index++) {
       if (--context.remaining < 0)
         return { kind: "opaque", reason: "invalid-structure" };
-      const char = input[index];
+      const char = input.charAt(index);
       if (char === "}") {
         if (
           evaluation &&
@@ -2209,7 +2208,7 @@ export function createShellScanner() {
     for (let index = start; index < input.length; index++) {
       if (--context.remaining < 0)
         return { kind: "opaque", reason: "invalid-structure" };
-      const char = input[index];
+      const char = input.charAt(index);
       if (char === "\\" && input[index + 1] === "\n") {
         index++;
         continue;
@@ -2310,7 +2309,7 @@ export function createShellScanner() {
     for (let index = start + 1; index < input.length; index++) {
       if (--context.remaining < 0)
         return { kind: "opaque", reason: "invalid-structure" };
-      const char = input[index];
+      const char = input.charAt(index);
       if (char === "\\" && input[index + 1] === "\n") {
         index++;
         continue;
@@ -2437,7 +2436,7 @@ export function createShellScanner() {
     let end = start;
     let started = false;
     for (let index = start; index < input.length; index++) {
-      const char = input[index];
+      const char = input.charAt(index);
       if (!started && /[ \t]/.test(char)) continue;
       if (!started && char === "#") return;
       if (!quote && /[ \t\n;&|()<>]/.test(char))
@@ -2503,7 +2502,7 @@ export function createShellScanner() {
     start: number,
     delimiter: {
       delimiter: string;
-      dashDelimiter?: string;
+      dashDelimiter?: string | undefined;
       tabs: boolean;
       quoted: boolean;
     },
@@ -2638,7 +2637,7 @@ export function createShellScanner() {
         !expression &&
         !clause &&
         !redirectTarget &&
-        !/['"]/.test(input[wordStart]) &&
+        !/['"]/.test(input.charAt(wordStart)) &&
         !rawWords.at(-1)?.endsWith(",") &&
         !POWERSHELL_PARAMETER_COLON_RE.test(rawWords.at(-1) ?? "")
       )
@@ -2693,7 +2692,7 @@ export function createShellScanner() {
       if (--budget.remaining < 0)
         return { kind: "opaque", reason: "invalid-structure" };
       if (skipped?.has(index)) continue;
-      const char = input[index];
+      const char = input.charAt(index);
       const inExpression = expression && !redirectTarget;
       const atBoundary = !started || (!inExpression && word.endsWith(","));
       if (!started) wordStart = index;
@@ -3164,7 +3163,7 @@ export function createShellScanner() {
         words.length === 0 &&
         ((char === "&" && input[index + 1] !== "&") ||
           (char === "." &&
-            (!input[index + 1] || /[\s"'$(),;{|}&]/.test(input[index + 1]))))
+            (!input[index + 1] || /[\s"'$(),;{|}&]/.test(input.charAt(index + 1)))))
       ) {
         if (invocation) return { kind: "opaque", reason: "invalid-structure" };
         segment = index;
@@ -3373,9 +3372,9 @@ export function createShellScanner() {
       };
     if (char === "u" && input[next + 1] === "{") {
       const code = matchAt(POWERSHELL_UNICODE_ESCAPE_RE, input, next);
-      if (!code || Number.parseInt(code[1], 16) > 0x10ffff) return;
+      if (!code || Number.parseInt(code[0].slice(2, -1), 16) > 0x10ffff) return;
       return {
-        value: String.fromCodePoint(Number.parseInt(code[1], 16)),
+        value: String.fromCodePoint(Number.parseInt(code[0].slice(2, -1), 16)),
         end: next + code[0].length - 1,
       };
     }
@@ -3861,7 +3860,7 @@ export function createPermissionParser(
                     (value) =>
                       value >= end &&
                       (value >= item.resource.length ||
-                        /\s/.test(item.resource[value])),
+                        /\s/.test(item.resource.charAt(value))),
                   ) ?? end;
                 const separator = /^\s+(?:`(?:\r\n|\r|\n)\s*)?/.exec(
                   item.resource.slice(boundary),
@@ -3888,8 +3887,7 @@ export function createPermissionParser(
     while (rawWords[index] === "builtin" || rawWords[index] === "command") {
       const wrapper = rawWords[index];
       index++;
-      while (rawWords[index]?.startsWith("-")) {
-        const flag = rawWords[index];
+      for (let flag = rawWords[index]; flag?.startsWith("-"); flag = rawWords[index]) {
         index++;
         if (flag === "--") break;
         if (wrapper === "command" && /^-[p]*[vV]/.test(flag)) return;
@@ -3926,7 +3924,7 @@ export function createPermissionParser(
     };
 
     for (let index = 0; index < raw.length; index++) {
-      const char = raw[index];
+      const char = raw.charAt(index);
       const next = raw[index + 1] ?? "";
       if (quote === "'") {
         if (char === "'") {
@@ -4048,7 +4046,7 @@ export function createPermissionParser(
     };
 
     for (let index = 0; index < raw.length; index++) {
-      const char = raw[index];
+      const char = raw.charAt(index);
       const next = raw[index + 1] ?? "";
       if (quote === "'") {
         if (char === "'" && next === "'") {
@@ -4245,7 +4243,7 @@ export function createPermissionParser(
       if (/^~(?:[-+](?:\d+)?|\d+)(?=$|\/)/.test(resolved)) return;
       const userMatch = /^~([A-Za-z_][A-Za-z0-9._-]*)(?=$|\/)/.exec(resolved);
       if (userMatch) {
-        const user = userMatch[1];
+        const user = userMatch[0].slice(1);
         const home = resolveUserHome(user);
         if (!home) return;
         return path.join(home, resolved.slice(user.length + 1));

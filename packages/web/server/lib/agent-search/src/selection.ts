@@ -15,7 +15,7 @@ interface SearchInvocation {
 interface SearchProvider {
   id: string;
   name: string;
-  execute(input: { query: string }, context: { signal: AbortSignal }): Promise<Array<{ url: string; title?: string; content?: string; time: object }>>;
+  execute(input: { query: string }, context: { signal: AbortSignal }): Promise<Array<{ url: string; title?: string | undefined; content?: string | undefined; time: object }>>;
 }
 interface SearchTool {
   name: string;

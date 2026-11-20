@@ -18,7 +18,7 @@ export interface CommandProcess {
     listener: (data: string, stream?: "stdout" | "stderr") => void,
   ): { dispose(): void };
   onExit(
-    listener: (event: { exitCode: number | null; signal?: number }) => void,
+    listener: (event: { exitCode: number | null; signal?: number | undefined }) => void,
   ): { dispose(): void };
   kill(signal?: NodeJS.Signals): void;
 }
@@ -35,7 +35,7 @@ interface CommandSpawnOptions {
   workdir: string;
   login: boolean;
   env: NodeJS.ProcessEnv;
-  shell?: string;
+  shell?: string | undefined;
 }
 
 export function commandShell() {
@@ -75,7 +75,6 @@ async function spawnPipedCommand(
     detached: process.platform !== "win32",
   });
   const kill = (signal: NodeJS.Signals = "SIGTERM") => {
-    const pid = child.pid!; // Called only for a successfully spawned process.
     if (process.platform === "win32") {
       const result = spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], {
         windowsHide: true,
@@ -93,7 +92,7 @@ async function spawnPipedCommand(
     }
   };
   let drainTimer: ReturnType<typeof setTimeout> | undefined;
-  const closed = new Promise<{ exitCode: number | null; signal?: number }>((resolve) => {
+  const closed = new Promise<{ exitCode: number | null; signal?: number | undefined }>((resolve) => {
     child.once("exit", () => {
       // The command owns its process group, including shell background jobs.
       if (process.platform !== "win32") kill("SIGKILL");
@@ -109,8 +108,12 @@ async function spawnPipedCommand(
       resolve({ exitCode, signal: signal ? os.constants.signals[signal] : undefined });
     });
   });
-  await once(child, "spawn");
-  const pid = child.pid!; // The spawn event guarantees a process ID.
+  const [, pid] = await Promise.all([
+    once(child, "spawn"),
+    new Promise<number>((resolve) => {
+      child.once("spawn", function (this: { pid: number }) { resolve(this.pid); });
+    }),
+  ]);
   const commandProcess: CommandProcess = {
     pid,
     onData(listener) {
