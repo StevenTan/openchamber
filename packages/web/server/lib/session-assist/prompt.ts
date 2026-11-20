@@ -1,4 +1,5 @@
 import { excerpt } from './context.js';
+import type { AssistTurn } from './contracts.js';
 
 const MAX_PROMPT_CHARS = 32_000;
 
@@ -13,7 +14,7 @@ export function buildAssistSystemPrompt() {
   ].join('\n');
 }
 
-function renderTurn(turn, index, userText = turn.user.text, answerText = turn.assistant?.text ?? '') {
+function renderTurn(turn: AssistTurn, index: number, userText = turn.user.text, answerText = turn.assistant?.text ?? '') {
   return [
     `Turn ${index + 1}${turn.complete ? '' : ' (interrupted before a final response)'}`,
     'User message with attached context:', userText,
@@ -21,7 +22,7 @@ function renderTurn(turn, index, userText = turn.user.text, answerText = turn.as
   ].join('\n');
 }
 
-export function buildAssistPrompt(turns, charBudget) {
+export function buildAssistPrompt(turns: AssistTurn[], charBudget: number) {
   const budget = Math.min(MAX_PROMPT_CHARS, Math.floor(charBudget));
   if (!Number.isFinite(budget) || budget < 1_000 || !turns.length) return null;
   const languageBudget = Math.min(3_600, Math.floor(budget / 5));
@@ -37,6 +38,7 @@ export function buildAssistPrompt(turns, charBudget) {
   }
   if (body.length > available) {
     const turn = kept[0];
+    if (!turn) return null;
     const textBudget = available - renderTurn(turn, 0, '', '').length;
     if (textBudget < 128) return null;
     const answer = turn.assistant?.text ?? '';
