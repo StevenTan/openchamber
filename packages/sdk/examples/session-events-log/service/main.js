@@ -145,7 +145,9 @@ var HOST_PUSH_TYPES = new Set([
   "file-open",
   "file-snapshot",
   "file-saved",
-  "generate-late"
+  "generate-late",
+  "microphone-audio",
+  "microphone-ended"
 ]);
 // packages/sdk/src/service-providers.ts
 var BROWSER_CONTROL_ACTIONS = [
@@ -160,7 +162,8 @@ var BROWSER_CONTROL_ACTIONS = [
   "browser.inspect",
   "browser.capture",
   "browser.resize",
-  "browser.close"
+  "browser.close",
+  "browser.playwright"
 ];
 var BROWSER_PROVIDER_IDLE_MS = 10 * 60000;
 var CONTROL_ACTIONS = new Set(BROWSER_CONTROL_ACTIONS);

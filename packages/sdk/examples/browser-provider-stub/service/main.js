@@ -71,7 +71,9 @@ var HOST_PUSH_TYPES = new Set([
   "file-open",
   "file-snapshot",
   "file-saved",
-  "generate-late"
+  "generate-late",
+  "microphone-audio",
+  "microphone-ended"
 ]);
 // packages/sdk/src/service-providers.ts
 var BROWSER_PROVIDER_PATH = "/browser-control";
@@ -87,7 +89,8 @@ var BROWSER_CONTROL_ACTIONS = [
   "browser.inspect",
   "browser.capture",
   "browser.resize",
-  "browser.close"
+  "browser.close",
+  "browser.playwright"
 ];
 var BROWSER_PROVIDER_IDLE_MS = 10 * 60000;
 var CONTROL_ACTIONS = new Set(BROWSER_CONTROL_ACTIONS);
@@ -290,6 +293,8 @@ var handle = (request) => {
     return { ok: false, error: "This browser has a single page and no tabs; omit tabId." };
   }
   switch (request.action) {
+    case "browser.playwright":
+      return { ok: false, error: "This provider does not implement Playwright page tools." };
     case "browser.open":
       navigate(request.parameters.url);
       if (request.parameters.viewport)

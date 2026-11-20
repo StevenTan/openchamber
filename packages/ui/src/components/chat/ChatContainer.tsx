@@ -37,7 +37,6 @@ const STATUS_OVERLAY_RESERVED_HEIGHT = 40;
 // for this many consecutive frames, or after the cap.
 const TIMELINE_SETTLE_STABLE_FRAMES = 2;
 const TIMELINE_SETTLE_CAP_MS = 300;
-// Mirrors the oc-chat-hydration-reveal duration in index.css.
 const TIMELINE_REVEAL_FADE_MS = 100;
 // After a turn starts or ends, how long the transcript settles before an
 // overgrown history is cut back: past the scroll hook's 2 s send glide and
@@ -1525,7 +1524,20 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     // Assigned during render: the entry restore runs in a layout effect of
     // this same commit, before passive effects could update the ref.
     const controllerLoadHistoryUntilMessage = timelineController.loadHistoryUntilMessage;
-    loadHistoryUntilMessageRef.current = (messageId, maxBatches) => controllerLoadHistoryUntilMessage(messageId, { maxBatches });
+    // The reader sits at the end while this search loads the history above
+    // them, which is when the history trim cuts it: the search holds the
+    // history as a reader browsing it does, or a cut would send it back to
+    // the start.
+    loadHistoryUntilMessageRef.current = async (messageId, maxBatches) => {
+        const release = currentSessionId && effectiveSessionDirectory
+            ? messageLoader.retainSessionHistory({ directory: effectiveSessionDirectory, sessionID: currentSessionId }, 'browsing')
+            : null;
+        try {
+            return await controllerLoadHistoryUntilMessage(messageId, { maxBatches });
+        } finally {
+            release?.();
+        }
+    };
     const chatQuoteHighlights = useChatQuoteHighlightStore();
     const loadQuoteSource = React.useCallback(async (messageId: string): Promise<boolean> => {
         return loadQuoteSourceMessage(messageId, {

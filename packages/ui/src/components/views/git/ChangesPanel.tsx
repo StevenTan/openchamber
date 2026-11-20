@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ScrollShadow } from '@/components/ui/ScrollShadow';
+import { ScrollShadow, ScrollShadowBands } from '@/components/ui/ScrollShadow';
 import { Icon } from '@/components/icon/Icon';
 import { ChangeRow } from './ChangeRow';
 import { ButtonTooltip } from '@/components/ui/action-toolbar';
@@ -57,6 +57,8 @@ interface ChangesPanelProps {
   revertingPaths: Set<string>;
   isRevertingAll?: boolean;
   headerBackgroundClassName?: string;
+  /** The opaque colour behind the list; its edge fades are then bands, not a mask. */
+  scrollSurface?: string;
   onVisiblePathsChange?: (paths: string[]) => void;
   /** Reverts every changed path across all groups; rendered once for the panel. */
   onRevertAll?: (paths: string[]) => Promise<void> | void;
@@ -89,6 +91,7 @@ export const ChangesPanel: React.FC<ChangesPanelProps> = ({
   revertingPaths,
   isRevertingAll = false,
   headerBackgroundClassName = 'bg-sidebar',
+  scrollSurface,
   onVisiblePathsChange,
   onRevertAll,
   onRevertDirectory,
@@ -545,6 +548,7 @@ export const ChangesPanel: React.FC<ChangesPanelProps> = ({
       <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden">
         <ScrollShadow
           ref={scrollRef}
+          surface={scrollSurface}
           className="overlay-scrollbar-target overlay-scrollbar-container min-h-0 w-full flex-1 overflow-x-hidden overflow-y-auto"
         >
           {shouldVirtualize ? (
@@ -595,6 +599,7 @@ export const ChangesPanel: React.FC<ChangesPanelProps> = ({
             </div>
           )}
         </ScrollShadow>
+        {scrollSurface ? <ScrollShadowBands surface={scrollSurface} /> : null}
         <DelegatedTooltip containerRef={scrollRef} sideOffset={8} />
       </div>
 

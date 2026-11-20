@@ -99,8 +99,12 @@
     inset-inline-end: max(12px, calc((100% - 768px) / 2));
   }
 
-  .wide-chat-layout .oc-prompt-navigator {
+  [data-chat-width="wider"] .oc-prompt-navigator {
     inset-inline-end: max(12px, calc((100% - 1024px) / 2));
+  }
+
+  [data-chat-width="full"] .oc-prompt-navigator {
+    inset-inline-end: 12px;
   }
 
   /* Enhanced focus indicators for small interactive elements */
@@ -201,8 +205,12 @@
   width: min(100%, 768px);
 }
 
-.wide-chat-layout :is(.chat-column, .chat-input-column, .chat-message-column) {
+[data-chat-width] :is(.chat-column, .chat-input-column, .chat-message-column) {
   width: min(100%, 1024px);
+}
+
+[data-chat-width="full"] .chat-message-column {
+  width: 100%;
 }
 
 /* A message reached through a message link shows a selection tint behind its

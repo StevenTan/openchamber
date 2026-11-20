@@ -201,6 +201,8 @@ const TerminalSection: React.FC = () => {
   const setTerminalCloseOnExit = useUIStore((state) => state.setTerminalCloseOnExit);
   const terminalFontSize = useUIStore((state) => state.terminalFontSize);
   const setTerminalFontSize = useUIStore((state) => state.setTerminalFontSize);
+  const terminalOpenOnProjectAction = useUIStore((state) => state.terminalOpenOnProjectAction);
+  const setTerminalOpenOnProjectAction = useUIStore((state) => state.setTerminalOpenOnProjectAction);
   const [availableTerminalShells, setAvailableTerminalShells] = React.useState<TerminalShellOption[]>([]);
   const [terminalShellRuntimeEpoch, setTerminalShellRuntimeEpoch] = React.useState(0);
 
@@ -280,6 +282,16 @@ const TerminalSection: React.FC = () => {
           info={t('settings.openchamber.visual.field.terminalCloseOnExitInfo')}
           settingsItem="appearance.terminal-close-on-exit"
         />
+        {!isMobile ? (
+          <SettingsCheckboxRow
+            checked={terminalOpenOnProjectAction}
+            onChange={setTerminalOpenOnProjectAction}
+            label={t('settings.openchamber.visual.field.terminalOpenOnProjectAction')}
+            ariaLabel={t('settings.openchamber.visual.field.terminalOpenOnProjectAction')}
+            info={t('settings.openchamber.visual.field.terminalOpenOnProjectActionInfo')}
+            settingsItem="appearance.terminal-open-on-project-action"
+          />
+        ) : null}
         {!isMobile ? (
           <SettingsCheckboxRow
             checked={showTerminalQuickKeysOnDesktop}

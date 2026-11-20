@@ -75,6 +75,7 @@ import { tooltipsPanelI18n } from './tooltips-panel.i18n';
 import { tooltipsChatI18n } from './tooltips-chat.i18n';
 
 import { typographyI18n } from './typography.i18n';
+import type { dict as englishDict } from './en';
 
 export const dict = {
   'quota.family.zen': 'نماذج Zen',
@@ -4066,4 +4067,4 @@ export const dict = {
   'chat.promptHistorySearch.hint': "↑ ↓ للتصفح · Enter للتحميل · Esc للإغلاق",
   'helpDialog.item.searchPromptHistory': "البحث في سجل المطالبات (إدخال الدردشة)",
 
-} as const;
+} satisfies Record<keyof typeof englishDict, string>;

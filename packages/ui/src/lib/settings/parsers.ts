@@ -427,6 +427,17 @@ export const parseFollowUpBehavior: SettingsParser<'steer' | 'queue'> = (value, 
   return legacy.data ? 'queue' : 'steer';
 };
 
+const chatWidthSchema = z.enum(['default', 'wider', 'full']);
+
+/** The stored wide-layout choice selects the wider reading column. */
+export const parseChatWidth: SettingsParser<'default' | 'wider' | 'full'> = (value, raw) => {
+  const direct = chatWidthSchema.safeParse(value);
+  if (direct.success) return direct.data;
+  const legacy = z.boolean().safeParse(raw.wideChatLayoutEnabled);
+  if (!legacy.success) return undefined;
+  return legacy.data ? 'wider' : 'default';
+};
+
 const activityRenderModeSchema = trimmed.pipe(z.enum(['collapsed', 'summary']));
 
 /**
