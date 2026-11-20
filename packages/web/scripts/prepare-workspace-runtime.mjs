@@ -5,7 +5,9 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { zstdDecompressSync } from 'node:zlib';
-import { runtimeFingerprint, workspaceRuntimeRoot } from '../server/lib/workspace-dependencies/cache.js';
+import './register-server-sources.mjs';
+
+const { runtimeFingerprint, workspaceRuntimeRoot } = await import('../server/lib/workspace-dependencies/cache.js');
 
 const webRoot = fileURLToPath(new URL('..', import.meta.url));
 const source = path.join(webRoot, 'server/lib/workspace-dependencies');

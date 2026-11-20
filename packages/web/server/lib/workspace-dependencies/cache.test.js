@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import { stripTypeScriptTypes } from 'node:module';
 import { afterEach, expect, it } from 'vitest';
 import { installWorkspaceRuntime, workspaceRuntimeRoot } from './cache.js';
 
@@ -48,7 +49,7 @@ it('installs once into a writable cache and reuses it across processes', async (
   await fs.rm(fixture.archive);
   const module = new URL('./cache.js', import.meta.url).href;
   const code = `import {installWorkspaceRuntime} from ${JSON.stringify(module)}; console.log(await installWorkspaceRuntime(process.argv[1],process.argv[2]));`;
-  const result = execFileSync(process.execPath, ['--input-type=module', '-e', code, fixture.payload, fixture.cache], { encoding: 'utf8' });
+  const result = execFileSync(process.execPath, ['--import', new URL('../../../scripts/register-server-sources.mjs', import.meta.url).href, '--input-type=module', '-e', code, fixture.payload, fixture.cache], { encoding: 'utf8' });
   expect(result.trim()).toBe(fixture.root);
   expect(await fs.readFile(path.join(fixture.root, 'python-cache'), 'utf8')).toBe('writable');
 });
@@ -97,7 +98,7 @@ it('materializes a packaged plugin without access to build scripts', async () =>
   await fs.writeFile(path.join(packageRoot, 'package.json'), JSON.stringify({
     name: '@openchamber/web', type: 'module', main: './server/index.js', bin: { openchamber: './bin/cli.js' },
   }));
-  await fs.copyFile(new URL('../web-package-paths.js', import.meta.url), path.join(packaged, '..', 'web-package-paths.js'));
+  await fs.writeFile(path.join(packaged, '..', 'web-package-paths.js'), stripTypeScriptTypes(await fs.readFile(new URL('../web-package-paths.ts', import.meta.url), 'utf8')));
   for (const file of ['runtime.js', 'cache.js', 'pdf-skill.txt', 'dist/plugin.js']) {
     await fs.copyFile(new URL(file, import.meta.url), path.join(packaged, file));
   }
