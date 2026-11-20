@@ -2277,7 +2277,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
         // creates the session under this id while the message is on screen.
         const sessionId = descendingId("ses")
         adoptDraftPanelWorkspace(draftPanelOwner(draft, capturedRuntimeKey), sessionPanelOwner(sessionId, capturedRuntimeKey))
-        options?.progress?.sessionMinted?.(sessionId)
+        options?.progress?.sessionMinted?.(sessionId, draft.target === "chat" ? sessionDirectory : null)
         const draftAgent = saveDraftSessionSelection(sessionId, selection)
         openPendingSessionTranscript(sessionId, sessionDirectory)
         get().setCurrentSession(sessionId, sessionDirectory, { transition: "submitted-draft" })
