@@ -3,11 +3,9 @@ import { useReducedMotion } from 'motion/react';
 import { OpenChamberLogo } from '@/components/ui/OpenChamberLogo';
 import { LevitatingLogo } from '@/components/ui/LevitatingLogo';
 
-// Seven quick taps on the logo, the way a phone's build number unlocks developer options.
 const TAPS_TO_LEVITATE = 7;
 const TAP_GAP_MS = 700;
 
-/** The logo of the About surfaces (the dialog and the Settings page), with its seven-tap levitation. */
 export const AboutLogo: React.FC<{ size?: number }> = ({ size = 64 }) => {
   const reducedMotion = useReducedMotion();
   const [levitating, setLevitating] = React.useState(false);

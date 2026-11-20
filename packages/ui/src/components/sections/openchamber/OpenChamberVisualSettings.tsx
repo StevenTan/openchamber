@@ -140,7 +140,6 @@ const WINDOW_CONTROLS_STYLE_OPTIONS: Array<{ id: DesktopWindowControlsStyle; lab
 ];
 
 interface OpenChamberVisualSettingsProps {
-    /** Which settings to show. If undefined, shows all. */
     visibleSettings?: VisibleSetting[];
 }
 
@@ -170,8 +169,6 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
     const desktopWindowControlsStyle = useUIStore((state) => state.desktopWindowControlsStyle);
     const setDesktopWindowControlsStyle = useUIStore((state) => state.setDesktopWindowControlsStyle);
 
-    // The server copy lets the language survive lost browser storage and reach
-    // the other clients of this instance.
     const handleLocaleChange = React.useCallback((value: string) => {
         const next = locales.find((candidate) => candidate === value);
         if (!next) return;
@@ -331,9 +328,6 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
 
     return (
         <>
-                {/* By what people come for: the theme, type and density, language,
-                    then what is set once per device. Sections stay direct children of
-                    the page, so the layout drops the divider above whichever renders first. */}
                 {hasThemeSettings && (
                     <>
                         <ThemeAppearancePicker />
@@ -350,7 +344,6 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                     </>
                 )}
 
-                {/* --- Density & type --- */}
                 {hasLayoutSettings && (
                     <SettingsSection title={t('settings.openchamber.visual.section.densityAndType')} contentClassName={SETTINGS_FIELDS_STACK_CLASS}>
                         <TypographySettings showInterface={shouldShow('fontSize') && !isMobile} showCode={shouldShow('editorFontSize')} />

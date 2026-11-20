@@ -10,13 +10,6 @@ import { formatBrowserAnnotationPrompt } from '@/lib/browser/annotationPrompt';
 import type { AnnotationSessionResult } from '@/lib/browser/annotationSession';
 import type { BrowserAnnotationOverlayLabels } from '@/lib/browser/annotationOverlay';
 
-/**
- * Attaches a finished annotation to the active composer.
- *
- * The screenshot is attached before the text so that a failed image upload
- * cannot leave a prompt claiming an attachment that never arrived — the text
- * states what actually happened.
- */
 export const useAnnotationAttach = (directory: string, intro?: string) => {
   const { t } = useI18n();
   const addInlineCommentDraft = useInlineCommentDraftStore((state) => state.addDraft);
@@ -54,12 +47,10 @@ export const useAnnotationAttach = (directory: string, intro?: string) => {
     }, { written: true });
 
     toast.success(t('contextPanel.browser.annotate.attached'));
-    // Focus leaves the page for the composer so Enter sends the prompt.
     requestAnimationFrame(focusChatInput);
   }, [addAttachedFile, addInlineCommentDraft, directory, intro, t]);
 };
 
-/** Overlay labels, resolved through i18n so the in-page UI follows the app locale. */
 export const useAnnotationOverlayLabels = (): BrowserAnnotationOverlayLabels => {
   const { t } = useI18n();
   return React.useMemo(() => ({

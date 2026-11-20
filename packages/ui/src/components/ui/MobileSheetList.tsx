@@ -4,7 +4,6 @@ import type { IconName } from '@/components/icon/icons';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
-/** Caption of a group of rows: in the phone's sheets and the desktop agent and effort menus. */
 export const PICKER_SECTION_HEADER_CLASS = 'typography-micro font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2 px-2 py-1.5';
 
 /** The borderless search field of pickers, under a hairline. */
@@ -12,7 +11,6 @@ export const PICKER_SEARCH_INPUT_CLASS = 'h-auto min-h-7 rounded-none bg-transpa
 
 interface MobileSheetSectionProps {
   title: string;
-  /** A short note at the end of the caption. */
   hint?: string;
   children: React.ReactNode;
 }
@@ -29,21 +27,13 @@ export const MobileSheetSection: React.FC<MobileSheetSectionProps> = ({ title, h
 
 interface MobileSheetRowProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'className'> {
   icon?: IconName;
-  /** Stands in for the icon: an agent's dot, a provider or project mark. */
   leading?: React.ReactNode;
-  /** Quiet text after the label: a count, a time. */
   meta?: React.ReactNode;
-  /** A control of its own at the end of the row, beside the row's button. */
   action?: React.ReactNode;
   selected?: boolean;
   destructive?: boolean;
 }
 
-/**
- * One line of a bottom sheet: an option or an action. The chosen row takes the
- * selection fill and a check, as the model and agent sheets show it. Its height
- * follows the model sheet's rows: the touch floor under a finger.
- */
 export const MobileSheetRow: React.FC<MobileSheetRowProps> = ({
   icon,
   leading,
@@ -81,15 +71,9 @@ interface MobileSheetSearchProps {
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
-  /** Buttons at the end of the search row. */
   actions?: React.ReactNode;
 }
 
-/**
- * The search of a phone surface: for `MobileOverlayPanel`'s `subheader`, or a
- * row above a list. It stays in place while the list scrolls. No autofocus: the
- * keyboard would rise over the list the user came to scan.
- */
 export const MobileSheetSearch: React.FC<MobileSheetSearchProps> = ({ value, onChange, placeholder, actions }) => (
   <div className="flex items-center gap-1 border-b border-edge-muted px-2 py-1">
     <div className="relative min-w-0 flex-1">
