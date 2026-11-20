@@ -8,6 +8,7 @@ import { UsageConfiguration, NewUsageConfiguration, DeleteUsageConfiguration } f
 import { useQuotaAutoRefresh, useQuotaProviders, useQuotaStore } from '@/stores/useQuotaStore';
 import { updateDesktopSettings } from '@/lib/persistence';
 import { QuotaProviderLogo } from '@/components/usage/QuotaProviderLogo';
+import { selectVisibleModelNames, toggleVisibleModel } from '@/components/usage/usageModelSelection';
 import {
   Collapsible,
   CollapsibleContent,
@@ -56,7 +57,7 @@ export const UsagePage: React.FC = () => {
   const dropdownProviderIds = useQuotaStore((state) => state.dropdownProviderIds);
   const setProviderInDropdown = useQuotaStore((state) => state.setProviderInDropdown);
   const selectedModels = useQuotaStore((state) => state.selectedModels);
-  const toggleModelSelected = useQuotaStore((state) => state.toggleModelSelected);
+  const setSelectedModels = useQuotaStore((state) => state.setSelectedModels);
   const applyDefaultSelections = useQuotaStore((state) => state.applyDefaultSelections);
   const providers = useQuotaProviders();
   const configurations = useQuotaStore(state => state.configurations);
@@ -146,19 +147,24 @@ export const UsagePage: React.FC = () => {
     }));
   }, []);
 
+  const providerSelectedModels = React.useMemo(
+    () => (selectedProviderId ? (selectedModels[selectedProviderId] ?? []) : []),
+    [selectedModels, selectedProviderId],
+  );
+  const providerModelNames = React.useMemo(() => providerModels.map((model) => model.name), [providerModels]);
+  const visibleModelNames = React.useMemo(
+    () => new Set(selectedProviderId
+      ? selectVisibleModelNames(selectedProviderId, providerModelNames, providerSelectedModels)
+      : []),
+    [providerModelNames, providerSelectedModels, selectedProviderId],
+  );
+
   const handleModelToggle = React.useCallback((modelName: string) => {
     if (!selectedProviderId) return;
-    toggleModelSelected(selectedProviderId, modelName);
-    const currentSelected = selectedModels[selectedProviderId] ?? [];
-    const isSelected = currentSelected.includes(modelName);
-    const nextSelected = isSelected
-      ? currentSelected.filter((m) => m !== modelName)
-      : [...currentSelected, modelName];
-    const nextSettings: Record<string, string[]> = { ...selectedModels, [selectedProviderId]: nextSelected };
-    void updateDesktopSettings({ usageSelectedModels: nextSettings });
-  }, [selectedProviderId, selectedModels, toggleModelSelected]);
-
-  const providerSelectedModels = selectedProviderId ? (selectedModels[selectedProviderId] ?? []) : [];
+    const nextSelected = toggleVisibleModel(selectedProviderId, providerModelNames, providerSelectedModels, modelName);
+    setSelectedModels(selectedProviderId, nextSelected);
+    void updateDesktopSettings({ usageSelectedModels: { ...selectedModels, [selectedProviderId]: nextSelected } });
+  }, [providerModelNames, providerSelectedModels, selectedModels, selectedProviderId, setSelectedModels]);
 
   if (isCreatingConfiguration) return <NewUsageConfiguration />;
 
@@ -297,7 +303,7 @@ export const UsagePage: React.FC = () => {
                         const entries = Object.entries(model.windows.windows);
                         if (entries.length === 0) return null;
                         const [label, window] = entries[0];
-                        const isSelected = providerSelectedModels.includes(model.name);
+                        const isShown = visibleModelNames.has(model.name);
 
                         return (
                           <UsageCard
@@ -306,7 +312,8 @@ export const UsagePage: React.FC = () => {
                             subtitle={getDisplayModelName(model.name)}
                             window={window}
                             showToggle
-                            toggleEnabled={isSelected}
+                            toggleEnabled={isShown}
+                            toggleDisabled={isShown && visibleModelNames.size === 1}
                             onToggle={() => handleModelToggle(model.name)}
                           />
                         );
@@ -349,7 +356,7 @@ export const UsagePage: React.FC = () => {
                         const entries = Object.entries(model.windows.windows);
                         if (entries.length === 0) return null;
                         const [label, window] = entries[0];
-                        const isSelected = providerSelectedModels.includes(model.name);
+                        const isShown = visibleModelNames.has(model.name);
 
                         return (
                           <UsageCard
@@ -358,7 +365,8 @@ export const UsagePage: React.FC = () => {
                             subtitle={getDisplayModelName(model.name)}
                             window={window}
                             showToggle
-                            toggleEnabled={isSelected}
+                            toggleEnabled={isShown}
+                            toggleDisabled={isShown && visibleModelNames.size === 1}
                             onToggle={() => handleModelToggle(model.name)}
                           />
                         );
