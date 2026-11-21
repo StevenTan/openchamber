@@ -133,7 +133,7 @@ the list loses its usage card with no error.
 - The `openchamber_usage` agent tool (`../openchamber-control/usage-read.js`), which calls the same `listConfiguredQuotaProviders` and `fetchQuotaForProvider` in-process, with the page's deadlines and fallback. It awaits `listUsagePageProviders()` for saved entries and attached extensions. Templates without an actual entry are not queried. Catalog reads share the list timeout and support cancellation.
 
 ## Internal-only provider module
-- `providers/openai.js` exists for logic parity/reuse but is intentionally not registered for dispatcher ID routing.
+- `providers/openai.ts` exists for logic parity/reuse but is intentionally not registered for dispatcher ID routing.
 
 ## Response contract
 All providers should return results via shared helpers to preserve API shape:

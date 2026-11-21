@@ -87,7 +87,7 @@ function disabled(action: string, rules: Permission.Ruleset) {
 }
 
 function catalogSchema(value: Tool.Info["input"], io: "input" | "output"): CatalogTool.SchemaType {
-  if (Schema.isSchema(value)) return value;
+  if (Schema.isSchema(value)) return Schema.toJsonSchemaDocument(value).schema;
   const convert = z.custom<(options: { target: string }) => z.core.JSONSchema.JSONSchema>(Predicate.isFunction);
   const standard = z.object({ "~standard": z.object({ jsonSchema: z.object({ input: convert, output: convert }) }) });
   const document = value instanceof $ZodType ? toJSONSchema(value, { target: "draft-2020-12", io })

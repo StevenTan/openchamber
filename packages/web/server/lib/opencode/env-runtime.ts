@@ -11,7 +11,7 @@ import type { ManagedOpenCodeLaunchSpec } from './lifecycle.js';
 export interface OpenCodeEnvState {
   cachedLoginShellEnvSnapshot?: NodeJS.ProcessEnv | null | undefined;
   resolvedOpencodeBinary?: string | null;
-  resolvedOpencodeBinarySource?: 'policy' | 'settings' | 'env' | 'path' | 'fallback' | 'where' | 'shell' | 'wsl' | 'unknown' | null;
+  resolvedOpencodeBinarySource?: 'policy' | 'settings' | 'env' | 'path' | 'fallback' | 'where' | 'shell' | 'wsl' | 'unknown' | null | undefined;
   resolvedNodeBinary?: string | null;
   resolvedBunBinary?: string | null;
   resolvedGitBinary?: string | null;

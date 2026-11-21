@@ -62,7 +62,7 @@ import {
   secretRunCommandLine,
 } from '../openchamber-control/secret-run.js';
 import { createCallbackAddress } from './callback-address.js';
-import { createCommandToolRuntime } from '../agent-command/dist/runtime.js';
+import { createCommandToolRuntime } from '../agent-command/src/runtime.js';
 import { materializeSearchPlugin } from '../agent-search/runtime.js';
 import { getPlaywrightToolDefinitions } from '../browser-control/playwright.js';
 import { controlErrorFields } from '../openchamber-control/error.js';
@@ -137,7 +137,7 @@ export interface AgentToolDependencies {
   getActivePort: () => number | null;
   getActiveHost?: () => string | null | undefined;
   executeAction?: ReturnType<typeof createOpenChamberControlService>['execute'];
-  resolveSessionDirectory?: ReturnType<typeof createOpenChamberControlService>['resolveSessionDirectory'];
+  resolveSessionDirectory: ReturnType<typeof createOpenChamberControlService>['resolveSessionDirectory'];
   getCommandEnvironment?: Parameters<typeof commandRuntime>[0]['getEnvironment'];
   hasPendingInput: Parameters<typeof commandRuntime>[0]['hasPendingInput'];
   questionRuntime: ReturnType<typeof createQuestionRuntime>;

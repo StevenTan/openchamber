@@ -68,11 +68,11 @@ export type ErrorRequestHandler = (
 
 export interface Router {
   (request: IncomingMessage, response: ServerResponse, next?: NextFunction): void;
-  get<Body = unknown, Params = Record<string, string>, Search = Query>(route: string | RegExp, ...handlers: RequestHandler<Body, Params, Search>[]): this;
+  get<Body = unknown, Params = Record<string, string>, Search = Query>(route: string | RegExp | string[], ...handlers: RequestHandler<Body, Params, Search>[]): this;
   post<Body = unknown, Params = Record<string, string>, Search = Query>(route: string | RegExp | string[], ...handlers: RequestHandler<Body, Params, Search>[]): this;
   put<Body = unknown, Params = Record<string, string>, Search = Query>(route: string | RegExp, ...handlers: RequestHandler<Body, Params, Search>[]): this;
   patch<Body = unknown, Params = Record<string, string>, Search = Query>(route: string | RegExp, ...handlers: RequestHandler<Body, Params, Search>[]): this;
-  delete<Body = unknown, Params = Record<string, string>, Search = Query>(route: string | RegExp, ...handlers: RequestHandler<Body, Params, Search>[]): this;
+  delete<Body = unknown, Params = Record<string, string>, Search = Query>(route: string | RegExp | string[], ...handlers: RequestHandler<Body, Params, Search>[]): this;
   options<Body = unknown, Params = Record<string, string>, Search = Query>(route: string | RegExp, ...handlers: RequestHandler<Body, Params, Search>[]): this;
   head<Body = unknown, Params = Record<string, string>, Search = Query>(route: string | RegExp, ...handlers: RequestHandler<Body, Params, Search>[]): this;
   all<Body = unknown, Params = Record<string, string>, Search = Query>(route: string | RegExp, ...handlers: RequestHandler<Body, Params, Search>[]): this;
@@ -101,7 +101,7 @@ export interface JsonOptions {
 
 export interface ExpressFactory {
   (): Application;
-  json(options?: JsonOptions): RequestHandler;
+  json(options?: JsonOptions): (request: IncomingMessage & { body?: unknown }, response: ServerResponse, next: (error?: Error) => void) => void;
   raw(options?: JsonOptions): RequestHandler;
   text(options?: JsonOptions & { defaultCharset?: string }): RequestHandler;
   urlencoded(options?: JsonOptions & { extended?: boolean; parameterLimit?: number }): RequestHandler;

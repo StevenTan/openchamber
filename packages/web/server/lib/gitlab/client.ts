@@ -1,13 +1,14 @@
 import { Gitlab } from '@gitbeaker/rest';
 import { isPlainObject, isString } from './validation.js';
 import type { SourceControlJson } from '@openchamber/sdk';
+import type { JsonValue } from '../shared/json-values.js';
 
-type RequestValue = SourceControlJson | Date | undefined | RequestValue[] | RequestFields;
+type RequestValue = JsonValue | Date | undefined | RequestValue[] | RequestFields;
 interface RequestFields { [key: string]: RequestValue }
 
 export interface GitLabClientOptions {
   origin: string;
-  token: string;
+  token: string | undefined;
   tokenType?: 'token' | 'oauth';
   fetch?: (request: Request) => Promise<Response>;
 }
@@ -67,7 +68,7 @@ function formatQuery(searchParams?: RequestFields) {
   return params.join('&');
 }
 
-async function parseBody(response: Response, asStream: boolean) {
+async function parseBody(response: Response, asStream: boolean): Promise<JsonValue | Blob | ReadableStream<Uint8Array> | null> {
   if (asStream) return response.body;
   if (response.status === 204) return null;
   const contentType = ((response.headers.get('content-type') || '').split(';')[0] ?? '').trim();
@@ -136,7 +137,7 @@ export interface GitLabDownloadOptions {
 }
 
 export function createGitLabDownloader({ origin, token, tokenType = 'token', fetch: fetchImpl = (request) => fetch(request) }: GitLabClientOptions) {
-  const credential: Record<string, string> = tokenType === 'oauth' ? { authorization: `Bearer ${token}` } : { 'private-token': token };
+  const credential: Record<string, string> = tokenType === 'oauth' ? { authorization: `Bearer ${token}` } : { 'private-token': token === undefined ? 'undefined' : token };
   return async (apiPath: string, { range, signal }: GitLabDownloadOptions = {}) => {
     const headers: Record<string, string> = range ? { range } : {};
     const url = new URL(`api/v4/${apiPath}`, `${origin}/`);

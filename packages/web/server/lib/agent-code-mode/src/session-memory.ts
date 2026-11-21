@@ -1,13 +1,12 @@
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 import { Tool } from "@opencode/schema/tool";
-import { z } from "zod";
 
-const key = z.string().describe("Cache key within the current session.");
-const storeInput = z.object({ key, value: z.json().describe("JSON value to save as a snapshot.") });
-const storeOutput = z.object({ key: z.string() });
-const loadInput = z.object({ key });
-const loadOutput = z.json();
-type Sessions = Map<string, Map<string, z.infer<typeof loadOutput>>>;
+const key = Schema.String.annotate({ description: "Cache key within the current session." });
+const storeInput = Schema.Struct({ key, value: Schema.Json.annotate({ description: "JSON value to save as a snapshot." }) });
+const storeOutput = Schema.Struct({ key: Schema.String });
+const loadInput = Schema.Struct({ key });
+const loadOutput = Schema.Json;
+type Sessions = Map<string, Map<string, Schema.Json>>;
 const memoryKey = Symbol.for("openchamber.code-mode.session-memory");
 const host: typeof globalThis & { [memoryKey]?: { sessions: Sessions; listening: boolean } } = globalThis;
 export const processMemory = host[memoryKey] ??= { sessions: new Map(), listening: false };

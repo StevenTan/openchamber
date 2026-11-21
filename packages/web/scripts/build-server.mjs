@@ -38,7 +38,9 @@ export async function buildServer(outputDirectory = path.join(webRoot, 'build'))
           if (error.code === 'ENOENT') return true;
           throw error;
         });
-        if (!declarationOnly && !assetExtensions.has(path.extname(entry.name))) continue;
+        const generatedPlugin = /^server\/lib\/(?:agent-command|agent-search|agent-question|agent-code-mode|workspace-dependencies|turn-diffs)\/dist\//.test(child.split(path.sep).join('/'));
+        const runtimeFingerprintSource = child === path.join('server', 'lib', 'workspace-dependencies', 'cache.ts');
+        if (!declarationOnly && !assetExtensions.has(path.extname(entry.name)) && !generatedPlugin && !runtimeFingerprintSource) continue;
         await fs.mkdir(path.dirname(path.join(outputDirectory, child)), { recursive: true });
         await fs.copyFile(path.join(webRoot, child), path.join(outputDirectory, child));
       }

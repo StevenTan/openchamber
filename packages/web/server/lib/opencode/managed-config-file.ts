@@ -55,6 +55,8 @@ const DISABLED_BUILTIN_PLUGINS = ['-opencode.browser', '-opencode-websearch', '-
 
 const BUILTIN_IMAGE_PLUGIN = '-opencode.tool.image-generate';
 
+const BUILTIN_AUTOMATION_PLUGIN = '-opencode.tool.automation';
+
 export const createManagedConfigRuntime = ({
   fsPromises,
   path,
@@ -123,7 +125,11 @@ export const createManagedConfigRuntime = ({
     if (agentToolRuntime) directories.push(await materializeCodeModePlugin(instanceDir));
     const workspace = await materializeWorkspaceDependencies({ fsPromises, path, instanceDir, env });
     directories.push(workspace.plugin);
-    const disabled = includeImage ? [...DISABLED_BUILTIN_PLUGINS, BUILTIN_IMAGE_PLUGIN] : DISABLED_BUILTIN_PLUGINS;
+    const disabled = [
+      ...DISABLED_BUILTIN_PLUGINS,
+      ...(includeImage ? [BUILTIN_IMAGE_PLUGIN] : []),
+      ...(agentToolRuntime && includeSchedule ? [BUILTIN_AUTOMATION_PLUGIN] : []),
+    ];
     const authoring = await materializeAuthoringSkill({ fsPromises, instanceDir, openchamberVersion });
     const opencodeSkill = path.join(authoring.skillsRoot, 'opencode');
     await fsPromises.mkdir(opencodeSkill, { recursive: true });

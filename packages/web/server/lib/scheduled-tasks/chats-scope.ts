@@ -5,7 +5,7 @@ import { createProjectIdFromPath } from '../projects/project-id.js';
 
 export const CHATS_SCOPE_PUBLIC_ID = 'openchamber:chats';
 
-export const createChatsScope = (chatsRoot: string, { legacyRoot }: { legacyRoot?: string } = {}) => {
+export const createChatsScope = (chatsRoot: string, { legacyRoot }: { legacyRoot?: string | undefined } = {}) => {
   const root = path.resolve(chatsRoot);
   const id = createProjectIdFromPath(legacyRoot || root);
   const roots = legacyRoot ? [root, path.resolve(legacyRoot)] : [root];

@@ -79,7 +79,7 @@ describe('managed OpenCode config file', () => {
     expect(childEnv.OPENCODE_CONFIG_CONTENT).toBeUndefined();
     expect(childEnv.OPENCHAMBER_AGENT_TOOL_TOKEN).toBe('token');
     expect(await readConfigFile()).toEqual({
-      plugins: ['-opencode.browser', '-opencode-websearch', '-opencode.skill', path.join(dataDir, 'agent-tool', 'openchamber-agent-tool'), titleDirectory, codexAgentDirectory(dataDir), commandDirectory(dataDir), searchDirectory(dataDir), questionDirectory(dataDir), turnDiffDirectory(dataDir), quotaUsageDirectory(dataDir), codeModeDirectory(dataDir), workspaceDirectory(dataDir)],
+      plugins: ['-opencode.browser', '-opencode-websearch', '-opencode.skill', '-opencode.tool.automation', path.join(dataDir, 'agent-tool', 'openchamber-agent-tool'), titleDirectory, codexAgentDirectory(dataDir), commandDirectory(dataDir), searchDirectory(dataDir), questionDirectory(dataDir), turnDiffDirectory(dataDir), quotaUsageDirectory(dataDir), codeModeDirectory(dataDir), workspaceDirectory(dataDir)],
       skills: [path.join(dataDir, 'skills'), workspaceSkills(dataDir)],
       commands: { 'new-extension': { description: expect.any(String), template: expect.stringContaining(path.join(dataDir, 'skills', 'openchamber-extensions', 'SKILL.md')) } },
     });
@@ -120,10 +120,10 @@ describe('managed OpenCode config file', () => {
     const plugins = { current: ['/pkg/plugin'] };
     const { dataDir, runtime, readConfigFile, titleDirectory } = await createHarness({ settings: {}, listExtensionPluginDirectories: async () => plugins.current });
     await runtime.buildManagedChildEnv();
-    expect((await readConfigFile()).plugins).toEqual(['-opencode.browser', '-opencode-websearch', '-opencode.skill', path.join(dataDir, 'agent-tool', 'openchamber-agent-tool'), titleDirectory, codexAgentDirectory(dataDir), commandDirectory(dataDir), searchDirectory(dataDir), questionDirectory(dataDir), turnDiffDirectory(dataDir), quotaUsageDirectory(dataDir), codeModeDirectory(dataDir), workspaceDirectory(dataDir), '/pkg/plugin']);
+    expect((await readConfigFile()).plugins).toEqual(['-opencode.browser', '-opencode-websearch', '-opencode.skill', '-opencode.tool.automation', path.join(dataDir, 'agent-tool', 'openchamber-agent-tool'), titleDirectory, codexAgentDirectory(dataDir), commandDirectory(dataDir), searchDirectory(dataDir), questionDirectory(dataDir), turnDiffDirectory(dataDir), quotaUsageDirectory(dataDir), codeModeDirectory(dataDir), workspaceDirectory(dataDir), '/pkg/plugin']);
     plugins.current = [];
     await runtime.refreshManagedConfigFile();
-    expect((await readConfigFile()).plugins).toEqual(['-opencode.browser', '-opencode-websearch', '-opencode.skill', path.join(dataDir, 'agent-tool', 'openchamber-agent-tool'), titleDirectory, codexAgentDirectory(dataDir), commandDirectory(dataDir), searchDirectory(dataDir), questionDirectory(dataDir), turnDiffDirectory(dataDir), quotaUsageDirectory(dataDir), codeModeDirectory(dataDir), workspaceDirectory(dataDir)]);
+    expect((await readConfigFile()).plugins).toEqual(['-opencode.browser', '-opencode-websearch', '-opencode.skill', '-opencode.tool.automation', path.join(dataDir, 'agent-tool', 'openchamber-agent-tool'), titleDirectory, codexAgentDirectory(dataDir), commandDirectory(dataDir), searchDirectory(dataDir), questionDirectory(dataDir), turnDiffDirectory(dataDir), quotaUsageDirectory(dataDir), codeModeDirectory(dataDir), workspaceDirectory(dataDir)]);
   });
 
   it('merges extension plugin folders into OPENCODE_CONFIG_CONTENT when the user owns OPENCODE_CONFIG', async () => {
@@ -135,7 +135,7 @@ describe('managed OpenCode config file', () => {
     const childEnv = await runtime.buildManagedChildEnv();
     // The user's own copy of the same folder is not listed twice; ours come after OpenChamber's.
     expect(JSON.parse(childEnv.OPENCODE_CONFIG_CONTENT).plugins).toEqual([
-      '-opencode.browser', '-opencode-websearch', '-opencode.skill', path.join(dataDir, 'agent-tool', 'openchamber-agent-tool'), titleDirectory, codexAgentDirectory(dataDir), commandDirectory(dataDir), searchDirectory(dataDir), questionDirectory(dataDir), turnDiffDirectory(dataDir), quotaUsageDirectory(dataDir), codeModeDirectory(dataDir), workspaceDirectory(dataDir), '/pkg/plugin',
+      '-opencode.browser', '-opencode-websearch', '-opencode.skill', '-opencode.tool.automation', path.join(dataDir, 'agent-tool', 'openchamber-agent-tool'), titleDirectory, codexAgentDirectory(dataDir), commandDirectory(dataDir), searchDirectory(dataDir), questionDirectory(dataDir), turnDiffDirectory(dataDir), quotaUsageDirectory(dataDir), codeModeDirectory(dataDir), workspaceDirectory(dataDir), '/pkg/plugin',
     ]);
   });
 
@@ -297,6 +297,17 @@ describe('managed OpenCode config file', () => {
     expect((await readConfigFile()).plugins.slice(0, 4)).toEqual(['-opencode.browser', '-opencode-websearch', '-opencode.skill', '-opencode.tool.image-generate']);
   });
 
+  it("disables OpenCode's own automations while the schedule tool is on", async () => {
+    const { runtime, current, readConfigFile } = await createHarness({ settings: {} });
+
+    await runtime.buildManagedChildEnv();
+    expect((await readConfigFile()).plugins).toContain('-opencode.tool.automation');
+
+    current.settings = { agentScheduleToolEnabled: false };
+    await runtime.refreshManagedConfigFile();
+    expect((await readConfigFile()).plugins).not.toContain('-opencode.tool.automation');
+  });
+
   it('injects the knowledge tool by default and leaves it out once switched off', async () => {
     const { runtime, current, agentToolRuntime } = await createHarness({ settings: {} });
 
@@ -405,7 +416,7 @@ describe('managed OpenCode config file', () => {
     expect(childEnv.OPENCODE_CONFIG).toBeUndefined();
     expect(JSON.parse(childEnv.OPENCODE_CONFIG_CONTENT)).toEqual({
       model: 'test/model',
-      plugins: ['-opencode.browser', '-opencode-websearch', '-opencode.skill', path.join(dataDir, 'agent-tool', 'openchamber-agent-tool'), titleDirectory, codexAgentDirectory(dataDir), commandDirectory(dataDir), searchDirectory(dataDir), questionDirectory(dataDir), turnDiffDirectory(dataDir), quotaUsageDirectory(dataDir), codeModeDirectory(dataDir), workspaceDirectory(dataDir)],
+      plugins: ['-opencode.browser', '-opencode-websearch', '-opencode.skill', '-opencode.tool.automation', path.join(dataDir, 'agent-tool', 'openchamber-agent-tool'), titleDirectory, codexAgentDirectory(dataDir), commandDirectory(dataDir), searchDirectory(dataDir), questionDirectory(dataDir), turnDiffDirectory(dataDir), quotaUsageDirectory(dataDir), codeModeDirectory(dataDir), workspaceDirectory(dataDir)],
       skills: [path.join(dataDir, 'skills'), workspaceSkills(dataDir)],
       commands: { 'new-extension': expect.any(Object) },
     });
@@ -461,7 +472,7 @@ describe('managed OpenCode config file', () => {
     await runtime.buildManagedChildEnv();
 
     expect(await readConfigFile()).toMatchObject({
-      plugins: ['-opencode.browser', '-opencode-websearch', '-opencode.skill', agentToolRuntime.pluginDirectory, titleDirectory, codexAgentDirectory(dataDir), commandDirectory(dataDir), searchDirectory(dataDir), questionDirectory(dataDir), turnDiffDirectory(dataDir), quotaUsageDirectory(dataDir), codeModeDirectory(dataDir), workspaceDirectory(dataDir)],
+      plugins: ['-opencode.browser', '-opencode-websearch', '-opencode.skill', '-opencode.tool.automation', agentToolRuntime.pluginDirectory, titleDirectory, codexAgentDirectory(dataDir), commandDirectory(dataDir), searchDirectory(dataDir), questionDirectory(dataDir), turnDiffDirectory(dataDir), quotaUsageDirectory(dataDir), codeModeDirectory(dataDir), workspaceDirectory(dataDir)],
       policies: [DENIAL],
     });
   });
@@ -477,7 +488,7 @@ describe('managed OpenCode config file', () => {
 
     expect(JSON.parse(childEnv.OPENCODE_CONFIG_CONTENT)).toMatchObject({
       model: 'test/model',
-      plugins: ['-opencode.browser', '-opencode-websearch', '-opencode.skill', agentToolRuntime.pluginDirectory, titleDirectory, codexAgentDirectory(dataDir), commandDirectory(dataDir), searchDirectory(dataDir), questionDirectory(dataDir), turnDiffDirectory(dataDir), quotaUsageDirectory(dataDir), codeModeDirectory(dataDir), workspaceDirectory(dataDir)],
+      plugins: ['-opencode.browser', '-opencode-websearch', '-opencode.skill', '-opencode.tool.automation', agentToolRuntime.pluginDirectory, titleDirectory, codexAgentDirectory(dataDir), commandDirectory(dataDir), searchDirectory(dataDir), questionDirectory(dataDir), turnDiffDirectory(dataDir), quotaUsageDirectory(dataDir), codeModeDirectory(dataDir), workspaceDirectory(dataDir)],
       policies: [DENIAL],
     });
   });

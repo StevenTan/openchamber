@@ -99,7 +99,12 @@ it('materializes a packaged plugin without access to build scripts', async () =>
     name: '@openchamber/web', type: 'module', main: './server/index.js', bin: { openchamber: './bin/cli.js' },
   }));
   await fs.writeFile(path.join(packaged, '..', 'web-package-paths.js'), stripTypeScriptTypes(await fs.readFile(new URL('../web-package-paths.ts', import.meta.url), 'utf8')));
-  for (const file of ['runtime.js', 'cache.js', 'pdf-skill.txt', 'dist/plugin.js']) {
+  await fs.mkdir(path.join(packaged, '..', 'openchamber-control'), { recursive: true });
+  await fs.writeFile(path.join(packaged, '..', 'openchamber-control', 'error.js'), stripTypeScriptTypes(await fs.readFile(new URL('../openchamber-control/error.ts', import.meta.url), 'utf8')));
+  for (const file of ['runtime', 'cache']) {
+    await fs.writeFile(path.join(packaged, `${file}.js`), stripTypeScriptTypes(await fs.readFile(new URL(`${file}.ts`, import.meta.url), 'utf8')));
+  }
+  for (const file of ['pdf-skill.txt', 'dist/plugin.js']) {
     await fs.copyFile(new URL(file, import.meta.url), path.join(packaged, file));
   }
   const code = `

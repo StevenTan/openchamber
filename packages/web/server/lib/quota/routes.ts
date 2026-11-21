@@ -185,7 +185,7 @@ export function registerQuotaRoutes(app: Application, { getQuotaProviders, suppo
   app.post('/api/quota/:providerId/gift-reset/use', express.json({ limit: '16kb' }), async (req, res) => {
     try {
       const providerId = readQuotaConfiguration(req.params.providerId)?.templateId;
-      if (!zaiAliases.includes(providerId)) {
+      if (!zaiAliases.some((alias) => alias === providerId)) {
         return res.status(404).json({ code: 'UNSUPPORTED_PROVIDER', error: 'Unsupported quota provider' });
       }
       const { recordId, resetType, grantType } = hasGiftResetFields(req.body) ? req.body : {};

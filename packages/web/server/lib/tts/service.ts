@@ -10,7 +10,7 @@ import type { SpeechCreateParams } from 'openai/resources/audio/speech';
 type SpeechCredential = string | {
   type?: string;
   key?: string;
-  access?: string;
+  access?: string | undefined;
   token?: string;
 };
 
@@ -19,7 +19,7 @@ export interface SpeechOptions {
   voice?: SpeechCreateParams['voice'];
   model?: SpeechCreateParams['model'];
   speed?: number;
-  instructions?: string;
+  instructions?: string | undefined;
   apiKey?: string | undefined;
   baseURL?: string | undefined;
   endpointPath?: string | undefined;

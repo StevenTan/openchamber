@@ -85,7 +85,7 @@ const requestInput = z
 interface CommandRuntimeOptions {
   instanceDir: string;
   resolveSessionDirectory: (sessionID: string) => Promise<string | null>;
-  getEnvironment?: () => NodeJS.ProcessEnv;
+  getEnvironment?: (() => NodeJS.ProcessEnv) | undefined;
   hasPendingInput: (sessionID: string, signal: AbortSignal) => Promise<boolean>;
 }
 

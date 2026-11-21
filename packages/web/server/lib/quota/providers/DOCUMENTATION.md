@@ -30,6 +30,13 @@ result construction; `../credentials` owns managed credential storage.
 
 ## Decisions
 
+### Why Codex reads the CLI token fields separately
+
+The CLI's ChatGPT sign-in is usable when `auth.json` contains a nonblank
+`tokens.access_token`. A missing account ID stays null. A signed-out CLI or
+an API-key sign-in without `tokens` provides no fallback login. JWT claims
+provide an optional display email only; decoding them does not verify the token.
+
 ### Why Copilot fields remain unknown
 
 Copilot's HTTP payload and normalized credentials do not validate their fields.
@@ -38,14 +45,14 @@ properties without copying or filtering them. Each numeric or string conversion
 retains its existing acceptance rules. In particular, string `credits_used`
 values are trimmed before numeric conversion so blank strings remain unavailable.
 
-### Why MiniMax's shared reader remains JavaScript
+### Why MiniMax model names keep their native failure
 
-`pickChatModel` calls `m.model_name.toLowerCase()` after checking only truthiness.
-A truthy number or object can reach that call and throw the native method-call
-error, which `fetchQuota` returns to the caller. The HTTP response has not
-established a string or a callable method. Declaring either would overpromise;
-adding validation or coercion would change the result for malformed model names.
-Type-only changes to neighbouring modules cannot establish that missing check.
+`pickChatModel` checks only that a model name is truthy. The prefix test still
+converts it with `String`, as `RegExp.prototype.test` did, and the text-model
+match lower-cases it through `lowerCaseLabel`, which throws the original
+`m.model_name.toLowerCase is not a function` for a truthy non-string.
+`fetchQuota` returns that message to the caller as before. Count comparisons
+treat a missing count as not positive, the result `null > 0` gave.
 
 ### Why MiniMax status fields remain unknown
 
@@ -67,8 +74,8 @@ read response usage. Public results carry the saved entry's ID and name;
 attached extension providers retain their own IDs. Pending requests for a saved
 entry are keyed by its ID and revision.
 
-`../utils/auth.js` leaves `getAuthEntry` and `normalizeAuthEntry` untyped;
-credential readers must narrow their results before promising credential fields.
+`getAuthEntry` and `normalizeAuthEntry` do not validate credential fields.
+Credential readers narrow the fields they use.
 
 ### Why shared readers retain precise window fields
 
@@ -122,25 +129,26 @@ inherited names remain unsupported. Mistral retains dictionary fallback and
 truthiness checks. DeepInfra interprets a negative Stripe balance as spendable
 funds and a positive balance as money owed, as documented by its account API.
 
-### Why the remaining unchecked operations need their JavaScript semantics
+### Why coding plan readers keep coercion and gift resets stay optional
 
-`parseZaiResetExpire` lets the regular expression coerce an expiry value, then
-calls its unchecked `replace` method. An array containing a date can pass the
-first step and fail at the method call. Adding a string check would change how
-the optional gift-reset read fails.
+The expiry pattern still tests the string form of the supplied value. A date
+inside an array can match the pattern, but it cannot supply a text expiry.
+This aborts the entire optional gift-reset read, keeping the quota windows
+without attaching partial gift-reset metadata.
 
-Kimi's legacy windows pass unchecked duration fields to `durationToSeconds`.
-Zhipu's windows pass unchecked unit and count fields to `resolveWindowSeconds`.
-Those helpers multiply the supplied values using JavaScript coercion. Their
-current numeric declarations do not establish a numeric HTTP field; broadening
-the parameter declarations alone cannot type the unchecked multiplication.
+Kimi's legacy durations retain the original truthiness check and numeric
+coercion. A numeric string can supply the duration; a nonnumeric truthy value
+can produce `NaN`. Only the recognized time-unit strings select a multiplier.
+The coding-plan unit lookup retains inherited keys and coerces counts only when
+the lookup returns a truthy value. The resulting duration can be `NaN`.
+Zhipu reads the merged OpenCode config without a working directory, so no
+project layer participates. The provider's `options.apiKey` remains unchecked
+until the shared resolver reads it.
+
+### Why the internal OpenAI reader keeps raw window fields
 
 The internal OpenAI reader copies unchecked percentages and window durations to
-the formatter and multiplies unchecked reset timestamps. Validating or coercing
-these values differently would change its existing output or failure behavior.
-Its result cannot honestly promise the numeric quota contract without those
-checks.
-
-The config declaration exposes `readConfig` because it already returns
-`readConfigLayers(...).mergedConfig`. Both readers accept an omitted working
-directory, which excludes the project config layer.
+its result, and uses numeric coercion for reset timestamps. Its result type keeps
+those copied fields unchecked. Only finite numeric percentages produce a derived
+remaining percentage. The reader stays outside the dispatcher's numeric usage
+contract.
