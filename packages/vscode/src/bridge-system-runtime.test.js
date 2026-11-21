@@ -54,6 +54,7 @@ mock.module('vscode', () => ({
 
 mock.module('./opencodeConfig', () => ({
   readConfig: mock(() => ({})),
+  readConfigLayers: mock(() => ({ userConfig: {}, projectConfig: {}, customConfig: {}, mergedConfig: {}, paths: {} })),
   removeProviderConfig: mock(),
   getProviderSources: mock(),
   getStoredProviderConfig: mock(),

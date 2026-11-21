@@ -1,6 +1,10 @@
 import { z } from 'zod';
+import { editableCapabilities, resolveDiscoveredCapabilities } from './model-capabilities';
 import type { Model } from '@/lib/opencode/model';
 import type { CustomProviderIcon } from '@/lib/customProviderIcons';
+import { storedCapabilitiesSchema, storedLimitSchema, storedVariantsSchema, type InheritedCanonical, type StoredProviderSource } from './stored-provider-entry';
+
+export { storedProviderEntrySchema, type StoredProviderSource } from './stored-provider-entry';
 
 
 export const CUSTOM_PROVIDER_PROTOCOLS = {
@@ -38,7 +42,7 @@ export type ModelRow = {
   outputCapabilities: string[];
   tools: boolean;
   type?: string;
-  capabilitiesKnown: boolean;
+  capabilitiesKnown: KnownCapabilities;
   metadataSource?: 'provider-api' | 'models.dev' | 'manual';
   variants: string;
   savedVariants?: Record<string, ModelVariantOverlay>;
@@ -46,6 +50,15 @@ export type ModelRow = {
   /** Undefined preserves saved settings; null explicitly inherits the provider default. */
   textVerbosity?: TextVerbosity | null;
 };
+
+export type KnownCapabilities = { tools: boolean; input: boolean; output: boolean };
+
+const NO_KNOWN_CAPABILITIES: KnownCapabilities = { tools: false, input: false, output: false };
+const knownCapabilitiesOf = (capabilities: { tools?: boolean; input?: string[]; output?: string[] } | undefined): KnownCapabilities => ({
+  tools: capabilities?.tools !== undefined,
+  input: capabilities?.input !== undefined,
+  output: capabilities?.output !== undefined,
+});
 
 export type HeaderRow = {
   row: string;
@@ -84,6 +97,8 @@ export type CustomProviderFormState = {
    * until the user types into them.
    */
   tls: ClientCertificateFields | null;
+  canonical: string | null;
+  inheritedCanonical?: InheritedCanonical;
 };
 
 export type FieldErrors = {
@@ -110,6 +125,7 @@ export type HeaderFieldErrors = {
 export type CustomProviderConfig = {
   package: CustomProviderPackage;
   name: string;
+  canonical?: string | null;
   env?: string[];
   settings: {
     baseURL: string;
@@ -132,7 +148,7 @@ export type CustomProviderModelConfig = {
   type?: string;
   variants?: ModelVariantConfig[];
   limit?: { context?: number; output?: number };
-  capabilities?: { tools: boolean; input: string[]; output: string[] };
+  capabilities?: { tools?: boolean; input?: string[]; output?: string[] };
   settings?: { textVerbosity: TextVerbosity | null };
 };
 
@@ -165,6 +181,7 @@ export type ValidateCustomProviderResult = {
 export type ProviderLikeForCustomForm = {
   id: string;
   name?: string;
+  canonical?: string;
   env?: string[];
   package?: string;
   settings?: Record<string, unknown> | null;
@@ -214,27 +231,22 @@ export const createModelRow = (): ModelRow => ({
   inputCapabilities: ['text'],
   outputCapabilities: ['text'],
   tools: true,
-  capabilitiesKnown: false,
+  capabilitiesKnown: NO_KNOWN_CAPABILITIES,
   variants: '',
 });
 
 const discoveredLimitSchema = z.object({ context: z.number().optional(), output: z.number().optional() });
-const discoveredCapabilitiesSchema = z.object({
-  tools: z.boolean(),
-  input: z.array(z.string()),
-  output: z.array(z.string()),
-});
 const discoveredModelSchema = z.object({
   id: z.string(),
   name: z.string(),
   limit: discoveredLimitSchema.optional(),
-  capabilities: discoveredCapabilitiesSchema.optional(),
+  capabilities: storedCapabilitiesSchema.optional(),
   metadata: z.object({
     providerID: z.string(),
     modelID: z.string(),
     name: z.string().optional(),
     limit: discoveredLimitSchema.optional(),
-    capabilities: discoveredCapabilitiesSchema.optional(),
+    capabilities: storedCapabilitiesSchema.optional(),
   }).optional(),
 });
 
@@ -247,7 +259,7 @@ export const modelRowFromDiscovery = (model: DiscoveredModel): ModelRow => {
   const metadata = model.metadata;
   const context = model.limit?.context ?? metadata?.limit?.context;
   const output = model.limit?.output ?? metadata?.limit?.output;
-  const capabilities = model.capabilities ?? metadata?.capabilities;
+  const capabilities = resolveDiscoveredCapabilities(model.capabilities, metadata?.capabilities);
   const describedByProvider = Boolean(model.limit || model.capabilities);
   return {
     ...createModelRow(),
@@ -255,10 +267,9 @@ export const modelRowFromDiscovery = (model: DiscoveredModel): ModelRow => {
     name: model.name !== model.id ? model.name : (metadata?.name ?? model.id),
     contextWindow: context ? String(context) : '',
     maxOutputTokens: output ? String(output) : '',
-    inputCapabilities: capabilities?.input ?? ['text'],
-    outputCapabilities: capabilities?.output ?? ['text'],
-    tools: capabilities?.tools ?? true,
-    capabilitiesKnown: Boolean(capabilities),
+    ...editableCapabilities(capabilities),
+    tools: capabilities.tools ?? true,
+    capabilitiesKnown: knownCapabilitiesOf(capabilities),
     ...(describedByProvider
       ? { metadataSource: 'provider-api' as const }
       : metadata ? { metadataSource: 'models.dev' as const } : {}),
@@ -316,6 +327,7 @@ export const createEmptyCustomProviderForm = (): CustomProviderFormState => ({
   models: [createModelRow()],
   headers: [createHeaderRow()],
   tls: EMPTY_CLIENT_CERTIFICATE,
+  canonical: '',
 });
 
 export const createCodexApiProviderForm = (): CustomProviderFormState => ({
@@ -530,7 +542,7 @@ export function providerToCustomFormState(provider: ProviderLikeForCustomForm): 
           outputCapabilities: model.capabilities?.output ?? ['text'],
           tools: model.capabilities?.tools ?? true,
           type: model.type,
-          capabilitiesKnown: Boolean(model.capabilities),
+          capabilitiesKnown: knownCapabilitiesOf(model.capabilities),
           variants: Object.keys(savedVariants).join(', '),
           savedVariants,
           savedTextVerbosity: storedModelSettingsSchema.safeParse(model.settings).data?.textVerbosity ?? undefined,
@@ -557,59 +569,43 @@ export function providerToCustomFormState(provider: ProviderLikeForCustomForm): 
     models,
     headers: headerRows.length > 0 ? headerRows : [createHeaderRow()],
     tls: clientCertificateFieldsOf(storedTlsSchema.safeParse(settings.tls).data),
+    canonical: provider.canonical ?? '',
   };
 }
 
-const storedVariantsSchema = z.array(z.object({
-  id: z.string(),
-  settings: z.record(z.string(), z.unknown()).optional(),
-  headers: z.record(z.string(), z.string()).optional(),
-  body: z.record(z.string(), z.unknown()).optional(),
-}));
-
-const storedLimitSchema = z.object({ context: z.number().optional(), output: z.number().optional() });
-const storedCapabilitiesSchema = z.object({
-  tools: z.boolean().optional(),
-  input: z.array(z.string()).optional(),
-  output: z.array(z.string()).optional(),
-});
 const storedModelSettingsSchema = z.object({ textVerbosity: textVerbositySchema.nullable().optional() });
 
-export const storedProviderEntrySchema = z.object({
-  name: z.string().optional(),
-  package: z.string().optional(),
-  env: z.array(z.string()).optional(),
-  settings: z.record(z.string(), z.unknown()).optional(),
-  headers: z.record(z.string(), z.string()).optional(),
-  models: z.record(z.string(), z.object({
-    modelID: z.string().optional(),
-    name: z.string().optional(),
-    type: z.string().optional(),
-    package: z.string().optional(),
-    variants: storedVariantsSchema.optional(),
-    limit: storedLimitSchema.optional(),
-    capabilities: storedCapabilitiesSchema.optional(),
-    settings: storedModelSettingsSchema.optional(),
-  })).optional(),
-});
-
-export type StoredProviderEntry = z.infer<typeof storedProviderEntrySchema>;
+function withInheritedCapabilities(model: ModelRow, live: ModelRow | undefined): ModelRow {
+  if (!live) return model;
+  return {
+    ...model,
+    tools: model.capabilitiesKnown.tools ? model.tools : live.tools,
+    inputCapabilities: model.capabilitiesKnown.input ? model.inputCapabilities : live.inputCapabilities,
+    outputCapabilities: model.capabilitiesKnown.output ? model.outputCapabilities : live.outputCapabilities,
+  };
+}
 
 export function providerToEditFormState(
   live: ProviderLikeForCustomForm,
-  stored: StoredProviderEntry | null,
+  stored: StoredProviderSource | null,
   icon: CustomProviderIcon | null = null,
 ): CustomProviderFormState {
   const liveModels = Array.isArray(live.models)
     ? live.models.map((model) => ({ ...model, variants: undefined }))
     : live.models;
   const liveState = providerToCustomFormState({ ...live, models: liveModels });
+  const liveRows = liveState.models.map((model) => ({
+    ...model,
+    ...editableCapabilities({ input: model.inputCapabilities, output: model.outputCapabilities }),
+    savedVariants: undefined,
+  }));
   if (!stored) {
     return {
       ...liveState,
       icon,
-      models: liveState.models.map((model) => ({ ...model, savedVariants: undefined })),
+      models: liveRows,
       tls: null,
+      canonical: null,
     };
   }
 
@@ -624,10 +620,12 @@ export function providerToEditFormState(
     baseURL: storedState.baseURL || liveState.baseURL,
     apiKey: storedState.apiKey,
     models: stored.models && Object.keys(stored.models).length > 0
-      ? storedState.models
-      : liveState.models.map((model) => ({ ...model, savedVariants: undefined })),
+      ? storedState.models.map((model) => withInheritedCapabilities(model, liveRows.find((entry) => entry.id === model.id)))
+      : liveRows,
     headers: storedState.headers,
     tls: storedState.tls,
+    canonical: storedState.canonical,
+    inheritedCanonical: stored.inheritedCanonical,
   };
 }
 
@@ -701,13 +699,11 @@ export function validateCustomProvider(input: ValidateCustomProviderInput): Vali
       const context = parsePositiveInteger(model.contextWindow);
       const output = parsePositiveInteger(model.maxOutputTokens);
       if (context || output) entry.limit = { ...(context ? { context } : {}), ...(output ? { output } : {}) };
-      if (model.capabilitiesKnown) {
-        entry.capabilities = {
-          tools: model.tools,
-          input: model.inputCapabilities,
-          output: model.outputCapabilities,
-        };
-      }
+      const capabilities: NonNullable<CustomProviderModelConfig['capabilities']> = {};
+      if (model.capabilitiesKnown.tools) capabilities.tools = model.tools;
+      if (model.capabilitiesKnown.input) capabilities.input = model.inputCapabilities;
+      if (model.capabilitiesKnown.output) capabilities.output = model.outputCapabilities;
+      if (Object.keys(capabilities).length > 0) entry.capabilities = capabilities;
       const variantIDs = parseVariantIDs(model.variants);
       if (variantIDs.length > 0 || model.savedVariants !== undefined) {
         entry.variants = variantIDs.map((id) => ({
@@ -790,6 +786,7 @@ export function validateCustomProvider(input: ValidateCustomProviderInput): Vali
         env,
         baseURL,
         tls,
+        canonical: input.form.canonical === null ? undefined : input.form.canonical || null,
         headers: headerConfig,
         models: modelConfig,
         nativeCompaction: input.form.nativeCompaction,
@@ -818,6 +815,7 @@ function buildCustomProviderConfig(input: {
   env?: string;
   baseURL: string;
   tls?: StoredClientCertificate | null;
+  canonical?: string | null;
   headers: Record<string, string>;
   models: Record<string, CustomProviderModelConfig>;
   nativeCompaction?: boolean;
@@ -832,6 +830,7 @@ function buildCustomProviderConfig(input: {
   };
   if (input.nativeCompaction) config.settings.compaction = { type: 'native' };
   if (input.tls !== undefined) config.settings.tls = input.tls;
+  if (input.canonical !== undefined) config.canonical = input.canonical;
   if (input.env) config.env = [input.env];
   if (Object.keys(input.headers).length > 0) config.headers = input.headers;
   return config;

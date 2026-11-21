@@ -21,7 +21,7 @@ import { useChatSessionSelection } from './chatColumnSession';
 import * as sessionActions from '@/sync/session-actions';
 import { agentUnavailableFrom, connectionLostMessage, isFormRequestNotFoundError } from '@/sync/form-request-error';
 import { useMobileAutocompleteMaxHeight } from './useMobileAutocompleteMaxHeight';
-import { FormDockModeContext } from './formsInChat';
+import { FormDockModeContext, formWaitingBlockId } from './formsInChat';
 import { FormFieldControl } from './FormFieldControl';
 import { WebSearchConsentDock } from './WebSearchConsent';
 import { FormMarkdown } from './FormMarkdown';
@@ -48,6 +48,9 @@ interface FormDockProps {
     hidden: boolean;
 }
 
+const dockKey = (form: FormRequest, directory: string | undefined, runtimeKey: string): string =>
+    Object.values(formDraftScope(form, directory, runtimeKey)).join('\u0000');
+
 const FormDockView: React.FC<FormDockProps> = ({ sessionId, directory, hidden }) => {
     const mode = React.useContext(FormDockModeContext);
     const inChat = mode === 'in-chat';
@@ -72,7 +75,7 @@ const FormDockView: React.FC<FormDockProps> = ({ sessionId, directory, hidden })
                         sessionId={sessionId}
                         form={first}
                         formIds={[...forms.map((item) => item.id), ...recovered.map((item) => item.form.id)]}
-                        groups={presented}
+                        groups={[...presented, ...recovered.map(item => ({ form: item.form }))]}
                     />
                 )}
             </AnimatePresence>
@@ -82,11 +85,11 @@ const FormDockView: React.FC<FormDockProps> = ({ sessionId, directory, hidden })
         <AnimatePresence>
             {hidden ? null : form ? (
                 webSearchConsent
-                    ? <WebSearchConsentDock key={form.id} form={form} consent={webSearchConsent} />
-                    : <FormDockPanel key={JSON.stringify(formDraftScope(form, directory, runtimeKey))} form={form} forms={forms} directory={directory} runtimeKey={runtimeKey} asyncForms={asyncForms} readingHistory={readingHistory} />
+                    ? <WebSearchConsentDock key={dockKey(form, directory, runtimeKey)} form={form} consent={webSearchConsent} />
+                    : <FormDockPanel key={dockKey(form, directory, runtimeKey)} form={form} forms={forms} directory={directory} runtimeKey={runtimeKey} asyncForms={asyncForms} readingHistory={readingHistory} />
             ) : recoveredFirst ? (
                 <FormDockPanel
-                    key={JSON.stringify(formDraftScope(recoveredFirst.form, recoveredFirst.directory ?? directory, runtimeKey))}
+                    key={dockKey(recoveredFirst.form, recoveredFirst.directory ?? directory, runtimeKey)}
                     form={recoveredFirst.form}
                     forms={forms}
                     directory={directory}
@@ -108,8 +111,8 @@ const FormDockPointer: React.FC<{
     const { t } = useI18n();
     const reveal = React.useCallback((formId: string) => {
         const pageId = groups.find(group => group.asyncForms?.some(member => member.id === formId))?.form.id ?? formId;
-        if (sessionId) revealWaitingPage(sessionId, pageId);
-    }, [sessionId, groups]);
+        if (sessionId) revealWaitingPage(sessionId, formWaitingBlockId(groups.find(group => group.form.id === pageId)?.form ?? form));
+    }, [sessionId, groups, form]);
     // "Open session" on a question's toast lands on that question's card.
     useRequestReveal(formIds, reveal);
     const title = form.title?.trim() || t('chat.formCard.inputNeeded');

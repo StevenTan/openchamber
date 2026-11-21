@@ -47,6 +47,7 @@ import { sidebarWorkI18n } from './sidebar-work.i18n';
 import { sidebarSectionsI18n } from './sidebar-sections.i18n';
 import { worktreeArchiveI18n } from './worktree-archive.i18n';
 import { operatorChildrenI18n } from './operator-children.i18n';
+import { leadI18n } from './lead.i18n';
 import { omniSearchI18n } from './omni-search.i18n';
 import { overviewI18n } from './overview.i18n';
 import { isolatedSpacesI18n } from './isolated-spaces.i18n';
@@ -252,6 +253,7 @@ export const dict: Record<I18nKey, string> = {
   ...sidebarSectionsI18n.es,
   ...worktreeArchiveI18n.es,
   ...operatorChildrenI18n.es,
+  ...leadI18n.es,
   ...omniSearchI18n.es,
   ...overviewI18n.es,
   ...isolatedSpacesI18n.es,
@@ -1577,6 +1579,10 @@ export const dict: Record<I18nKey, string> = {
   "walkthrough.observation.unproven": "Sin prueba",
   "walkthrough.observation.unprovenHint": "Ninguna prueba comprueba la promesa principal de este cambio.",
   "walkthrough.help.guide": "Cómo funcionan los walkthroughs",
+  "walkthrough.export.markdown": "Exportar como Markdown",
+  "walkthrough.export.html": "Exportar como HTML",
+  "walkthrough.export.failed": "No se pudo exportar el recorrido",
+  "walkthrough.export.menuAria": "Exportar recorrido",
   "walkthrough.blocked.noModel.title": "No hay ningún modelo pequeño disponible",
   "walkthrough.blocked.noModel.description": "Inicia sesión en un proveedor de modelos para generar una revisión.",
   "walkthrough.blocked.emptyDiff.title": "Nada que revisar",

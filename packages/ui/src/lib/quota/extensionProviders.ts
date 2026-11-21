@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isOpenCodeProviderId, QUOTA_PROVIDERS_MAX } from '@openchamber/sdk';
 
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import type { ExtensionQuotaProviderId, QuotaProviderId } from '@/types';
@@ -11,6 +12,7 @@ export type ExtensionQuotaProvider = {
   name: string;
   icon: string;
   guestId: string;
+  providers: string[];
 };
 
 export const isExtensionQuotaProviderId = (providerId: string): providerId is ExtensionQuotaProviderId => providerId.startsWith('ext-');
@@ -21,6 +23,7 @@ const extensionQuotaProviderSchema = z.object({
   name: z.string().trim().min(1),
   icon: z.string().trim().min(1),
   guestId: z.string().regex(/^[a-z][a-z0-9-]{0,27}$/),
+  providers: z.array(z.string().refine(isOpenCodeProviderId)).max(QUOTA_PROVIDERS_MAX).default([]),
 });
 const providersAnswerSchema = z.object({ extensions: z.array(extensionQuotaProviderSchema).max(64) });
 
@@ -30,17 +33,20 @@ export const fetchExtensionQuotaProviders = async ({ signal }: { signal?: AbortS
   return providersAnswerSchema.parse(await response.json()).extensions;
 };
 
+const sameProviders = (a: readonly string[], b: readonly string[]): boolean => a.length === b.length && a.every((id, index) => id === b[index]);
+
 export const sameExtensionQuotaProviders = (a: readonly ExtensionQuotaProvider[], b: readonly ExtensionQuotaProvider[]): boolean => (
   a.length === b.length && a.every((entry, index) => {
     const other = b[index];
-    return entry.id === other.id && entry.name === other.name && entry.icon === other.icon && entry.guestId === other.guestId;
+    return entry.id === other.id && entry.name === other.name && entry.icon === other.icon && entry.guestId === other.guestId
+      && sameProviders(entry.providers, other.providers);
   })
 );
 
 /** Saved usage configurations followed by the extensions' providers. */
 export const quotaProviderList = (extensionProviders: readonly ExtensionQuotaProvider[], configurations: readonly QuotaConfiguration[] | null = null): QuotaProviderMeta[] => [
   ...(configurations ?? []).map(({ id, name, templateId }) => ({ id, name, templateId })),
-  ...extensionProviders.map(({ id, name }) => ({ id, name })),
+  ...extensionProviders.map(({ id, name, providers }) => ({ id, name, providers })),
 ];
 
 /** The ids of every usage provider to draw, in the same order. */

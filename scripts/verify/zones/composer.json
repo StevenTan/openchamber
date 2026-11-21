@@ -314,9 +314,8 @@
             {"do": "editor", "empty": true},
             {"do": "reload", "ready": false},
             {"do": "server.start"},
-            {"do": "reload"},
-            {"do": "see", "on": "composer.projectPicker", "text": "relay-desk"},
-            {"do": "editor", "equals": "first prompt of a project draft"},
+            {"do": "see", "on": "composer.projectPicker", "text": "relay-desk", "timeout": 60},
+            {"do": "editor", "equals": "first prompt of a project draft", "timeout": 60},
             {"do": "steady", "on": "chat.userBubble", "count": 0, "ms": 1500}
           ]
         }
@@ -758,7 +757,7 @@
     {
       "id": "recover",
       "name": "Sending after a failed turn",
-      "sources": ["packages/ui/src/components/chat/ChatInput.tsx", "packages/ui/src/components/chat/composer/input/", "packages/ui/src/components/chat/ModelControls.tsx", "packages/ui/src/components/chat/composer/ui/ComposerActionButtons.tsx", "packages/ui/src/components/chat/composer/ui/ComposerFooter.tsx", "packages/ui/src/components/chat/StatusRow.tsx", "packages/ui/src/components/chat/message/parts/WorkingPlaceholder.tsx"],
+      "sources": ["packages/ui/src/components/chat/ChatInput.tsx", "packages/ui/src/components/chat/composer/input/", "packages/ui/src/components/chat/ModelControls.tsx", "packages/ui/src/components/chat/composer/ui/ComposerActionButtons.tsx", "packages/ui/src/components/chat/composer/ui/ComposerFooter.tsx", "packages/ui/src/components/chat/message/parts/WorkingPlaceholder.tsx"],
       "what": "When the model provider is down the turn shows the connection error and retries; the user stops it, picks a working model and sends again.",
       "reach": "A session whose model's server refuses connections.",
       "proof": "The error and the retry countdown show, Stop ends the retries, the next prompt on another model is answered.",

@@ -1,4 +1,4 @@
-import { expect, spyOn, test } from 'bun:test';
+import { afterEach, beforeEach, expect, spyOn, test } from 'bun:test';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { installHookTestDom } from '@/components/session/sidebar/test-utils/testDom';
@@ -6,6 +6,19 @@ import { initializeRuntimeEndpoint } from '@/lib/runtime-switch';
 import { QUOTA_PROVIDERS } from '@/lib/quota';
 import { useConfigStore } from './useConfigStore';
 import { refreshTrayQuotas, useQuotaAutoRefresh, useQuotaStore } from './useQuotaStore';
+
+const configurations = QUOTA_PROVIDERS.map(entry => ({ id: entry.id, name: entry.name, templateId: entry.id, source: 'account' as const, providerId: null, revision: 'initial' }));
+let server: ReturnType<typeof spyOn<typeof globalThis, 'fetch'>>;
+beforeEach(() => {
+  server = spyOn(globalThis, 'fetch').mockImplementation(async input => {
+    const url = String(input);
+    if (url.endsWith('/api/quota/configurations')) return Response.json({ configurations, catalogRevision: 1, providerResponseTemplates: [] });
+    if (url.endsWith('/api/quota/extensions')) return Response.json({ extensions: [] });
+    if (url.endsWith('/api/quota/providers')) return Response.json({ providers: configurations.map(entry => entry.id) });
+    return Response.json({});
+  });
+});
+afterEach(() => server.mockRestore());
 
 test('tray launch seeds dropdown quotas and native openings share freshness even in a hidden window', async () => {
   const dom = installHookTestDom();
@@ -16,7 +29,7 @@ test('tray launch seeds dropdown quotas and native openings share freshness even
   const initialized = useConfigStore.getState().isInitialized;
   useConfigStore.setState({ isInitialized: true });
   useQuotaStore.getState().resetForRuntimeSwitch();
-  useQuotaStore.setState({ dropdownProviderIds: ['claude'] });
+  useQuotaStore.setState({ dropdownProviderIds: ['claude'], savedDropdownProviderIds: ['claude'] });
   const actions = { loadSettings: useQuotaStore.getState().loadSettings, fetchProviderQuota: useQuotaStore.getState().fetchProviderQuota };
   let now = 100_000;
   const clock = spyOn(Date, 'now').mockImplementation(() => now);
@@ -115,7 +128,7 @@ test('quota fetches belong to shown readouts and stop while the document is hidd
   const previousInitialized = useConfigStore.getState().isInitialized;
   useConfigStore.setState({ isInitialized: true });
   useQuotaStore.getState().resetForRuntimeSwitch();
-  useQuotaStore.setState({ dropdownProviderIds: ['claude'] });
+  useQuotaStore.setState({ dropdownProviderIds: ['claude'], savedDropdownProviderIds: ['claude'] });
   let now = 100_000;
   let nextTimer = 0;
   const timers = new Map<number, () => void>();
@@ -138,6 +151,7 @@ test('quota fetches belong to shown readouts and stop while the document is hidd
     listeners.delete(listener);
     events.removeEventListener(type, listener);
   });
+  const actions = { loadSettings: useQuotaStore.getState().loadSettings, fetchProviderQuota: useQuotaStore.getState().fetchProviderQuota };
   const settings = spyOn(useQuotaStore.getState(), 'loadSettings').mockResolvedValue();
   const fetch = spyOn(useQuotaStore.getState(), 'fetchProviderQuota').mockResolvedValue(true);
   const Readout = ({ visible = true, all = false }: { visible?: boolean; all?: boolean }) => {
@@ -203,7 +217,7 @@ test('quota fetches belong to shown readouts and stop while the document is hidd
 
     await render(null);
     useQuotaStore.getState().resetForRuntimeSwitch();
-    useQuotaStore.setState({ dropdownProviderIds: ['claude'] });
+    useQuotaStore.setState({ dropdownProviderIds: ['claude'], savedDropdownProviderIds: ['claude'] });
     const beforeSlowSettings = fetch.mock.calls.length;
     let finishSettings = () => {};
     const slowSettings = new Promise<void>(resolve => { finishSettings = resolve; });
@@ -218,6 +232,7 @@ test('quota fetches belong to shown readouts and stop while the document is hidd
   } finally {
     await act(async () => root.unmount());
     for (const spy of [clock, interval, clear, add, remove, settings, fetch]) spy.mockRestore();
+    useQuotaStore.setState(actions);
     useConfigStore.setState({ isInitialized: previousInitialized });
     useQuotaStore.getState().resetForRuntimeSwitch();
     if (locationDescriptor) Object.defineProperty(window, 'location', locationDescriptor);
@@ -247,7 +262,9 @@ test('hidden native windows stop quota requests even when Chromium reports visib
   const previousInitialized = useConfigStore.getState().isInitialized;
   useConfigStore.setState({ isInitialized: true });
   useQuotaStore.getState().resetForRuntimeSwitch();
-  useQuotaStore.setState({ dropdownProviderIds: ['claude'] });
+  useQuotaStore.setState({ dropdownProviderIds: ['claude'], savedDropdownProviderIds: ['claude'] });
+  // Spies sit on one store snapshot; restore the real actions on the current store explicitly.
+  const actions = { loadSettings: useQuotaStore.getState().loadSettings, fetchProviderQuota: useQuotaStore.getState().fetchProviderQuota };
   let now = 100_000;
   const callbacks: Array<() => void> = [];
   const clock = spyOn(Date, 'now').mockImplementation(() => now);
@@ -283,6 +300,7 @@ test('hidden native windows stop quota requests even when Chromium reports visib
   } finally {
     await act(async () => root.unmount());
     for (const spy of [clock, interval, clear, settings, fetch]) spy.mockRestore();
+    useQuotaStore.setState(actions);
     useConfigStore.setState({ isInitialized: previousInitialized });
     useQuotaStore.getState().resetForRuntimeSwitch();
     for (const [key, descriptor] of descriptors) {

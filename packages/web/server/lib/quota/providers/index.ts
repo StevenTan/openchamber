@@ -279,7 +279,7 @@ const fetchQuotaForProviderUncoalesced = async (providerId: string | null) => {
 export const fetchQuotaForProvider = (providerId: string | null) => {
   const configuration = readQuotaConfiguration(providerId ?? undefined);
   const key = configuration ? `${providerId}:${configuration.revision}` : providerId;
-  const existing = pendingFetches.get(key);
+  const existing = configuration?.templateId === claude.providerId ? undefined : pendingFetches.get(key);
   if (existing) return existing;
   const pending = (async () => {
     if (!configuration) {

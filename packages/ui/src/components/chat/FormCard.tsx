@@ -38,27 +38,17 @@ interface FormCardProps {
     recovered?: RecoveredQuestion;
     asyncForms?: FormRequest[];
     inChat?: boolean;
+    keepDraft?: boolean;
     directory?: string;
 }
 
-/**
- * The inline card for a form request, used where a dock cannot float: the
- * BTW sheet renders its child session's forms with it, and the main chat
- * renders them at its end when questions are set to show in the chat
- * (`TranscriptForms`). Otherwise the main composer shows forms in
- * `FormDock`, one field at a time.
- *
- * A form request is a single blocking question with typed fields, so the card
- * renders every visible field at once and submits one answer. Fields gated by
- * a `when` clause appear and disappear as their controlling field changes.
- */
-export const FormCard: React.FC<FormCardProps> = ({ form, recovered, asyncForms, inChat, directory }) => {
+export const FormCard: React.FC<FormCardProps> = ({ form, recovered, asyncForms, inChat, keepDraft, directory }) => {
     const webSearchConsent = readWebSearchConsent(form);
     if (webSearchConsent) return <WebSearchConsentCard form={form} consent={webSearchConsent} />;
-    return <GenericFormCard form={form} recovered={recovered} asyncForms={asyncForms} inChat={inChat} directory={directory} />;
+    return <GenericFormCard form={form} recovered={recovered} asyncForms={asyncForms} inChat={inChat} keepDraft={keepDraft} directory={directory} />;
 };
 
-const GenericFormCard: React.FC<FormCardProps> = ({ form, recovered, asyncForms, inChat = false, directory }) => {
+const GenericFormCard: React.FC<FormCardProps> = ({ form, recovered, asyncForms, inChat = false, keepDraft = false, directory }) => {
     const { t } = useI18n();
     const isMobile = useUIStore((state) => state.isMobile);
     const { sessionId: currentSessionId, directory: currentSessionDirectory } = useChatSessionSelection();
@@ -75,8 +65,8 @@ const GenericFormCard: React.FC<FormCardProps> = ({ form, recovered, asyncForms,
     const fieldsSignature = fields.map((field) => `${field.key}:${field.type}`).join('|');
     const recoveryDirectory = recovered?.directory;
     const draftScope = React.useMemo(
-        () => (recoveryDirectory !== undefined || asyncForms || inChat ? formDraftScope(form, recoveryDirectory ?? directory ?? transcriptDirectory ?? undefined) : null),
-        [asyncForms, transcriptDirectory, form, recoveryDirectory, directory, inChat],
+        () => (recoveryDirectory !== undefined || asyncForms || keepDraft || inChat ? formDraftScope(form, recoveryDirectory ?? directory ?? transcriptDirectory ?? undefined) : null),
+        [asyncForms, keepDraft, transcriptDirectory, form, recoveryDirectory, directory, inChat],
     );
     const [restored] = React.useState(() => {
         const draft = draftScope ? loadFormDraft(draftScope) : null;
@@ -118,7 +108,8 @@ const GenericFormCard: React.FC<FormCardProps> = ({ form, recovered, asyncForms,
 
     React.useEffect(() => {
         if (!draftScope) return;
-        saveFormDraft(draftScope, { fieldsSignature, values, step: 0 });
+        const stored = loadFormDraft(draftScope);
+        saveFormDraft(draftScope, { fieldsSignature, values, step: stored?.fieldsSignature === fieldsSignature ? stored.step : 0 });
         savedValuesRef.current = values;
     }, [draftScope, fieldsSignature, values]);
 

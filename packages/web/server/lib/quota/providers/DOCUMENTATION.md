@@ -73,6 +73,8 @@ Account entries select a built-in reader by template ID. Provider-bound entries
 read response usage. Public results carry the saved entry's ID and name;
 attached extension providers retain their own IDs. Pending requests for a saved
 entry are keyed by its ID and revision.
+Claude owns its pending requests so the registry cannot join requests for
+different homes; its reads still pass the registry's error normalization.
 
 `getAuthEntry` and `normalizeAuthEntry` do not validate credential fields.
 Credential readers narrow the fields they use.

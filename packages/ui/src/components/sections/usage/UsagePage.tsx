@@ -87,6 +87,8 @@ export const UsagePage: React.FC = () => {
   const templateName = QUOTA_PROVIDERS.find(provider => provider.id === configuration?.templateId)?.name;
   const usageTitle = t('settings.usage.page.header.providerUsage', { provider: providerName });
   const usage = selectedResult?.usage;
+  const accountLabel = selectedResult?.accountLabel;
+  const isOpenCodeGo = configuration?.templateId === 'opencode-go';
   const refreshError = selectedProviderId ? refreshErrors[selectedProviderId] : undefined;
   const selectedProviderError = refreshError
     ? usage
@@ -190,9 +192,9 @@ export const UsagePage: React.FC = () => {
             plan: selectedResult.planLabel,
             time: formatTime(lastUpdated, timeFormatPreference),
           })
-        ) : selectedResult?.accountLabel ? (
+        ) : accountLabel && !isOpenCodeGo ? (
           t('settings.usage.page.header.lastUpdatedWithAccount', {
-            account: selectedResult.accountLabel,
+            account: accountLabel,
             time: formatTime(lastUpdated, timeFormatPreference),
           })
         ) : (
@@ -250,7 +252,10 @@ export const UsagePage: React.FC = () => {
       )}
 
       {usage?.windows && Object.keys(usage.windows).length > 0 && (
-        <SettingsSection settingsItem="usage.model-quotas">
+        <SettingsSection
+          settingsItem="usage.model-quotas"
+          description={isOpenCodeGo && accountLabel ? <bdi className="wrap-anywhere">{accountLabel}</bdi> : undefined}
+        >
           <div className="divide-y divide-[var(--surface-subtle)]">
             {Object.entries(usage.windows).map(([label, window]) => (
               <UsageCard key={label} title={label} window={window} providerId={selectedProviderId} showGiftReset />

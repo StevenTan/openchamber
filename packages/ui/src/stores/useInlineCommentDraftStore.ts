@@ -31,6 +31,8 @@ export interface InlineCommentDraft {
   anchor?: ChatQuoteAnchor;
   provider?: SourceControlProvider;
   origin?: DiffCommentOrigin;
+  composing?: boolean;
+  screenshot?: string;
   createdAt: number;
 }
 
@@ -143,6 +145,7 @@ const persistedDraftSchema = z.object({
   anchor: chatQuoteAnchorSchema.optional(),
   provider: sourceControlProviderIdSchema.optional(),
   origin: diffCommentOriginSchema.optional(),
+  composing: z.boolean().optional(),
   createdAt: z.number(),
 });
 

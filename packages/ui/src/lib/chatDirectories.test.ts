@@ -57,6 +57,17 @@ describe('server-owned chat directories', () => {
     expect(getKnownChatsRoots()).toEqual(['/home/user/Documents/OpenChamber', '/home/user/.config/openchamber/chats']);
   });
 
+  test('classifies a folder against the roots of the runtime it is asked on', async () => {
+    await ensureChatsRootDirectory();
+    expect(getChatsRootFromDirectory('/srv/chats/day/session-a')).toBe('/srv/chats');
+    nextRuntime();
+    home.mockResolvedValue({ home: '/home/user', chatsRoot: '/srv/other' });
+    expect(getChatsRootFromDirectory('/srv/chats/day/session-a')).toBeNull();
+    await ensureChatsRootDirectory();
+    expect(getChatsRootFromDirectory('/srv/chats/day/session-a')).toBeNull();
+    expect(getChatsRootFromDirectory('/srv/other/day/session-a')).toBe('/srv/other');
+  });
+
   for (const mode of ['current', 'captured']) {
     test(`deletes real descendants but never shared roots, lookalikes, or traversal paths on the ${mode} runtime`, async () => {
       const deleteDirectory = mode === 'captured' ? await captureChatDirectoryCleanup(getRuntimeKey()) : deleteChatDirectory;

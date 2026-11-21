@@ -65,6 +65,14 @@ export interface ControlInput {
   withStatus?: unknown;
   inWork?: unknown;
   busy?: unknown;
+  mine?: unknown;
+  brief?: unknown;
+  edits?: unknown;
+  needsYou?: unknown;
+  now?: unknown;
+  news?: unknown;
+  suggestions?: unknown;
+  leadId?: unknown;
   all?: unknown;
   children?: unknown;
   query?: unknown;

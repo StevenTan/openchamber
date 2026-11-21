@@ -47,6 +47,7 @@ import { sidebarWorkI18n } from './sidebar-work.i18n';
 import { sidebarSectionsI18n } from './sidebar-sections.i18n';
 import { worktreeArchiveI18n } from './worktree-archive.i18n';
 import { operatorChildrenI18n } from './operator-children.i18n';
+import { leadI18n } from './lead.i18n';
 import { omniSearchI18n } from './omni-search.i18n';
 import { overviewI18n } from './overview.i18n';
 import { isolatedSpacesI18n } from './isolated-spaces.i18n';
@@ -242,6 +243,7 @@ export const dict: Record<I18nKey, string> = {
   ...sidebarSectionsI18n['zh-TW'],
   ...worktreeArchiveI18n['zh-TW'],
   ...operatorChildrenI18n['zh-TW'],
+  ...leadI18n['zh-TW'],
   ...omniSearchI18n['zh-TW'],
   ...overviewI18n['zh-TW'],
   ...isolatedSpacesI18n['zh-TW'],
@@ -1606,6 +1608,10 @@ export const dict: Record<I18nKey, string> = {
   'walkthrough.observation.unproven': '未測試',
   'walkthrough.observation.unprovenHint': '沒有測試驗證這次變更的主要承諾。',
   'walkthrough.help.guide': 'Walkthrough 的運作方式',
+  'walkthrough.export.markdown': '匯出為 Markdown',
+  'walkthrough.export.html': '匯出為 HTML',
+  'walkthrough.export.failed': '無法匯出導讀',
+  'walkthrough.export.menuAria': '匯出導讀',
   'walkthrough.blocked.noModel.title': '沒有可用的小模型',
   'walkthrough.blocked.noModel.description': '請先登入模型供應商再產生審閱。',
   'walkthrough.blocked.emptyDiff.title': '沒有可審閱的內容',

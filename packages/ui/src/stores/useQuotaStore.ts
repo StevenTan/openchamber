@@ -17,6 +17,7 @@ import { runBackgroundNetworkTask } from '@/lib/background-network';
 const QUOTA_REFRESH_INTERVAL_MS = 3 * 60 * 1000;
 const QUOTA_OPEN_FRESHNESS_MS = 15 * 1000;
 let quotaGeneration = 0;
+let claudeSelectionRevision = 0;
 let inFlightRuntimeLoad: Promise<void> | null = null;
 let inFlightExtensionLoad: Promise<void> | null = null;
 let extensionLoadAgain = false;
@@ -76,6 +77,7 @@ interface QuotaStore extends QuotaSettingsState {
   ensureLoadedForRuntime: (options?: { refresh?: boolean; allProviders?: boolean; visibleOnly?: boolean }) => Promise<void>;
   resetForRuntimeSwitch: () => void;
   refreshAfterCredentialChange: () => Promise<void>;
+  reconcileClaudeSelection: (options: { changed: boolean }) => Promise<void>;
 }
 
 const resolveDropdownProviderIds = (saved: readonly string[] | null, known: readonly QuotaProviderId[]): QuotaProviderId[] => (
@@ -115,20 +117,25 @@ const applyExtensionProviders = (next: ExtensionQuotaProvider[]): void => {
   if (sameExtensionQuotaProviders(state.extensionProviders, next)) return;
   const gone = state.extensionProviders.map((previous) => previous.id).filter((id) => !next.some((entry) => entry.id === id));
   const isGone = (id: string): boolean => gone.some((goneId) => goneId === id);
-  for (const id of gone) {
+  const replaced = state.extensionProviders
+    .filter((previous) => next.some((entry) => entry.id === previous.id && !sameExtensionQuotaProviders([previous], [entry])))
+    .map((previous) => previous.id);
+  const stale = [...gone, ...replaced];
+  const isStale = (id: string): boolean => stale.some((staleId) => staleId === id);
+  for (const id of stale) {
     quotaRequests.get(id)?.controller.abort();
     quotaRequests.delete(id);
   }
   useQuotaStore.setState((current) => {
     const refreshErrors = { ...current.refreshErrors };
-    for (const id of gone) delete refreshErrors[id];
+    for (const id of stale) delete refreshErrors[id];
     return {
       extensionProviders: next,
       dropdownProviderIds: resolveDropdownProviderIds(current.savedDropdownProviderIds, quotaProviderIds(next, current.configurations)),
-      results: gone.length > 0 ? current.results.filter((result) => !isGone(result.providerId)) : current.results,
+      results: stale.length > 0 ? current.results.filter((result) => !isStale(result.providerId)) : current.results,
       refreshErrors,
       selectedProviderId: current.selectedProviderId !== null && isGone(current.selectedProviderId) ? null : current.selectedProviderId,
-      isFetchingProvider: Object.fromEntries(Object.entries(current.isFetchingProvider).filter(([id]) => !isGone(id))),
+      isFetchingProvider: Object.fromEntries(Object.entries(current.isFetchingProvider).filter(([id]) => !isStale(id))),
       isLoading: quotaRequests.size > 0,
     };
   });
@@ -295,6 +302,7 @@ export const useQuotaStore = create<QuotaStore>()(
 
       fetchQuotas: async (providerIds, { invalidate = false } = {}) => {
         const generation = quotaGeneration;
+        const claudeRevision = claudeSelectionRevision;
         const revisions = new Map(get().configurations?.map(entry => [entry.id, entry.revision]));
         try {
           if (!invalidate) set({ isLoading: true });
@@ -305,7 +313,8 @@ export const useQuotaStore = create<QuotaStore>()(
             if (id.startsWith('ext-')) return current.extensionProviders.some(entry => entry.id === id);
             if (current.configurations === null) return true;
             const configuration = current.configurations.find(entry => entry.id === id);
-            return configuration !== undefined && configuration.revision === revisions.get(id);
+            return configuration !== undefined && configuration.revision === revisions.get(id)
+              && (configuration.templateId !== 'claude' || configuration.source !== 'account' || claudeRevision === claudeSelectionRevision);
           });
           const absent = configured ? active.filter((providerId) => !configured.has(providerId)) : [];
           const targets = active.filter((providerId) => !absent.includes(providerId));
@@ -356,7 +365,7 @@ export const useQuotaStore = create<QuotaStore>()(
               const message = result.error || 'Failed to fetch quota';
               set(state => {
                 const previous = state.results.find(entry => entry.providerId === providerId);
-                const keepPrevious = previous?.configured && !invalidate;
+                const keepPrevious = previous?.configured && !invalidate && previous.selection === result.selection;
                 const results = keepPrevious
                   ? state.results
                   : [...state.results.filter(entry => entry.providerId !== providerId), result];
@@ -485,6 +494,41 @@ export const useQuotaStore = create<QuotaStore>()(
         await get().ensureLoadedForRuntime({ refresh: true, allProviders: [...quotaAutoRefreshConsumers.values()].some(Boolean), visibleOnly: true });
       },
 
+      reconcileClaudeSelection: async ({ changed }) => {
+        lastVisibleRefreshAt = null;
+        lastVisibleRefreshIncludedAll = false;
+        const providerIds = new Set(get().configurations?.filter(entry => entry.templateId === 'claude' && entry.source === 'account').map(entry => entry.id));
+        if (changed) {
+          claudeSelectionRevision += 1;
+          configuredProvidersRequest = null;
+          for (const providerId of providerIds) {
+            quotaRequests.get(providerId)?.controller.abort();
+            quotaRequests.delete(providerId);
+          }
+          set(state => {
+            const refreshErrors = { ...state.refreshErrors };
+            const isFetchingProvider = { ...state.isFetchingProvider };
+            for (const providerId of providerIds) {
+              delete refreshErrors[providerId];
+              isFetchingProvider[providerId] = false;
+            }
+            return {
+              results: state.results.filter(entry => !providerIds.has(entry.providerId)),
+              refreshErrors,
+              error: Object.values(refreshErrors)[0] ?? null,
+              isFetchingProvider,
+              isLoading: quotaRequests.size > 0,
+            };
+          });
+        } else if (!get().results.some(entry => providerIds.has(entry.providerId))) {
+          return;
+        }
+        if (!hasVisibleQuotaReadout() || !useConfigStore.getState().isInitialized) {
+          if (changed) set({ loadedRuntimeKey: null });
+          return;
+        }
+        await Promise.all([...providerIds].map(providerId => get().fetchProviderQuota(providerId, changed)));
+      },
       startConfiguration: () => set({ isCreatingConfiguration: true }),
       setSelectedProvider: (providerId) => set({ selectedProviderId: providerId, isCreatingConfiguration: false }),
       setDisplayMode: (mode) => set({ displayMode: mode }),

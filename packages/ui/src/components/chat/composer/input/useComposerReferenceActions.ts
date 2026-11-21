@@ -4,6 +4,7 @@ import type { useComposerRuntime } from './useComposerRuntime';
 import type { useComposerReferencePickerState } from './useComposerReferencePickerState';
 import type { useComposerReferencePicker } from './useComposerReferencePicker';
 import type { useComposerReferenceDrafts } from './useComposerReferenceDrafts';
+import type { useComposerColumn } from './useComposerColumn';
 
 import React from 'react';
 import { useUIStore } from '@/stores/useUIStore';
@@ -12,7 +13,8 @@ import { toast } from '@/components/ui';
 import { isMobileSurfaceRuntime } from '@/lib/runtimeSurface';
 import { openGuestSurface } from '@/lib/guests/open-surface';
 import { guestPanelOpensHere } from '@/lib/guests/phone';
-import { type ComposerReference } from '../../composer/composerReferences';
+import { withComposerReferences, type ComposerReference } from '../../composer/composerReferences';
+import { usePendingComposerReferences, resolveComposerReferenceHandoffTarget, type ComposerReferenceHandoff } from '../../composer/pendingComposerReferences';
 
 import { trackerPresentation } from '@/lib/trackers/presentation';
 import { trackerReferenceSource } from '@/components/references/referencePickerItems';
@@ -24,8 +26,9 @@ import { isGuestActive } from '@/lib/guests/capabilities';
 import { pluginModeFromId } from '@/lib/surfaces/modes';
 
 type Dependencies = {
-    referenceDrafts: Pick<ReturnType<typeof useComposerReferenceDrafts>, 'setAttachDialogItem' | 'setAttachDialogGuestId'>;
-    sessionScope: Pick<ReturnType<typeof useComposerSessionScope>, 'currentDirectory'>;
+    referenceDrafts: Pick<ReturnType<typeof useComposerReferenceDrafts>, 'setAttachDialogItem' | 'setAttachDialogGuestId' | 'handleGuestAttach' | 'updateLinkedReferences'>;
+    sessionScope: Pick<ReturnType<typeof useComposerSessionScope>, 'currentDirectory' | 'pendingGuestIssue' | 'isBtwActive' | 'consumePendingGuestIssue' | 'currentSessionId' | 'newSessionDraftOpen' | 'newSessionDraft' | 'activeRuntimeKey' | 'pendingComposerReferenceCount'>;
+    column: Pick<ReturnType<typeof useComposerColumn>, 'columnPinned'>;
     i18n: Pick<ReturnType<typeof useI18n>, 't'>;
     referencePicker: Pick<ReturnType<typeof useComposerReferencePicker>, 'trackerSources'>;
     referencePickerState: Pick<ReturnType<typeof useComposerReferencePickerState>, 'setReferencePicker'>;
@@ -33,10 +36,11 @@ type Dependencies = {
 };
 
 export function useComposerReferenceActions({
-    referenceDrafts, sessionScope, i18n, referencePicker, referencePickerState, runtime,
+    referenceDrafts, sessionScope, column, i18n, referencePicker, referencePickerState, runtime,
 }: Dependencies) {
-    const { setAttachDialogItem, setAttachDialogGuestId } = referenceDrafts;
-    const { currentDirectory } = sessionScope;
+    const { setAttachDialogItem, setAttachDialogGuestId, handleGuestAttach, updateLinkedReferences } = referenceDrafts;
+    const { currentDirectory, pendingGuestIssue, isBtwActive, consumePendingGuestIssue, currentSessionId, newSessionDraftOpen, newSessionDraft, activeRuntimeKey, pendingComposerReferenceCount } = sessionScope;
+    const { columnPinned } = column;
     const { t } = i18n;
 
 
@@ -101,6 +105,35 @@ export function useComposerReferenceActions({
         setAttachDialogItem(issue);
         setAttachDialogGuestId(issue.providerId);
     }, [currentDirectory, guestAttachItems, t, setAttachDialogItem, setAttachDialogGuestId]);
+
+    React.useEffect(() => {
+        if (!pendingGuestIssue || columnPinned || isBtwActive) {
+            return;
+        }
+        const issue = consumePendingGuestIssue();
+        if (issue) {
+            handleGuestAttach(issue);
+        }
+    }, [columnPinned, consumePendingGuestIssue, handleGuestAttach, isBtwActive, pendingGuestIssue]);
+
+    const composerReferenceHandoffTarget = React.useMemo<ComposerReferenceHandoff | null>(() => (
+        resolveComposerReferenceHandoffTarget({
+            columnPinned,
+            btwActive: isBtwActive,
+            currentSessionId,
+            draftOpen: newSessionDraftOpen,
+            workDraftId: newSessionDraft?.workDraftId ?? null,
+            runtimeKey: activeRuntimeKey,
+        })
+    ), [activeRuntimeKey, columnPinned, currentSessionId, isBtwActive, newSessionDraft?.workDraftId, newSessionDraftOpen]);
+
+    React.useEffect(() => {
+        if (pendingComposerReferenceCount === 0 || !composerReferenceHandoffTarget) return;
+        const references = usePendingComposerReferences.getState().consume(composerReferenceHandoffTarget);
+        if (references.length > 0) {
+            updateLinkedReferences((current) => withComposerReferences(current, references));
+        }
+    }, [composerReferenceHandoffTarget, pendingComposerReferenceCount, updateLinkedReferences]);
 
     const trackerPickers = React.useMemo<readonly ComposerTrackerPicker[]>(() => (
         !isVSCode

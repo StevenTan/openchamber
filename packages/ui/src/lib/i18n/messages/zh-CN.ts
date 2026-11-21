@@ -47,6 +47,7 @@ import { sidebarWorkI18n } from './sidebar-work.i18n';
 import { sidebarSectionsI18n } from './sidebar-sections.i18n';
 import { worktreeArchiveI18n } from './worktree-archive.i18n';
 import { operatorChildrenI18n } from './operator-children.i18n';
+import { leadI18n } from './lead.i18n';
 import { omniSearchI18n } from './omni-search.i18n';
 import { overviewI18n } from './overview.i18n';
 import { isolatedSpacesI18n } from './isolated-spaces.i18n';
@@ -242,6 +243,7 @@ export const dict: Record<I18nKey, string> = {
   ...sidebarSectionsI18n['zh-CN'],
   ...worktreeArchiveI18n['zh-CN'],
   ...operatorChildrenI18n['zh-CN'],
+  ...leadI18n['zh-CN'],
   ...omniSearchI18n['zh-CN'],
   ...overviewI18n['zh-CN'],
   ...isolatedSpacesI18n['zh-CN'],
@@ -1587,6 +1589,10 @@ export const dict: Record<I18nKey, string> = {
   'walkthrough.observation.unproven': '未测试',
   'walkthrough.observation.unprovenHint': '没有测试验证这次改动的主要承诺。',
   'walkthrough.help.guide': 'Walkthrough 的工作方式',
+  'walkthrough.export.markdown': '导出为 Markdown',
+  'walkthrough.export.html': '导出为 HTML',
+  'walkthrough.export.failed': '无法导出导读',
+  'walkthrough.export.menuAria': '导出导读',
   'walkthrough.blocked.noModel.title': '没有可用的小模型',
   'walkthrough.blocked.noModel.description': '请登录模型提供方后再生成评审。',
   'walkthrough.blocked.emptyDiff.title': '没有可评审的内容',

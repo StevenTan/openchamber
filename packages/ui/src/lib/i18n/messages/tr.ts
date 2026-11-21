@@ -45,6 +45,7 @@ import { sidebarWorkI18n } from './sidebar-work.i18n';
 import { sidebarSectionsI18n } from './sidebar-sections.i18n';
 import { worktreeArchiveI18n } from './worktree-archive.i18n';
 import { operatorChildrenI18n } from './operator-children.i18n';
+import { leadI18n } from './lead.i18n';
 import { omniSearchI18n } from './omni-search.i18n';
 import { overviewI18n } from './overview.i18n';
 import { isolatedSpacesI18n } from './isolated-spaces.i18n';
@@ -181,6 +182,7 @@ export const dict = {
   ...sidebarSectionsI18n.tr,
   ...worktreeArchiveI18n.tr,
   ...operatorChildrenI18n.tr,
+  ...leadI18n.tr,
   ...omniSearchI18n.tr,
   ...overviewI18n.tr,
   ...isolatedSpacesI18n.tr,
@@ -1462,6 +1464,10 @@ export const dict = {
   'walkthrough.observation.unproven': 'Test yok',
   'walkthrough.observation.unprovenHint': 'Değişikliğin ana vaadini hiçbir test sınamıyor.',
   'walkthrough.help.guide': 'İnceleme turları nasıl çalışır',
+  'walkthrough.export.markdown': 'Markdown olarak dışa aktar',
+  'walkthrough.export.html': 'HTML olarak dışa aktar',
+  'walkthrough.export.failed': 'İnceleme turu dışa aktarılamadı',
+  'walkthrough.export.menuAria': 'İnceleme turunu dışa aktar',
   'walkthrough.blocked.noModel.title': 'Kullanılabilir küçük model yok',
   'walkthrough.blocked.noModel.description': 'Bir inceleme oluşturmak için bir model provider\'ına giriş yap.',
   'walkthrough.blocked.emptyDiff.title': 'İncelenecek bir şey yok',

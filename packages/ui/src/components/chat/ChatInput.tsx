@@ -179,7 +179,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         fileIntake, runtime, i18n,
     });
     const referenceActions = useComposerReferenceActions({
-        referenceDrafts, sessionScope, i18n, referencePicker, referencePickerState, runtime,
+        referenceDrafts, sessionScope, column, i18n, referencePicker, referencePickerState, runtime,
     });
     const draftTarget = useComposerDraftTarget({
         sessionScope, runtime, mobilePanels, preferences, expansion, props,

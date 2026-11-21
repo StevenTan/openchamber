@@ -122,6 +122,7 @@ type ChangeRequestContext = {
     number: number;
     title: string;
     url: string;
+    sourceLinks?: string[];
 };
 
 /** A tracker's work item. Messages from before trackers carry `linear-issue`, read as Linear's. */
@@ -480,6 +481,7 @@ const canonicalContextPayloadSchema = z.discriminatedUnion('kind', [
         number: z.number().int().positive(),
         title: z.string(),
         url: z.string(),
+        sourceLinks: z.array(z.string()).optional(),
     }),
     z.object({
         kind: z.literal('tracker-item'),

@@ -47,6 +47,7 @@ import { sidebarWorkI18n } from './sidebar-work.i18n';
 import { sidebarSectionsI18n } from './sidebar-sections.i18n';
 import { worktreeArchiveI18n } from './worktree-archive.i18n';
 import { operatorChildrenI18n } from './operator-children.i18n';
+import { leadI18n } from './lead.i18n';
 import { omniSearchI18n } from './omni-search.i18n';
 import { overviewI18n } from './overview.i18n';
 import { isolatedSpacesI18n } from './isolated-spaces.i18n';
@@ -242,6 +243,7 @@ export const dict: Record<I18nKey, string> = {
   ...sidebarSectionsI18n.ja,
   ...worktreeArchiveI18n.ja,
   ...operatorChildrenI18n.ja,
+  ...leadI18n.ja,
   ...omniSearchI18n.ja,
   ...overviewI18n.ja,
   ...isolatedSpacesI18n.ja,
@@ -1583,6 +1585,10 @@ export const dict: Record<I18nKey, string> = {
   'walkthrough.observation.unproven': '未テスト',
   'walkthrough.observation.unprovenHint': 'この変更の主な約束を確かめるテストがありません。',
   'walkthrough.help.guide': 'ウォークスルーの仕組み',
+  'walkthrough.export.markdown': 'Markdown として書き出す',
+  'walkthrough.export.html': 'HTML として書き出す',
+  'walkthrough.export.failed': 'ウォークスルーを書き出せませんでした',
+  'walkthrough.export.menuAria': 'ウォークスルーを書き出す',
   'walkthrough.blocked.noModel.title': '利用できるスモールモデルがありません',
   'walkthrough.blocked.noModel.description': 'レビューを生成するにはモデルプロバイダーにサインインしてください。',
   'walkthrough.blocked.emptyDiff.title': 'レビュー対象がありません',

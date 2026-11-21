@@ -21,6 +21,9 @@
 - Mobile Turn scope reads persisted patches by session and turn ID, including
   external paths and non-Git projects. A chip request retains its selected turn
   and navigation across tablet pane remounts; missing records show unavailable.
+- A native device token belongs to every saved instance. Registration and removal go to every saved server once, each on its own: the relay binds a token to each server that registered it, so one server failing, or answering `localOnly` (a phone paired with it for the home network only, which it neither stores nor binds), leaves the others as they are. Only a phone whose active server is home-network-only and that has no other saved server skips the permission prompt and registration, and only then does the Notifications page disable the switch and explain why; with another saved server the switch stays on and a line says only the active server stays silent. Registrations and removals for saved servers run one after another (`mobilePushTokens.ts`), so removing an instance sends its unregister after a registration already on its way to it. Their direct requests pass the same `/health` identity gate as a connect probe before the saved client token is attached. The device token is kept in secure storage, so turning notifications off or removing an instance also works after a cold launch that never registered in this process. Turning notifications off removes the token from each saved server and the active runtime; removing an instance reads that server's credentials before they disappear and then unregisters from it; when that request fails, the server keeps the token.
+- A push carries `serverId` next to `sessionId`. Before opening its session the app switches to the saved instance with that identity, also on a cold start before any instance has connected, and holds the intent until the new runtime initializes. The switch accepts only an address that answers `/health` with that identity. A saved instance that never reported its identity is asked for it when a push names an unknown one. An unknown or unreachable instance leaves the session unopened rather than opening it on the active server.
+- A direct connection learns the server's identity from `/health` into `pushServerId` when it connects, so an older manually-added instance can still be matched by a later push. This field does not key the stored client token, so learning it cannot orphan the token or change the active runtime key.
 
 - Chat-side Settings entry points request the native Settings tab through `RuntimeAPIs.vscode`. They preserve chat selection, drafts and the current layout. The source's in-page dialog flag is cleared so it cannot block chat shortcuts.
 - Only the Settings root receives page navigation. The bridge parses it before applying it to stores, and the mounted root signals readiness before the host consumes pending navigation.
@@ -47,6 +50,7 @@
 - The connection heartbeat in the live connection's card on Instances (`MobileConnectionHeartbeat`) asks `/health` through `runtimeFetch` every 4 s, only while it is mounted and the app is in the foreground. On Capacitor the foreground comes from the native app state, since the WebView's page visibility is unreliable there. Going to the background or unmounting clears the pending ping, aborts the one in flight and stops its clock subscription. A ping with no answer within 5 s shows as "No answer", never as the last latency. Its trace steps on the shared clock's beat, four frames a second, like a spinner.
 - Keep screen awake (`mobileKeepScreenAwake`, device-local) keeps the display on in the native app always, or while the open session or a subagent below it is active in the global status store (`useKeepScreenAwake`). "While working" also needs `isConnected`, because the store keeps a lost server's last busy state; a dead server therefore releases the screen, and a reconnect holds it again only while the turn still runs. A permission request keeps the turn running, so it keeps the screen on. Android holds a screen wake lock, which the system drops when the app leaves the screen, so the hook asks again on each return. iOS turns off the idle timer through the app-local `KeepAwake` plugin, and every mount writes the current choice so a reloaded page clears what the last one set. The setting renders, and the hook acts, only where `canKeepScreenAwake` holds: the iOS app, or the Android app on a WebView that exposes `navigator.wakeLock`. The hosted mobile page never keeps the screen on.
 - Notification commands and initial session tabs in VS Code use the shared session opener, so a `/btw` fork opens its parent and expands the panel mounted in the shared composer. Notification commands also reveal the chat view.
+- The expanded VS Code layout uses the shared `useUIStore` sidebar state (`isSidebarOpen`, `sidebarWidth`). Only the drag preview is local.
 - A sessions-sheet row is never a scroll container of its own: it clips with `oc-row-clip`, and the two-line row's 54 px box ends flush with the 32 px chevron at `top: 22`, so a drag that starts on a row scrolls the list.
 
 ### Boot, runtime changes and mini chat
@@ -127,6 +131,18 @@
 
 ## Decisions
 
+### Why mobile push registers with every saved instance and not only the connected one
+
+A phone with two saved servers stayed quiet for the one it was not connected to: the token went only to the active server, and the relay kept one owning server per token. The relay now keeps one binding per token and server (openchamber-website `apps/api`, `push_tokens`), and the app registers with every saved server, in no particular order. An ordering that left the active server registered last was weighed and dropped: it only mattered while each registration took the token from the previous server, and the relay change ships before this app. The cost is that every saved server can push to the phone.
+
+### Why a notification switch holds the tap until the runtime is ready
+
+Switching instances resets the shell and clears `ready`. Opening the session as soon as the endpoint changes would run against the previous server's stores or session list. The intent stays stashed until the shell reports ready again, then opens on the new runtime.
+
+### Why a direct connection learns its pushServerId from /health
+
+A manually added instance had no relay identity on file, so a push from it carried an id that matched no saved entry. The health probe already runs on every connect; keeping the reported id under a separate field makes a later notification switch possible without re-pairing, and without changing the key the client token is stored under.
+
 ### Why a visited extension tab keeps its frame and not a fresh load per visit
 
 The drawer keeps every visited pane mounted while hidden, and the desktop rail keeps a panel frame it has shown; an extension tab does the same, so its page keeps its place, a half-filled form and an item it was handed across tab switches and a closed drawer. The memory is one frame per extension the user opened in this run, and a frame unmounts when its extension leaves the catalog. A live screen's picture mounts only while its tab is on screen, so an unwatched surface keeps no socket open.
@@ -142,6 +158,10 @@ The secure store and localStorage cannot commit together. A new reference lets a
 ### Why navigation carries intent and not the source's stores
 
 Each webview owns its own stores. A small parsed request preserves the originating Settings directory, page links, provider-connect action, new-snippet action and selected skill without transferring chat state or overwriting the tab's independently edited settings.
+
+### Why the VS Code sessions sidebar shares the app's sidebar state
+
+The existing store remembers the open state and width across reloads. The VS Code resize hook previews changes locally and saves on release so pointer moves do not write to storage. VS Code allows resizing from 196px to 520px to fit its smaller webview. A drag whose handle leaves the DOM (the sidebar hidden or the layout collapsed mid-drag) or loses pointer capture ends there and saves its last preview width. The desktop layout still clamps its displayed width to at least 264px to fit the toolbar.
 
 ### Why mobile web holds one back guard and not one history entry per layer
 

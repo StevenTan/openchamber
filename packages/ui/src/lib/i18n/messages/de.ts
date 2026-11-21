@@ -45,6 +45,7 @@ import { sidebarWorkI18n } from './sidebar-work.i18n';
 import { sidebarSectionsI18n } from './sidebar-sections.i18n';
 import { worktreeArchiveI18n } from './worktree-archive.i18n';
 import { operatorChildrenI18n } from './operator-children.i18n';
+import { leadI18n } from './lead.i18n';
 import { omniSearchI18n } from './omni-search.i18n';
 import { overviewI18n } from './overview.i18n';
 import { isolatedSpacesI18n } from './isolated-spaces.i18n';
@@ -242,6 +243,7 @@ export const dict = {
   ...sidebarSectionsI18n.de,
   ...worktreeArchiveI18n.de,
   ...operatorChildrenI18n.de,
+  ...leadI18n.de,
   ...omniSearchI18n.de,
   ...overviewI18n.de,
   ...isolatedSpacesI18n.de,
@@ -3613,6 +3615,10 @@ export const dict = {
   'walkthrough.observation.unproven': 'Ungetestet',
   'walkthrough.observation.unprovenHint': 'Das Hauptversprechen der Änderung prüft kein Test.',
   'walkthrough.help.guide': 'So funktionieren Walkthroughs',
+  'walkthrough.export.markdown': 'Als Markdown exportieren',
+  'walkthrough.export.html': 'Als HTML exportieren',
+  'walkthrough.export.failed': 'Der Walkthrough konnte nicht exportiert werden',
+  'walkthrough.export.menuAria': 'Walkthrough exportieren',
   'walkthrough.blocked.noModel.title': 'Kein Modell ausgewählt',
   'walkthrough.blocked.noModel.description': 'Wählen Sie zuerst ein Modell aus.',
   'walkthrough.blocked.emptyDiff.title': 'Kein Diff vorhanden',

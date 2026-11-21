@@ -45,6 +45,7 @@ import { sidebarWorkI18n } from './sidebar-work.i18n';
 import { sidebarSectionsI18n } from './sidebar-sections.i18n';
 import { worktreeArchiveI18n } from './worktree-archive.i18n';
 import { operatorChildrenI18n } from './operator-children.i18n';
+import { leadI18n } from './lead.i18n';
 import { omniSearchI18n } from './omni-search.i18n';
 import { overviewI18n } from './overview.i18n';
 import { isolatedSpacesI18n } from './isolated-spaces.i18n';
@@ -1504,6 +1505,10 @@ export const dict = {
   'walkthrough.observation.unproven': 'بلا اختبار',
   'walkthrough.observation.unprovenHint': 'لا يتحقق أي اختبار من الوعد الأساسي لهذا التغيير.',
   'walkthrough.help.guide': 'كيف تعمل جولات الشرح',
+  'walkthrough.export.markdown': 'تصدير بصيغة Markdown',
+  'walkthrough.export.html': 'تصدير بصيغة HTML',
+  'walkthrough.export.failed': 'تعذّر تصدير جولة الشرح',
+  'walkthrough.export.menuAria': 'تصدير جولة الشرح',
   'walkthrough.blocked.noModel.title': 'لا يتوفر نموذج صغير',
   'walkthrough.blocked.noModel.description': 'سجّل الدخول إلى موفر نماذج لإنشاء مراجعة.',
   'walkthrough.blocked.emptyDiff.title': 'لا شيء للمراجعة',
@@ -4008,6 +4013,7 @@ export const dict = {
   ...sidebarSectionsI18n.ar,
   ...worktreeArchiveI18n.ar,
   ...operatorChildrenI18n.ar,
+  ...leadI18n.ar,
   ...omniSearchI18n.ar,
   ...overviewI18n.ar,
   ...isolatedSpacesI18n.ar,

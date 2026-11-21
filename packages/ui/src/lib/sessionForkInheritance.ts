@@ -19,6 +19,7 @@ export function withoutSourceOwnedLinks(metadata: Metadata): Metadata {
   delete next.reviewSessionID;
   delete next.sideChat;
   delete next.sideChatSessions;
+  delete next.lead;
   if (next.kind === 'btw') {
     delete next.kind;
     delete next.originalSessionID;

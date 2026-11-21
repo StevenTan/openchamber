@@ -18,7 +18,7 @@ import { modelTextVerbosity, type TextVerbosity, type ModelFieldErrors, type Mod
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
 
-const MODEL_CAPABILITIES = ['text', 'image', 'audio', 'video', 'pdf'] as const;
+import { MODEL_CAPABILITIES } from './model-capabilities';
 
 export type ModelTextField = 'id' | 'name' | 'variants' | 'contextWindow' | 'maxOutputTokens';
 export type ModelCapabilityList = 'inputCapabilities' | 'outputCapabilities';

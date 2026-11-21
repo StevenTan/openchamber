@@ -4,6 +4,7 @@ export interface QuotaProviderMeta {
   id: QuotaProviderId;
   name: string;
   templateId?: BuiltInQuotaProviderId;
+  providers?: string[];
 }
 
 /** Base usage templates available when adding a configuration. */

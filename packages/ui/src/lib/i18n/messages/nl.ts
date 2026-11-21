@@ -45,6 +45,7 @@ import { sidebarWorkI18n } from './sidebar-work.i18n';
 import { sidebarSectionsI18n } from './sidebar-sections.i18n';
 import { worktreeArchiveI18n } from './worktree-archive.i18n';
 import { operatorChildrenI18n } from './operator-children.i18n';
+import { leadI18n } from './lead.i18n';
 import { omniSearchI18n } from './omni-search.i18n';
 import { overviewI18n } from './overview.i18n';
 import { isolatedSpacesI18n } from './isolated-spaces.i18n';
@@ -242,6 +243,7 @@ export const dict = {
   ...sidebarSectionsI18n.nl,
   ...worktreeArchiveI18n.nl,
   ...operatorChildrenI18n.nl,
+  ...leadI18n.nl,
   ...omniSearchI18n.nl,
   ...overviewI18n.nl,
   ...isolatedSpacesI18n.nl,
@@ -1582,6 +1584,10 @@ export const dict = {
   'walkthrough.observation.unproven': 'Ongetest',
   'walkthrough.observation.unprovenHint': 'Geen enkele test controleert de belangrijkste belofte van deze wijziging.',
   'walkthrough.help.guide': 'Hoe rondleidingen werken',
+  'walkthrough.export.markdown': 'Exporteren als Markdown',
+  'walkthrough.export.html': 'Exporteren als HTML',
+  'walkthrough.export.failed': 'Kan de rondleiding niet exporteren',
+  'walkthrough.export.menuAria': 'Rondleiding exporteren',
   'walkthrough.blocked.noModel.title': 'Geen klein model beschikbaar',
   'walkthrough.blocked.noModel.description': 'Meld u aan bij een modelprovider om een beoordeling te genereren.',
   'walkthrough.blocked.emptyDiff.title': 'Niets te beoordelen',
