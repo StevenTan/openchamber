@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
-import type { SyncEvent } from '@/lib/opencode/events';
+import type { SyncEvent } from '@/lib/agent/events';
 import {
   applyGlobalBlockingRequestEvents,
   applyWaitingPageEvent,

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, jest } from 'bun:test';
-import { createEventPipeline } from '../event-pipeline';
+import { createEventPipeline } from '../../lib/opencode/event-source';
 
 const savedDocument = globalThis.document;
 const savedWindow = globalThis.window;

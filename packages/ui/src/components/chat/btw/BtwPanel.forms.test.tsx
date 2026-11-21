@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { act } from 'react';
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { Root } from 'react-dom/client';
@@ -6,7 +7,7 @@ import { OpenCode } from '@opencode/client';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import type { FormRequest, Message, Session } from '@/lib/opencode/model';
 import { SyncProvider, createEventRoutingIndex, handleEvent } from '@/sync/sync-context';
-import type { SyncEvent } from '@/lib/opencode/events';
+import type { SyncEvent } from '@/lib/agent/events';
 import { getRuntimeKey } from '@/lib/runtime-switch';
 import { getSyncChildStores } from '@/sync/sync-refs';
 import { I18nProvider } from '@/lib/i18n';
@@ -155,7 +156,7 @@ const sdk = OpenCode.make({
   fetch: async () => new Response('[]', { headers: { 'Content-Type': 'application/json' } }),
 });
 const tree = (parentId: string, fork: Fork | null) => (
-  <SyncProvider sdk={sdk} directory={PARENT_DIRECTORY}>
+  <SyncProvider backend={createOpenCodeBackend(sdk)} directory={PARENT_DIRECTORY}>
     <RuntimeAPIContext.Provider value={runtimeAPIs}>
       <I18nProvider>
         <ThemeSystemContext.Provider value={themeContext}>

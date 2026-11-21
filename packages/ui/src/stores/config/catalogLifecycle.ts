@@ -1,4 +1,4 @@
-import { type CatalogKind } from '@/lib/opencode/events';
+import { type CatalogKind } from '@/lib/agent/events';
 import { toConfigDirectoryKey, DIRECTORY_KEY_GLOBAL } from './directories';
 import { type ConfigRuntimeContext, isConfigRuntimeContextCurrent } from './runtime';
 import { type CachedCatalog, writeCachedCatalogWhenSettled } from '../configCatalogCache';

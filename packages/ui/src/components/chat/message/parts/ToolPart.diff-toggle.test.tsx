@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { act } from 'react';
 import { expect, test } from 'bun:test';
 import { createRoot } from 'react-dom/client';
@@ -93,7 +94,7 @@ test('the diff layout toggle sits in each diff entry header and switches every e
       },
     };
     await act(async () => root.render(
-      <SyncProvider sdk={sdk} directory="">
+      <SyncProvider backend={createOpenCodeBackend(sdk)} directory="">
         <I18nProvider>
           <ThemeSystemContext.Provider value={themeContext}>
             <ToolPart part={part} isExpanded isMobile={false} onToggle={() => {}} />

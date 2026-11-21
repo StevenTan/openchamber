@@ -1,3 +1,4 @@
+import { conversationClient } from "@/lib/agent/active"
 import { useCallback, useMemo } from "react"
 import type { Message, Part } from "@/lib/opencode/model"
 import { opencodeClient } from "@/lib/opencode/client"
@@ -130,7 +131,7 @@ export function useSync() {
           shouldFetchSession
             ? (async () => {
                 try {
-                  const session = await retry(() => opencodeClient.getSession(sessionID, targetDirectory))
+                  const session = await retry(() => conversationClient.getSession(sessionID, targetDirectory))
                   if (!isStale()) {
                     const nextSession = stripSessionDiffSnapshots(session)
                     const s = targetStore.getState()

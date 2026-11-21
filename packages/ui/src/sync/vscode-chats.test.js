@@ -131,7 +131,7 @@ describe('VS Code without a workspace', () => {
       children?.disposeAll();
       children = new ChildStoreManager();
       loader = new SessionMessageLoader(children, { sdk: opencodeClient, runtimeKey: getRuntimeKey() });
-      setSyncRefs(null, children, chatsRoot);
+      setSyncRefs(children, chatsRoot);
       setImperativeSessionMessageLoader(loader);
     };
     const openTranscript = async (entry) => {

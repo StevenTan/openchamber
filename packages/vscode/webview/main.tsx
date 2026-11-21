@@ -23,7 +23,7 @@ import { usePermissionStore } from '@openchamber/ui/stores/permissionStore';
 import { permissionPolicyWireSchema, policySnapshotFromWire } from '@openchamber/ui/stores/utils/permissionAutoAccept';
 import { processVSCodePermissionAutoAccept } from '@openchamber/ui/sync/vscode-permission-auto-accept';
 import type { AssistantMessage } from '@openchamber/ui/lib/opencode/model';
-import { syncEventSessionID, type SyncEvent } from '@openchamber/ui/lib/opencode/events';
+import { syncEventSessionID, type SyncEvent } from '@openchamber/ui/lib/agent/events';
 import { focusChatInput } from '@openchamber/ui/components/chat/composer/editor/dom';
 import { hostViewerStateSchema, reportHostViewerState } from '@openchamber/ui/lib/surfaceAttention';
 import { vscodeSettingsNavigationSchema } from '@openchamber/ui/lib/settings/vscodeNavigation';

@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { describe, expect, spyOn, test } from 'bun:test';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -82,7 +83,7 @@ describe('issue #3036 stale persisted models', () => {
       await act(async () => root.render(React.createElement(I18nProvider, null,
         React.createElement(ThemeSystemContext.Provider, { value: themeContext },
           React.createElement(RuntimeAPIContext.Provider, { value: createWebAPIs() },
-            React.createElement(SyncProvider, { sdk, directory: '/workspace', children: React.createElement(ModelControls) }),
+            React.createElement(SyncProvider, { backend: createOpenCodeBackend(sdk), directory: '/workspace', children: React.createElement(ModelControls) }),
           ),
         ),
       )));

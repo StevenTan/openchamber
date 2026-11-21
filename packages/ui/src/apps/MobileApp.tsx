@@ -1,7 +1,6 @@
 import { flushSync } from 'react-dom';
 import { OpenCodeCompatibilityGate } from '@/components/update/OpenCodeCompatibilityGate';
 import React from 'react';
-
 import { AboutSettings } from '@/components/sections/openchamber/AboutSettings';
 import { OpenCodeUpdateToast } from '@/components/update/OpenCodeUpdateToast';
 import { MobileAppUpdateToast } from '@/components/update/MobileAppUpdateToast';
@@ -44,6 +43,8 @@ import { useGuestCatalogSync } from '@/hooks/useGuestCatalogSync';
 import { useGuestMarksSync } from '@/hooks/useGuestMarksSync';
 import { resolvePlanRequestOwner } from '@/hooks/useProjectContextOwner';
 import { opencodeClient } from '@/lib/opencode/client';
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
+import { conversationClient } from "@/lib/agent/active"
 import type { RuntimeAPIs } from '@/lib/api/types';
 import type { ProjectRef } from '@/lib/projectContextApi';
 import { readTabletLayout, useOrientation, useTabletLayout } from '@/lib/device';
@@ -70,7 +71,6 @@ import { useSessionUIStore } from '@/sync/session-ui-store';
 import { openSessionFromToast } from '@/sync/session-navigation';
 import { SyncProvider } from '@/sync/sync-context';
 import { toast } from '@/components/ui';
-
 import { SyncAppEffects } from './AppEffects';
 import { BusyDots } from '@/components/ui/busy-dots';
 import { MobileConnectionWelcome, type MobileConnectionNotice } from './MobileConnectionWelcome';
@@ -275,7 +275,7 @@ const MobileShell: React.FC<{ onActiveConnectionDeleted: () => void }> = ({ onAc
       return;
     }
     const readSession = async (id: string) => useGlobalSessionsStore.getState().entityById.get(id)
-      ?? await opencodeClient.getSession(id).catch(() => null);
+      ?? await conversationClient.getSession(id).catch(() => null);
     void sessionLineage(sessionId, readSession).then((lineage) => {
       const isViewed = () => {
         const { currentSessionId } = useSessionUIStore.getState();
@@ -1285,7 +1285,7 @@ function MobileAppContent({ apis }: MobileAppProps) {
 
   return (
     <ErrorBoundary>
-      <SyncProvider key={runtimeEndpointEpoch} sdk={opencodeClient.getSdkClient()} directory={currentDirectory || ''}>
+      <SyncProvider key={runtimeEndpointEpoch} backend={createOpenCodeBackend(opencodeClient.getSdkClient())} directory={currentDirectory || ''}>
         <RuntimeAPIProvider apis={apis}>
           <TooltipProvider delayDuration={300} skipDelayDuration={150}>
             <div className="h-full bg-background text-foreground">

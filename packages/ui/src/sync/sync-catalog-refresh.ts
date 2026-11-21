@@ -1,4 +1,4 @@
-import { type CatalogKind } from "@/lib/opencode/events"
+import { type CatalogKind } from "@/lib/agent/events"
 import { useGlobalSyncStore } from "./global-sync-store"
 import { ChildStoreManager } from "./child-store"
 import { emitSyncConfigChanged } from "./sync-refs"

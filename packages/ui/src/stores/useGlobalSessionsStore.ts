@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Session } from '@/lib/opencode/model';
 import { opencodeClient } from '@/lib/opencode/client';
+import { conversationClient } from "@/lib/agent/active"
 import { addUnlistedLiveSessions, filterManagedChatsForRuntime, listGlobalSessionPages, splitGlobalSessionsByArchived, type SessionPageLister } from '@/stores/globalSessions';
 import { getReviewTransferDirection, type ReviewTransferDirection } from '@/lib/reviewFlow';
 import { getOriginalSessionID, getReviewSessionID } from '@/lib/sessionReviewMetadata';
@@ -28,7 +29,6 @@ import {
   type GlobalSessionStructure,
   type GlobalSessionStructureMutation,
 } from './globalSessionStructure';
-
 export { mergeSessionDirectoryMetadata, resolveGlobalSessionDirectory } from './globalSessionStructure';
 
 type GlobalSessionsStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -283,7 +283,7 @@ type DirectoryPageResult = {
   errors: unknown[];
 };
 
-const listSessionPage: SessionPageLister = (options) => opencodeClient.listSessionsPage(options);
+const listSessionPage: SessionPageLister = (options) => conversationClient.listSessionsPage(options);
 
 const fetchDirectoryPages = async (
   directories: Set<string>,

@@ -1,3 +1,4 @@
+import { conversationClient } from "@/lib/agent/active"
 import React from 'react';
 import { toast } from 'sonner';
 import { useShallow } from 'zustand/react/shallow';
@@ -5,7 +6,6 @@ import { Icon } from '@/components/icon/Icon';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useI18n } from '@/lib/i18n';
 import { useDirectorySync, useSession } from '@/sync/sync-context';
-import { opencodeClient } from '@/lib/opencode/client';
 import type { Part } from '@/lib/opencode/model';
 import { readMessageFocusInFlight, requestMessageFocus, subscribeMessageFocusStatus } from '@/lib/router/messageFocus';
 import { useGlobalSessionsStore } from '@/stores/useGlobalSessionsStore';
@@ -63,7 +63,7 @@ export const WorkStatusPinnedSection: React.FC<Props> = ({ sessionId, directory 
     if (!sessionId || !unresolvedKey) return;
     let cancelled = false;
     const ids = unresolvedKey.split(' ');
-    void Promise.all(ids.map((id) => opencodeClient.getSessionMessage(sessionId, id, directory)
+    void Promise.all(ids.map((id) => conversationClient.getSessionMessage(sessionId, id, directory)
       .then((message) => firstText(message.parts, sessionId, id))
       .catch(() => null)))
       .then((texts) => {

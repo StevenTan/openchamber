@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { act } from 'react';
 import { afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test';
 import { createRoot, type Root } from 'react-dom/client';
@@ -155,7 +156,7 @@ const renderFork = async () => {
     fetch: async () => new Response('[]', { headers: { 'Content-Type': 'application/json' } }),
   });
   const tree = (showPanel: boolean) => (
-    <SyncProvider sdk={sdk} directory={PARENT_DIRECTORY}>
+    <SyncProvider backend={createOpenCodeBackend(sdk)} directory={PARENT_DIRECTORY}>
       <I18nProvider>
         <ThemeSystemContext.Provider value={themeContext}>
           <TooltipProvider>

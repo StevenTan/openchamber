@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { afterEach, beforeEach, expect, spyOn, test } from 'bun:test';
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -70,7 +71,7 @@ beforeEach(async () => {
   await act(async () => root.render(React.createElement(I18nProvider, null,
     React.createElement(ThemeSystemContext.Provider, { value: themeContext },
       React.createElement(RuntimeAPIContext.Provider, { value: apis },
-        React.createElement(SyncProvider, { sdk, directory: '/repo', children: React.createElement(ContextSurfacePanes) }),
+        React.createElement(SyncProvider, { backend: createOpenCodeBackend(sdk), directory: '/repo', children: React.createElement(ContextSurfacePanes) }),
       ),
     ),
   )));

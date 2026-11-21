@@ -1,4 +1,4 @@
-import type { SyncEvent } from "@/lib/opencode/events"
+import type { SyncEvent } from "@/lib/agent/events"
 import { subscribeRuntimeEndpointWillChange } from "@/lib/runtime-switch"
 
 const BULK_ARCHIVE_ECHO_TTL_MS = 30_000

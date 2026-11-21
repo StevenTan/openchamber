@@ -1,7 +1,7 @@
 import { resetGlobalBlockingRequests, useGlobalBlockingRequestsStore } from "../global-blocking-requests"
 import { describe, expect, test, afterEach, beforeEach, jest, mock } from "bun:test"
 import { create, type StoreApi } from "zustand"
-import type { SyncEvent, ToolTransition } from "@/lib/opencode/events"
+import type { SyncEvent, ToolTransition } from "@/lib/agent/events"
 import type { FormRequest, PermissionRequest, ToolInput } from "@/lib/opencode/model"
 
 const listPendingFormsCalls: Array<{ directories?: Array<string | null | undefined> }> = []

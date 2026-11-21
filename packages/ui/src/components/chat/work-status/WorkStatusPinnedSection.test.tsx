@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -44,7 +45,7 @@ describe('pinned messages stay scoped to the displayed session', () => {
 
   const render = async (sessionId: string) => {
     await act(async () => root.render(
-      <SyncProvider sdk={sdk} directory={directory}>
+      <SyncProvider backend={createOpenCodeBackend(sdk)} directory={directory}>
         <I18nProvider><WorkStatusPinnedSection sessionId={sessionId} directory={directory} /></I18nProvider>
       </SyncProvider>,
     ));

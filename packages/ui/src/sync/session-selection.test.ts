@@ -47,7 +47,7 @@ beforeEach(() => {
   opencodeClient.reconnectToRuntimeBaseUrl()
   manager = new ChildStoreManager()
   manager.ensureChild(DIRECTORY, { bootstrap: false }).setState({ session: [session] })
-  setSyncRefs(opencodeClient.getScopedSdkClient(DIRECTORY), manager, DIRECTORY)
+  setSyncRefs(manager, DIRECTORY)
   const transport = spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const url = new URL(input instanceof Request ? input.url : String(input))
     if (url.pathname === "/auth/url-token") return new Response(null, { status: 404 })
@@ -60,7 +60,7 @@ beforeEach(() => {
 afterEach(() => {
   restoreFetch()
   manager.disposeAll()
-  setSyncRefs(opencodeClient.getSdkClient(), new ChildStoreManager(), "")
+  setSyncRefs(new ChildStoreManager(), "")
   switchRuntimeEndpoint(originalRuntime)
   opencodeClient.reconnectToRuntimeBaseUrl()
 })

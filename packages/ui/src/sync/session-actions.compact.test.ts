@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
 
-import { createRuntimeOpencodeClient, opencodeClient } from "@/lib/opencode/client"
+import { opencodeClient } from "@/lib/opencode/client"
 import type { ModelRef, ModelSelection, Session } from "@/lib/opencode/model"
 import { getRuntimeApiBaseUrl, getRuntimeKey, switchRuntimeEndpoint } from "@/lib/runtime-switch"
 import { compactSession } from "./session-actions"
@@ -36,7 +36,7 @@ const originalRuntime = getRuntimeKey()
 
 beforeEach(() => {
   manager = new ChildStoreManager()
-  setSyncRefs(createRuntimeOpencodeClient({ baseUrl: "http://localhost" }), manager, DIRECTORY)
+  setSyncRefs(manager, DIRECTORY)
   manager.ensureChild(DIRECTORY, { bootstrap: false }).setState({
     session: [sessionOn({ providerID: "provider", id: "model-a", variant: "high" })],
   })

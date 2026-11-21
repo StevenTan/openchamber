@@ -369,10 +369,10 @@ describe('resolveSendSelection thinking level', () => {
   const seedSession = (model) => {
     const childStores = new ChildStoreManager();
     childStores.ensureChild(DIRECTORY, { bootstrap: false }).setState({ session: [{ id: 'ses_variant', model }] });
-    setSyncRefs({}, childStores, DIRECTORY);
+    setSyncRefs(childStores, DIRECTORY);
   };
   afterEach(() => {
-    setSyncRefs({}, new ChildStoreManager(), '');
+    setSyncRefs(new ChildStoreManager(), '');
   });
   const desire = (variant) => resolveSendSelection('ses_variant', DIRECTORY, { providerID: 'openai', modelID: MODEL.id, variant });
 
@@ -418,13 +418,13 @@ describe('routeMessage agent the folder lacks (#5522)', () => {
     childStores.ensureChild(DIRECTORY, { bootstrap: false }).setState({
       session: [{ id: 'ses_stuck', agent: 'stock', model: { providerID: 'provider-a', id: 'model-a' } }],
     });
-    setSyncRefs({}, childStores, DIRECTORY);
+    setSyncRefs(childStores, DIRECTORY);
   });
 
   afterEach(() => {
     getSession.mockRestore();
     useConfigStore.setState(previousConfig, true);
-    setSyncRefs({}, new ChildStoreManager(), '');
+    setSyncRefs(new ChildStoreManager(), '');
   });
 
   const sendCommandWith = async (catalog) => {
@@ -2253,7 +2253,7 @@ describe('routeMessage skill invocation', () => {
     const seedSession = (session) => {
       const childStores = new ChildStoreManager();
       childStores.ensureChild('/skills/project', { bootstrap: false }).setState({ session: [session] });
-      setSyncRefs({}, childStores, '/skills/project');
+      setSyncRefs(childStores, '/skills/project');
     };
     const sendCommandWithContext = () => routeMessage({
       sessionId: 'session-command',
@@ -2274,7 +2274,7 @@ describe('routeMessage skill invocation', () => {
 
     afterEach(() => {
       opencodeClient.commitRevert = originalCommitRevert;
-      setSyncRefs({}, new ChildStoreManager(), '');
+      setSyncRefs(new ChildStoreManager(), '');
     });
 
     test('hands sendCommand the commit of the staged revert, aimed at the session and its directory', async () => {
@@ -2294,7 +2294,7 @@ describe('routeMessage skill invocation', () => {
         message: { 'session-command': [{ id: 'msg_boundary', sessionID: 'session-command', role: 'user', time: { created: 1 } }] },
       });
       setActionRefs(childStores, () => '/skills/project');
-      setSyncRefs({}, childStores, '/skills/project');
+      setSyncRefs(childStores, '/skills/project');
       let releaseStage = () => {};
       const stageGate = new Promise((resolve) => { releaseStage = resolve; });
       let started = () => {};

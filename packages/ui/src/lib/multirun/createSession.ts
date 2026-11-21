@@ -1,4 +1,4 @@
-import { opencodeClient } from '@/lib/opencode/client';
+import { conversationClient } from "@/lib/agent/active"
 import type { ModelRef, Session } from '@/lib/opencode/model';
 import { requestSessionMetadataUpdate } from '@/sync/session-archive-batch';
 import { getMultiRunMembership, multiRunMembershipPatch, withMultiRunMembership, type MultiRunIdentity } from './identity';
@@ -14,7 +14,7 @@ export async function createMultiRunSession(
 ): Promise<Session> {
   assertCurrent();
   const membership = { ...input.identity, version: 1 as const, sessionID: null };
-  const session = await opencodeClient.createSession({
+  const session = await conversationClient.createSession({
     title: input.title,
     model: input.selection?.model,
     agent: input.selection?.agent,
@@ -34,7 +34,7 @@ export async function createMultiRunSession(
   } catch (error) {
     assertCurrent();
     try {
-      await opencodeClient.deleteSession(session.id, input.directory);
+      await conversationClient.deleteSession(session.id, input.directory);
     } catch {
       console.warn('[MultiRun] Could not remove an undispatched session after membership failure');
     }

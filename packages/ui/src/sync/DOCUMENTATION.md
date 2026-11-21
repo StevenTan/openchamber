@@ -1780,7 +1780,7 @@ Keep this in sync with `handleDirectoryEvent` in `sync-context.tsx`:
 | `openchamber.notification`, `openchamber.permission-auto-accept`, `openchamber.permission-left-for-user` | (none — side effects only) |
 | `openchamber.page-waiting/settled`, `openchamber.session-assist`, `openchamber.workflow-run`, `openchamber.workflow-run-removed` | (none: dropped here; `applyControlStreamOnlyEvent` applies the control stream's copy) |
 
-These are `SyncEvent`s from `packages/ui/src/lib/opencode/events.ts`, not OpenCode wire events: the event pipeline translates every OpenCode 2.x wire event (`session.text.delta`, `session.tool.called`, `session.step.ended`, ...) into this vocabulary before coalescing. Wire-level knowledge lives only in that translator; the reducer applies patches and tool-state transitions against the store.
+These are `SyncEvent`s from `packages/ui/src/lib/agent/events.ts`, not OpenCode wire events: the event pipeline translates every OpenCode 2.x wire event (`session.text.delta`, `session.tool.called`, `session.step.ended`, ...) into this vocabulary before coalescing. Wire-level knowledge lives only in that translator; the reducer applies patches and tool-state transitions against the store.
 
 ### Directory-less session events
 

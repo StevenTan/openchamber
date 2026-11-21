@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { afterAll, afterEach, beforeEach, expect, test } from 'bun:test';
 import React, { act } from 'react';
 import { Window } from 'happy-dom';
@@ -80,7 +81,7 @@ beforeEach(() => {
 });
 
 const renderPalette = async () => {
-  await act(async () => root.render(<RuntimeAPIProvider apis={apis}><I18nProvider><SyncProvider sdk={sdk} directory="/allowed"><CommandPalette /></SyncProvider></I18nProvider></RuntimeAPIProvider>));
+  await act(async () => root.render(<RuntimeAPIProvider apis={apis}><I18nProvider><SyncProvider backend={createOpenCodeBackend(sdk)} directory="/allowed"><CommandPalette /></SyncProvider></I18nProvider></RuntimeAPIProvider>));
   await act(async () => {
     await ensureHomeDirectoryResolved();
     await updateDesktopSettings({});
@@ -130,7 +131,7 @@ afterAll(async () => {
 });
 
 test('recent sessions and name search exclude declined folders and react to admission', async () => {
-  await act(async () => root.render(<RuntimeAPIProvider apis={apis}><I18nProvider><SyncProvider sdk={sdk} directory="/allowed"><CommandPalette /></SyncProvider></I18nProvider></RuntimeAPIProvider>));
+  await act(async () => root.render(<RuntimeAPIProvider apis={apis}><I18nProvider><SyncProvider backend={createOpenCodeBackend(sdk)} directory="/allowed"><CommandPalette /></SyncProvider></I18nProvider></RuntimeAPIProvider>));
   await act(async () => {
     // Settle the startup echo before simulating a new server-confirmed project.
     await ensureHomeDirectoryResolved();

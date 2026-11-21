@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import React, { act } from 'react';
 import type { Root } from 'react-dom/client';
@@ -87,7 +88,7 @@ describe('TextSelectionMenu render subscriptions', () => {
     store().setState({ session: sessions });
   });
   const render = (frameSelections = false, controller: MobileCommentDraftController | null = null, pinned = false) => act(async () => root.render(
-    <SyncProvider sdk={sdk} directory={directory}>
+    <SyncProvider backend={createOpenCodeBackend(sdk)} directory={directory}>
       <I18nProvider>
         <MobileCommentComposerContext.Provider value={controller}>
           <ChatColumnSessionContext.Provider value={column}>
@@ -158,7 +159,7 @@ describe('TextSelectionMenu render subscriptions', () => {
     document.body.appendChild(host);
     containerRef.current = host;
     await act(async () => root.render(
-      <SyncProvider sdk={sdk} directory={directory}>
+      <SyncProvider backend={createOpenCodeBackend(sdk)} directory={directory}>
         <I18nProvider>
           <ChatColumnSessionContext.Provider value={column}>
             <LiveActivityInteractionContext.Provider value={interaction}>
@@ -196,7 +197,7 @@ describe('TextSelectionMenu render subscriptions', () => {
     try {
       useUIStore.setState({ isMobile: true });
       await act(async () => root.render(
-        <SyncProvider sdk={sdk} directory={directory}>
+        <SyncProvider backend={createOpenCodeBackend(sdk)} directory={directory}>
           <I18nProvider>
             <MobileCommentComposerContext.Provider value={controller}>
               <ChatColumnSessionContext.Provider value={column}>
@@ -342,7 +343,7 @@ describe('TextSelectionMenu render subscriptions', () => {
     const hold = () => undefined;
     const renderBody = async (row: string, controller: MobileCommentDraftController, pagesShown = true) => {
       await act(async () => root.render(
-        <SyncProvider sdk={sdk} directory={directory}>
+        <SyncProvider backend={createOpenCodeBackend(sdk)} directory={directory}>
           <I18nProvider>
             <MobileCommentComposerContext.Provider value={controller}>
               <ChatColumnSessionContext.Provider value={column}>
@@ -558,7 +559,7 @@ describe('TextSelectionMenu render subscriptions', () => {
     containerRef.current = host;
     // KeepAlive keeps a session the user switched away from in a hidden Activity.
     const renderIn = (mode: 'visible' | 'hidden') => act(async () => root.render(
-      <SyncProvider sdk={sdk} directory={directory}>
+      <SyncProvider backend={createOpenCodeBackend(sdk)} directory={directory}>
         <I18nProvider>
           <ChatColumnSessionContext.Provider value={column}>
             <React.Activity mode={mode}>

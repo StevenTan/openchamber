@@ -44,7 +44,7 @@ const settle = async () => { for (let i = 0; i < 40; i += 1) await Promise.resol
 beforeEach(() => {
   SESSION_ID = `ses_directory_adoption_${++run}`
   manager = new ChildStoreManager()
-  setSyncRefs({} as never, manager, PARENT)
+  setSyncRefs(manager, PARENT)
   useSessionUIStore.getState().setCurrentSession(null)
   useProjectsStore.setState({ projects: [{ id: "repo", path: PARENT }, { id: "windows", path: "C:/repo" }] })
   const detail = new Promise<Session>((resolve) => { resolveDetail = resolve })

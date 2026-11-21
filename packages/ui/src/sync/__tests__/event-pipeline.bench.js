@@ -13,7 +13,7 @@
  * impact at varying concurrency levels.
  */
 
-import { createEventPipeline } from '../event-pipeline.ts';
+import { createEventPipeline } from '../../lib/opencode/event-source.ts';
 
 // ---------------------------------------------------------------------------
 // Minimal DOM stubs (same approach as the unit tests)

@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import React, { act } from 'react';
 import { expect, test } from 'bun:test';
 import { Window } from 'happy-dom';
@@ -77,7 +78,7 @@ test('a draft waiting for a new space lists nothing of this computer\'s while th
   };
   try {
     await act(async () => root.render(
-      <SyncProvider sdk={sdk} directory={PROJECT}>
+      <SyncProvider backend={createOpenCodeBackend(sdk)} directory={PROJECT}>
         <I18nProvider><RuntimeAPIContext.Provider value={apis}><SidebarFilesTree /></RuntimeAPIContext.Provider></I18nProvider>
       </SyncProvider>,
     ));

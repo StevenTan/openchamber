@@ -1,8 +1,9 @@
+import { conversationClient } from "@/lib/agent/active"
 /* oxlint-disable react/only-export-components */
 import React, { useEffect, useRef, useCallback, useMemo } from "react"
 import type { StoreApi } from "zustand"
-import { type SyncEvent } from "@/lib/opencode/events"
-import { createEventPipeline } from "./event-pipeline"
+import { type SyncEvent } from "@/lib/agent/events"
+import type { AgentBackend } from "@/lib/agent/backend"
 import { isVSCodeRuntime } from "@/lib/desktop"
 import { type SessionMaterializationReason } from "./event-reducer"
 import { useGlobalSyncStore } from "./global-sync-store"
@@ -46,7 +47,7 @@ import { listGlobalSessionPages, splitGlobalSessionsByArchived, type GlobalSessi
 import { SessionMessageLoader, getImperativeSessionMessageLoader, setImperativeSessionMessageLoader, type SessionMessageTarget } from "./session-message-loader"
 import { openCodeStartupSignal } from "./opencode-startup-gate"
 import { notifyStreamGap } from "./stream-gap"
-import { type OpenCodeClient, type CurrentDirectorySource, type SyncRuntime, type SyncSystem, SyncContext, SyncRuntimeContext } from "./sync-runtime-context"
+import { type CurrentDirectorySource, type SyncRuntime, type SyncSystem, SyncContext, SyncRuntimeContext } from "./sync-runtime-context"
 import { type EventRoutingIndex, createEventRoutingIndex, ingestDirectoryStateIntoRoutingIndex, resolveDirectoryFromRoutingIndex, setIndexedSessionDirectory } from "./event-routing-index"
 import { type DirectoryReadBackoff, recordWatchdogReadFailure, CHILD_SESSION_DISCOVERY_RETRY_MS, ACTIVE_SESSION_STATUS_POLL_INTERVAL_MS, ACTIVE_SESSION_STATUS_POLL_MAX_BACKOFF_MS, CHILD_SESSION_DISCOVERY_WAIT_MS, ACTIVE_SESSION_STALE_EVENT_MS, ACTIVE_SESSION_STATUS_POLL_HEALTHY_INTERVAL_MS, shouldTriggerStaleResync, ACTIVE_SESSION_WATCHDOG_INTERVAL_MS, ACTIVE_SESSION_FULL_RESYNC_COOLDOWN_MS } from "./sync-watchdog-policy"
 import { listSessionPage } from "./session-page-listing"
@@ -123,7 +124,7 @@ const createSyncStores = (): SyncStores => {
   const childStores = new ChildStoreManager({ seedsSessions: isDirectoryOfKnownSpace })
   return {
     childStores,
-    messageLoader: new SessionMessageLoader(childStores, { sdk: opencodeClient, runtimeKey: getRuntimeKey() }, openCodeStartupSignal),
+    messageLoader: new SessionMessageLoader(childStores, { sdk: conversationClient, runtimeKey: getRuntimeKey() }, openCodeStartupSignal),
   }
 }
 
@@ -135,7 +136,7 @@ export function prefetchSessionBeforeMount(target: SessionMessageTarget): void {
 }
 
 export function SyncProvider(props: {
-  sdk: OpenCodeClient
+  backend: AgentBackend
   directory: string
   children: React.ReactNode
 }) {
@@ -155,7 +156,7 @@ export function SyncProvider(props: {
   }, [childStores])
   const runtimeKey = getRuntimeKey()
   const messageLoaderDisposalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  messageLoader.configure({ sdk: opencodeClient, runtimeKey })
+  messageLoader.configure({ sdk: props.backend.client, runtimeKey })
   useEffect(() => {
     opencodeClient.learnMessagePageShellsSupport()
   }, [runtimeKey])
@@ -204,7 +205,7 @@ export function SyncProvider(props: {
       release.dispose()
       if (locationReleaseRef.current === release) locationReleaseRef.current = null
     }
-  }, [childStores, props.sdk])
+  }, [childStores, props.backend.events.identity])
   useEffect(() => {
     const previous = previousDirectoryRef.current
     previousDirectoryRef.current = props.directory
@@ -224,8 +225,8 @@ export function SyncProvider(props: {
   const pipelineDisconnectedBeforeFirstConnectRef = useRef(false)
 
   const runtime = useMemo<SyncRuntime>(
-    () => ({ childStores, messageLoader, runtimeKey, sdk: props.sdk, currentDirectory: currentDirectorySource }),
-    [childStores, currentDirectorySource, messageLoader, props.sdk, runtimeKey],
+    () => ({ childStores, messageLoader, runtimeKey, currentDirectory: currentDirectorySource }),
+    [childStores, currentDirectorySource, messageLoader, props.backend.events.identity, runtimeKey],
   )
   const system = useMemo<SyncSystem>(
     () => ({ ...runtime, directory: props.directory }),
@@ -235,7 +236,7 @@ export function SyncProvider(props: {
   useEffect(() => {
     staleResyncBackoffByDirectoryRef.current = new Map()
     childDiscoveryBackoffByDirectoryRef.current = new Map()
-  }, [childStores, props.sdk, runtimeKey])
+  }, [childStores, props.backend.events.identity, runtimeKey])
 
   const replayResyncDirectoriesRef = useRef(new Map<string, SessionMaterializationReason | null>())
   const triggerDirectoryResyncRef = useRef<(directory: string, reason: SessionMaterializationReason) => void>(() => undefined)
@@ -314,7 +315,7 @@ export function SyncProvider(props: {
     void usePermissionStore.getState().hydrate().catch(() => undefined)
     void useMessageQueueStore.getState().hydrate().catch(() => undefined)
     if (isAutoReviewAvailable()) void useAutoReviewStore.getState().hydrate().catch(() => undefined)
-  }, [props.sdk])
+  }, [props.backend.events.identity])
 
   useEffect(() => {
     const expectedRuntimeKey = getRuntimeKey()
@@ -451,7 +452,7 @@ export function SyncProvider(props: {
       },
       isLoadingSessions: () => false,
     })
-  }, [childStores, messageLoader, props.sdk, routingIndex])
+  }, [childStores, messageLoader, props.backend.events.identity, routingIndex])
 
   useEffect(() => {
     let previous = knownSpaceIds(useSpacesStore.getState())
@@ -499,7 +500,7 @@ export function SyncProvider(props: {
         bootingRoot = false
       }
     }
-  }, [props.sdk])
+  }, [props.backend.events.identity])
 
   useEffect(() => {
     const unsubscribeSessionFeatures = subscribeSessionFeatures(runtimeKey, childStores, routingIndex)
@@ -513,8 +514,7 @@ export function SyncProvider(props: {
       void reconcileActivityAfterGap(childStores)
       notifyStreamGap(runtimeKey)
     }
-    const pipeline = createEventPipeline({
-      sdk: props.sdk,
+    const pipeline = props.backend.events.connect({
       transport: messageStreamTransport,
       routeDirectory: (directory, payload) => {
         return resolveDirectoryFromRoutingIndex(routingIndex, directory, payload, childStores)
@@ -623,7 +623,7 @@ export function SyncProvider(props: {
       pipeline.cleanup()
       unsubscribeSessionFeatures()
     }
-  }, [props.sdk, childStores, messageLoader, routingIndex, messageStreamTransport, runtimeKey, triggerDirectoryResync])
+  }, [props.backend.events.identity, childStores, messageLoader, routingIndex, messageStreamTransport, runtimeKey, triggerDirectoryResync])
 
   useEffect(() => {
     let stopped = false
@@ -790,7 +790,7 @@ export function SyncProvider(props: {
       stopped = true
       clearInterval(interval)
     }
-  }, [childStores, props.sdk, triggerDirectoryResync, runtimeKey])
+  }, [childStores, props.backend.events.identity, triggerDirectoryResync, runtimeKey])
 
   useEffect(() => {
     let seedExpiryTimer: ReturnType<typeof setTimeout> | undefined
@@ -843,7 +843,7 @@ export function SyncProvider(props: {
 
   useEffect(() => {
     setImperativeSessionMessageLoader(messageLoader)
-    setSyncRefs(props.sdk, childStores, props.directory, (sessionID, dir) => {
+    setSyncRefs(childStores, props.directory, (sessionID, dir) => {
       setIndexedSessionDirectory(routingIndex, sessionID, dir)
     })
     setActionRefs(
@@ -861,7 +861,7 @@ export function SyncProvider(props: {
         setImperativeSessionMessageLoader(null)
       }
     }
-  }, [props.sdk, props.directory, childStores, messageLoader, routingIndex])
+  }, [props.backend.events.identity, props.directory, childStores, messageLoader, routingIndex])
 
   useEffect(() => {
     if (messageLoaderDisposalTimerRef.current) {

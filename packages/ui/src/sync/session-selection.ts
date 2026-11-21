@@ -1,4 +1,4 @@
-import { opencodeClient } from "@/lib/opencode/client"
+import { conversationClient } from "@/lib/agent/active"
 import { isSameModelRef, toModelRef, type ModelRef, type Session } from "@/lib/opencode/model"
 import { markDefiniteTransportFailure } from "@/lib/relay/transport-error"
 import { captureRuntimeInstance } from "@/lib/runtime-switch"
@@ -19,7 +19,7 @@ export async function resolveSendSelection(
   const isCurrentRuntime = captureRuntimeInstance()
   let serverSession: Session
   try {
-    serverSession = await opencodeClient.getSession(sessionId, directory)
+    serverSession = await conversationClient.getSession(sessionId, directory)
   } catch (error) {
     if (desired.agent) {
       if (error instanceof Error) markDefiniteTransportFailure(error)

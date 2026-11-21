@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { act } from 'react';
 import { expect, test } from 'bun:test';
 import { createRoot } from 'react-dom/client';
@@ -82,7 +83,7 @@ test('a write row draws one diff: the reported one, not the input preview', asyn
     const input = { filePath: 'src/notes.md', content: 'alpha revised\nbeta\ngamma' };
     const render = async (state: ToolState) => {
         await act(async () => root.render(
-            <SyncProvider sdk={sdk} directory="">
+            <SyncProvider backend={createOpenCodeBackend(sdk)} directory="">
                 <I18nProvider>
                     <ThemeSystemContext.Provider value={themeContext}>
                         <ToolPart part={writePart(state)} isExpanded isMobile={false} onToggle={() => {}} />

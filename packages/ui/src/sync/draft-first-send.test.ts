@@ -185,7 +185,7 @@ beforeEach(() => {
   loader = new SessionMessageLoader(childStores, { sdk, runtimeKey: getRuntimeKey() })
   setActionRefs(childStores, () => DIRECTORY)
   // The send reads the created record (its model) from the directory store.
-  setSyncRefs(opencodeClient.getSdkClient(), childStores, DIRECTORY)
+  setSyncRefs(childStores, DIRECTORY)
   setOptimisticRefs(
     (input) => loader.optimisticAdd({ ...input, directory: input.directory ?? DIRECTORY }),
     (input) => loader.optimisticRemove({ ...input, directory: input.directory ?? DIRECTORY }),

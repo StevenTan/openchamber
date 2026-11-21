@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import React from 'react';
 import { expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -42,7 +43,7 @@ const userText: Part = { id: 'text', sessionID: 'session', messageID: 'user', ty
 
 const renderUserActionsRow = () => renderToStaticMarkup(
   <RuntimeAPIContext.Provider value={runtimeApis}>
-    <SyncProvider sdk={sdk} directory="">
+    <SyncProvider backend={createOpenCodeBackend(sdk)} directory="">
       <I18nProvider>
         <MessageBody
           messageId="user"

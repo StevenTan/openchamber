@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { expect, spyOn, test } from 'bun:test';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -76,7 +77,7 @@ test('a status section without a project opens its panel under the chat, as the 
   try {
     await act(async () => root.render(
       <I18nProvider><ThemeSystemContext.Provider value={themeContext}>
-        <SyncProvider sdk={sdk} directory="/visible"><PluginPane mode="plugin:repro" surface="status" item={null} statusDirectory={null} /></SyncProvider>
+        <SyncProvider backend={createOpenCodeBackend(sdk)} directory="/visible"><PluginPane mode="plugin:repro" surface="status" item={null} statusDirectory={null} /></SyncProvider>
       </ThemeSystemContext.Provider></I18nProvider>,
     ));
     for (let attempt = 0; attempt < 100 && !container.querySelector('iframe'); attempt++) {

@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { act } from 'react';
 import { afterEach, expect, test } from 'bun:test';
 import { createRoot } from 'react-dom/client';
@@ -82,7 +83,7 @@ const renderToolOutput = async (output: string, run: (container: HTMLElement) =>
   try {
     await act(async () => {
       root.render(
-        <SyncProvider sdk={sdk} directory="">
+        <SyncProvider backend={createOpenCodeBackend(sdk)} directory="">
           <I18nProvider>
             <ThemeSystemContext.Provider value={themeContext}>
               <ToolPart part={completedShellPart(output)} isExpanded isMobile={false} onToggle={() => {}} />

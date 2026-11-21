@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { afterAll, afterEach, beforeEach, expect, spyOn, test } from 'bun:test';
 import React, { act } from 'react';
 import { Window } from 'happy-dom';
@@ -146,7 +147,7 @@ const sdk = OpenCode.make({
 const render = async (visible = true, projectRef = project) => {
   await act(async () => root?.render(
     <RuntimeAPIContext.Provider value={runtimeApis}>
-      <SyncProvider sdk={sdk} directory="">
+      <SyncProvider backend={createOpenCodeBackend(sdk)} directory="">
         <I18nProvider><ProjectNotesTodoPanel projectRef={projectRef} visible={visible} /></I18nProvider>
       </SyncProvider>
     </RuntimeAPIContext.Provider>,

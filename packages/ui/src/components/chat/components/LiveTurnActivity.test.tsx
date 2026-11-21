@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import React, { act } from 'react';
 import { afterEach, beforeEach, describe, expect, setDefaultTimeout, spyOn, test } from 'bun:test';
 import { plugin } from 'bun';
@@ -171,7 +172,7 @@ function Harness({ record, retired = false, changedFiles, isLatestTurn = true, h
     );
     return <RuntimeAPIContext.Provider value={runtimeApis}>
         <ThemeSystemContext.Provider value={themeContext}>
-            <SyncProvider sdk={sdk} directory="/project">
+            <SyncProvider backend={createOpenCodeBackend(sdk)} directory="/project">
                 <I18nProvider>
                     <TurnRows record={record} retired={retired} expanded={expanded}
                         onToggle={() => setExpanded((value) => !value)} renderMessage={renderMessage} />
@@ -259,7 +260,7 @@ describe('live Activity with the real message body', () => {
             state: 'awaiting-approval', attempt: 0, createdAt: 1, currentPhase: null, phases: [], agents: [], logs: [],
         }));
         useWorkflowRunsStore.setState({ bySession: { session: { status: 'ready', runs } } });
-        const draw = (messages: ChatMessageEntry[], sessionId = 'session') => <SyncProvider sdk={sdk} directory="/project">
+        const draw = (messages: ChatMessageEntry[], sessionId = 'session') => <SyncProvider backend={createOpenCodeBackend(sdk)} directory="/project">
             <I18nProvider><PendingWorkflowApprovals sessionId={sessionId} messages={messages} /></I18nProvider>
         </SyncProvider>;
         await act(async () => root.render(draw([])));
@@ -298,7 +299,7 @@ describe('live Activity with the real message body', () => {
         let messages = [record.userMessage, step];
         const draw = () => <RuntimeAPIContext.Provider value={runtimeApis}>
             <ThemeSystemContext.Provider value={themeContext}>
-                <SyncProvider sdk={liveSdk} directory="/project">
+                <SyncProvider backend={createOpenCodeBackend(liveSdk)} directory="/project">
                     <I18nProvider>
                         <ChatColumnSessionContext.Provider value={{ sessionId: 'session', directory: '/project' }}>
                             <MessageList sessionKey="session" directory="/project" messages={messages}

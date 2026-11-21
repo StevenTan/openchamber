@@ -9,7 +9,7 @@ import { registerRuntimeAPIs } from '@/contexts/runtimeAPIRegistry';
 import { useSessionUIStore } from './session-ui-store';
 import { admitSession, isSessionAdmitted, subscribeSessionAdmission } from './session-admission';
 import { applySessionEventsToGlobalSessions } from './session-event-router';
-import type { SyncEvent } from '@/lib/opencode/events';
+import type { SyncEvent } from '@/lib/agent/events';
 
 const session = (id: string, directory: string): Session => ({
   id, directory, projectID: 'external', title: id, time: { created: 1, updated: 1 },

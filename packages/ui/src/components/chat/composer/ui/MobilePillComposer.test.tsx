@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import React, { act } from 'react';
 import { Window } from 'happy-dom';
 import { describe, expect, test } from 'bun:test';
@@ -30,7 +31,7 @@ const renderPill = async (options: { hasContent: boolean; newSessionDraftOpen: b
     let primaryActions = 0;
     try {
         await act(async () => root.render(
-        <SyncProvider directory="/fixture" sdk={OpenCode.make({ baseUrl: "http://opencode.test", fetch: async () => new Response("[]", { headers: { "content-type": "application/json" } }) })}>
+        <SyncProvider directory="/fixture" backend={createOpenCodeBackend(OpenCode.make({ baseUrl: "http://opencode.test", fetch: async () => new Response("[]", { headers: { "content-type": "application/json" } }) }))}>
         <ThemeSystemProvider>
         <I18nProvider>
             <MobilePillComposer

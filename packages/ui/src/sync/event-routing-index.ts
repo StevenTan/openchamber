@@ -1,4 +1,4 @@
-import { syncEventMessageID, syncEventSessionID, type SyncEvent } from "@/lib/opencode/events"
+import { syncEventMessageID, syncEventSessionID, type SyncEvent } from "@/lib/agent/events"
 import type { Message } from "@/lib/opencode/model"
 import { ChildStoreManager } from "./child-store"
 import { LOCATION_SCOPED_FORM_SESSION_ID } from "./location-scoped-forms"

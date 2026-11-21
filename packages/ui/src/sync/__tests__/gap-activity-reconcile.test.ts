@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import type { SyncEvent } from "@/lib/opencode/events"
+import type { SyncEvent } from "@/lib/agent/events"
 import type { Session, SessionStatus } from "@/lib/opencode/model"
 import { opencodeClient } from "@/lib/opencode/client"
 import { ChildStoreManager } from "../child-store"

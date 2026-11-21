@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
 
-import { createRuntimeOpencodeClient, opencodeClient } from "@/lib/opencode/client"
+import { opencodeClient } from "@/lib/opencode/client"
 import type { ModelSelection, Session } from "@/lib/opencode/model"
 import { useConfigStore } from "@/stores/useConfigStore"
 import { applyModelPickToRetry } from "./session-actions"
@@ -39,7 +39,7 @@ const composerOn = (modelId: string, variant?: string) => {
 
 beforeEach(() => {
   manager = new ChildStoreManager()
-  setSyncRefs(createRuntimeOpencodeClient({ baseUrl: "http://localhost" }), manager, DIRECTORY)
+  setSyncRefs(manager, DIRECTORY)
   manager.ensureChild(DIRECTORY, { bootstrap: false }).setState({ session: [session] })
   useSessionUIStore.setState({ currentSessionId: SESSION_ID })
   useSelectionStore.setState({ sessionPickedModels: new Map() })

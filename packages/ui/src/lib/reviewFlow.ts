@@ -1,5 +1,5 @@
+import { conversationClient } from "@/lib/agent/active"
 import { isSameModelRef, toModelRef, type Message, type Session } from '@/lib/opencode/model';
-import { opencodeClient } from '@/lib/opencode/client';
 import { loadMagicPrompts, type MagicPromptSnapshot } from '@/lib/magicPrompts';
 import { flattenAssistantTextParts } from '@/lib/messages/messageText';
 import {
@@ -169,7 +169,7 @@ const sendPlainMessage = async (
     onOptimisticInsert: () => requestChatForceScrollBottom(sessionID),
     send: async (messageID, context, commitRevert) => {
       const selection = await resolveSendSelection(sessionID, directory, resolved);
-      return opencodeClient.sendMessage({
+      return conversationClient.sendMessage({
         runtimeKey,
         id: sessionID,
         directory,
@@ -204,7 +204,7 @@ const openReviewSessionPanel = (directory: string, session: Session): void => {
 
 const getSessionOrNull = async (sessionID: string, directory: string): Promise<Session | null> => {
   try {
-    return await opencodeClient.getSession(sessionID, directory);
+    return await conversationClient.getSession(sessionID, directory);
   } catch {
     return null;
   }
@@ -232,7 +232,7 @@ const createOrReuseReviewSession = async (
   expectedRuntimeKey?: string,
 ): Promise<Session> => {
   assertAutoReviewRuntimeStillCurrent(expectedRuntimeKey);
-  const original = await opencodeClient.getSession(originalSessionID, directory);
+  const original = await conversationClient.getSession(originalSessionID, directory);
   assertAutoReviewRuntimeStillCurrent(expectedRuntimeKey);
   const existingReviewID = getReviewSessionID(original);
   if (existingReviewID) {
@@ -252,7 +252,7 @@ const createOrReuseReviewSession = async (
   }
 
   assertAutoReviewRuntimeStillCurrent(expectedRuntimeKey);
-  const review = await opencodeClient.createSession({
+  const review = await conversationClient.createSession({
     title: getReviewSessionTitle(original),
     metadata: withReviewSessionMarker({}, originalSessionID),
     model: { providerID: selection.providerID, id: selection.modelID, variant: selection.variant },
@@ -265,7 +265,7 @@ const createOrReuseReviewSession = async (
     await patchSessionMetadata(originalSessionID, directory, (metadata) => withReviewSessionLink(metadata, review.id));
   } catch (error) {
     assertAutoReviewRuntimeStillCurrent(expectedRuntimeKey);
-    await opencodeClient.deleteSession(review.id, directory).catch((deleteError) => {
+    await conversationClient.deleteSession(review.id, directory).catch((deleteError) => {
       console.warn('[review-flow] failed to delete unlinked review session after link failure', deleteError);
     });
     throw error;
@@ -281,11 +281,11 @@ const startAutoReview = async (input: StartReviewFlowInput, selection: SessionMo
   const model = { providerID: selection.providerID, id: selection.modelID, variant: selection.variant };
   if (!reviewSession.model || !isSameModelRef(reviewSession.model, toModelRef(model))) {
     assertAutoReviewRuntimeStillCurrent(runtimeKey);
-    await opencodeClient.switchSessionModel(reviewSession.id, model, input.directory);
+    await conversationClient.switchSessionModel(reviewSession.id, model, input.directory);
   }
   if (selection.agent && reviewSession.agent !== selection.agent) {
     assertAutoReviewRuntimeStillCurrent(runtimeKey);
-    await opencodeClient.switchSessionAgent(reviewSession.id, selection.agent, input.directory);
+    await conversationClient.switchSessionAgent(reviewSession.id, selection.agent, input.directory);
   }
   const withHandoff = input.generateHandoff ?? true;
   assertAutoReviewRuntimeStillCurrent(runtimeKey);
@@ -352,7 +352,7 @@ export const startReviewFlow = async (input: StartReviewFlowInput): Promise<void
 };
 
 export const sendReviewFeedbackToOriginal = async (reviewSessionID: string, directory: string, reviewFeedback: string): Promise<void> => {
-  const reviewSession = await opencodeClient.getSession(reviewSessionID, directory);
+  const reviewSession = await conversationClient.getSession(reviewSessionID, directory);
   const originalSessionID = getOriginalSessionID(reviewSession);
   if (!originalSessionID) throw new Error('Original session is missing');
   const prompt = (await loadMagicPrompts(directory)).render('session.reviewFeedbackToImplementer.visible', { review_feedback: reviewFeedback });
@@ -360,12 +360,12 @@ export const sendReviewFeedbackToOriginal = async (reviewSessionID: string, dire
 };
 
 export const sendImplementationResponseToReviewer = async (originalSessionID: string, directory: string, implementationResponse: string): Promise<void> => {
-  const originalSession = await opencodeClient.getSession(originalSessionID, directory);
+  const originalSession = await conversationClient.getSession(originalSessionID, directory);
   const reviewSessionID = getReviewSessionID(originalSession);
   if (!reviewSessionID) throw new Error('Review session is missing');
   let reviewSession: Session;
   try {
-    reviewSession = await opencodeClient.getSession(reviewSessionID, directory);
+    reviewSession = await conversationClient.getSession(reviewSessionID, directory);
   } catch (error) {
     await patchSessionMetadata(originalSessionID, directory, (metadata) => withoutReviewSessionLink(metadata, reviewSessionID));
     throw error;

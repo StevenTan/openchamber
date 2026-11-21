@@ -1,3 +1,4 @@
+import { conversationClient } from "@/lib/agent/active"
 import { opencodeClient } from '@/lib/opencode/client';
 import { fetchResponseStyleInstruction } from '@/lib/responseStyle';
 import { syncSessionKnowledge } from '@/lib/sessionKnowledgeApi';
@@ -75,7 +76,7 @@ async function loadFusionSources(
   const sources = await Promise.all(sourceIds.map(async (sessionId): Promise<FusionSource | null> => {
     const cached = sessionById.get(sessionId);
     if (!cached) throw new Error('Fusion source membership changed');
-    const session = await opencodeClient.getSession(sessionId, cached.directory);
+    const session = await conversationClient.getSession(sessionId, cached.directory);
     assertCurrent();
     const location = await resolveRunMemberLocation(session, run);
     assertCurrent();
@@ -237,7 +238,7 @@ export async function startRunFusion(input: {
 
   assertCurrent();
   await syncSessionKnowledge(directory, fusionSession.id, responseStyleInstruction, runtimeKey);
-  await opencodeClient.sendMessage({
+  await conversationClient.sendMessage({
     runtimeKey,
     id: fusionSession.id,
     providerID: judge.providerID,

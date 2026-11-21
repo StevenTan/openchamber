@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import type { SyncEvent } from "@/lib/opencode/events"
+import type { SyncEvent } from "@/lib/agent/events"
 import type { FormRequest } from "@/lib/opencode/model"
 import { getRuntimeKey } from "@/lib/runtime-switch"
 import { ChildStoreManager } from "../child-store"

@@ -1,4 +1,4 @@
-import type { SyncEvent } from "@/lib/opencode/events"
+import type { SyncEvent } from "@/lib/agent/events"
 import type { FormRequest, PermissionRequest, SessionStatus } from "@/lib/opencode/model"
 import { withPromptsInFlight } from "./prompts-in-flight"
 import type { State } from "./types"

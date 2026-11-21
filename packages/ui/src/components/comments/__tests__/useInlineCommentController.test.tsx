@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import React, { act } from 'react';
 import type { Root } from 'react-dom/client';
@@ -53,7 +54,7 @@ describe('inline comment target', () => {
     useInlineCommentDraftStore.setState({ drafts: {} });
     await act(async () => root.render(
       <I18nProvider>
-        <SyncProvider sdk={sdk} directory={directory}>
+        <SyncProvider backend={createOpenCodeBackend(sdk)} directory={directory}>
           <Harness />
         </SyncProvider>
       </I18nProvider>,

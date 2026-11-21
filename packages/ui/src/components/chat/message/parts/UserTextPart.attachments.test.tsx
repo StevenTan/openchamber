@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import React, { act } from 'react';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createRoot, type Root } from 'react-dom/client';
@@ -146,7 +147,7 @@ const renderMessage = async (text: string, options: { runtime?: RuntimeAPIs } = 
     await act(async () => {
         root.render(
             <RuntimeAPIContext.Provider value={options.runtime ?? null}>
-                <SyncProvider sdk={sdk} directory="">
+                <SyncProvider backend={createOpenCodeBackend(sdk)} directory="">
                     <I18nProvider>{part}</I18nProvider>
                 </SyncProvider>
             </RuntimeAPIContext.Provider>,

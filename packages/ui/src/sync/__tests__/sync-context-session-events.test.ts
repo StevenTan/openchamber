@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test"
-import type { SyncEvent } from "@/lib/opencode/events"
+import type { SyncEvent } from "@/lib/agent/events"
 import type { Session } from "@/lib/opencode/model"
 
 let currentSessions: Session[] = []

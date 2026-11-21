@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { Window } from 'happy-dom';
 import React, { act } from 'react';
@@ -44,7 +45,7 @@ describe('a pinned chat column follows its session across a move', () => {
   };
   const render = async (directory: string | null) => {
     await act(async () => root.render(
-      <SyncProvider sdk={sdk} directory={parentDirectory}>
+      <SyncProvider backend={createOpenCodeBackend(sdk)} directory={parentDirectory}>
         <Probe directory={directory} />
       </SyncProvider>,
     ));

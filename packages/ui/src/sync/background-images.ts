@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { IMAGE_JOB_LIFETIME_MS, readImageJobEnd, readImageJobStart, type RunningImageJob } from '@/lib/opencode/background-image';
 import { isSpaceDirectory } from '@/lib/spaces/space-route';
-import type { SyncEvent } from '@/lib/opencode/events';
+import type { SyncEvent } from '@/lib/agent/events';
 
 
 type TrackedImageJob = RunningImageJob & {

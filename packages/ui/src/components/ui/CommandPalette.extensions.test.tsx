@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { afterAll, afterEach, beforeEach, expect, test } from 'bun:test';
 import React, { act } from 'react';
 import { Window } from 'happy-dom';
@@ -64,7 +65,7 @@ const tasks: InstalledGuest = {
 };
 
 const render = async () => {
-  await act(async () => root.render(<RuntimeAPIProvider apis={apis}><I18nProvider><SyncProvider sdk={sdk} directory="/repo"><CommandPalette /></SyncProvider></I18nProvider></RuntimeAPIProvider>));
+  await act(async () => root.render(<RuntimeAPIProvider apis={apis}><I18nProvider><SyncProvider backend={createOpenCodeBackend(sdk)} directory="/repo"><CommandPalette /></SyncProvider></I18nProvider></RuntimeAPIProvider>));
 };
 const search = async (query: string) => {
   const input = browser.document.querySelector('input');

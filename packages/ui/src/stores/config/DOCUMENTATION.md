@@ -6,7 +6,8 @@ This module owns the composer's directory-scoped provider catalog, agent catalog
 model and effort selection, settings defaults, voice preferences, startup and
 connection state. `../useConfigStore.ts` composes the slices and retains the
 public import path. Session-specific picks belong to `sync/selection-store.ts`;
-the OpenCode client owns transport and wire-to-domain conversion.
+the conversation client supplies model and agent catalogs; the backend adapter
+owns transport and native-record conversion.
 
 ## Invariants
 

@@ -1,6 +1,6 @@
 import { readShellCompletion } from '@/lib/opencode/background-shell';
 import { opencodeClient } from '@/lib/opencode/client';
-import type { SyncEvent } from '@/lib/opencode/events';
+import type { SyncEvent } from '@/lib/agent/events';
 import { ascendingId } from '@/lib/opencode/ids';
 import { replyCommandContinuation, replyCommandNote, type ReplyCommandNote } from '@/lib/opencode/reply-command';
 import { getRuntimeKey } from '@/lib/runtime-switch';

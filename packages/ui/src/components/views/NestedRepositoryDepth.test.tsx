@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import React, { act } from 'react';
 import { expect, test } from 'bun:test';
 import { Window } from 'happy-dom';
@@ -77,7 +78,7 @@ test('a nested repository row keeps the separate-repository note without recursi
   document.body.append(container);
   const root = createRoot(container);
   const render = () => act(async () => {
-    root.render(<SyncProvider sdk={SYNC_SDK} directory="/repo"><I18nProvider><RuntimeAPIContext.Provider value={apis}>
+    root.render(<SyncProvider backend={createOpenCodeBackend(SYNC_SDK)} directory="/repo"><I18nProvider><RuntimeAPIContext.Provider value={apis}>
       <MultiFileDiffEntry directory="/repo" file={{ path: 'nested/', index: ' ', working_dir: 'M', insertions: 0, deletions: 0, isNew: false }}
         layout="inline" wrapLines={false} isSelected={false} isExpanded isMounted
         onSelect={() => {}} onExpandedChange={() => {}} registerSectionRef={() => {}} />

@@ -1,4 +1,3 @@
-
 import type { FilePart, FormRequest, Message, Metadata, ModelSelection, Part, PermissionRequest, Session, SyntheticMessage, TextPart, UserMessage } from "@/lib/opencode/model"
 import { compact, partIds } from "@/lib/opencode/model"
 import { readSubagentRun } from "@/lib/opencode/subagent-run"
@@ -30,6 +29,7 @@ import type { ChildStoreManager } from "./child-store"
 import { computeSubtreeIds } from "./scoped-blocking-requests"
 import { withUserWorkTitle } from "@/lib/sessionWorkTitle"
 import { opencodeClient, type SyntheticContextInput } from "@/lib/opencode/client"
+import { conversationClient } from "@/lib/agent/active"
 import { withSessionMetadata } from "@/lib/opencode/projection"
 import { findMessagePageItem } from "@/lib/opencode/messagePaging"
 import { toJsonRecord } from "@/lib/opencode/json"
@@ -463,7 +463,7 @@ export async function compactSession(
     const { model } = await resolveSendSelection(sessionId, directory ?? undefined, selection)
     if (!isCurrentRuntime()) throw new Error("Compaction was cancelled because the runtime changed.")
     if (model) {
-      await opencodeClient.switchSessionModel(sessionId, model, directory)
+      await conversationClient.switchSessionModel(sessionId, model, directory)
     }
   }
   if (!isCurrentRuntime()) throw new Error("Compaction was cancelled because the runtime changed.")
@@ -532,7 +532,7 @@ export async function readSessionsLiveActivity(sessionIds: string[], directory: 
 async function abortDescendantIfBusy(sessionId: string, directory: string): Promise<void> {
   if (!isSessionBusyNow(sessionId)) return
   try {
-    await opencodeClient.abortSession(sessionId, directory)
+    await conversationClient.abortSession(sessionId, directory)
   } catch {
     // ignore abort errors
   }
@@ -572,7 +572,7 @@ function firstUserMessageAtOrAfter(messages: Message[], cutoff: number): Message
 }
 
 async function fetchSessionMessages(sessionId: string, directory?: string | null): Promise<Message[]> {
-  const page = await opencodeClient.getSessionMessages(sessionId, undefined, directory)
+  const page = await conversationClient.getSessionMessages(sessionId, undefined, directory)
   return page.items.map(({ info }) => info)
 }
 
@@ -592,7 +592,7 @@ async function stageAndReadRevert(sessionId: string, messageId: string, director
   unreconciledReverts.add(key)
   await opencodeClient.stageRevert(sessionId, messageId, { directory })
   assertRuntime()
-  const reverted = await opencodeClient.getSession(sessionId, directory)
+  const reverted = await conversationClient.getSession(sessionId, directory)
   assertRuntime()
   unreconciledReverts.delete(key)
   return reverted
@@ -627,13 +627,13 @@ async function clearStagedRevertNow(sessionId: string): Promise<void> {
     if (!descendant.session.revert) continue
     try {
       await opencodeClient.clearRevert(descendant.session.id, descendant.directory)
-      mirrorSessionIntoLiveStores(await opencodeClient.getSession(descendant.session.id, descendant.directory), descendant.directory)
+      mirrorSessionIntoLiveStores(await conversationClient.getSession(descendant.session.id, descendant.directory), descendant.directory)
     } catch (error) {
       console.error(`[session-actions] Failed to clear revert in descendant ${descendant.session.id}:`, error)
     }
   }
   await opencodeClient.clearRevert(sessionId, directory)
-  mirrorSessionIntoLiveStores(await opencodeClient.getSession(sessionId, directory), directory)
+  mirrorSessionIntoLiveStores(await conversationClient.getSession(sessionId, directory), directory)
   if (directory) {
     sessionEvents.requestGitRefresh({ directory })
     fileTreeChanges.unknownChange(directory)
@@ -680,7 +680,7 @@ export async function waitForPendingRevert(sessionId: string, directory?: string
         const revision = revertRevision
         const targetDirectory = directory ?? getSessionDirectory(sessionId)
         const read = Promise.resolve().then(async () => {
-          const session = await opencodeClient.getSession(sessionId, targetDirectory)
+          const session = await conversationClient.getSession(sessionId, targetDirectory)
           if (!isCurrentRuntime()) throw new Error("Runtime changed while reconciling the revert.")
           if (revision !== revertRevision || pendingRevertsForSession(sessionId).length > 0) return
           mirrorSessionIntoLiveStores(session, targetDirectory)
@@ -1034,7 +1034,7 @@ async function resolveBlockingRequestTarget(
     const readIsCurrent = captureRuntimeInstance()
     let fetched: Session
     try {
-      fetched = await opencodeClient.getSession(sessionId, guessedDirectory)
+      fetched = await conversationClient.getSession(sessionId, guessedDirectory)
     } catch (error) {
       if (error instanceof Error) markDefiniteTransportFailure(error)
       throw new Error("The reply was not sent because its session record could not be read.", { cause: error })
@@ -1066,7 +1066,7 @@ export async function createSession(
     const cleanupSession = await opencodeClient.captureSessionCleanup(effectiveDirectory, runtimeKey)
     if (getRuntimeKey() !== runtimeKey || opencodeClient.getSdkClient() !== runtimeClient) return null
     const sessionMetadata = title ? withUserWorkTitle(metadata ?? {}, title) : metadata
-    const session = await opencodeClient.createSession(
+    const session = await conversationClient.createSession(
       { id, title, metadata: sessionMetadata, model: selection?.model, agent: selection?.agent },
       effectiveDirectory,
     )
@@ -1119,7 +1119,7 @@ export async function patchSessionMetadata(
 ): Promise<Session> {
   if (isStaleRuntime(expectedRuntimeKey)) throw new Error("runtime changed")
   const targetDirectory = directory ?? getSessionDirectory(sessionId)
-  const current = await opencodeClient.getSession(sessionId, targetDirectory)
+  const current = await conversationClient.getSession(sessionId, targetDirectory)
   if (isStaleRuntime(expectedRuntimeKey)) throw new Error("runtime changed")
   let currentMetadata = getSessionMetadata(current)
   let result: Awaited<ReturnType<typeof requestSessionMetadataUpdate>>
@@ -1172,12 +1172,12 @@ async function updateLinkedIssues(
     || findLiveSession(sessionId) !== null
   const fallbackRecord = heldBeforeRequest
     ? null
-    : await opencodeClient.getSession(sessionId, targetDirectory)
+    : await conversationClient.getSession(sessionId, targetDirectory)
   const result = await requestSessionLinksUpdate(sessionId, issues, linked, targetDirectory)
   if (result.outcome !== "updated") throw new Error(`session link update failed: ${result.reason}`)
   const record = fallbackRecord
     ?? (getGlobalSessionSnapshot(sessionId) ?? findLiveSession(sessionId))
-    ?? await opencodeClient.getSession(sessionId, targetDirectory)
+    ?? await conversationClient.getSession(sessionId, targetDirectory)
   const updated: Session = { ...record, metadata: result.metadata }
   useGlobalSessionsStore.getState().upsertSession(updated)
   const sessionDirectory = updated.directory || targetDirectory
@@ -1241,7 +1241,7 @@ async function cleanupReviewMetadataBeforeDelete(
   if (isStaleRuntime(expectedRuntimeKey)) return
   let session: Session
   try {
-    session = await opencodeClient.getSession(sessionId, directory ?? getSessionDirectory(sessionId))
+    session = await conversationClient.getSession(sessionId, directory ?? getSessionDirectory(sessionId))
   } catch {
     return
   }
@@ -1463,7 +1463,7 @@ export async function deleteSession(sessionId: string, options?: DeleteSessionOp
   try {
     await cleanupReviewMetadataBeforeDelete(sessionId, sessionDirectory, expectedRuntimeKey, options?.temporarySideChatIDs)
     if (isStaleRuntime(expectedRuntimeKey)) return false
-    const deleted = await opencodeClient.deleteSession(sessionId, sessionDirectory)
+    const deleted = await conversationClient.deleteSession(sessionId, sessionDirectory)
     if (isStaleRuntime(expectedRuntimeKey)) return false
     if (deleted !== true) {
       throw new Error("session.delete failed: server did not confirm deletion")
@@ -1778,8 +1778,8 @@ export async function updateSessionTitle(
   if (options?.signal) options.signal.throwIfAborted()
   else cancelSessionTitleGeneration(sessionId)
   const sessionDirectory = options?.directory ?? getSessionDirectory(sessionId)
-  await opencodeClient.renameSession(sessionId, title, sessionDirectory)
-  const session = await opencodeClient.getSession(sessionId, sessionDirectory)
+  await conversationClient.renameSession(sessionId, title, sessionDirectory)
+  const session = await conversationClient.getSession(sessionId, sessionDirectory)
   if (isStaleRuntime(options?.expectedRuntimeKey)) throw new Error("runtime changed")
   options?.signal?.throwIfAborted()
   useGlobalSessionsStore.getState().upsertSession(session)
@@ -1971,7 +1971,7 @@ export async function optimisticSend(input: {
 
     let revertStaged = !revertCommitted
     if (revertCommitSent && !revertCommitted && ambiguousFailure) {
-      revertStaged = await opencodeClient.getSession(input.sessionId, targetDirectory).then((record) => !!record.revert, () => true)
+      revertStaged = await conversationClient.getSession(input.sessionId, targetDirectory).then((record) => !!record.revert, () => true)
     }
 
     const rollbackDirectory = getSessionDirectory(input.sessionId) ?? targetDirectory
@@ -2030,7 +2030,7 @@ async function fetchRecentSendConfirmationRecords(
   for (let attempt = 0; attempt < SEND_CONFIRMATION_REFETCH_ATTEMPTS; attempt += 1) {
     if (attempt > 0) await wait(SEND_CONFIRMATION_REFETCH_BASE_RETRY_MS * 2 ** (attempt - 1))
     try {
-      const page = await opencodeClient.getSessionMessages(
+      const page = await conversationClient.getSessionMessages(
         sessionId,
         { limit: SEND_CONFIRMATION_REFETCH_LIMIT },
         directory,
@@ -2076,7 +2076,7 @@ function materializeConfirmedSendRecords(
 export async function abortCurrentOperation(sessionId: string): Promise<void> {
   const { directory } = dirStoreForSession(sessionId)
   try {
-    await opencodeClient.abortSession(sessionId, directory)
+    await conversationClient.abortSession(sessionId, directory)
   } catch (error) {
     console.error("[session-actions] abort failed", error)
   }
@@ -2095,7 +2095,7 @@ export async function respondToPermission(
     resolveDirectoryForBlockingRequest("permission", sessionId, requestId) || getSessionDirectory(sessionId),
   )).directory
   try {
-    if (await opencodeClient.replyToPermission(sessionId, requestId, response, { directory }) !== true) {
+    if (await conversationClient.replyToPermission(sessionId, requestId, response, { directory }) !== true) {
       throw new Error("Permission reply failed")
     }
   } catch (error) {
@@ -2116,7 +2116,7 @@ export async function dismissPermission(
     resolveDirectoryForBlockingRequest("permission", sessionId, requestId) || getSessionDirectory(sessionId),
   )
   try {
-    if (await opencodeClient.replyToPermission(sessionId, requestId, "reject", { directory }) !== true) {
+    if (await conversationClient.replyToPermission(sessionId, requestId, "reject", { directory }) !== true) {
       throw new Error("Permission dismissal failed")
     }
   } catch (error) {
@@ -2242,7 +2242,7 @@ export async function applyModelPickToRetry(sessionId: string, directory: string
   const { model } = resolveFormSelection(findSessionRecordAnywhere(sessionId, directory), sessionId)
   if (model?.providerID !== pick.providerId || model.modelID !== pick.modelId) return
   const settleModelPick = useSelectionStore.getState().captureSessionModelPickSettlement(sessionId, model.providerID, model.modelID)
-  await opencodeClient.switchSessionModel(sessionId, { providerID: model.providerID, id: model.modelID, variant: model.variant }, directory)
+  await conversationClient.switchSessionModel(sessionId, { providerID: model.providerID, id: model.modelID, variant: model.variant }, directory)
   settleModelPick()
 }
 
@@ -2265,7 +2265,7 @@ export async function replyToForm(
     )
     const settleSelection = await applyFormSelection(record, sessionId, replyDirectory, runtimeKey)
     assertRuntimeCurrent()
-    if (await opencodeClient.replyToForm(sessionId, formId, answer, replyDirectory) !== true) {
+    if (await conversationClient.replyToForm(sessionId, formId, answer, replyDirectory) !== true) {
       throw new Error("Form reply failed")
     }
     if (!isCurrentRuntime()) return
@@ -2285,7 +2285,7 @@ export async function cancelForm(sessionId: string, formId: string, message?: st
   await waitForConnectionOrThrow()
   const { directory } = await resolveBlockingRequestTarget(sessionId, getRequestReplyDirectory("form", sessionId, formId))
   try {
-    if (await opencodeClient.cancelForm(sessionId, formId, directory, message) !== true) {
+    if (await conversationClient.cancelForm(sessionId, formId, directory, message) !== true) {
       throw new Error("Form cancellation failed")
     }
     removeFormRequestFromChildStores(sessionId, formId)
@@ -2427,7 +2427,7 @@ function readFormToolLink(form: FormRequest): Promise<boolean> {
   const read = (async () => {
     try {
       const { directory } = await resolveBlockingRequestTarget(form.sessionID, getRequestReplyDirectory("form", form.sessionID, form.id))
-      const parts = { [tool.messageID]: (await opencodeClient.getSessionMessage(form.sessionID, tool.messageID, directory)).parts }
+      const parts = { [tool.messageID]: (await conversationClient.getSessionMessage(form.sessionID, tool.messageID, directory)).parts }
       if (!isCurrentRuntime()) return false
       if (formTurnHold(form, parts) !== "released") return isWaitingQuestionCall(form, parts)
       const openKeys = openFormReleaseKeys()
@@ -2597,7 +2597,7 @@ async function stageRevertToMessage(sessionId: string, messageId: string): Promi
   const status = state.session_status[sessionId]
   if (status && status.type !== "idle") {
     try {
-      await opencodeClient.abortSession(sessionId, directory)
+      await conversationClient.abortSession(sessionId, directory)
     } catch {
       // ignore abort errors
     }
@@ -2693,7 +2693,7 @@ export async function refetchSessionMessages(sessionId: string): Promise<void> {
     return
   }
 
-  const page = await opencodeClient.getSessionMessages(sessionId, { limit: MESSAGE_REFETCH_LIMIT }, directory)
+  const page = await conversationClient.getSessionMessages(sessionId, { limit: MESSAGE_REFETCH_LIMIT }, directory)
   const records = page.items.filter((record) => !!record.info?.id).reverse()
   if (records.length === 0) return
 
@@ -2733,7 +2733,7 @@ async function inheritForkState(sourceSessionId: string, forkedSession: Session,
     if (isStaleRuntime(expectedRuntimeKey)) return
   }
   return applyForkInheritance(sourceSessionId, forkedSession, {
-    readGoalId: async (sessionId) => getSessionGoal(await opencodeClient.getSession(sessionId, directory))?.id ?? null,
+    readGoalId: async (sessionId) => getSessionGoal(await conversationClient.getSession(sessionId, directory))?.id ?? null,
     readObjective: fetchGoalObjectiveContent,
     writeObjective: writeGoalObjectiveFile,
     patchMetadata: async (sessionId, updater, condition) => { await patchSessionMetadata(sessionId, directory, updater, expectedRuntimeKey, condition) },

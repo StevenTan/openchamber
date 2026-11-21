@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import React, { act } from 'react';
 import { describe, expect, jest, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -35,7 +36,7 @@ const sdk = OpenCode.make({
 });
 const TestProviders = ({ children }: { children: React.ReactNode }) => (
   <RuntimeAPIContext.Provider value={runtimeApis}>
-    <SyncProvider sdk={sdk} directory="">
+    <SyncProvider backend={createOpenCodeBackend(sdk)} directory="">
       <I18nProvider>{children}</I18nProvider>
     </SyncProvider>
   </RuntimeAPIContext.Provider>

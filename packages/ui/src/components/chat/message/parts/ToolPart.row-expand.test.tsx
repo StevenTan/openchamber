@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import React, { act } from 'react';
 import { expect, test } from 'bun:test';
 import { createRoot } from 'react-dom/client';
@@ -103,7 +104,7 @@ test('opening a tool row tells the timeline before the row grows; closing it doe
   try {
     await act(async () => {
       root.render(
-        <SyncProvider sdk={sdk} directory="">
+        <SyncProvider backend={createOpenCodeBackend(sdk)} directory="">
           <I18nProvider>
             <ThemeSystemContext.Provider value={themeContext}>
               <Row onToggled={() => { events.push('toggle'); }} />

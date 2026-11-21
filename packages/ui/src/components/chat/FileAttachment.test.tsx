@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { afterAll, describe, expect, test } from 'bun:test';
 import { Window } from 'happy-dom';
 
@@ -64,7 +65,7 @@ const renderFiles = async (files: FilePart[], compact: boolean) => {
   };
   await act(async () => {
     root.render(
-      <SyncProvider sdk={sdk} directory="">
+      <SyncProvider backend={createOpenCodeBackend(sdk)} directory="">
         <I18nProvider>
           <TooltipProvider>
             <MessageFilesDisplay files={files} onShowPopup={onShowPopup} compact={compact} />

@@ -143,7 +143,7 @@ describe('resolveQueuedSessionStatusType', () => {
     childStores = new ChildStoreManager();
     const store = childStores.ensureChild(DIRECTORY, { bootstrap: false });
     store.setState({ status: 'complete', session_status: {}, message: {} });
-    setSyncRefs({} as never, childStores, DIRECTORY);
+    setSyncRefs(childStores, DIRECTORY);
   });
 
   test('treats a session with an in-flight assistant turn as busy even when the status entry is missing', () => {

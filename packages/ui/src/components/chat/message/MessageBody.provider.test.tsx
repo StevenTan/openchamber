@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import React, { act } from 'react';
 import { afterAll, afterEach, describe, expect, test } from 'bun:test';
 import { createRoot, type Root } from 'react-dom/client';
@@ -54,7 +55,7 @@ async function renderMessage() {
     root?.render(
       <RuntimeAPIContext.Provider value={runtimeApis}>
         <ThemeSystemContext.Provider value={themeContext}>
-        <SyncProvider sdk={sdk} directory="">
+        <SyncProvider backend={createOpenCodeBackend(sdk)} directory="">
           <I18nProvider>
             <MessageBody
               messageId="answer" parts={[]} isUser={false} isMessageCompleted messageFinish="stop"

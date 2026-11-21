@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 import type { RunningShell, ShellEnd } from '@/lib/opencode/background-shell';
-import type { SyncEvent } from '@/lib/opencode/events';
+import type { SyncEvent } from '@/lib/agent/events';
 import {
   ENDED_SHELLS_MAX,
   applyBackgroundShellEvents,

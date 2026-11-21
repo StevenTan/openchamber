@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { expect, spyOn, test } from 'bun:test';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -48,7 +49,7 @@ test('mobile drawer keeps its terminal Escape exception', async () => {
       await act(async () => root.render(React.createElement(I18nProvider, null,
         React.createElement(ThemeSystemContext.Provider, { value: themeContext },
           React.createElement(RuntimeAPIContext.Provider, { value: apis },
-            React.createElement(SyncProvider, { sdk, directory: '', children:
+            React.createElement(SyncProvider, { backend: createOpenCodeBackend(sdk), directory: '', children:
               React.createElement(MobileWorkspaceDrawer, {
                 open: true, tab, onClose: () => { closes += 1; }, onTabChange: empty,
                 registerPreviewBackHandler: empty, pendingChangesDiff: null, pendingChangesCommit: null,

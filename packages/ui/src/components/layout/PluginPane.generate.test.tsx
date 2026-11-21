@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { expect, spyOn, test } from 'bun:test';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -69,7 +70,7 @@ test('a generate answer that arrives after its panel closed reaches the reopened
   const restores: Array<() => void> = [];
   const pane = (open: boolean, headless = false) => (
     <I18nProvider><ThemeSystemContext.Provider value={themeContext}>
-      <SyncProvider sdk={sdk} directory="/visible">{open ? <PluginPane mode="plugin:writer" surface="panel" headless={headless} /> : null}</SyncProvider>
+      <SyncProvider backend={createOpenCodeBackend(sdk)} directory="/visible">{open ? <PluginPane mode="plugin:writer" surface="panel" headless={headless} /> : null}</SyncProvider>
     </ThemeSystemContext.Provider></I18nProvider>
   );
   // Mount the panel and attach a stand-in for the document inside its frame.

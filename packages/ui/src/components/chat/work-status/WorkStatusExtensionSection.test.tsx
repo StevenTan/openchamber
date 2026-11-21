@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { expect, spyOn, test } from 'bun:test';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -122,7 +123,7 @@ test('a status frame keeps subscriptions and storage alive while project changes
   const root = createRoot(container);
   const renderSection = (directory: string) => (
     <I18nProvider><ThemeSystemContext.Provider value={activeThemeContext}>
-      <SyncProvider sdk={sdk} directory={directory}><WorkStatusExtensionSection guest={guest} directory={directory} /></SyncProvider>
+      <SyncProvider backend={createOpenCodeBackend(sdk)} directory={directory}><WorkStatusExtensionSection guest={guest} directory={directory} /></SyncProvider>
     </ThemeSystemContext.Provider></I18nProvider>
   );
   try {

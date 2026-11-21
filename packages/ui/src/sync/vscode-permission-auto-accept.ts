@@ -1,3 +1,4 @@
+import { conversationClient } from "@/lib/agent/active"
 import type { PermissionRequest, Session } from "@/lib/opencode/model"
 import { opencodeClient } from "@/lib/opencode/client"
 import { usePermissionStore } from "@/stores/permissionStore"
@@ -122,7 +123,7 @@ const runtime = createVSCodePermissionAutoAcceptRuntime({
     Object.entries(usePermissionStore.getState().modes).map(([sessionId, mode]) => [sessionId, mode !== "ask"]),
   ),
   getSessions: getAllSyncSessionMap,
-  getSession: (sessionId, directory) => opencodeClient.getSession(sessionId, directory),
+  getSession: (sessionId, directory) => conversationClient.getSession(sessionId, directory),
   getKnownPendingPermissions: (directory) => Object.values(getDirectoryState(directory)?.permission ?? {}).flat(),
   listPendingPermissions: (directory) => opencodeClient.listPendingPermissions({ directories: [directory] }),
   getPermissionState: async (sessionId, requestId, directory) => (await opencodeClient.fetchPermission(sessionId, requestId, directory)).state,

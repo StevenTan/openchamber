@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -70,7 +71,7 @@ describe('useSessionProjectCollection archive coverage', () => {
 
   const render = async () => {
     await act(async () => root.render(
-      <SyncProvider sdk={createSdk()} directory="">
+      <SyncProvider backend={createOpenCodeBackend(createSdk())} directory="">
         <Probe />
       </SyncProvider>,
     ));

@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -50,7 +51,7 @@ describe('agent-linked threads in the context section', () => {
     await act(async () => root.render(
       <I18nProvider>
         <RuntimeAPIContext.Provider value={apis}>
-          <SyncProvider sdk={sdk} directory={directory}>
+          <SyncProvider backend={createOpenCodeBackend(sdk)} directory={directory}>
             <WorkStatusContextSection sessionId={sessionId} directory={directory} />
           </SyncProvider>
         </RuntimeAPIContext.Provider>

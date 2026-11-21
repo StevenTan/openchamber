@@ -1,4 +1,4 @@
-import type { MessagePatch, SessionPatch, SyncEvent, ToolTransition } from "@/lib/opencode/events"
+import type { MessagePatch, SessionPatch, SyncEvent, ToolTransition } from "@/lib/agent/events"
 import {
   compact,
   isFinalToolStatus,

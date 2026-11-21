@@ -1,5 +1,5 @@
+import { conversationClient } from "@/lib/agent/active"
 import { useCallback } from 'react';
-import { opencodeClient } from '@/lib/opencode/client';
 import { generateSessionTitle } from '@/lib/sessionTitle';
 import { getRuntimeKey } from '@/lib/runtime-switch';
 import { isVSCodeRuntime } from '@/lib/desktop';
@@ -21,7 +21,7 @@ export function useSessionAiRename(sessionID: string, directory: string | null |
     if (!directory || isVSCodeRuntime()) throw new Error('Session title generation is unavailable');
     signal.throwIfAborted();
     if (getRuntimeKey() !== runtimeKey) throw new Error('Runtime changed');
-    const session = await opencodeClient.getSession(sessionID, directory);
+    const session = await conversationClient.getSession(sessionID, directory);
     signal.throwIfAborted();
     if (getRuntimeKey() !== runtimeKey || normalizePath(session.directory) !== normalizePath(directory)) {
       throw new Error('Session moved');
@@ -51,7 +51,7 @@ export function useSessionAiRename(sessionID: string, directory: string | null |
         signal,
         prepare,
         generate: (session, turns, requestSignal) => generateSessionTitle({ turns, currentTitle: session.title, directory, signal: requestSignal }),
-        readSession: () => opencodeClient.getSession(sessionID, directory),
+        readSession: () => conversationClient.getSession(sessionID, directory),
         saveTitle: (title, requestSignal) => updateSessionTitle(sessionID, title, { directory, expectedRuntimeKey: runtimeKey, signal: requestSignal, byUser: true }),
       });
     });

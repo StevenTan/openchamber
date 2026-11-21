@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -58,7 +59,7 @@ describe('BtwPanel', () => {
         document.body.appendChild(container);
         root = createRoot(container);
         await act(async () => root.render(
-            <SyncProvider sdk={sdk} directory={directory}>
+            <SyncProvider backend={createOpenCodeBackend(sdk)} directory={directory}>
                 <RuntimeAPIContext.Provider value={createWebAPIs()}>
                     <ThemeSystemProvider><I18nProvider>
                         <BtwPanel parentSessionId="parent" panel={panel} hidden={false} onExit={() => {}} />
@@ -119,7 +120,7 @@ describe('BtwPanel', () => {
 
     test('keeps inherited context outside the boundary and renders a late context echo', async () => {
         await act(async () => root.render(
-            <SyncProvider sdk={sdk} directory={directory}>
+            <SyncProvider backend={createOpenCodeBackend(sdk)} directory={directory}>
                 <RuntimeAPIContext.Provider value={createWebAPIs()}>
                     <ThemeSystemProvider><I18nProvider>
                         <BtwPanel parentSessionId="parent" panel={{ ...panel, boundaryMessageID: 'boundary' }} hidden={false} onExit={() => {}} />

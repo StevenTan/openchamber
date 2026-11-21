@@ -1,4 +1,4 @@
-import { type SyncEvent } from "@/lib/opencode/events"
+import { type SyncEvent } from "@/lib/agent/events"
 import type { ControlStreamSyncEvent } from "@/lib/openchamberEvents"
 import { applyWaitingPageEvent } from "./global-blocking-requests"
 import { applySessionAssistEvent } from "./pending-session-assists"

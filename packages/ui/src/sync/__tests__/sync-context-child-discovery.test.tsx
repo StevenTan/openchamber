@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { describe, expect, jest, spyOn, test } from 'bun:test'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -213,7 +214,7 @@ describe('SyncProvider child-session discovery pagination', () => {
 
       const root = createRoot(dom.container)
       await act(async () => root.render(
-        <SyncProvider sdk={sdk} directory={DIRECTORY}>
+        <SyncProvider backend={createOpenCodeBackend(sdk)} directory={DIRECTORY}>
           <div />
         </SyncProvider>,
       ))
@@ -291,7 +292,7 @@ const withWatchdogFixture = async (run: (fixture: {
   }
   try {
     readDiscoveryPage = async () => ({ sessions: [], cursor: {} })
-    await act(async () => root.render(<SyncProvider sdk={sdk} directory={DIRECTORY}><div /></SyncProvider>))
+    await act(async () => root.render(<SyncProvider backend={createOpenCodeBackend(sdk)} directory={DIRECTORY}><div /></SyncProvider>))
     await run({ advance, manager: getSyncChildStores() })
   } finally {
     setActiveSession('', '')
@@ -526,7 +527,7 @@ describe('SyncProvider active-session watchdog status poll', () => {
         })
       }
       try {
-        await act(async () => root.render(<SyncProvider sdk={sdk} directory={DIRECTORY}><div /></SyncProvider>))
+        await act(async () => root.render(<SyncProvider backend={createOpenCodeBackend(sdk)} directory={DIRECTORY}><div /></SyncProvider>))
         const manager = getSyncChildStores()
         const store = manager.getChild(DIRECTORY)
         if (!store) throw new Error('Directory store was not created')
@@ -625,7 +626,7 @@ describe('SyncProvider active-session watchdog status poll', () => {
       seedPersistedSessions(DIRECTORY, [rootSession('ses_idle', 'idle', 1500)])
       const root = createRoot(dom.container)
       await act(async () => root.render(
-        <SyncProvider sdk={sdk} directory={DIRECTORY}>
+        <SyncProvider backend={createOpenCodeBackend(sdk)} directory={DIRECTORY}>
           <div />
         </SyncProvider>,
       ))

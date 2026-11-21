@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -69,7 +70,7 @@ describe('mounted turn telemetry with live sync stores', () => {
   } });
   const render = async (visible = true, selectedDirectory = directory, selectedSession = sessionId) => {
     await act(async () => root.render(
-      <SyncProvider sdk={sdk} directory={selectedDirectory}>
+      <SyncProvider backend={createOpenCodeBackend(sdk)} directory={selectedDirectory}>
         <I18nProvider>{visible ? <WorkStatusTelemetrySection sessionId={selectedSession} directory={selectedDirectory} /> : null}</I18nProvider>
       </SyncProvider>,
     ));

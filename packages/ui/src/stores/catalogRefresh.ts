@@ -1,5 +1,5 @@
 
-import type { CatalogKind } from "@/lib/opencode/events";
+import type { CatalogKind } from "@/lib/agent/events";
 import { opencodeClient } from "@/lib/opencode/client";
 import { captureRuntimeInstance } from "@/lib/runtime-switch";
 import { notifyCredentialChanged } from "@/lib/opencode/integration-catalog";

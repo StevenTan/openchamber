@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { afterAll, beforeEach, expect, spyOn, test } from 'bun:test';
 import { plugin } from 'bun';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -183,7 +184,7 @@ const submitInComposer = async (text: string, options?: { attachment: AttachedFi
         <RuntimeAPIContext.Provider value={runtimeAPIs}>
           <ThemeSystemProvider>
             <I18nProvider>
-              <SyncProvider sdk={sdk} directory={WORKTREE}>
+              <SyncProvider backend={createOpenCodeBackend(sdk)} directory={WORKTREE}>
                 <ChatInput />
               </SyncProvider>
             </I18nProvider>

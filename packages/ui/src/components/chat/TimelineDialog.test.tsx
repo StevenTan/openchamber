@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { act } from 'react';
 import type { Root } from 'react-dom/client';
@@ -89,7 +90,7 @@ describe('TimelineDialog', () => {
     });
   });
   const render = (open: boolean) => act(async () => root.render(
-    <SyncProvider sdk={sdk} directory={directory}>
+    <SyncProvider backend={createOpenCodeBackend(sdk)} directory={directory}>
       <I18nProvider>
         <ChatColumnSessionContext.Provider value={column}>
           <TimelineDialog open={open} onOpenChange={() => undefined} />

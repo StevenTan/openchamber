@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { describe, expect, spyOn, test } from 'bun:test'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -60,7 +61,7 @@ describe('SyncProvider selection boundary', () => {
       })
       try {
         await act(async () => {
-          root.render(<SyncProvider sdk={createSdk()} directory={directory}><Probe /></SyncProvider>)
+          root.render(<SyncProvider backend={createOpenCodeBackend(createSdk())} directory={directory}><Probe /></SyncProvider>)
         })
         await act(() => secondPageStarted)
         if (!manager) throw new Error('Bootstrap manager was not mounted')
@@ -116,7 +117,7 @@ describe('SyncProvider selection boundary', () => {
         tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } }, time: { created: 1, updated: 1 },
       }) : null
       try {
-        await act(async () => root.render(<SyncProvider sdk={createSdk()} directory="/workspace/guess"><Probe /></SyncProvider>))
+        await act(async () => root.render(<SyncProvider backend={createOpenCodeBackend(createSdk())} directory="/workspace/guess"><Probe /></SyncProvider>))
         if (!manager) throw new Error('Directory manager was not mounted')
         const store = manager.ensureChild(directory, { bootstrap: false })
         const messages: Message[] = Array.from({ length: 10 }, (_, index) => ({
@@ -180,7 +181,7 @@ describe('SyncProvider selection boundary', () => {
     const sdk = createSdk()
 
     try {
-      await act(async () => root.render(<SyncProvider sdk={sdk} directory="/workspace/a"><Probe /></SyncProvider>))
+      await act(async () => root.render(<SyncProvider backend={createOpenCodeBackend(sdk)} directory="/workspace/a"><Probe /></SyncProvider>))
       if (!manager) throw new Error('Bootstrap manager was not mounted')
       const mountedManager = manager
       const waitForState = (expected: 'complete' | 'failed') => new Promise<void>((resolve) => {
@@ -237,14 +238,14 @@ describe('SyncProvider selection boundary', () => {
 
     try {
       await act(async () => root.render(
-        <SyncProvider sdk={sdk} directory="/workspace/a">
+        <SyncProvider backend={createOpenCodeBackend(sdk)} directory="/workspace/a">
           <RuntimeConsumer />
           <DirectoryConsumer />
         </SyncProvider>,
       ))
       const initialCallback = callback
       await act(async () => root.render(
-        <SyncProvider sdk={sdk} directory="/workspace/b">
+        <SyncProvider backend={createOpenCodeBackend(sdk)} directory="/workspace/b">
           <RuntimeConsumer />
           <DirectoryConsumer />
         </SyncProvider>,

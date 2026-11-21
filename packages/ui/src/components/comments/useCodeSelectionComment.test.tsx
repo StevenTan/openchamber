@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { EditorSelection, EditorState } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
@@ -144,7 +145,7 @@ describe('comment on a code selection', () => {
   const render = async (props: { filePath: string; scope: string; value?: string } = { filePath: 'src/a.ts', scope: 'docked' }) => {
     await act(async () => root.render(
       <I18nProvider>
-        <SyncProvider sdk={sdk} directory={directory}>
+        <SyncProvider backend={createOpenCodeBackend(sdk)} directory={directory}>
           <Host {...props} />
         </SyncProvider>
       </I18nProvider>,

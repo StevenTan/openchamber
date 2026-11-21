@@ -1,30 +1,12 @@
 import type { OpenCodeClient } from '@opencode/client';
 import { z } from 'zod';
-import { spaceMarkSchema, type SpaceMark } from '../spaces/spaces-store';
-import { compact, type Session, type Message, type Part } from './model';
+import { spaceMarkSchema } from '../spaces/spaces-store';
+import { compact } from './model';
 import { projectSession, toOpenCodeDirectory } from './projection';
 import type { normalizeOpencodeError } from './client';
 
-export type SessionPage = {
-  sessions: Session[];
-  cursor: { previous?: string; next?: string };
-  spaces?: SpaceMark[];
-};
-
-export type SessionListOptions = {
-  directory?: string | null;
-  global?: boolean;
-  limit?: number;
-  order?: 'asc' | 'desc';
-  search?: string;
-  cursor?: string;
-  parentID?: string | null;
-};
-
-export type MessagePage = {
-  items: Array<{ info: Message; parts: Part[] }>
-  cursor: { previous?: string; next?: string }
-}
+import type { SessionPage, SessionListOptions} from "../agent/client"
+export type { SessionPage, SessionListOptions, MessagePage } from "../agent/client"
 
 export const pageCursor = (cursor: { previous?: string | null; next?: string | null }) =>
   compact({ previous: cursor.previous ?? undefined, next: cursor.next ?? undefined })

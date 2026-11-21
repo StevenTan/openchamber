@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import React, { act } from 'react';
 import { expect, test } from 'bun:test';
 import { createRoot } from 'react-dom/client';
@@ -81,7 +82,7 @@ for (const stuck of [false, true]) test(stuck
     await act(async () => {
       root.render(
         <RuntimeAPIContext.Provider value={runtimeApis}>
-          <SyncProvider sdk={sdk} directory="">
+          <SyncProvider backend={createOpenCodeBackend(sdk)} directory="">
             <I18nProvider>
               {stuck ? <div data-turn-sticky-header="">{body}</div> : body}
             </I18nProvider>

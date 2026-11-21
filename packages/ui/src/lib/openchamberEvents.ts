@@ -18,8 +18,8 @@ import { sessionTodosEventSchema, type SessionTodosEvent } from '@/stores/useSes
 import { isJsonValue, type JsonValue } from '@openchamber/sdk';
 import { z } from 'zod';
 import { trackedItemRecordsSchema } from './trackedItems/model';
-import type { SyncEvent } from './opencode/events';
-import { classifyStreamPayload } from '@/sync/event-pipeline';
+import type { SyncEvent } from './agent/events';
+import { classifyStreamPayload } from '@/lib/opencode/stream-payload';
 import { parseEnvelope, getEventProperties } from './control-event-envelope';
 
 type ScheduledTaskRanEvent = {

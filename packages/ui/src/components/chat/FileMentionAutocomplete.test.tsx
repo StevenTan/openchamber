@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import React, { act } from 'react';
 import type { Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, jest, spyOn, test } from 'bun:test';
@@ -107,7 +108,7 @@ const handle = React.createRef<FileMentionHandle>();
 let mentioned: string[] = [];
 
 const type = (searchQuery: string) => act(async () => root.render(
-  <SyncProvider sdk={sdk} directory="">
+  <SyncProvider backend={createOpenCodeBackend(sdk)} directory="">
     <I18nProvider>
       <RuntimeAPIContext.Provider value={apis}>
         <FileMentionAutocomplete

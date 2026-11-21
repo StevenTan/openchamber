@@ -1,5 +1,5 @@
+import { conversationClient } from "@/lib/agent/active"
 import type { JsonValue, Metadata } from "@/lib/opencode/model"
-import { opencodeClient } from "@/lib/opencode/client"
 import { retry } from "./retry"
 
 const isMetadataRecord = (value: JsonValue | undefined): value is Metadata =>
@@ -30,7 +30,7 @@ export async function readForkMessages(sessionId: string, directory: string | nu
   do {
     const page = await retry(() => {
       if (isStale()) throw new Error("runtime changed")
-      return opencodeClient.getSessionMessages(sessionId, { limit: 100, cursor, order: "asc" }, directory)
+      return conversationClient.getSessionMessages(sessionId, { limit: 100, cursor, order: "asc" }, directory)
     }, { attempts: 2 })
     if (isStale()) throw new Error("runtime changed")
     for (const { info } of page.items) {

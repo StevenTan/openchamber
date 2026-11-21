@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { opencodeClient } from '@/lib/opencode/client';
-import type { SyncEvent } from '@/lib/opencode/events';
+import type { SyncEvent } from '@/lib/agent/events';
 import type { Message, Session } from '@/lib/opencode/model';
 import { ChildStoreManager } from './child-store';
 import { applyReplyCommandEvents, runReplyCommand } from './reply-commands';

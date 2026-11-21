@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, spyOn, test } from 'bun:test';
 import type { RunningShell } from '@/lib/opencode/background-shell';
 import { opencodeClient } from '@/lib/opencode/client';
-import type { SyncEvent } from '@/lib/opencode/events';
+import type { SyncEvent } from '@/lib/agent/events';
 import { switchRuntimeEndpoint } from '@/lib/runtime-switch';
 import { applyBackgroundShellEvents, resetBackgroundShells } from '@/sync/background-shells';
 import { isForegroundShellStopping, stopForegroundShell } from './foregroundShellStop';

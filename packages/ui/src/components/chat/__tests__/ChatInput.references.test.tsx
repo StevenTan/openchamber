@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { afterAll, expect, mock, spyOn, test } from 'bun:test';
 import { plugin } from 'bun';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -164,7 +165,7 @@ const withComposer = async (run: (container: HTMLElement) => Promise<void>, pinn
   try {
     await act(async () => root.render(
       <RuntimeAPIContext.Provider value={runtimeAPIs}><ThemeSystemProvider><I18nProvider>
-        <SyncProvider sdk={sdk} directory={DIRECTORY}>
+        <SyncProvider backend={createOpenCodeBackend(sdk)} directory={DIRECTORY}>
           <ChatInput />
           {pinnedSessionId ? (
             <ChatColumnSessionContext.Provider value={{ sessionId: pinnedSessionId, directory: DIRECTORY }}>

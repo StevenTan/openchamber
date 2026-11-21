@@ -12,22 +12,19 @@ import type {
   IntegrationInfo,
   IntegrationKeyMethod as IntegrationKeyMethodWire,
   IntegrationOAuthMethod as IntegrationOAuthMethodWire,
-  JsonValue,
   McpServer,
   ModelInfo,
-  ModelRef,
   PermissionRequest as PermissionRequestWire,
   PermissionEffect as PermissionEffectWire,
-  PermissionRuleset,
   ProviderInfo,
-  SessionForkBoundary,
-  SessionRevert,
-  SessionStatus as SessionStatusWire,
-  SessionStructuredError,
   SkillInfo,
-  TokenUsageInfo,
 } from "@opencode/client"
 
+
+import type { ModelRef, ModelSelection, Message, UserMessage, AssistantMessage } from "../agent/model"
+export type { JsonValue, Metadata, ModelRef, ModelSelection, TokenUsageInfo, PermissionRuleset, SessionStatus, SessionOutcome, Session, StructuredError, UserMessage, AssistantFinish, AssistantMessage, SyntheticMessage, CompactionMessage, Message, TextPart, ReasoningPart, FilePart, ToolInput, ToolStateCompleted, ToolState, ToolPart, Part, PartType } from "../agent/model"
+
+type MessageRole = Message["role"]
 
 export type Agent = Omit<AgentInfo, "name"> & { name: string; displayName: string }
 export type Command = CommandInfo
@@ -58,9 +55,7 @@ export type Project = {
 }
 export type ConfigDocument = Extract<ConfigEntry, { type: "document" }>
 export type Config = ConfigDocument["info"]
-export type { JsonValue, ModelRef, PermissionRuleset, TokenUsageInfo }
 
-export type ModelSelection = Omit<ModelRef, "variant"> & { variant?: string | null }
 
 export function toModelRef({ providerID, id, variant }: ModelSelection): ModelRef {
   return variant ? { providerID, id, variant } : { providerID, id }
@@ -80,7 +75,6 @@ export function findCatalogModel<T extends { id: string; modelID: string }>(
   return models.find((model) => model.id === id) ?? models.find((model) => model.modelID === id)
 }
 
-export type Metadata = Record<string, JsonValue>
 
 export function compact<T extends object>(value: T): T {
   // SAFETY: only keys with an undefined value are dropped; every remaining
@@ -88,246 +82,6 @@ export function compact<T extends object>(value: T): T {
   return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as T
 }
 
-
-export type SessionStatus = SessionStatusWire
-
-export type SessionOutcome = "succeeded" | "failed" | "interrupted"
-
-export type Session = {
-  id: string
-  parentID?: string
-  projectID: string
-  directory: string
-  subpath?: string
-  title: string
-  agent?: string
-  model?: ModelRef
-  cost: number
-  tokens: TokenUsageInfo
-  outcome?: SessionOutcome
-  time: {
-    created: number
-    updated: number
-    idle?: number
-    viewed?: number
-    archived?: number
-  }
-  metadata?: Metadata
-  permissions?: PermissionRuleset
-  revert?: SessionRevert
-  fork?: {
-    sessionID: string
-    boundary: SessionForkBoundary
-  }
-}
-
-
-export type StructuredError = SessionStructuredError
-
-type MessageBase = {
-  id: string
-  sessionID: string
-  metadata?: Metadata
-}
-
-export type UserMessage = MessageBase & {
-  role: "user"
-  time: { created: number }
-  skills?: Array<{ id: string; name: string }>
-}
-
-export type AssistantFinish = "stop" | "length" | "tool-calls" | "content-filter" | "error" | "unknown"
-
-export type AssistantMessage = MessageBase & {
-  role: "assistant"
-  time: {
-    created: number
-    firstToken?: number
-    streamed?: number
-    completed?: number
-  }
-  agent: string
-  providerID: string
-  modelID: string
-  variant?: string
-  finish?: AssistantFinish
-  error?: StructuredError
-  closedLocally?: true
-  cost?: number
-  tokens?: TokenUsageInfo
-  snapshot?: { start?: string; end?: string; files?: string[] }
-  retry?: { attempt: number; at: number; error: StructuredError }
-}
-
-export type SyntheticMessage = MessageBase & {
-  role: "synthetic"
-  time: { created: number }
-  text: string
-  description?: string
-  pending?: true
-}
-
-type SystemMessage = MessageBase & {
-  role: "system"
-  time: { created: number }
-  text: string
-  description?: string
-}
-
-type SkillMessage = MessageBase & {
-  role: "skill"
-  time: { created: number }
-  skill: string
-  name: string
-  text: string
-}
-
-type ShellMessage = MessageBase & {
-  role: "shell"
-  time: { created: number; completed?: number }
-  shellID: string
-  command: string
-  status: "running" | "exited" | "timeout" | "killed"
-  exit?: number
-  signal?: string
-  output?: { output: string; cursor: number; size: number; truncated: boolean }
-}
-
-export type CompactionMessage = MessageBase & {
-  role: "compaction"
-  time: { created: number }
-  status: "running" | "completed" | "failed"
-  reason: "auto" | "manual"
-  summary: string
-  model?: ModelRef
-  error?: StructuredError
-  cost?: number
-  tokens?: TokenUsageInfo
-}
-
-type AgentSwitchedMessage = MessageBase & {
-  role: "agent-switched"
-  time: { created: number }
-  agent: string
-  previous?: string
-}
-
-type ModelSwitchedMessage = MessageBase & {
-  role: "model-switched"
-  time: { created: number }
-  model: ModelRef
-  previous?: ModelRef
-}
-
-type LocationSwitchedMessage = MessageBase & {
-  role: "location-switched"
-  time: { created: number }
-  directory: string
-  previous?: string
-}
-
-type IdleMessage = MessageBase & {
-  role: "idle"
-  time: { created: number }
-  outcome: SessionOutcome
-  error?: StructuredError
-}
-
-export type Message =
-  | UserMessage
-  | AssistantMessage
-  | SyntheticMessage
-  | SystemMessage
-  | SkillMessage
-  | ShellMessage
-  | CompactionMessage
-  | AgentSwitchedMessage
-  | ModelSwitchedMessage
-  | LocationSwitchedMessage
-  | IdleMessage
-
-type MessageRole = Message["role"]
-
-
-type PartBase = {
-  id: string
-  sessionID: string
-  messageID: string
-}
-
-export type TextPart = PartBase & {
-  type: "text"
-  text: string
-  time?: { start: number; end?: number }
-  metadata?: Metadata
-}
-
-export type ReasoningPart = PartBase & {
-  type: "reasoning"
-  text: string
-  time: { start: number; end?: number }
-}
-
-export type FilePart = PartBase & {
-  type: "file"
-  mime: string
-  filename?: string
-  url: string
-}
-
-type AgentPart = PartBase & {
-  type: "agent"
-  name: string
-}
-
-export type ToolInput = Record<string, JsonValue>
-
-type ToolStatePending = {
-  status: "pending"
-  input: ToolInput
-  raw: string
-}
-
-type ToolStateRunning = {
-  status: "running"
-  input: ToolInput
-  metadata?: Metadata
-  time: { start: number }
-}
-
-export type ToolStateCompleted = {
-  status: "completed"
-  input: ToolInput
-  output: string
-  metadata?: Metadata
-  time: { start: number; end: number }
-  attachments?: FilePart[]
-}
-
-type ToolStateError = {
-  status: "error"
-  input: ToolInput
-  error: string
-  errorType?: string
-  errorSource?: "local"
-  output?: string
-  metadata?: Metadata
-  time: { start: number; end: number }
-}
-
-export type ToolState = ToolStatePending | ToolStateRunning | ToolStateCompleted | ToolStateError
-
-export type ToolPart = PartBase & {
-  type: "tool"
-  callID: string
-  tool: string
-  state: ToolState
-  executed?: boolean
-}
-
-export type Part = TextPart | ReasoningPart | FilePart | AgentPart | ToolPart
-
-export type PartType = Part["type"]
 
 
 export type PermissionRequest = PermissionRequestWire

@@ -3,8 +3,10 @@
 ## Ownership
 
 This module owns official OpenCode SDK calls and translation from wire records
-to the shared UI domain model. Sync owns transcript membership and store writes.
-Wire session and message shapes stay inside this adapter. Stores and rendering
+to the shared UI conversation model in `../agent/model.ts`. `backend.ts`
+composes its conversation client and event source. Sync owns transcript membership and store writes.
+Wire session and message shapes stay inside this adapter. `event-source.ts`
+owns the OpenCode stream, reconnect behavior and wire event admission. Stores and rendering
 consume the domain model across web, desktop, VS Code and both mobile clients.
 The domain model also exports integration connections, authentication methods,
 form fields, answers and conditions, and permission effects for shared UI consumers.

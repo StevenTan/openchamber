@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { create } from 'zustand';
-import type { SessionTurnStart } from '@/lib/opencode/events';
+import type { SessionTurnStart } from '@/lib/agent/events';
 import { getSafeStorage } from '@/stores/utils/safeStorage';
 import { countSyncPerformance } from './performance-diagnostics';
 

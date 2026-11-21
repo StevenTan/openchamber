@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import React, { act } from 'react';
 import type { Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, spyOn, test, vi } from 'bun:test';
@@ -117,7 +118,7 @@ async function mountPicker(kind: 'command' | 'skill') {
     </>;
   }
   await act(async () => root.render(
-    <SyncProvider sdk={sdk} directory=""><I18nProvider><Picker /></I18nProvider></SyncProvider>,
+    <SyncProvider backend={createOpenCodeBackend(sdk)} directory=""><I18nProvider><Picker /></I18nProvider></SyncProvider>,
   ));
   const input = host.querySelector('input');
   if (!input) throw new Error('Missing draft');
@@ -168,7 +169,7 @@ for (const kind of ['command', 'skill'] as const) {
     });
     const placed = { top: '48px', bottom: 'auto', maxHeight: '120px' };
     await act(async () => root.render(
-      <SyncProvider sdk={sdk} directory="">
+      <SyncProvider backend={createOpenCodeBackend(sdk)} directory="">
         <I18nProvider>
           <main>
             {kind === 'command'
@@ -186,7 +187,7 @@ for (const kind of ['command', 'skill'] as const) {
 test('skill: loads in one row until the project\'s skills are read, then says there are none at the same height', async () => {
   const { useSkillsStore } = await import('@/stores/useSkillsStore');
   useSkillsStore.setState({ skillsByDirectory: {} });
-  const picker = <SyncProvider sdk={sdk} directory=""><I18nProvider><SkillAutocomplete searchQuery="" onClose={() => undefined} onSkillSelect={() => undefined} /></I18nProvider></SyncProvider>;
+  const picker = <SyncProvider backend={createOpenCodeBackend(sdk)} directory=""><I18nProvider><SkillAutocomplete searchQuery="" onClose={() => undefined} onSkillSelect={() => undefined} /></I18nProvider></SyncProvider>;
   await act(async () => root.render(picker));
   const loadingRow = host.querySelector('[data-spinner]')?.closest('div');
   expect(loadingRow).not.toBeNull();

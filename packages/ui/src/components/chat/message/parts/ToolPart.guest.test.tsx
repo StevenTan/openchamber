@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { act } from 'react';
 import { expect, test } from 'bun:test';
 import { createRoot } from 'react-dom/client';
@@ -104,7 +105,7 @@ const mountToolPart = () => {
   const render = async (shown: ToolPartData) => {
     await act(async () => {
       root.render(
-        <SyncProvider sdk={sdk} directory="">
+        <SyncProvider backend={createOpenCodeBackend(sdk)} directory="">
           <I18nProvider>
             <ThemeSystemContext.Provider value={themeContext}>
               <ToolPart part={shown} isExpanded isMobile={false} onToggle={() => {}} />

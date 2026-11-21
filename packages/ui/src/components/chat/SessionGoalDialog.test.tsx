@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import React, { act } from 'react';
 import type { Root } from 'react-dom/client';
@@ -69,7 +70,7 @@ describe('SessionGoalDialog', () => {
     store().setState({ session: [record] });
   });
   const render = (open: boolean) => act(async () => root.render(
-    <SyncProvider sdk={sdk} directory={directory}>
+    <SyncProvider backend={createOpenCodeBackend(sdk)} directory={directory}>
       <I18nProvider>
         <React.Profiler id="goal-dialog" onRender={() => { renders += 1; }}>
           <SessionGoalDialog open={open} onOpenChange={() => undefined} sessionId={sessionId} directory={directory} />

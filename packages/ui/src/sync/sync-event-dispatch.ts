@@ -1,4 +1,5 @@
-import { syncEventMessageID, syncEventSessionID, type SyncEvent } from "@/lib/opencode/events"
+import { conversationClient } from "@/lib/agent/active"
+import { syncEventMessageID, syncEventSessionID, type SyncEvent } from "@/lib/agent/events"
 import type { PermissionRequest } from "@/lib/opencode/model"
 import { isVSCodeRuntime } from "@/lib/desktop"
 import { reduceGlobalEvent, applyDirectoryEvent } from "./event-reducer"
@@ -142,7 +143,7 @@ export function handleEvent(
       {
         isKnown: (sessionID) => useGlobalSessionsStore.getState().entityById.has(sessionID),
         isCreatingLocally: (parentID) => useBtwStore.getState().byParent[parentID]?.creating === true,
-        getSession: (sessionID, sessionDirectory) => opencodeClient.getSession(sessionID, sessionDirectory),
+        getSession: (sessionID, sessionDirectory) => conversationClient.getSession(sessionID, sessionDirectory),
         isCurrent: () => expectedRuntimeKey === getRuntimeKey(),
         apply: (info) => handleEvent(
           rawDirectory,

@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -100,7 +101,7 @@ describe('useCurrentContextReading', () => {
     store = null
     renders = 0
     await act(async () => root.render(
-      <SyncProvider sdk={createSdk()} directory="">
+      <SyncProvider backend={createOpenCodeBackend(createSdk())} directory="">
         <StoreProbe />
         <React.Profiler id="reading" onRender={() => { renders += 1 }}>
           <ReadingProbe />

@@ -1,9 +1,7 @@
 import React, { createContext, useContext } from "react"
-import type { OpenCodeClient } from "@opencode/client"
 import { ChildStoreManager } from "./child-store"
 import { SessionMessageLoader } from "./session-message-loader"
 
-export type { OpenCodeClient }
 
 export type CurrentDirectorySource = {
   get: () => string
@@ -14,7 +12,6 @@ export type SyncRuntime = {
   childStores: ChildStoreManager
   messageLoader: SessionMessageLoader
   runtimeKey: string
-  sdk: OpenCodeClient
   currentDirectory: CurrentDirectorySource
 }
 

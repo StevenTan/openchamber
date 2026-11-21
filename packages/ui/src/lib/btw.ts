@@ -1,3 +1,4 @@
+import { conversationClient } from "@/lib/agent/active"
 import { permissionModeForNewSession, type PermissionMode } from '@/stores/utils/permissionAutoAccept';
 import { isSpaceDirectory } from '@/lib/spaces/space-route';
 import { useUIStore } from '@/stores/useUIStore';
@@ -189,7 +190,7 @@ export async function startBtwSession(input: StartBtwInput): Promise<Session> {
     await sessionActions.waitForConnectionOrThrow();
     if (getRuntimeKey() !== expectedRuntimeKey) throw new Error('runtime changed');
     // external: https://github.com/anomalyco/opencode/tree/v2.3.0/packages/core/src/session Fork at HEAD copies settled records only; unfinished work reaches the first question as fresh server-read text.
-    const parentTail = await opencodeClient.getSessionMessages(input.parentSessionId, { limit: IN_FLIGHT_TAIL_LIMIT }, input.directory);
+    const parentTail = await conversationClient.getSessionMessages(input.parentSessionId, { limit: IN_FLIGHT_TAIL_LIMIT }, input.directory);
     if (getRuntimeKey() !== expectedRuntimeKey) throw new Error('runtime changed');
     const inFlightNote = buildBtwInFlightNote(parentTail.items);
     const forked = await opencodeClient.forkSession(input.parentSessionId, { directory: input.directory });
@@ -218,7 +219,7 @@ export async function startBtwSession(input: StartBtwInput): Promise<Session> {
         else await write.catch((error) => console.warn('Failed to apply the default permission mode to the btw fork:', error));
         if (getRuntimeKey() !== expectedRuntimeKey) throw new Error('runtime changed');
       }
-      const newestCloned = await opencodeClient.getSessionMessages(forked.id, { limit: 1 }, sessionDirectory);
+      const newestCloned = await conversationClient.getSessionMessages(forked.id, { limit: 1 }, sessionDirectory);
       const boundaryMessageID = newestCloned.items[newestCloned.items.length - 1]?.info.id ?? null;
 
       const marked = await sessionActions.patchSessionMetadata(forked.id, sessionDirectory, (metadata) =>

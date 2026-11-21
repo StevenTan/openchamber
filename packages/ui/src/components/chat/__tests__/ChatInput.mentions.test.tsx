@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { afterAll, beforeEach, expect, spyOn, test } from 'bun:test';
 import { plugin } from 'bun';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -209,7 +210,7 @@ const mountComposer = async (run: (composer: Composer) => Promise<void>, options
   try {
     await act(async () => root.render(
       <RuntimeAPIContext.Provider value={runtimeAPIs}><ThemeSystemProvider><I18nProvider>
-        <SyncProvider sdk={sdk} directory={DIRECTORY}>
+        <SyncProvider backend={createOpenCodeBackend(sdk)} directory={DIRECTORY}>
           <ChatColumnSessionContext.Provider value={options?.pinned || options?.column ? { sessionId, directory: DIRECTORY } : null}>
             <ChatColumnActionsContext.Provider value={{ pinned: Boolean(options?.pinned), openSession: () => {}, openTimelineDialog: () => {}, focusInput: () => {} }}>
               <ChatInput />

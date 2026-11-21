@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import React, { act } from 'react';
 import { expect, test } from 'bun:test';
 import { Window } from 'happy-dom';
@@ -58,7 +59,7 @@ test('hidden diff entries defer reads, retain completed content and refresh chan
   let visible = false;
   let insertions = 1;
   const render = () => act(async () => {
-    root.render(<SyncProvider sdk={SYNC_SDK} directory="/repo"><I18nProvider><RuntimeAPIContext.Provider value={apis}>
+    root.render(<SyncProvider backend={createOpenCodeBackend(SYNC_SDK)} directory="/repo"><I18nProvider><RuntimeAPIContext.Provider value={apis}>
       <MultiFileDiffEntry directory="/repo" file={{ path: 'test.bin', index: ' ', working_dir: 'M', insertions, deletions: 0, isNew: false }}
         visible={visible} layout="inline" wrapLines={false} isSelected={false} isExpanded isMounted
         onSelect={() => {}} onExpandedChange={() => {}} registerSectionRef={() => {}} />
@@ -124,7 +125,7 @@ test('status paths without file contents render what git records instead of an e
   document.body.append(container);
   const root = createRoot(container);
   const render = (path: string) => act(async () => {
-    root.render(<SyncProvider sdk={SYNC_SDK} directory="/repo"><I18nProvider><RuntimeAPIContext.Provider value={apis}>
+    root.render(<SyncProvider backend={createOpenCodeBackend(SYNC_SDK)} directory="/repo"><I18nProvider><RuntimeAPIContext.Provider value={apis}>
       <MultiFileDiffEntry key={path} directory="/repo" file={{ path, index: ' ', working_dir: 'M', insertions: 0, deletions: 0, isNew: false }}
         layout="inline" wrapLines={false} isSelected={false} isExpanded isMounted
         onSelect={() => {}} onExpandedChange={() => {}} registerSectionRef={() => {}} />

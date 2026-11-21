@@ -1,10 +1,11 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { act } from 'react';
 import { expect, spyOn, test } from 'bun:test';
 import { createRoot } from 'react-dom/client';
 import { Window } from 'happy-dom';
 import { OpenCode } from '@opencode/client';
 import type { ToolPart as ToolPartData } from '@/lib/opencode/model';
-import type { SyncEvent } from '@/lib/opencode/events';
+import type { SyncEvent } from '@/lib/agent/events';
 import { opencodeClient } from '@/lib/opencode/client';
 import { SyncProvider } from '@/sync/sync-context';
 import { applyBackgroundShellEvents, backgroundShellRevision, replaceDirectoryShells, resetBackgroundShells, useBackgroundShellsStore } from '@/sync/background-shells';
@@ -77,7 +78,7 @@ const withHarness = async (run: (render: Render, container: HTMLElement) => Prom
   const render: Render = async (part, isExpanded = true) => {
     await act(async () => {
       root.render(
-        <SyncProvider sdk={sdk} directory="/workspace">
+        <SyncProvider backend={createOpenCodeBackend(sdk)} directory="/workspace">
           <I18nProvider>
             <ThemeSystemContext.Provider value={themeContext}>
               <ToolPart part={part} isExpanded={isExpanded} isMobile={false} onToggle={() => {}} />

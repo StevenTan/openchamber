@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import type { OpenCodeClient, OpenCodeEvent } from "@opencode/client"
-import type { SyncEvent } from "@/lib/opencode/events"
+import type { SyncEvent } from "@/lib/agent/events"
 import type { JsonValue } from "@/lib/opencode/model"
 import { adoptRelayTunnel, deactivateRelayTunnel } from "@/lib/relay/runtime-tunnel"
 import type { RelayTunnelClient, RelayTunnelWebSocket } from "@/lib/relay/tunnel-client"
 import { clearRuntimeUrlAuthToken, setRuntimeUrlAuthToken } from "@/lib/runtime-auth"
 import { useAuthSessionStore } from "@/lib/runtime-auth-expiry"
-import { classifyStreamPayload, createEventPipeline } from "./event-pipeline"
+import { createEventPipeline } from "./event-source"
+import { classifyStreamPayload } from "./stream-payload"
 
 const failAfter = (ms: number) => new Promise<never>((_, reject) => {
   setTimeout(() => reject(new Error("Timed out waiting for event pipeline flush")), ms)

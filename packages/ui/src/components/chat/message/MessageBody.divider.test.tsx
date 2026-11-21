@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import React from 'react';
 import { describe, expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -32,7 +33,7 @@ const context: TurnGroupingContext = {
 };
 const renderAnswer = (parts: Part[], turnContext = context, showReasoningTraces = true) => renderToStaticMarkup(
   <RuntimeAPIContext.Provider value={runtimeApis}>
-    <SyncProvider sdk={sdk} directory="">
+    <SyncProvider backend={createOpenCodeBackend(sdk)} directory="">
       <I18nProvider>
         <MessageBody
           messageId="answer" parts={parts} isUser={false} isMessageCompleted messageFinish="stop"
@@ -46,7 +47,7 @@ const renderAnswer = (parts: Part[], turnContext = context, showReasoningTraces 
 );
 const renderStreamingReasoning = (parts: Part[]) => renderToStaticMarkup(
   <RuntimeAPIContext.Provider value={runtimeApis}>
-    <SyncProvider sdk={sdk} directory="">
+    <SyncProvider backend={createOpenCodeBackend(sdk)} directory="">
       <I18nProvider>
         <MessageBody
           messageId="answer" parts={parts} isUser={false} isMessageCompleted={false}

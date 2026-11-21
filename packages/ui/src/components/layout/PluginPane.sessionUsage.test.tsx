@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { expect, spyOn, test } from 'bun:test';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -75,7 +76,7 @@ test('a usage change sends the frame one session update and nothing else', async
   try {
     await act(async () => root.render(
       <I18nProvider><ThemeSystemContext.Provider value={themeContext}>
-        <SyncProvider sdk={sdk} directory="/visible"><ChatColumnSessionContext.Provider value={column}>
+        <SyncProvider backend={createOpenCodeBackend(sdk)} directory="/visible"><ChatColumnSessionContext.Provider value={column}>
           <PluginPane mode="plugin:board" surface="panel" pinnedDirectory="/visible" />
         </ChatColumnSessionContext.Provider></SyncProvider>
       </ThemeSystemContext.Provider></I18nProvider>,

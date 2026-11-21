@@ -7,7 +7,7 @@ import { useSessionDraftsStore } from '@/stores/useSessionDraftsStore';
 import { listSpaces, readSpaceCatalogProviders, readSpaceCustomProviders, spaceTaskTitleSchema, type SpaceTaskTitle, type SpaceCatalogProvider, type SpaceCustomProvider, type SpaceEntry, type SpaceFailure, type SpaceGrant } from './spaces-api';
 import { spaceIdOfDirectory } from './space-route';
 import { normalizePath } from '@/lib/pathNormalization';
-import type { SpaceProgress } from '@/sync/event-pipeline';
+import type { SpaceProgress } from '@/lib/agent/event-source';
 
 export type SpaceListState = 'complete' | 'partial' | 'stale' | 'unknown';
 

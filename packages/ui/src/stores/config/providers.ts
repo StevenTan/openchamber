@@ -1,3 +1,4 @@
+import { conversationClient } from "@/lib/agent/active"
 import { type ConfigSlice, type ConfigStore, type DirectoryScopedConfig, type ProviderModel, type ProviderWithModelList } from './types';
 import { toDirectoryKey, fromDirectoryKey, normalizeConfigPath as resolveConfigDirectory } from './directories';
 import { getProjectDefaultsForConfigDirectory } from './projectDefaults';
@@ -177,7 +178,7 @@ export const createProviderCatalog: ConfigSlice<'invalidateProviderCache' | 'loa
                 );
                 const apiResult = await measureStartupTrace(
                     'loadProviders:api',
-                    () => opencodeClient.getProvidersForConfig(fromDirectoryKey(directoryKey), { fresh: options?.fresh }),
+                    () => conversationClient.getProvidersForConfig(fromDirectoryKey(directoryKey), { fresh: options?.fresh }),
                     { directoryKey, source, requestedDirectory, effectiveDirectory, attempt: attempt + 1 },
                 );
                 if (!isCurrentProviderLoad()) return;

@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import React, { act } from 'react';
 import { expect, spyOn, test } from 'bun:test';
 import { Window } from 'happy-dom';
@@ -169,7 +170,7 @@ test('mobile comparisons drill into files, retry, resume, change source, and yie
   document.body.append(container);
   const root = createRoot(container);
   const render = () => act(async () => {
-    root.render(<SyncProvider sdk={SYNC_SDK} directory={directory}><I18nProvider><RuntimeAPIContext.Provider value={apis}>
+    root.render(<SyncProvider backend={createOpenCodeBackend(SYNC_SDK)} directory={directory}><I18nProvider><RuntimeAPIContext.Provider value={apis}>
       <MobileChangesPane rootDirectory={directory}
         repository={{ rootIsGitRepo: true, gitDirectory: directory, nestedRepos: null, nestedRepoSelection: null, repositoryOptions: null, repositoriesKnown: true, unreadable: null }}
         visible={visible} initialDiff={initialDiff} />
@@ -425,7 +426,7 @@ test('bounds Revert All fan-out to two in-flight revert requests', async () => {
   const root = createRoot(container);
   try {
     await act(async () => {
-      root.render(<SyncProvider sdk={SYNC_SDK} directory="/repo"><TurnTranscript /><I18nProvider><RuntimeAPIContext.Provider value={apis}>
+      root.render(<SyncProvider backend={createOpenCodeBackend(SYNC_SDK)} directory="/repo"><TurnTranscript /><I18nProvider><RuntimeAPIContext.Provider value={apis}>
         <MobileChangesPane rootDirectory="/repo"
           repository={{ rootIsGitRepo: true, gitDirectory: '/repo', nestedRepos: null, nestedRepoSelection: null, repositoryOptions: null, repositoriesKnown: true, unreadable: null }}
           visible />
@@ -559,7 +560,7 @@ test('mobile changes last turn scope lists the turn diffs, opens one, and shows 
     await act(async () => { button.click(); });
   };
   const renderPane = (initialDiff: { path: string; staged: boolean; scope?: 'turn' } | null) => act(async () => {
-    root.render(<SyncProvider sdk={SYNC_SDK} directory="/repo"><TurnTranscript /><I18nProvider><RuntimeAPIContext.Provider value={apis}>
+    root.render(<SyncProvider backend={createOpenCodeBackend(SYNC_SDK)} directory="/repo"><TurnTranscript /><I18nProvider><RuntimeAPIContext.Provider value={apis}>
       <MobileChangesPane rootDirectory="/repo"
         repository={{ rootIsGitRepo: true, gitDirectory: '/repo', nestedRepos: null, nestedRepoSelection: null, repositoryOptions: null, repositoriesKnown: true, unreadable: null }}
         visible initialDiff={initialDiff} />
@@ -705,7 +706,7 @@ test('mobile changes last turn scope paints loading before the turn fetch settle
   };
   try {
     await act(async () => {
-      root.render(<SyncProvider sdk={SYNC_SDK} directory="/repo"><TurnTranscript /><I18nProvider><RuntimeAPIContext.Provider value={apis}>
+      root.render(<SyncProvider backend={createOpenCodeBackend(SYNC_SDK)} directory="/repo"><TurnTranscript /><I18nProvider><RuntimeAPIContext.Provider value={apis}>
         <MobileChangesPane rootDirectory="/repo"
           repository={{ rootIsGitRepo: true, gitDirectory: '/repo', nestedRepos: null, nestedRepoSelection: null, repositoryOptions: null, repositoriesKnown: true, unreadable: null }}
           visible />
@@ -720,7 +721,7 @@ test('mobile changes last turn scope paints loading before the turn fetch settle
     const initialDiff = { path: 'src/late.ts', staged: false, scope: 'turn' as const, turnId: 'user-turn' };
     for (const paneKey of ['before-resize', 'after-resize']) {
       await act(async () => {
-        root.render(<SyncProvider sdk={SYNC_SDK} directory="/repo"><TurnTranscript /><I18nProvider><RuntimeAPIContext.Provider value={apis}>
+        root.render(<SyncProvider backend={createOpenCodeBackend(SYNC_SDK)} directory="/repo"><TurnTranscript /><I18nProvider><RuntimeAPIContext.Provider value={apis}>
           <MobileChangesPane key={paneKey} rootDirectory="/repo"
             repository={{ rootIsGitRepo: false, gitDirectory: null, nestedRepos: null, nestedRepoSelection: null, repositoryOptions: null, repositoriesKnown: true, unreadable: null }}
             visible initialDiff={initialDiff} />
@@ -825,7 +826,7 @@ test('keeps the nested repository picker reachable once the working list resolve
   document.body.append(container);
   const root = createRoot(container);
   const render = (rootDirectory: string, repository: { rootIsGitRepo: boolean; gitDirectory: string; nestedRepos: string[] | null; nestedRepoSelection: string | null; repositoryOptions: string[] | null; repositoriesKnown: boolean; unreadable?: null }) => act(async () => {
-    root.render(<SyncProvider sdk={SYNC_SDK} directory={rootDirectory}><I18nProvider><RuntimeAPIContext.Provider value={apis}>
+    root.render(<SyncProvider backend={createOpenCodeBackend(SYNC_SDK)} directory={rootDirectory}><I18nProvider><RuntimeAPIContext.Provider value={apis}>
       <MobileChangesPane rootDirectory={rootDirectory} repository={{ unreadable: null, ...repository }} visible />
     </RuntimeAPIContext.Provider></I18nProvider></SyncProvider>);
   });

@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { describe, expect, spyOn, test } from 'bun:test'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -79,7 +80,7 @@ const withProbe = async (includeChild: boolean, assert: () => Promise<void>) => 
   renderCount = 0
   try {
     await act(async () => root.render(
-      <SyncProvider sdk={createSdk()} directory="">
+      <SyncProvider backend={createOpenCodeBackend(createSdk())} directory="">
         <CountsProbe includeChild={includeChild} />
       </SyncProvider>,
     ))

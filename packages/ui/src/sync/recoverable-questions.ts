@@ -1,6 +1,6 @@
 import { create } from "zustand"
 import { z } from "zod"
-import type { SyncEvent } from "@/lib/opencode/events"
+import type { SyncEvent } from "@/lib/agent/events"
 import type { FormRequest, Message, Metadata, Part, ToolPart } from "@/lib/opencode/model"
 import { getRuntimeKey } from "@/lib/runtime-switch"
 

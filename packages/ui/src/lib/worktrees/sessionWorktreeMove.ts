@@ -1,3 +1,4 @@
+import { conversationClient } from "@/lib/agent/active"
 import type { Session } from '@/lib/opencode/model';
 import type { I18nKey } from '@/lib/i18n';
 import { toast } from '@/components/ui';
@@ -16,7 +17,6 @@ import type { WorktreeMetadata } from '@/types/worktree';
 import { waitForWorktreeGitReady } from '@/lib/worktrees/worktreeBootstrap';
 import { moveSessionsThenRemoveWorktree, WorktreeKeepStoppedError, type WorktreeKeepStop } from '@/lib/worktrees/worktreeRemovalFlow';
 import { captureRuntimeInstance } from '@/lib/runtime-switch';
-import { opencodeClient } from '@/lib/opencode/client';
 import { create } from 'zustand';
 
 export type SessionTreeMoveMessages = {
@@ -350,7 +350,7 @@ const waitUntilSessionsMoved = async (
   const timer = setTimeout(() => deadline.abort(), timeoutMs);
   const readPlaced = async (target: { sessionId: string; directory: string }): Promise<boolean> => {
     try {
-      const session = await opencodeClient.getSession(target.sessionId, target.directory, deadline.signal);
+      const session = await conversationClient.getSession(target.sessionId, target.directory, deadline.signal);
       return normalizePath(session.directory) === normalizePath(target.directory);
     } catch {
       return false;

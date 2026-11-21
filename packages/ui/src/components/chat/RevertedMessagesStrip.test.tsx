@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -70,7 +71,7 @@ describe('RevertedMessagesStrip', () => {
     dom = installDom();
     root = createRoot(dom.container);
     await act(async () => root.render(
-      <SyncProvider sdk={sdk} directory={directory}>
+      <SyncProvider backend={createOpenCodeBackend(sdk)} directory={directory}>
         <I18nProvider><RevertedMessagesStrip sessionId={sessionId} directory={directory} /></I18nProvider>
       </SyncProvider>,
     ));

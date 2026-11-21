@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { afterAll, expect, spyOn, test } from 'bun:test';
 import { plugin } from 'bun';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -237,7 +238,7 @@ const countComposerRenders = async (
         <RuntimeAPIContext.Provider value={runtimeAPIs}>
           <ThemeSystemProvider>
             <I18nProvider>
-              <SyncProvider sdk={sdk} directory="/workspace">
+              <SyncProvider backend={createOpenCodeBackend(sdk)} directory="/workspace">
                 <Profiler id="composer" onRender={(_id, _phase, actual) => { commits += 1; renderMs += actual; }}>
                   <ChatInput />
                 </Profiler>
@@ -405,7 +406,7 @@ const mountComposer = async (draftText: string): Promise<MountedComposer> => {
       <RuntimeAPIContext.Provider value={runtimeAPIs}>
         <ThemeSystemProvider>
           <I18nProvider>
-            <SyncProvider sdk={sdk} directory="/workspace">
+            <SyncProvider backend={createOpenCodeBackend(sdk)} directory="/workspace">
               <ChatInput />
             </SyncProvider>
           </I18nProvider>

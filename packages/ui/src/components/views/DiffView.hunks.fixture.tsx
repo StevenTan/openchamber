@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import React, { act } from 'react';
 import { expect } from 'bun:test';
 import { Window } from 'happy-dom';
@@ -160,7 +161,7 @@ export async function exerciseDiffHunkActions(snapshotCase?: 'cold' | 'cached' |
   Object.defineProperty(container, 'clientHeight', { value: 2000 });
   document.body.append(container);
   const root = createRoot(container);
-  const render = () => act(async () => root.render(<I18nProvider><SyncProvider sdk={opencodeClient.getSdkClient()} directory=""><RuntimeAPIContext.Provider value={apis}>
+  const render = () => act(async () => root.render(<I18nProvider><SyncProvider backend={createOpenCodeBackend(opencodeClient.getSdkClient())} directory=""><RuntimeAPIContext.Provider value={apis}>
     <MultiFileDiffEntry directory="/repo" file={file} layout={layout} wrapLines={wrapLines} isSelected={false}
       isExpanded isMounted onSelect={() => {}} onExpandedChange={() => {}} registerSectionRef={() => {}}
       showOpenInEditorAction onOpenInEditor={(_path, diff) => { openedPatch = diff?.patch ?? null; }}
@@ -315,7 +316,7 @@ export async function exerciseTrailingContextExpansion(layout: 'inline' | 'side-
   Object.defineProperty(container, 'clientHeight', { value: 2000 });
   document.body.append(container);
   const root = createRoot(container);
-  const render = (key: string) => act(async () => root.render(<I18nProvider><SyncProvider sdk={opencodeClient.getSdkClient()} directory=""><RuntimeAPIContext.Provider value={apis}>
+  const render = (key: string) => act(async () => root.render(<I18nProvider><SyncProvider backend={createOpenCodeBackend(opencodeClient.getSdkClient())} directory=""><RuntimeAPIContext.Provider value={apis}>
     <MultiFileDiffEntry key={key} directory="/repo" file={file} layout={layout} wrapLines={false} isSelected={false}
       isExpanded isMounted onSelect={() => {}} onExpandedChange={() => {}} registerSectionRef={() => {}}
       hunkActionsEnabled={false} />
@@ -442,7 +443,7 @@ export async function exerciseMobileComparisonContextExpansion() {
     await act(async () => { element.click(); });
   };
   try {
-    await act(async () => root.render(<I18nProvider><SyncProvider sdk={opencodeClient.getSdkClient()} directory=""><RuntimeAPIContext.Provider value={createWebAPIs()}>
+    await act(async () => root.render(<I18nProvider><SyncProvider backend={createOpenCodeBackend(opencodeClient.getSdkClient())} directory=""><RuntimeAPIContext.Provider value={createWebAPIs()}>
       <MobileChangesPane rootDirectory="/repo" visible initialDiff={null}
         repository={{ rootIsGitRepo: true, gitDirectory: '/repo', nestedRepos: null, nestedRepoSelection: null, repositoryOptions: null, repositoriesKnown: true, unreadable: null }} />
     </RuntimeAPIContext.Provider></SyncProvider></I18nProvider>));
@@ -507,7 +508,7 @@ export async function exerciseHiddenWhitespace() {
   Object.defineProperty(container, 'clientHeight', { value: 2000 });
   document.body.append(container);
   const root = createRoot(container);
-  const render = (key: string, hideWhitespace: boolean) => act(async () => root.render(<I18nProvider><SyncProvider sdk={opencodeClient.getSdkClient()} directory=""><RuntimeAPIContext.Provider value={apis}>
+  const render = (key: string, hideWhitespace: boolean) => act(async () => root.render(<I18nProvider><SyncProvider backend={createOpenCodeBackend(opencodeClient.getSdkClient())} directory=""><RuntimeAPIContext.Provider value={apis}>
     <MultiFileDiffEntry key={key} directory="/repo" file={file} layout="inline" wrapLines={false} hideWhitespace={hideWhitespace} isSelected={false}
       isExpanded isMounted onSelect={() => {}} onExpandedChange={() => {}} registerSectionRef={() => {}} hunkActionsEnabled />
   </RuntimeAPIContext.Provider></SyncProvider></I18nProvider>));

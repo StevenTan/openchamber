@@ -1,4 +1,4 @@
-import { type SyncEvent } from "@/lib/opencode/events"
+import { type SyncEvent } from "@/lib/agent/events"
 import type { FormRequest, PermissionRequest } from "@/lib/opencode/model"
 import { isVSCodeRuntime } from "@/lib/desktop"
 import { ChildStoreManager } from "./child-store"

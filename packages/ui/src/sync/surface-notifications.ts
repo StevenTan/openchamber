@@ -1,4 +1,4 @@
-import { type OpenchamberNotification } from "@/lib/opencode/events"
+import { type OpenchamberNotification } from "@/lib/agent/events"
 import { toast } from "@/components/ui"
 import { openSessionFromToast } from "./session-navigation"
 import { getRuntimeKey } from "@/lib/runtime-switch"

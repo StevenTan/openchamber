@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { expect, test } from 'bun:test';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -108,7 +109,7 @@ test('quote reveal opens real folded Activity, including a source prepended from
         root.render(
             <RuntimeAPIContext.Provider value={runtime}>
                 <ThemeSystemProvider>
-                    <SyncProvider sdk={sdk} directory="/repo">
+                    <SyncProvider backend={createOpenCodeBackend(sdk)} directory="/repo">
                         <I18nProvider>
                             <ChatColumnSessionContext.Provider value={{ sessionId: 'quote-navigation', directory: '/repo' }}>
                                 <Harness />
@@ -241,7 +242,7 @@ test('retains real lists and Markdown while reconnecting only the selected scrol
     }
     const render = (name: string, text = `**${name}**`) => act(async () => {
         root.render(
-            <SyncProvider sdk={sdk} directory="/repo">
+            <SyncProvider backend={createOpenCodeBackend(sdk)} directory="/repo">
                 <Harness name={name} text={text} />
             </SyncProvider>,
         );
@@ -314,7 +315,7 @@ test('owns one anchor hold and removes its frame and input listeners on hide', a
     const ref = React.createRef<MessageListHandle>();
     const messages: [] = [];
     const render = (mode: 'visible' | 'hidden') => root.render(
-        <SyncProvider sdk={sdk} directory="/repo">
+        <SyncProvider backend={createOpenCodeBackend(sdk)} directory="/repo">
             <React.Activity mode={mode}>
                 <MessageList
                     ref={ref}

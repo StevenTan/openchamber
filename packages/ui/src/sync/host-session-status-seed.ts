@@ -1,4 +1,4 @@
-import { hostTurnStart, type SessionTurnStart, type SyncEvent } from '@/lib/opencode/events';
+import { hostTurnStart, type SessionTurnStart, type SyncEvent } from '@/lib/agent/events';
 import { opencodeClient } from '@/lib/opencode/client';
 import type { HostSessionStatusSnapshot } from '@/lib/opencode/session-status';
 import { getRuntimeKey } from '@/lib/runtime-switch';

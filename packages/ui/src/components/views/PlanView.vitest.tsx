@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import React, { act } from 'react';
 import { expect, test } from 'bun:test';
 import { Window } from 'happy-dom';
@@ -67,7 +68,7 @@ const withPlanView = async (run: (fixture: PlanFixture) => Promise<void>, option
   try {
     useProjectContextStore.getState().reset();
     await act(async () => root.render(<I18nProvider><ThemeSystemProvider><RuntimeAPIContext.Provider value={apis}>
-      <SyncProvider sdk={opencodeClient.getSdkClient()} directory="/plan-fixture">
+      <SyncProvider backend={createOpenCodeBackend(opencodeClient.getSdkClient())} directory="/plan-fixture">
         <PlanView savedProjectPlan={{ projectRef, planId: 'A' }} />
       </SyncProvider>
     </RuntimeAPIContext.Provider></ThemeSystemProvider></I18nProvider>));

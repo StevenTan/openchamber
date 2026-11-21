@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import type { SyncEvent } from "@/lib/opencode/events"
+import type { SyncEvent } from "@/lib/agent/events"
 import type { Session } from "@/lib/opencode/model"
 import { ChildStoreManager } from "../child-store"
 import { createEventRoutingIndex, handleEvent } from "../sync-context"

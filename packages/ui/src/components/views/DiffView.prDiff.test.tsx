@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import React, { act } from 'react';
 import { expect, test } from 'bun:test';
 import { Window } from 'happy-dom';
@@ -95,7 +96,7 @@ test('the pull request diff on a host without change-request diffs says so and o
   const root = createRoot(container);
   try {
     await act(async () => {
-      root.render(<SyncProvider sdk={sdk} directory="/repo"><I18nProvider><RuntimeAPIContext.Provider value={createWebAPIs()}>
+      root.render(<SyncProvider backend={createOpenCodeBackend(sdk)} directory="/repo"><I18nProvider><RuntimeAPIContext.Provider value={createWebAPIs()}>
         <DiffView directory="/repo" diffScope="pr" />
       </RuntimeAPIContext.Provider></I18nProvider></SyncProvider>);
     });

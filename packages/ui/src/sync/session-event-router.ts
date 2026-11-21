@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react"
-import type { SessionPatch, SyncEvent } from "@/lib/opencode/events"
+import type { SessionPatch, SyncEvent } from "@/lib/agent/events"
 import type { Session } from "@/lib/opencode/model"
 import { compact } from "@/lib/opencode/model"
 import { withSessionMetadata } from "@/lib/opencode/projection"

@@ -6,7 +6,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { I18nProvider } from '@/lib/i18n';
 import type { RunningShell } from '@/lib/opencode/background-shell';
 import { opencodeClient } from '@/lib/opencode/client';
-import type { SyncEvent } from '@/lib/opencode/events';
+import type { SyncEvent } from '@/lib/agent/events';
 import type { Session } from '@/lib/opencode/model';
 import { useGlobalSessionsStore } from '@/stores/useGlobalSessionsStore';
 import { applyBackgroundShellEvents, resetBackgroundShells } from '@/sync/background-shells';

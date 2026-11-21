@@ -1,3 +1,4 @@
+import { conversationClient } from "@/lib/agent/active"
 import type { StoreApi } from "zustand"
 import { type SessionMaterializationReason } from "./event-reducer"
 import { ChildStoreManager, type DirectoryStore } from "./child-store"
@@ -40,7 +41,7 @@ export async function resyncDirectoryAfterReconnect(
     syncDebug.recovery.materializing({ reason, directory, sessionID: sessionId })
     const loader = getImperativeSessionMessageLoader()
     const [session] = await Promise.all([
-      retry(() => opencodeClient.getSession(sessionId, directory)).catch(() => null),
+      retry(() => conversationClient.getSession(sessionId, directory)).catch(() => null),
       loader?.refreshTail({ directory, sessionID: sessionId }, RECONNECT_MESSAGE_LIMIT) ?? Promise.resolve(),
     ])
     if (isStale()) return

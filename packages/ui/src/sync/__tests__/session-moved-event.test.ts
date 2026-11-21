@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { GLOBAL_EVENT_DIRECTORY, type SyncEvent } from "@/lib/opencode/events"
+import { GLOBAL_EVENT_DIRECTORY, type SyncEvent } from "@/lib/agent/events"
 import type { Message, Part, Session } from "@/lib/opencode/model"
 import { getRuntimeKey } from "@/lib/runtime-switch"
 import { useGlobalSessionsStore } from "@/stores/useGlobalSessionsStore"

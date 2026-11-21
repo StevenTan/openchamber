@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 import { useGlobalSessionsStore } from '@/stores/useGlobalSessionsStore';
 import type { Session } from '@/lib/opencode/model';
-import type { SessionPatch, SyncEvent } from '@/lib/opencode/events';
+import type { SessionPatch, SyncEvent } from '@/lib/agent/events';
 import { applySessionEventsToGlobalSessions } from './session-event-router';
 
 const session = (id: string, directory: string): Session => ({

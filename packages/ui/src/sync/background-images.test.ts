@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, jest, spyOn, test } from 'bun:test';
 import { IMAGE_JOB_LIFETIME_MS, type RunningImageJob } from '@/lib/opencode/background-image';
-import type { SyncEvent } from '@/lib/opencode/events';
+import type { SyncEvent } from '@/lib/agent/events';
 import {
   applyBackgroundImageEvents,
   backgroundImageRevision,

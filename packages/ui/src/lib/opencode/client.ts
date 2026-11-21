@@ -14,7 +14,6 @@ import type { FilesAPI } from "../api/types"
 import { getDesktopHomeDirectory } from "../desktop"
 import { isAmbiguousTransportFailure, isDefiniteTransportFailure, markAmbiguousTransportFailure, markDefiniteTransportFailure } from "@/lib/relay/transport-error"
 import { FilesystemError, parseFilesystemErrorReason } from "@/lib/api/files-errors"
-import type { ContextPartMetadata } from "@/lib/messages/contextParts"
 import { getRuntimeUrlResolver } from "@/lib/runtime-url"
 import { runtimeFetch } from "@/lib/runtime-fetch"
 import { captureRuntimeCleanup } from "@/lib/runtime-cleanup"
@@ -38,19 +37,14 @@ import {
   type McpServerStatus,
   type Message,
   type Metadata,
-  type Model,
-  type ModelRef,
   type ModelSelection,
   type Part,
   type PermissionReply,
   type PermissionRequest,
   type Project,
-  type Provider,
   type Session,
   type SessionStatus,
   type Skill,
-  type SyntheticMessage,
-  type UserMessage,
   type Vcs,
   toModelRef,
 } from "./model"
@@ -77,6 +71,9 @@ import {
   readIntegrationPolicies,
   type IntegrationPolicy,
 } from "./projection"
+
+import type { ConversationClient, SendMessageInput, PendingInboxMessage, ProviderCatalog, SyntheticContextInput } from "../agent/client"
+export type { PendingInboxMessage, ProviderCatalog, SkillMentions, SyntheticContextInput } from "../agent/client"
 
 export type { OpenCodeClient }
 
@@ -193,11 +190,6 @@ export function normalizeOpencodeError(operation: string, error: unknown): Openc
     return wrapped
   }
   return new OpencodeApiError(operation, String(error), { cause: error })
-}
-
-export type SkillMentions = {
-  names: readonly string[]
-  instructionFor: (names: readonly string[]) => string | null
 }
 
 type SkillAttachmentRef = { id: string; name: string }
@@ -410,17 +402,6 @@ type DirectorySwitchResult = {
   path: string
 }
 
-export type PendingInboxMessage = {
-  info: UserMessage | SyntheticMessage
-  parts: Part[] | null
-}
-
-export type ProviderCatalog = {
-  providers: Provider[]
-  models: Model[]
-  default?: ModelRef
-}
-
 type FetchPermissionResult =
   | { state: "ok"; permission: PermissionRequest }
   | { state: "resolved" }
@@ -532,13 +513,6 @@ const fsHomeResponseSchema = z.object({
   canonicalLegacyChatsRoot: fsAbsolutePathSchema.optional(),
 })
 
-export type SyntheticContextInput = {
-  id?: string
-  text: string
-  metadata?: ContextPartMetadata
-  description?: string
-}
-
 const dedupeById = <T extends { id: string }>(lists: T[][]): T[] => {
   const merged: T[] = []
   const seen = new Set<string>()
@@ -553,7 +527,7 @@ const dedupeById = <T extends { id: string }>(lists: T[][]): T[] => {
 }
 
 
-class OpencodeService {
+class OpencodeService implements ConversationClient {
   private client: OpenCodeClient
   private baseUrl: string
   private scopedClients: Map<string, OpenCodeClient> = new Map()
@@ -1206,24 +1180,7 @@ class OpencodeService {
     throw new AgentUnavailableError(agent, this.resolveDirectory(directory))
   }
 
-  async sendMessage(params: {
-    runtimeKey?: string
-    id: string
-    model?: ModelSelection
-    agent?: string
-    providerID: string
-    text: string
-    files?: Array<FileInputLite>
-    context?: SyntheticContextInput[]
-    messageId?: string
-    agentMentions?: Array<{ name: string; source?: { value: string; start: number; end: number } }>
-    metadata?: Metadata
-    delivery?: SessionInboxDelivery
-    directory?: string | null
-    skills?: SkillMentions
-    beforeSend?: () => void
-    commitRevert?: () => Promise<void>
-  }): Promise<string> {
+  async sendMessage(params: SendMessageInput): Promise<string> {
     this.assertRuntimeUnchanged(params.runtimeKey)
 
     const context = (params.context ?? [])

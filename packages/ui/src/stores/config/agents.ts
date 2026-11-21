@@ -1,3 +1,4 @@
+import { conversationClient } from "@/lib/agent/active"
 import { type ConfigSlice, type DirectoryScopedConfig, type ConfigStore } from './types';
 import { captureConfigRuntimeContext, isConfigRuntimeContextCurrent } from './runtime';
 import { fromDirectoryKey, normalizeConfigPath as resolveConfigDirectory, toDirectoryKey } from './directories';
@@ -89,7 +90,7 @@ export const createAgentCatalog: ConfigSlice<'loadAgents'> = (set, get) => ({
                 const [agents, defaultsLoaded] = await Promise.all([
                     measureStartupTrace(
                         'loadAgents:api',
-                        () => opencodeClient.listAgents(configDirectoryPath),
+                        () => conversationClient.listAgents(configDirectoryPath),
                         { directoryKey, source, requestedDirectory, effectiveDirectory, attempt: attempt + 1 },
                     ),
                     get().loadSessionDefaults(),

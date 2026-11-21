@@ -1,4 +1,3 @@
-
 import type { ContextPartMetadata } from "@/lib/messages/contextParts"
 import { readEffortRevision, rememberEffort } from "@/lib/modelEfforts"
 import { draftSessionMetadata } from "./draft-session-metadata"
@@ -8,6 +7,7 @@ import type { AttachedFile, SessionWorktreeAttachment } from "@/stores/types/ses
 import { permissionModeForNewSession, type PermissionMode } from "@/stores/utils/permissionAutoAccept"
 import type { WorktreeMetadata } from "@/types/worktree"
 import { opencodeClient, type SkillMentions } from "@/lib/opencode/client"
+import { conversationClient } from "@/lib/agent/active"
 import { draftSessionCreateSelection, trimAgent, type DraftSessionSelection } from "./draft-session-selection"
 import { buildSkillMentionInstruction } from "@/lib/skillMentionInstruction"
 import { runtimeFetch } from "@/lib/runtime-fetch"
@@ -286,7 +286,7 @@ export async function routeMessage(params: {
     send: async (messageID, context, commitRevert) => {
       assertRuntimeCurrent()
       const selection = await sendSelection()
-      return opencodeClient.sendMessage({
+      return conversationClient.sendMessage({
         runtimeKey: params.runtimeKey,
         id: params.sessionId,
         providerID: params.providerID,
@@ -1214,7 +1214,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
         const runtimeKey = getRuntimeKey()
         const stillSelected = () => navigationRevision === admissionNavigationRevision && runtimeKey === getRuntimeKey()
         void (async () => {
-          const destination = directory ?? resolveGlobalSessionDirectory(await opencodeClient.getSession(id))
+          const destination = directory ?? resolveGlobalSessionDirectory(await conversationClient.getSession(id))
           if (!destination || !stillSelected()) return
           const admitted = await admitSession(id, destination, true)
           if (!admitted || !stillSelected()) return

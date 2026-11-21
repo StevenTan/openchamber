@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, jest, test } from 'bun:test';
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Window } from 'happy-dom';
-import type { SyncEvent } from '@/lib/opencode/events';
+import type { SyncEvent } from '@/lib/agent/events';
 import type { Session } from '@/lib/opencode/model';
 import { CHAT_DRAFT_PROJECT_ID, ensureChatsRootDirectory } from '@/lib/chatDirectories';
 import { opencodeClient } from '@/lib/opencode/client';

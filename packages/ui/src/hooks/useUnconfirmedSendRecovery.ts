@@ -1,3 +1,4 @@
+import { conversationClient } from "@/lib/agent/active"
 import * as React from 'react';
 
 import { deleteChatDirectory } from '@/lib/chatDirectories';
@@ -28,7 +29,7 @@ const serverOfThisRuntime = (): UnconfirmedSendServer => ({
         null,
     ),
     hasMessage: (sessionId, messageId, directory) => absentOnNotFound(
-        opencodeClient.getSessionMessage(sessionId, messageId, directory).then(() => true),
+        conversationClient.getSessionMessage(sessionId, messageId, directory).then(() => true),
         false,
     ),
     hasSessionsIn: async (directory) => {

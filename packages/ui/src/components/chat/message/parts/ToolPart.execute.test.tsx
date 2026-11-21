@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { act } from 'react';
 import { expect, test } from 'bun:test';
 import { createRoot } from 'react-dom/client';
@@ -97,7 +98,7 @@ test('a Code Mode call shows its script, the tools it called, and the truncation
     useGuestsStore.setState({ status: 'ready', guests: [], runtimeKey: 'test' });
     await act(async () => {
       root.render(
-        <SyncProvider sdk={sdk} directory="">
+        <SyncProvider backend={createOpenCodeBackend(sdk)} directory="">
           <I18nProvider>
             <ThemeSystemContext.Provider value={themeContext}>
               <ToolPart part={part} isExpanded isMobile={false} onToggle={() => {}} />
@@ -141,7 +142,7 @@ test('a Code Mode call shows its script, the tools it called, and the truncation
     };
     await act(async () => {
       root.render(
-        <SyncProvider sdk={sdk} directory="">
+        <SyncProvider backend={createOpenCodeBackend(sdk)} directory="">
           <I18nProvider>
             <ThemeSystemContext.Provider value={themeContext}>
               <ToolPart part={namespacePart} isExpanded={false} isMobile={false} onToggle={() => {}} />
@@ -183,7 +184,7 @@ test('a Code Mode call shows its script, the tools it called, and the truncation
       };
       await act(async () => {
         root.render(
-          <SyncProvider sdk={sdk} directory="">
+          <SyncProvider backend={createOpenCodeBackend(sdk)} directory="">
             <I18nProvider>
               <ThemeSystemContext.Provider value={themeContext}>
                 <ToolPart key={viewPart.id} part={viewPart} isExpanded isMobile={false} onToggle={() => {}} />
@@ -210,7 +211,7 @@ test('a Code Mode call shows its script, the tools it called, and the truncation
     };
     await act(async () => {
       root.render(
-        <SyncProvider sdk={sdk} directory="/repo">
+        <SyncProvider backend={createOpenCodeBackend(sdk)} directory="/repo">
           <I18nProvider>
             <ThemeSystemContext.Provider value={themeContext}>
               <ToolPart key={filePart.id} part={filePart} isExpanded={false} isMobile={false} onToggle={() => {}} />
@@ -237,7 +238,7 @@ test('a Code Mode call shows its script, the tools it called, and the truncation
     expect(container.textContent).toContain('READ_RESULT');
     await act(async () => {
       root.render(
-        <SyncProvider sdk={sdk} directory="/repo"><I18nProvider><ThemeSystemContext.Provider value={themeContext}>
+        <SyncProvider backend={createOpenCodeBackend(sdk)} directory="/repo"><I18nProvider><ThemeSystemContext.Provider value={themeContext}>
           <ToolPart key={filePart.id} part={filePart} isExpanded isMobile={false} onToggle={() => {}} />
         </ThemeSystemContext.Provider></I18nProvider></SyncProvider>,
       );

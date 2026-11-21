@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { act } from 'react';
 import { expect, spyOn, test } from 'bun:test';
 import { createRoot } from 'react-dom/client';
@@ -105,7 +106,7 @@ const withHarness = async (
     useGuestsStore.setState({ status: 'ready', guests: [], runtimeKey: 'test' });
     await act(async () => {
       root.render(
-        <SyncProvider sdk={sdk} directory="/workspace">
+        <SyncProvider backend={createOpenCodeBackend(sdk)} directory="/workspace">
           <CaptureManager />
           <I18nProvider>
             <ThemeSystemContext.Provider value={themeContext}>

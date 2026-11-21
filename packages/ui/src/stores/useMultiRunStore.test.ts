@@ -184,7 +184,7 @@ beforeEach(async () => {
   useGlobalSessionsStore.getState().resetForRuntimeSwitch();
   useSessionUIStore.setState({ worktreeMetadata: new Map(), availableWorktreesByProject: new Map(), availableWorktrees: [] });
   childStores = new ChildStoreManager();
-  setSyncRefs(opencodeClient.getSdkClient(), childStores, '/repo', (sessionID, directory) => registeredDirectories.push({ sessionID, directory }));
+  setSyncRefs(childStores, '/repo', (sessionID, directory) => registeredDirectories.push({ sessionID, directory }));
   setActionRefs(childStores, () => '/repo');
   loader = new SessionMessageLoader(childStores, { sdk: opencodeClient, runtimeKey: getRuntimeKey() });
   setOptimisticRefs(

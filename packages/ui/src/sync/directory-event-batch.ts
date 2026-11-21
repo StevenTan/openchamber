@@ -1,5 +1,5 @@
 import type { StoreApi } from "zustand"
-import { type SyncEvent } from "@/lib/opencode/events"
+import { type SyncEvent } from "@/lib/agent/events"
 import { type DirectoryStore } from "./child-store"
 import { countSyncPerformance } from "./performance-diagnostics"
 import { applyRecoverableQuestionEvents } from "./recoverable-questions"

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { SyncEvent } from '@/lib/opencode/events';
+import type { SyncEvent } from '@/lib/agent/events';
 import type { JsonValue } from '@/lib/opencode/model';
 import { contextTokensFromBreakdown } from '@/stores/utils/tokenUtils';
 

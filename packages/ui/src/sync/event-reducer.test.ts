@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import type { SyncEvent } from "@/lib/opencode/events"
+import type { SyncEvent } from "@/lib/agent/events"
 import type { Message, Part, PermissionRequest, Session } from "@/lib/opencode/model"
 import { toolContentShellChars } from "@/lib/opencode/toolContentShells"
 import { applyDirectoryEvent, reduceGlobalEvent } from "./event-reducer"

@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import React from 'react';
 import { FireworksProvider } from '@/contexts/FireworksContext';
 import { RuntimeAPIProvider } from '@/contexts/RuntimeAPIProvider';
@@ -126,7 +127,7 @@ export function VSCodeApp({ apis }: VSCodeAppProps) {
 
   return (
     <ErrorBoundary>
-      <SyncProvider sdk={opencodeClient.getSdkClient()} directory={isSettingsPanel ? '' : currentDirectory || ''}>
+      <SyncProvider backend={createOpenCodeBackend(opencodeClient.getSdkClient())} directory={isSettingsPanel ? '' : currentDirectory || ''}>
         <RuntimeAPIProvider apis={apis}>
           <FireworksProvider>
             <TooltipProvider delayDuration={300} skipDelayDuration={150}>

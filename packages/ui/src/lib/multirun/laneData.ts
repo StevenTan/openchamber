@@ -1,4 +1,4 @@
-import { opencodeClient } from '@/lib/opencode/client';
+import { conversationClient } from "@/lib/agent/active"
 import { findMessagePageItem } from '@/lib/opencode/messagePaging';
 import type { FilePart, Part } from '@/lib/opencode/model';
 import { flattenAssistantTextParts, flattenUserTextParts } from '@/lib/messages/messageText';
@@ -36,7 +36,7 @@ export type LaneLastTurn = {
 };
 
 export async function loadLaneLastTurn(sessionId: string, directory: string): Promise<LaneLastTurn> {
-  const page = await opencodeClient.getSessionMessages(sessionId, { limit: 50 }, directory);
+  const page = await conversationClient.getSessionMessages(sessionId, { limit: 50 }, directory);
   let error: string | null = null;
   for (const record of page.items) {
     if (record.info.role !== 'assistant') continue;

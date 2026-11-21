@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { act } from 'react';
 import { expect, test } from 'bun:test';
 import { createRoot } from 'react-dom/client';
@@ -77,7 +78,7 @@ test('edit and patch headers render v2 file diff counts as results arrive', asyn
         state: { status: 'completed', input, metadata, output: '', time: { start: 1, end: 2 } },
       };
       await act(async () => root.render(
-        <SyncProvider sdk={sdk} directory="">
+        <SyncProvider backend={createOpenCodeBackend(sdk)} directory="">
           <I18nProvider>
             <ThemeSystemContext.Provider value={themeContext}>
               <ToolPart part={part} isExpanded={false} isMobile={false} onToggle={() => {}} />

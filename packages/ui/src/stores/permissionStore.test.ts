@@ -20,7 +20,7 @@ let childStores = new ChildStoreManager();
 const configureSessions = (sessions: Array<{ id: string; directory: string }>) => {
   childStores.disposeAll();
   childStores = new ChildStoreManager();
-  setSyncRefs(opencodeClient.getSdkClient(), childStores, '/project');
+  setSyncRefs(childStores, '/project');
   for (const session of sessions) {
     const store = childStores.ensureChild(session.directory, { bootstrap: false });
     store.setState((state) => ({ session: [...state.session, {

@@ -1,6 +1,7 @@
+import { conversationClient } from "@/lib/agent/active"
 import React from 'react';
 import { toast } from '@/components/ui';
-import { isOpencodeNotFound, opencodeClient } from '@/lib/opencode/client';
+import { isOpencodeNotFound} from '@/lib/opencode/client';
 import { useChatTimelineScroll, type LinkedMessageState } from '@/hooks/useChatTimelineScroll';
 import { useI18n } from '@/lib/i18n';
 import type { MessageListHandle } from '../MessageList';
@@ -45,7 +46,7 @@ export const useColumnTimelineScroll = ({
     const checkLinkedMessage = React.useCallback(async (messageId: string): Promise<LinkedMessageState> => {
         if (!currentSessionId) return 'unknown';
         try {
-            await opencodeClient.getSessionMessage(currentSessionId, messageId, effectiveSessionDirectory);
+            await conversationClient.getSessionMessage(currentSessionId, messageId, effectiveSessionDirectory);
             return 'exists';
         } catch (error) {
             return isOpencodeNotFound(error) ? 'missing' : 'unknown';

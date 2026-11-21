@@ -1,5 +1,5 @@
+import { conversationClient } from "@/lib/agent/active"
 
-import { opencodeClient } from '@/lib/opencode/client';
 import type { Message, Part, Session } from '@/lib/opencode/model';
 import { findSessionLinks, sessionLinkKey, type SessionLinkTarget } from '@/lib/sessionLinks';
 import { ensureGlobalSessionsLoaded, resolveGlobalSessionDirectory } from '@/stores/useGlobalSessionsStore';
@@ -59,7 +59,7 @@ export const loadSessionLinkReference = async (target: SessionLinkTarget): Promi
     const session = [...snapshot.activeSessions, ...snapshot.archivedSessions].find((entry) => entry.id === target.sessionId);
     if (!session) return null;
     if (!target.messageId) return sessionReference(session);
-    const message = await opencodeClient.getSessionMessage(session.id, target.messageId, resolveGlobalSessionDirectory(session));
+    const message = await conversationClient.getSessionMessage(session.id, target.messageId, resolveGlobalSessionDirectory(session));
     return sessionMessageReference(session, message) ?? { ...sessionReference(session), messageId: target.messageId };
 };
 

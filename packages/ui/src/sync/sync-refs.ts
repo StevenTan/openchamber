@@ -1,5 +1,4 @@
 
-import type { OpenCodeClient } from "@opencode/client"
 import type { Config } from "@/lib/opencode/model"
 import type { ChildStoreManager } from "./child-store"
 import { getSessionMaterializationStatus } from "./materialization"
@@ -15,7 +14,6 @@ let cachedSessionsById = new Map<string, State["session"][number]>()
 let cachedSessionDirectoryById = new Map<string, string>()
 
 export function setSyncRefs(
-  _sdk: OpenCodeClient,
   childStores: ChildStoreManager,
   directory: string,
   registerSessionDirectory?: (sessionID: string, directory: string) => void,

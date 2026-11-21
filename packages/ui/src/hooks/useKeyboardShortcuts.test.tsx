@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { expect, test } from 'bun:test';
 import { OpenCode } from '@opencode/client';
 import { Window } from 'happy-dom';
@@ -152,7 +153,7 @@ async function withShortcutsMounted(
     await act(async () => root.render(
       <ThemeSystemProvider>
         {settingsOnly ? <SettingsShortcutOwner /> : (
-          <SyncProvider sdk={sdk} directory={directory}><ShortcutOwner /></SyncProvider>
+          <SyncProvider backend={createOpenCodeBackend(sdk)} directory={directory}><ShortcutOwner /></SyncProvider>
         )}
       </ThemeSystemProvider>,
     ));

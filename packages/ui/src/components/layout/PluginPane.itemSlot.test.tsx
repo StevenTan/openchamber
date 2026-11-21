@@ -1,3 +1,4 @@
+import { createOpenCodeBackend } from "@/lib/opencode/backend"
 import { expect, spyOn, test } from 'bun:test';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -65,7 +66,7 @@ test('an item parked for the rail reaches the panel, not a block of the same ext
   // Strict Mode runs the panel's mount effect twice, as the app does in development.
   const render = (withPanel: boolean, panelOpen = true) => root.render(
     <React.StrictMode><I18nProvider><ThemeSystemContext.Provider value={themeContext}>
-      <SyncProvider sdk={sdk} directory="/visible">
+      <SyncProvider backend={createOpenCodeBackend(sdk)} directory="/visible">
         <PluginPane mode="plugin:tracker" surface="block" block={block} />
         {withPanel ? <PluginPane mode="plugin:tracker" panelOpen={panelOpen} /> : null}
       </SyncProvider>

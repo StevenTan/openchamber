@@ -1,3 +1,4 @@
+import { conversationClient } from "@/lib/agent/active"
 import { isOpencodeNotFound, opencodeClient } from '@/lib/opencode/client';
 import { getRuntimeKey } from '@/lib/runtime-switch';
 import { findLastCompletedAssistantMessageID, insertForkIntoDirectoryStore, serverCutAfterAnswer } from '@/lib/btw';
@@ -34,7 +35,7 @@ export async function createSideChat(parentSessionId: string | null, directory: 
       const before = (localAnswer ? transcriptCutAfterMessage(messages, answer) : undefined) ?? await serverCutAfterAnswer(parentSessionId, answer, directory);
       session = await forkAtTranscriptCut(parentSessionId, before, directory, runtime);
       if (getRuntimeKey() !== runtime) throw new Error('runtime changed');
-      const tail = await opencodeClient.getSessionMessages(session.id, { limit: 1 }, session.directory ?? directory);
+      const tail = await conversationClient.getSessionMessages(session.id, { limit: 1 }, session.directory ?? directory);
       const last = tail.items.at(-1)?.info;
       if (!last) throw new Error('Inherited transcript boundary is missing');
       const metadata = sideChatMetadata(parentSessionId, { id: last.id, created: last.time.created, synthetic: last.role === 'synthetic' });
@@ -82,7 +83,7 @@ async function readSideChat(sessionID: string, directory: string, runtime: strin
   if (getRuntimeKey() !== runtime) throw new Error('runtime changed');
   let session: Session | null;
   try {
-    session = await opencodeClient.getSession(sessionID, directory);
+    session = await conversationClient.getSession(sessionID, directory);
   } catch (error) {
     if (!isOpencodeNotFound(error)) throw error;
     session = null;

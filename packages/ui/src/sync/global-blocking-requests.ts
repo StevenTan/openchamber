@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { SyncEvent } from '@/lib/opencode/events';
+import type { SyncEvent } from '@/lib/agent/events';
 import { normalizeProjectPath } from '@/lib/projectResolution';
 import type { FormRequest, PermissionRequest } from '@/lib/opencode/model';
 import type { HostSessionStatusSnapshot } from '@/lib/opencode/session-status';

@@ -1,3 +1,4 @@
+import { conversationClient } from "@/lib/agent/active"
 import type { Session } from '@/lib/opencode/model';
 import { opencodeClient } from '@/lib/opencode/client';
 import { isOperatorChildSession, metadataAfterTakeOver, permissionsAfterTakeOver } from '@/lib/sessionOperatorChild';
@@ -7,7 +8,7 @@ import { patchSessionMetadata } from './session-actions';
 export const takeOverSession = async (sessionId: string, directory: string | null): Promise<Session | null> => {
   const runtimeKeyAtClick = getRuntimeKey();
   try {
-    const current = await opencodeClient.getSession(sessionId, directory);
+    const current = await conversationClient.getSession(sessionId, directory);
     if (getRuntimeKey() !== runtimeKeyAtClick) return null;
     if (!isOperatorChildSession(current)) return current;
     await opencodeClient.setSessionPermissions(sessionId, permissionsAfterTakeOver(current.permissions), directory);

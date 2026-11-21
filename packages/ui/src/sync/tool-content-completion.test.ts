@@ -59,7 +59,7 @@ beforeEach(async () => {
   responses.length = 0
   runtimeKey = "test-runtime"
   stores = new ChildStoreManager()
-  setSyncRefs(opencodeClient.getSdkClient(), stores, directory)
+  setSyncRefs(stores, directory)
   responses.push(() => json({ data: wire(true) }))
   const record = await opencodeClient.getSessionMessage(sessionID, messageID, directory)
   stores.ensureChild(directory, { bootstrap: false }).setState({
