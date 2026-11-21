@@ -109,3 +109,27 @@ test('a ready selection supersedes a pending session without displaying its work
     expect(rendered).not.toContain(b);
     expect(rendered.at(-1)).toBe(c);
 });
+
+const renderIntoDraft = (session: Selection, draft: Selection): Selection[] => {
+  const rendered: Selection[] = [];
+  const Probe = ({ target, opensDraft }: { target: Selection; opensDraft: boolean }) => {
+    const { sessionId, directory } = useShownSessionSelection(target, { newSessionDraftOpen: opensDraft }).selection;
+    rendered.push({ sessionId, directory });
+    return null;
+  };
+  act(() => root.render(<Probe target={session} opensDraft={false} />));
+  act(() => root.render(<Probe target={draft} opensDraft />));
+  return rendered;
+};
+
+test('a session left for a new-session draft is dropped at once', () => {
+  const rendered = renderIntoDraft(
+    { sessionId: 'ses_a', directory: '/repo' },
+    { sessionId: null, directory: null },
+  );
+
+  // A draft has nothing to load. A commit still naming ses_a had the composer
+  // build its draft identity from that session, so a dictation started in that
+  // window recorded the previous session as its origin (#6927).
+  expect(rendered.slice(1).every((shown) => shown.sessionId === null)).toBe(true);
+});

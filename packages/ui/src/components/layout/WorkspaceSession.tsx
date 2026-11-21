@@ -21,7 +21,7 @@ export const WorkspaceSession: React.FC<React.PropsWithChildren> = ({ children }
   const panelDirectory = useEffectiveDirectory() ?? '';
   const target = React.useMemo(() => ({ sessionId, directory, draft, owner, panelDirectory }), [sessionId, directory, draft, owner, panelDirectory]);
   const renderable = useSessionRenderable(sessionId ?? '', directory ?? undefined);
-  const { selection, revealWaited } = useShownSessionSelection(target, { renderable, materializedSessionId });
+  const { selection, revealWaited } = useShownSessionSelection(target, { renderable, materializedSessionId, newSessionDraftOpen: draft.open });
   const displayed = React.useMemo(() => ({ ...selection, revealWaited }), [selection, revealWaited]);
   const draftRequestId = selection.sessionId === null && selection.draft.open
     ? selection.draft.pendingWorktreeRequestId ?? null : null;

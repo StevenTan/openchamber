@@ -23,7 +23,7 @@ const SESSION_SWITCH_HOLD_MS = 400;
  */
 export const useShownSessionSelection = <T extends SessionSelection>(
     target: T,
-    { renderable = true, materializedSessionId }: { renderable?: boolean; materializedSessionId?: string | null } = {},
+    { renderable = true, materializedSessionId, newSessionDraftOpen = false }: { renderable?: boolean; materializedSessionId?: string | null; newSessionDraftOpen?: boolean } = {},
 ) => {
     const shownRef = React.useRef(target);
     const [expiredHold, setExpiredHold] = React.useState<string | null>(null);
@@ -45,7 +45,7 @@ export const useShownSessionSelection = <T extends SessionSelection>(
     }
     const next = hold ? shownRef.current : target;
     const deferred = React.useDeferredValue(next);
-    const selection = deferred.sessionId === next.sessionId || (deferred.sessionId === null && next.sessionId !== null)
+    const selection = deferred.sessionId === next.sessionId || (newSessionDraftOpen && next.sessionId === null) || (deferred.sessionId === null && next.sessionId !== null)
         ? next : deferred;
     shownRef.current = selection;
     return { selection, revealWaited: Boolean(selection.sessionId) && selection.sessionId === waited.current };

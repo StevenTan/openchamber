@@ -25,6 +25,7 @@ import { CHAT_SCROLL_STYLE } from './chatScrollStyle';
 import { shouldIgnoreChatNavigationTarget } from './chatKeyboardNavigation';
 import { usePromptRail } from './usePromptRail';
 import { useTimelineReveal } from './useTimelineReveal';
+import type { RetryOverlay } from '../timeline/types';
 
 type SessionMessageRecord = { info: Message; parts: Part[] };
 
@@ -50,12 +51,7 @@ type ChatViewportProps = {
     sessionIsWorking: boolean;
     streamingMessageId: string | null;
     activeStreamingPhase: import('../message/types').StreamPhase | null;
-    retryOverlay: {
-        sessionId: string;
-        message: string;
-        confirmedAt?: number;
-        fallbackTimestamp?: number;
-    } | null;
+    retryOverlay: RetryOverlay | null;
     scrollToBottom: () => void;
     endPinningReleased: boolean;
     /** The user waited for this session (held or fetched); reveal it with a fade. */

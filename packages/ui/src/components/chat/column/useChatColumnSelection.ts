@@ -33,6 +33,7 @@ export const useChatColumnSelection = ({
     const liveSessionId = pinned ? (pinnedSessionDirectory ? pinnedSelection?.sessionId ?? null : null) : globalSessionId;
     const liveSessionDirectory = pinned ? pinnedSessionDirectory : globalSessionDirectory;
     const materializedDraftSessionId = useSessionUIStore((s) => (pinned ? null : s.materializedDraftSessionId));
+    const draftOpen = useSessionUIStore((s) => !pinned && s.newSessionDraft.open);
     const liveSelection = React.useMemo(
         () => ({ sessionId: mainWorkspace ? null : liveSessionId, directory: mainWorkspace ? null : liveSessionDirectory }),
         [mainWorkspace, liveSessionId, liveSessionDirectory],
@@ -40,7 +41,7 @@ export const useChatColumnSelection = ({
     // Desktop main chat follows its workspace's committed selection. Pinned
     // columns and standalone runtimes own the same presentation policy here.
     const liveSessionRenderable = useSessionRenderable(liveSelection.sessionId ?? '', liveSelection.directory ?? undefined);
-    const localPresentation = useShownSessionSelection(liveSelection, { renderable: liveSessionRenderable, materializedSessionId: materializedDraftSessionId });
+    const localPresentation = useShownSessionSelection(liveSelection, { renderable: liveSessionRenderable, materializedSessionId: materializedDraftSessionId, newSessionDraftOpen: draftOpen });
     const { sessionId: currentSessionId, directory: currentSessionDirectory } = mainWorkspace ?? localPresentation.selection;
     const revealWaited = mainWorkspace?.revealWaited ?? localPresentation.revealWaited;
 

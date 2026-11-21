@@ -8,12 +8,14 @@ type ChatViewProps = {
     active?: boolean;
     readOnly?: boolean;
     pinnedSession?: { sessionId: string; directory: string | null };
+    registerParentSessionBack?: (handler: (() => void) | null) => void;
 };
 
 export const ChatView: React.FC<ChatViewProps> = ({
     active = true,
     readOnly = false,
     pinnedSession,
+    registerParentSessionBack,
 }) => {
     const workspace = React.useContext(DisplayedWorkspaceContext);
     const currentSessionId = useSessionUIStore((state) => (pinnedSession || workspace ? null : state.currentSessionId));
@@ -24,6 +26,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 active={active}
                 readOnly={readOnly}
                 pinnedSession={pinnedSession}
+                registerParentSessionBack={registerParentSessionBack}
             />
         </ChatErrorBoundary>
     );

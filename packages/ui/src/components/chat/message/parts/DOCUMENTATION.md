@@ -35,6 +35,7 @@ Use this doc when you ask an agent to change tool/header/description behavior.
   - The entry of expandable tool rows (shell/edit/write/question/subagent + fallback). It only composes: it picks the row for the call (`BackgroundShellToolPartContent`, `SubagentToolPartContent`, `ShellToolPartContent` or `ToolPartContent`) and wraps it in `ToolPartErrorBoundary`.
   - The pieces live in `toolRow/`: `ToolPartContent.tsx` is the row (header title/description/diff stats/timer, with `useToolRowTiming` and `useToolRowOpenActions`), `ToolExpandedContent.tsx` is the expanded body, `toolDescriptions.ts` builds the row's text, and the output views (`ToolScrollableTextOutput`, `JsonToolOutput`, `CommandOutput`, `DiffPreview`, ...) are one file each.
   - If you want to change expandable tool layout, edit in `toolRow/`.
+  - A question call's expanded body reads the answers the tool recorded in its result metadata (`answers`, one entry per asked question) before the reply text, and the text parse stays the fallback for a call that carries none. The tool writes each answer between quotes without escaping a quote the reader typed, so the reply alone cannot say where an answer ends. Older calls without that metadata keep the previous best-effort text parse unchanged: an answer holding a quote, or a quote followed by a comma, can still split or merge there. An answer the reader left blank shows as `chat.htmlRender.unanswered`, which the component must pass into `questionAnswersForCall`, so the pure module keeps no i18n hook and no English default; the fallback parse never relabels what the tool stored.
   - A subagent call is an ordinary tool row, rendered through `SubagentToolPartContent`: shine and a live duration while it runs, the final duration (red on failure) once settled, and an open action that shows the child session. Expanded, it shows the prompt and the result. The row never reads the child session's messages; the child's own chat is where its work is shown.
   - While the child runs, foreground or background, the row has a stop action. OpenCode 2.0.23 has no route that cancels a subagent job; interrupting the child ends the job as cancelled, which the agent reads as a failed subagent and tends to restart. `opencodeClient.stopSubagent` therefore first admits a non-resuming synthetic note (`subagentCancellationNote` in `@/lib/opencode/subagent-run`) that explains the cancellation as the user's stop without forbidding the work, and interrupts the child only once the note is in. A foreground call the note names reads `stopped` instead of failed (`toStoppedSubagentPart`). Drop the note once OpenCode reports a user cancel itself.
 
@@ -76,6 +77,8 @@ Use this doc when you ask an agent to change tool/header/description behavior.
 
 - `ReasoningPart.tsx`
   - Thinking block UI (`ReasoningTimelineBlock`), summary + optional duration.
+  - Live reasoning displays throttled partial paragraphs, so an expanded trace does not stay empty until a paragraph finishes. The 100 ms throttle limits updates; assistant answer text retains its block-level reveal.
+  - The collapsed header keeps up to 400 characters of the summary in the DOM; CSS truncates at the real row width. A per-row measured character budget was rejected because a ResizeObserver per row would re-render the chat on every frame of a sidebar animation, the cost `useWorkStatusVisibility` records.
   - Presentation titles accept inline content. `TimelineNotice` uses this for completed compactions, appending the recorded `providerID/id` in the description color (also on empty-summary rows). Attribution comes from the stored compaction message or `session.compaction.ended`, never the current session selection. Running, failed, and older model-less compactions have no attribution. Custom presentation headers can shrink and wrap long identifiers; ordinary thinking rows retain their existing layout.
 
 - `components/LiveTurnActivity.tsx` (relative to the chat folder)
@@ -670,6 +673,17 @@ same commit without waiting for another animation frame.
 
 A page waited whenever its call was `running`. A call stays `running` in OpenCode's storage when OpenCode is stopped under it, so after an app restart the page still offered its buttons and every answer came back as "This page is no longer waiting for an answer". Now such a page reads "Not answered" when the server does not list its call as waiting (`useIsCallWaiting`, the list the answer route itself checks) and its session no longer runs (`livePageAsk`). Requiring the server's announcement alone was rejected: it arrives a moment after the call starts, and after a reload only through the host's snapshot, which a client that cannot place the session yet skips, so a page that really waits would come up without buttons.
 
+### Why a quoted image path may hold the other quote characters
+
+`renderPageImages.ts` stops a quoted path only at the quote that opened it, so a
+Windows folder named `chef's` keeps its image; the server's copy in
+`packages/web/server/lib/openchamber-control/render-page.js` matches, because the
+grant route allows exactly the paths the chat reads. The rule used to stop at
+every quote character, which dropped such a path without even a "not shown"
+note. A character class cannot express "any character but the one in this
+backreference", so the body tests each character against `\1`; a later reader
+could otherwise simplify that back into the bug (#6806).
+
 ### Why a running shell row reads its output only while expanded
 
 OpenCode has no output event, so every running row that shows output costs one
@@ -684,6 +698,25 @@ The gallery reads the mounted thumbnail and its natural dimensions through
 PhotoSwipe's data API. Opening, closing, loading and gestures share one image
 lifecycle, including thumbnails cropped with `object-fit: cover`. React owns
 the application toolbar and Base UI owns the modal focus scope.
+
+### Why a write row prefers a reported diff to its input preview
+
+A `write` row draws the call's content as a diff preview because the native
+tool reports no diff. A plugin that replaces the file tools reports one for the
+same call, and the row drew both, so one file's changes appeared twice.
+`carriesFileDiffs('write')` answers which tools *produce* per-file diffs, not
+which may show one, so the row's gate reads the result's own entries instead of
+that predicate. The reported diff wins because it is the only source with
+deletions when an existing file is overwritten, and because
+`resolveToolQuickOpenTarget` already resolves the row's line from the same
+entry. The preview hides only when the result branch actually draws that
+patch: an extension's output rule that replaces the result, or metadata whose
+diff text is no usable patch (the plain-text fallback entry), keeps the
+preview, while a valid patch shown as plain text because of its size still
+counts when it carries a hunk header; a long diagnostic in the diff field does
+not. Gating the result-diff branch back to edit and patch reopens the
+duplicate; `ToolPart.write-row-diff.test.tsx` pins the completed, running,
+native, unusable-patch and long-diagnostic cases.
 
 ### Message parts
 

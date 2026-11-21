@@ -1,8 +1,10 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
+import type { Session } from '@/lib/opencode/model';
 import { useUIStore } from '@/stores/useUIStore';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useGlobalSyncStore } from '@/sync/global-sync-store';
+import { useSessionSelector } from '@/sync/sync-context';
 import ChatEmptyState from './ChatEmptyState';
 import { type MessageListHandle } from './MessageList';
 import { useScrollShadow } from '@/components/ui/useScrollShadow';
@@ -45,13 +47,17 @@ type ChatContainerProps = {
     autoOpenDraft?: boolean;
     readOnly?: boolean;
     pinnedSession?: { sessionId: string; directory: string | null };
+    registerParentSessionBack?: (handler: (() => void) | null) => void;
 };
+
+const selectSessionLastIdleAt = (session: Session | undefined): number | null => session?.time.idle ?? null;
 
 export const ChatContainer: React.FC<ChatContainerProps> = ({
     active = true,
     autoOpenDraft: autoOpenDraftProp = true,
     readOnly = false,
     pinnedSession,
+    registerParentSessionBack,
 }) => {
     const { t } = useI18n();
     const {
@@ -107,6 +113,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         sessionMessages,
         sync,
     });
+    const lastIdleAt = useSessionSelector(currentSessionId, effectiveSessionDirectory, selectSessionLastIdleAt);
     useColumnAutoReadAloud({
         pinned,
         currentSessionKey,
@@ -116,7 +123,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         sessionMessages,
         olderCompletedReplyIds: sessionMessageLoadState.olderCompletedReplyIds,
     });
-    const retryOverlay = useRetryOverlay(currentSessionId, sessionStatusForCurrent);
+    const retryOverlay = useRetryOverlay(currentSessionId, sessionStatusForCurrent, lastIdleAt);
 
     const { isMobile } = useDeviceInfo();
     const isVSCode = isVSCodeRuntime();
@@ -378,6 +385,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
                         directory={effectiveSessionDirectory}
                         hidden={hideReturnToParent}
                         openSession={columnActions.openSession}
+                        registerParentSessionBack={registerParentSessionBack}
                     />
                     {sessionSurface}
                     {chatSearch.open && currentSessionId && messageSearchEnabled ? (

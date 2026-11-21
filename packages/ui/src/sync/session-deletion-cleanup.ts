@@ -7,6 +7,7 @@ import { useInlineCommentDraftStore } from '@/stores/useInlineCommentDraftStore'
 import { useSessionMultiSelectStore } from '@/stores/useSessionMultiSelectStore';
 import { deletePanelWorkspace } from '@/stores/useUIStore';
 import { sessionPanelOwner } from '@/lib/workspace/panelOwner';
+import { useSessionTabsStore } from '@/stores/useSessionTabsStore';
 
 export const cleanupPersistedSessionState = (identity: {
   runtimeKey: string;
@@ -23,6 +24,7 @@ export const cleanupPersistedSessionState = (identity: {
   useSessionFoldersStore.getState().removeSessionEverywhere(identity.runtimeKey, identity.sessionId);
   useSessionMultiSelectStore.getState().removeMany([identity.sessionId]);
   deletePanelWorkspace(sessionPanelOwner(identity.sessionId, identity.runtimeKey));
+  useSessionTabsStore.getState().removeTabs([identity.sessionId], identity.runtimeKey);
   useInlineCommentDraftStore.getState().clearSessionDrafts(identity.runtimeKey, identity.directory, identity.sessionId);
   const inputHistoryIdentity = createInputHistoryIdentity(identity.runtimeKey, identity.directory, identity.sessionId);
   if (inputHistoryIdentity) useInputHistoryStore.getState().clearSession(inputHistoryIdentity);
