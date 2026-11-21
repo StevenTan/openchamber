@@ -166,6 +166,7 @@ export function writeMcpEntry(config: Record<string, unknown>, name: string, val
 export function deleteMcpEntry(config: Record<string, unknown>, name: string): boolean;
 
 export function toProviderPackage(value: unknown): string | undefined;
+export function toModelVariants(value: readonly unknown[]): NonNullable<ProviderModelEntity['variants']>;
 export function toProviderEntity(raw: unknown): ProviderEntity;
 export function readStoredProviderEntry(configs: unknown[], providerId: string): ProviderEntity | null;
 
@@ -218,7 +219,7 @@ export interface OpenCodePolicyConfig {
   experimental?: { policies?: OpenCodePolicyStatement[] };
 }
 /** Adds (`disabled`) or removes the exact deny for skill `id` (`skill.use`, or legacy `integration.use` `skill:<id>`) in one config object; returns whether it changed. */
-export function writeSkillDisabled(config: OpenCodePolicyConfig, id: string, disabled: boolean): boolean;
+export function writeSkillDisabled(config: OpenCodePolicyConfig | import('./config-files.js').OpenCodeConfigLayer, id: string, disabled: boolean): boolean;
 export interface WebSearchConfigLayers {
   paths: { userPath: string | null; customPath?: string | null };
 }

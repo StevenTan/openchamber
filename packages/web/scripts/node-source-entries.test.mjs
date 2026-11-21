@@ -21,10 +21,10 @@ const entries = [
 ];
 const preloadedEntries = [
   'packages/web/server/lib/outbound-proxy.ts',
-  'packages/web/server/lib/github/auth.js',
+  'packages/web/server/lib/github/auth.ts',
   'packages/web/server/lib/source-control/auth-storage.ts',
   'packages/web/server/lib/quota/providers/index.ts',
-  'packages/web/server/lib/opencode/providers.js',
+  'packages/web/server/lib/opencode/providers.ts',
   'packages/web/server/lib/dictation/local/model-downloader.ts',
   'packages/web/server/lib/guests/service-registry.ts',
   'packages/web/server/lib/spaces/run-command.ts',

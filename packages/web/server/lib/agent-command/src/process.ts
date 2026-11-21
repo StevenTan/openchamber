@@ -18,7 +18,7 @@ export interface CommandProcess {
     listener: (data: string, stream?: "stdout" | "stderr") => void,
   ): { dispose(): void };
   onExit(
-    listener: (event: { exitCode: number | null; signal?: number | undefined }) => void,
+    listener: (event: { exitCode: number | null; signal?: number | string | undefined }) => void,
   ): { dispose(): void };
   kill(signal?: NodeJS.Signals): void;
 }
@@ -173,7 +173,7 @@ async function spawnPipedCommand(
 
 export async function prepareCommandSpawn(tty: boolean) {
   const provider = tty ? await loadTerminalPtyProvider() : null;
-  return ({
+  return async ({
     command,
     workdir,
     login,
@@ -200,7 +200,7 @@ export async function prepareCommandSpawn(tty: boolean) {
     if (!provider)
       return spawnPipedCommand(shell.executable, shell.args, workdir, env);
     const launch = resolvePosixPtyLaunch(shell.executable, shell.args);
-    const terminal: CommandProcess & { write(input: string): void } = provider.spawn(launch.executable, launch.args, {
+    const terminal: CommandProcess & { write(input: string): void } = await provider.spawn(launch.executable, launch.args, {
         cwd: workdir,
         env,
         cols: 120,

@@ -250,22 +250,24 @@ export function changeRequestCheckSource(provider: SourceControlProvider | undef
     return `${changeRequestNoun(provider)} ${ci === 'pipeline' ? 'pipeline job' : 'check'}`;
 }
 
-/**
- * The model-facing text for a context payload. The wording intentionally
- * matches what OpenChamber sent before parts carried metadata, so model
- * behavior does not change with the transport format.
- */
+// Selections read as the user's own words to the agent: a bare "Comment on <file>" header
+// read like a review comment from someone else, and models drafted replies to it.
+const userWords = (text: string | undefined, subject: string) => (
+    text ? `\n\nThe user wrote this to you about ${subject}:\n${text}` : ''
+);
+
 export function formatContextText(payload: ContextPartPayload): string {
     switch (payload.kind) {
         case 'code-comment': {
             const originNote = payload.origin ? ` ${describeDiffCommentOrigin(payload.origin)}` : '';
             // A whole-file comment has no lines to quote: the model reads the file itself.
             if (payload.startLine === 0 && payload.endLine === 0) {
-                return `Comment on \`${payload.fileLabel}\` (the whole file)${originNote}:\n\n${payload.text}`;
+                return `The user wrote this to you about \`${payload.fileLabel}\` (the whole file)${originNote}:\n\n${payload.text}`;
             }
             const range = `lines ${payload.startLine}-${payload.endLine}`;
             const sideNote = payload.source === 'diff' && payload.side ? ` (${payload.side})` : '';
-            return `Comment on \`${payload.fileLabel}\` ${range}${sideNote}${originNote}:\n\`\`\`${payload.language}\n${payload.code}\n\`\`\`\n\n${payload.text}`;
+            const quoted = `The user selected \`${payload.fileLabel}\` ${range}${sideNote}${originNote}:\n\`\`\`${payload.language}\n${payload.code}\n\`\`\``;
+            return `${quoted}${userWords(payload.text, 'these lines')}`;
         }
         case 'terminal':
             return appendTerminalContexts('', [{
@@ -284,11 +286,11 @@ export function formatContextText(payload: ContextPartPayload): string {
                 ? ` lines ${payload.startLine}-${payload.endLine}`
                 : '';
             const quoted = payload.quote.split('\n').map((line) => `> ${line}`).join('\n');
-            return `Comment on this fragment of \`${payload.fileLabel}\`${location}:\n${quoted}${payload.text ? `\n\n${payload.text}` : ''}`;
+            return `The user selected this fragment of \`${payload.fileLabel}\`${location}:\n${quoted}${userWords(payload.text, 'it')}`;
         }
         case 'chat-quote': {
             const quoted = payload.quote.split('\n').map((line) => `> ${line}`).join('\n');
-            return `Comment on this fragment of an earlier message in this conversation:\n${quoted}${payload.text ? `\n\n${payload.text}` : ''}`;
+            return `The user selected this fragment of an earlier message in this conversation:\n${quoted}${userWords(payload.text, 'it')}`;
         }
         case 'pr-check':
             return `Attached failed ${changeRequestCheckSource(payload.provider)} (${payload.label}):\n\`\`\`\n${payload.output}\n\`\`\`${payload.text ? `\n\n${payload.text}` : ''}`;

@@ -48,12 +48,12 @@ export interface PluginFile {
 export interface PluginInput {
   spec?: JsonValue | undefined;
   options?: JsonValue | undefined;
-  scope?: JsonValue;
+  scope?: JsonValue | undefined;
 }
 export interface PluginFileInput {
-  fileName?: JsonValue;
-  scope?: JsonValue;
-  content?: string | NodeJS.ArrayBufferView | null;
+  fileName?: JsonValue | undefined;
+  scope?: JsonValue | undefined;
+  content?: unknown;
 }
 interface ConfigSource {
   config: OpenCodeConfigLayer;
@@ -507,7 +507,14 @@ function writePluginDirFile(file: PluginFileInput | null | undefined, workingDir
     throw codedError(`Plugin file "${fileName}" already exists`, 'FILE_EXISTS');
   }
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(absolutePath, file?.content ?? '', 'utf8');
+  const content = file?.content ?? '';
+  if (isString(content)) {
+    fs.writeFileSync(absolutePath, content, 'utf8');
+  } else if (ArrayBuffer.isView(content)) {
+    fs.writeFileSync(absolutePath, new Uint8Array(content.buffer, content.byteOffset, content.byteLength));
+  } else {
+    throw new TypeError('Plugin file content must be text or bytes');
+  }
 }
 
 function deletePluginDirFile(id: string, workingDirectory?: string | null) {

@@ -100,7 +100,7 @@ interface CommandResult {
   read_from: number;
   total_lines: number;
   exit_code?: number | null | undefined;
-  signal?: number;
+  signal?: number | string;
 }
 interface CallbackResponse extends ServerResponse {
   status(code: number): CallbackResponse;
@@ -183,7 +183,7 @@ export function createCommandToolRuntime({
         read_from: z.number(),
         total_lines: z.number(),
         exit_code: z.number().nullable().optional(),
-        signal: z.number().optional(),
+        signal: z.union([z.number(), z.string()]).optional(),
       })),
     });
     await fs.mkdir(pluginDirectory, { recursive: true });

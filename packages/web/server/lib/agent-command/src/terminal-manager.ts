@@ -23,7 +23,7 @@ interface ProcessStartResult {
 }
 interface CommandProcessState extends ProcessState {
   exitCode?: number | null | undefined;
-  signal?: number | undefined;
+  signal?: number | string | undefined;
 }
 
 type OutputStream = "stdout" | "stderr";
@@ -60,7 +60,7 @@ interface ManagedSession extends TerminalSession {
 interface CompletedSession {
   session: ManagedSession;
   exitCode: number | null;
-  signal?: number | undefined;
+  signal?: number | string | undefined;
   endTime: Date;
 }
 interface OutputSnapshot {
@@ -75,7 +75,7 @@ interface PaginatedOutputResult {
   remaining: number;
   isComplete: boolean;
   exitCode?: number | null | undefined;
-  signal?: number | undefined;
+  signal?: number | string | undefined;
   runtimeMs?: number | undefined;
   evictedLines?: number;
 }
