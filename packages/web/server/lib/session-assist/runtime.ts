@@ -149,12 +149,6 @@ const extractUserMessage = (payload: AssistEvent | null | undefined) => {
   };
 };
 
-/**
- * The recap lives in OpenChamber's own session metadata
- * store: OpenCode 2.x accepts session metadata only when a session is created.
- * `persistSessionAssist(sessionID, directory, assist)` writes it; without that
- * seam the runtime stays inert rather than generating text it cannot save.
- */
 export const createSessionAssistRuntime = ({
   buildOpenCodeUrl,
   getOpenCodeAuthHeaders,
@@ -163,8 +157,6 @@ export const createSessionAssistRuntime = ({
   quietMs = IDLE_QUIET_MS,
   persistSessionAssist = null,
   isSessionArchived = async () => false,
-  // Asked once when a turn ends, before the recap's quiet window is armed.
-  // A null result leaves the decision to the Small Model. See session-work.
   evaluateTurn = null,
   lineage = null,
   onPendingChange = () => {},
@@ -203,7 +195,6 @@ export const createSessionAssistRuntime = ({
     announce(sessionId);
   };
 
-  // A new turn retires the stored recap for the preceding turn.
   const retireStored = (sessionId: string, directory: string) => {
     if (!persisted.has(sessionId)) return;
     const storedDirectory = persisted.get(sessionId);
@@ -287,9 +278,6 @@ export const createSessionAssistRuntime = ({
       || (hasCjk(text) && !hasCjk(prompt.language)));
     if (recap && scriptMismatch(recap)) recap = '';
     if (!recap) return;
-    // v2 lists newest first. The answer is followed by its `idle` marker and
-    // possibly a model or agent switch, so read a short tail and compare the
-    // newest content record rather than the newest record.
     const latestPage = await client.message.list({ sessionID: sessionId, limit: TAIL_RECHECK_LIMIT, order: 'desc' }, requestOptions());
     checkCurrent();
     if (newestContentId(latestPage?.data) !== last.id) return;
@@ -342,7 +330,6 @@ export const createSessionAssistRuntime = ({
     announce(sessionId, directory);
   };
 
-  // Only turns eligible for a recap arm the quiet window.
   const onTurnEnd = (sessionId: string, directory: string) => {
     clearTimer(sessionId);
     const armedAt = Date.now();

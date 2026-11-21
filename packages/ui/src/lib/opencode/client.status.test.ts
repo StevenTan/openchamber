@@ -18,10 +18,7 @@ describe("v2 status and cancellation HTTP boundary", () => {
   // only source that reaches the index pre-parsed, so a strip here silently
   // turns a savable request into an unsavable one (#4698).
   test("the host status snapshot keeps the save patterns a pending permission carries", async () => {
-    const fetch = spyOn(globalThis, "fetch").mockImplementation(async (input) => {
-      const url = new URL(input instanceof Request ? input.url : input.toString())
-      if (url.pathname === '/api/agent-backends/sessions') return Response.json({ sessions: [], statuses: {}, forms: [] })
-      return Response.json({
+    const fetch = spyOn(globalThis, "fetch").mockImplementation(async () => Response.json({
       serverTime: 1_700_000_000_000,
       sessions: { s1: { status: "busy", lastUpdateAt: 1_700_000_000_000 } },
       pending: {
@@ -33,8 +30,7 @@ describe("v2 status and cancellation HTTP boundary", () => {
           forms: [],
         },
       },
-      })
-    })
+    }))
     try {
       const snapshot = await opencodeClient.getHostSessionStatusSnapshot()
       const permissions = snapshot?.pending?.s1?.permissions ?? []
@@ -52,7 +48,6 @@ describe("v2 status and cancellation HTTP boundary", () => {
     const requests: Array<{ path: string; directory: string | null }> = []
     const fetch = spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const url = new URL(input instanceof Request ? input.url : input.toString())
-      if (url.pathname === '/api/agent-backends/sessions') return Response.json({ sessions: [], statuses: {}, forms: [] })
       const headers = new Headers(input instanceof Request ? input.headers : init?.headers)
       requests.push({ path: url.pathname, directory: headers.get("x-opencode-directory") })
       return Response.json({ data: [] })
@@ -141,10 +136,7 @@ describe("v2 status and cancellation HTTP boundary", () => {
         fetch.mockImplementation(async () => Response.json({ data: body }))
         expect(await opencodeClient.getActiveSessionStatuses()).toBeNull()
       }
-      fetch.mockImplementation(async (input) => {
-        const url = new URL(input instanceof Request ? input.url : input.toString())
-        return Response.json(url.pathname === '/api/agent-backends/sessions' ? { sessions: [], statuses: {}, forms: [] } : { data: {} })
-      })
+      fetch.mockImplementation(async () => Response.json({ data: {} }))
       expect(await opencodeClient.getActiveSessionStatuses()).toEqual({})
     } finally {
       fetch.mockRestore()
@@ -155,9 +147,7 @@ describe("v2 status and cancellation HTTP boundary", () => {
     const requests: URL[] = []
     const status = { session: { type: "running" } }
     const fetch = spyOn(globalThis, "fetch").mockImplementation(async (input) => {
-      const url = new URL(input instanceof Request ? input.url : input.toString())
-      if (url.pathname === '/api/agent-backends/sessions') return Response.json({ sessions: [], statuses: {}, forms: [] })
-      requests.push(url)
+      requests.push(new URL(input instanceof Request ? input.url : input.toString()))
       return Response.json({ data: status })
     })
     try {

@@ -1,7 +1,7 @@
 export type OpenCodeCompatibility = {
   state: 'unavailable' | 'compatible' | 'incompatible';
   version: string | null;
-  installation: 'managed' | 'external' | 'bundled';
+  installation: 'managed' | 'external';
   binary: string | null;
   minimumVersion: string;
   canInstall: boolean;

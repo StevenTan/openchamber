@@ -5,12 +5,9 @@
 #
 # Recipe parity with the AppImage build:
 #   1. build:web-assets    -> done by openchamberCore (packages/web build)
-#   2. prepare:opencode-server -> replaced by opencodeCli on the launcher's
-#                             PATH: the OpenCode CLI built from upstream's
-#                             flake at the pinned tag (see runtimePath)
-#   3. bundle:main         -> bun ./scripts/bundle-main.mjs
-#   4. rebuild:native      -> node-pty rebuilt against the Electron headers
-#   5. electron-builder    -> replaced by a plain Electron tree at
+#   2. bundle:main         -> bun ./scripts/bundle-main.mjs
+#   3. rebuild:native      -> node-pty rebuilt against the Electron headers
+#   4. electron-builder    -> replaced by a plain Electron tree at
 #                             $out/share/openchamber (resources/app instead
 #                             of app.asar); the renamed executable is what
 #                             makes Electron treat it as a packaged app.
@@ -51,8 +48,7 @@
 }:
 
 let
-  # The release desktop bundles OpenCode's server (packages/electron/opencode-server);
-  # this build ships none, so the backend runs the CLI built from the pinned
+  # The backend runs the CLI built from the pinned
   # upstream tag: from PATH through the launcher, and on macOS also through
   # LSEnvironment in Info.plist for Finder launches (see installPhase).
   # nixpkgs' own opencode is a different major and stays out.

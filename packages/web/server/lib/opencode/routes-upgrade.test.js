@@ -20,11 +20,7 @@ const createApp = (overrides = {}) => {
   const app = express();
   app.use(express.json());
   const dependencies = {
-    getOpenCodeUpgradeCapability: () => ({
-      supported: false,
-      manager: 'openchamber',
-      reason: 'bundled',
-    }),
+    getOpenCodeUpgradeCapability: () => supportedCapability,
     buildOpenCodeUrl: (pathname) => `http://127.0.0.1:4096${pathname}`,
     getOpenCodeAuthHeaders: () => ({}),
     upgradeOpenCodeCli: vi.fn(async () => {}),
@@ -75,46 +71,6 @@ describe('OpenCode upgrade routes', () => {
     }
   });
 
-  it('fails closed without contacting the bundled OpenCode updater', async () => {
-    globalThis.fetch = vi.fn();
-    const { app } = createApp();
-
-    await request(app)
-      .post('/api/opencode/upgrade')
-      .send({})
-      .expect(409, {
-        success: false,
-        code: 'OPENCODE_UPGRADE_MANAGED_BY_OPENCHAMBER',
-        error: 'OpenCode is bundled with OpenChamber Desktop and updates with the app.',
-      });
-
-    expect(globalThis.fetch).not.toHaveBeenCalled();
-  });
-
-  it('never announces a newer version for a bundled binary: it updates with the desktop app', async () => {
-    globalThis.fetch = vi.fn(async (url) => {
-      if (String(url).includes('registry.npmjs.org')) return jsonResponse({ version: '2.0.3' });
-      if (String(url).includes('api.github.com')) return jsonResponse({ tag_name: 'v2.0.3' });
-      return jsonResponse({ version: '1.18.8', pid: 1, urls: [], paths: { tmp: '/tmp' } });
-    });
-    const { app } = createApp();
-
-    const response = await request(app)
-      .get('/api/opencode/upgrade-status')
-      .expect(200);
-
-    expect(response.body).toEqual({
-      available: false,
-      currentVersion: '1.18.8',
-      latestVersion: '2.0.3',
-      upgrade: {
-        supported: false,
-        manager: 'openchamber',
-        reason: 'bundled',
-      },
-    });
-  });
-
   it('runs the managed CLI and leaves restart to the existing Reload action', async () => {
     globalThis.fetch = vi.fn();
     const { app, dependencies } = createApp({ getOpenCodeUpgradeCapability: () => supportedCapability });
@@ -159,8 +115,8 @@ describe('OpenCode upgrade routes', () => {
 });
 
 describe('OpenCode v1 migration routes', () => {
-  it('rejects external, bundled and unsupported runtimes before running an installer', async () => {
-    for (const installation of ['external', 'bundled', 'managed']) {
+  it('rejects external and unsupported runtimes before running an installer', async () => {
+    for (const installation of ['external', 'managed']) {
       const installOpenCodeV2 = vi.fn();
       const { app } = createApp({
         getOpenCodeCompatibility: async () => ({ state: 'incompatible', version: '1.18.30', installation, canInstall: false }),

@@ -738,7 +738,6 @@ export const createSettingsHelpers = (dependencies: SettingsHelpersDependencies)
         result[key] = value;
       }
     }
-    // Family names for the "custom" font choice; empty clears them.
     for (const key of ['customUiFont', 'customMonoFont', 'customChatFont'] as const) {
       const value = candidate[key];
       if (isString(value)) {

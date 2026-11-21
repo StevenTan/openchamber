@@ -94,10 +94,7 @@ async function spawnPipedCommand(
   let drainTimer: ReturnType<typeof setTimeout> | undefined;
   const closed = new Promise<{ exitCode: number | null; signal?: number | undefined }>((resolve) => {
     child.once("exit", () => {
-      // The command owns its process group, including shell background jobs.
       if (process.platform !== "win32") kill("SIGKILL");
-      // Descendants can inherit the pipes after the command exits. Drain queued
-      // output briefly without holding its completion open for those descendants.
       drainTimer = setTimeout(() => {
         child.stdout.destroy();
         child.stderr.destroy();
@@ -140,7 +137,6 @@ async function spawnPipedCommand(
     kill,
   };
   const pendingInput = new Set<(error: Error) => void>();
-  // Stream failures reject pending writes; callbacks may have already reported the same failure.
   child.stdin.on("error", error => {
     for (const failed of pendingInput) failed(error);
   });

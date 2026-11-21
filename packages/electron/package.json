@@ -15,13 +15,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@effect/platform-node": "4.1.0",
     "@electron/rebuild": "^4.2.0",
-    "@opencode/plugin": "2.3.0",
-    "@opencode/schema": "2.3.0",
-    "@opencode/server": "2.3.0",
-    "@opencode/util": "2.3.0",
-    "effect": "4.1.0",
     "electron": "^45.0.0",
     "electron-builder": "^26.0.0",
     "node-abi": "^4.40.0"
@@ -31,7 +25,7 @@
   ],
   "desktopPrerequisites": [
     "Electron runtime dependencies installed via bun install",
-    "Bun available for bundling the OpenCode server",
+    "Bun available for bundling the Electron main process",
     "macOS: Xcode + build tools for notarized packaging",
     "Windows: NSIS installed for installer creation",
     "Linux: native x64 or arm64 host (no cross-arch packaging); FUSE/libfuse2 to run AppImages, or APPIMAGE_EXTRACT_AND_RUN=1"
@@ -41,12 +35,8 @@
     "build:web-assets": "node ./scripts/build-web-assets.mjs",
     "build": "bun -e \"process.exit(0)\"",
     "ensure:electron": "node ./scripts/ensure-electron.mjs",
-    "prepare:opencode-server": "bun install --cwd ../../vendor/opencode --frozen-lockfile --filter @opencode/server && bun ./scripts/prepare-opencode-server.mjs",
-    "prepare:antigravity": "node ./scripts/prepare-antigravity.mjs",
     "prepare:ripgrep": "node ./scripts/prepare-ripgrep.mjs",
     "prepare:workspace-runtime": "node ./scripts/prepare-workspace-runtime.mjs",
-    "verify:opencode-server": "node ./scripts/verify-opencode-server.mjs --staged",
-    "verify:opencode-server:packaged": "node ./scripts/verify-opencode-server.mjs --packaged",
     "verify:linux-appimage": "node ./scripts/verify-linux-appimage.mjs",
     "bundle:main": "bun ./scripts/bundle-main.mjs",
     "generate:macos-icon": "node ./scripts/generate-macos-icon-assets.cjs",
@@ -57,7 +47,7 @@
     "test:linux-desktop": "node --test ./linux-autostart.test.mjs ./linux-desktop-entry.test.mjs && node ./scripts/smoke-linux-app-discovery.mjs && node ./scripts/smoke-path-open-utils.mjs",
     "updater:e2e:fixture": "node ./scripts/updater-e2e-fixture.mjs",
     "verify:update-manifest": "node ./scripts/verify-update-manifest.mjs",
-    "package": "bun run build:web-assets && bun run prepare:opencode-server && bun run prepare:antigravity && bun run prepare:ripgrep && bun run prepare:workspace-runtime && bun run bundle:main && bun run rebuild:native && node ./scripts/package.mjs",
+    "package": "bun run build:web-assets && bun run prepare:ripgrep && bun run prepare:workspace-runtime && bun run bundle:main && bun run rebuild:native && node ./scripts/package.mjs",
     "finalize:latest-yml": "node ./scripts/finalize-latest-yml.mjs",
     "type-check": "node --check ./entry.mjs && node --check ./early-startup.mjs && node --check ./main.mjs && node --check ./preload.mjs && node --check ./browser-panel-preload.cjs",
     "lint": "node -e \"process.exit(0)\""
@@ -116,14 +106,6 @@
       {
         "from": "resources/icons/tray",
         "to": "icons/tray"
-      },
-      {
-        "from": "resources/opencode-server",
-        "to": "opencode-server"
-      },
-      {
-        "from": "resources/antigravity",
-        "to": "antigravity"
       },
       {
         "from": "resources/ripgrep",

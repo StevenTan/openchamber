@@ -4,7 +4,6 @@ import { markDefiniteTransportFailure } from "@/lib/relay/transport-error"
 import { captureRuntimeInstance } from "@/lib/runtime-switch"
 import { selectCatalogLoadedForDirectory, selectConfigAgentsForDirectory, useConfigStore } from "@/stores/useConfigStore"
 import { getAllSyncSessions, getDirectoryState } from "./sync-refs"
-import { isAcpSession } from '@/lib/agent-backends/model'
 
 type ResolvedSendSelection = {
   model?: ModelRef
@@ -16,7 +15,6 @@ export async function resolveSendSelection(
   directory: string | undefined,
   desired: { providerID: string; modelID: string; variant?: string | null; agent?: string },
 ): Promise<ResolvedSendSelection> {
-  if (isAcpSession(sessionId)) return {};
   const model = toModelRef({ providerID: desired.providerID, id: desired.modelID, variant: desired.variant })
   const isCurrentRuntime = captureRuntimeInstance()
   let serverSession: Session
@@ -47,7 +45,6 @@ export async function resolveCheckedSendSelection(
   directory: string | undefined,
   desired: { providerID: string; modelID: string; variant?: string | null; agent?: string },
 ): Promise<ResolvedSendSelection> {
-  if (isAcpSession(sessionId)) return {};
   const selection = await resolveSendSelection(sessionId, directory, desired)
   if (selection.agent || !desired.agent || !directory) return selection
   const config = useConfigStore.getState()

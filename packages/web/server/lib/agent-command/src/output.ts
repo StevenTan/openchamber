@@ -12,7 +12,6 @@ export function truncateOutput(text: string, maxTokens: number) {
   const rightBudget = maxBytes - leftBudget;
   let prefixEnd = leftBudget;
   let suffixStart = bytes.length - rightBudget;
-  // Keep both cuts on complete UTF-8 characters.
   while ((bytes.readUInt8(prefixEnd) & 0xc0) === 0x80) prefixEnd--;
   while (suffixStart < bytes.length && (bytes.readUInt8(suffixStart) & 0xc0) === 0x80)
     suffixStart++;

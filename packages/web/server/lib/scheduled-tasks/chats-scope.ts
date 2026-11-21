@@ -3,16 +3,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createProjectIdFromPath } from '../projects/project-id.js';
 
-// The id the UI already uses for the chats list (CHAT_DRAFT_PROJECT_ID). It is
-// not a valid file name on Windows, so tasks are stored under the scope's
-// path id instead and this id only exists at the API edge.
 export const CHATS_SCOPE_PUBLIC_ID = 'openchamber:chats';
 
-/**
- * Chats have no project checkout: every chat owns a fresh directory under the
- * managed chats root. A scheduled task in the chats scope therefore stores its
- * definition under a stable path id and opens a new chat directory for each run.
- */
 export const createChatsScope = (chatsRoot: string, { legacyRoot }: { legacyRoot?: string } = {}) => {
   const root = path.resolve(chatsRoot);
   const id = createProjectIdFromPath(legacyRoot || root);

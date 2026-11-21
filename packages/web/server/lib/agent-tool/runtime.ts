@@ -219,16 +219,7 @@ const AGENT_TOOL_ACTION_TITLES = Object.fromEntries(
   ].map(({ action, title }) => [action, title]),
 );
 
-/**
- * Each tool carries only the inputs its own actions take.
- *
- * A shared parameter object would leave a disabled capability's inputs visible
- * in the other tool's schema, which is both misleading and paid for in context
- * on every call.
- */
 const WEB_PARAMETER_NAMES = ['url', 'selector', 'text', 'value', 'submit', 'direction', 'viewport', 'label', 'tabId'];
-// `title` is shared with the control tool, so it is not listed here — only the
-// names memory alone introduces are kept out of the other schemas.
 const MEMORY_ONLY_PARAMETER_NAMES = ['body', 'scope', 'memoryId', 'type'];
 const MEMORY_PARAMETER_NAMES = [...MEMORY_ONLY_PARAMETER_NAMES, 'title'];
 const SCHEDULE_ONLY_PARAMETER_NAMES = ['taskId', 'name', 'targetSessionId', 'daily', 'weekly', 'once', 'time', 'cron', 'timezone', 'disabled', 'runInWorktree', 'baseBranch', 'cleanupWorktree'];

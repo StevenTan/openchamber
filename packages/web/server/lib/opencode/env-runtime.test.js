@@ -9,8 +9,6 @@ const originalComSpec = process.env.ComSpec;
 const originalPath = process.env.PATH;
 const originalLocalAppData = process.env.LOCALAPPDATA;
 const originalSystemRoot = process.env.SystemRoot;
-const originalBundledOpencodeServerDir = process.env.OPENCHAMBER_BUNDLED_OPENCODE_SERVER_DIR;
-const originalResourcesPath = process.resourcesPath;
 const originalWslBinary = process.env.WSL_BINARY;
 const originalOpenChamberWslBinary = process.env.OPENCHAMBER_WSL_BINARY;
 const originalPlatform = process.platform;
@@ -71,16 +69,6 @@ afterEach(() => {
     delete process.env.LOCALAPPDATA;
   }
 
-  if (typeof originalBundledOpencodeServerDir === 'string') {
-    process.env.OPENCHAMBER_BUNDLED_OPENCODE_SERVER_DIR = originalBundledOpencodeServerDir;
-  } else {
-    delete process.env.OPENCHAMBER_BUNDLED_OPENCODE_SERVER_DIR;
-  }
-
-  Object.defineProperty(process, 'resourcesPath', {
-    configurable: true,
-    value: originalResourcesPath,
-  });
 
   if (typeof originalWslBinary === 'string') {
     process.env.WSL_BINARY = originalWslBinary;
@@ -125,17 +113,6 @@ const createRuntime = (settings, options = {}) => {
   return { runtime, state };
 };
 
-// The desktop's bundled OpenCode: the server script staged under Electron's resources folder.
-const createBundledServer = () => {
-  const resourcesPath = createTempDir('openchamber-resources-');
-  const directory = path.join(resourcesPath, 'opencode-server');
-  fs.mkdirSync(directory);
-  const entry = path.join(directory, 'serve.mjs');
-  fs.writeFileSync(entry, '');
-  Object.defineProperty(process, 'resourcesPath', { configurable: true, value: resourcesPath });
-  return entry;
-};
-
 const createExecutable = (prefix) => {
   const directory = createTempDir(prefix);
   const binary = path.join(directory, process.platform === 'win32' ? 'opencode.exe' : 'opencode');
@@ -144,49 +121,9 @@ const createExecutable = (prefix) => {
 };
 
 describe('OpenCode env runtime', () => {
-  it.each(['linux', 'darwin', 'win32'])('keeps the bundled server off PATH and OPENCODE_BINARY across relaunch on %s', (platform) => {
-    setPlatform(platform);
+  it.each(['env', 'settings'])('uses an explicit desktop %s selection', async (source) => {
     process.env.OPENCHAMBER_RUNTIME = 'desktop';
     delete process.env.OPENCODE_BINARY;
-    delete process.env.OPENCHAMBER_BUNDLED_OPENCODE_SERVER_DIR;
-    const pathBefore = process.env.PATH;
-
-    const oldEntry = createBundledServer();
-    const oldRuntime = createRuntime({});
-    expect(oldRuntime.runtime.ensureOpencodeCliEnv()).toBe(oldEntry);
-    expect(oldRuntime.runtime.ensureOpencodeCliEnv()).toBe(oldEntry);
-    expect(oldRuntime.state.resolvedOpencodeBinarySource).toBe('bundled');
-    expect(process.env.OPENCODE_BINARY).toBeUndefined();
-    expect(process.env.PATH).toBe(pathBefore);
-
-    const newEntry = createBundledServer();
-    const newRuntime = createRuntime({});
-    expect(newRuntime.runtime.ensureOpencodeCliEnv()).toBe(newEntry);
-    expect(newRuntime.state.resolvedOpencodeBinarySource).toBe('bundled');
-    expect(newRuntime.runtime.isBundledOpenCodePath(newEntry)).toBe(true);
-    expect(process.env.OPENCODE_BINARY).toBeUndefined();
-    expect(process.env.PATH).toBe(pathBefore);
-  });
-
-  it('runs the bundled server on the host runtime and leaves other binaries unwrapped', () => {
-    setPlatform('linux');
-    const entry = createBundledServer();
-    const { runtime } = createRuntime({});
-    expect(runtime.resolveManagedOpenCodeLaunchSpec(entry)).toEqual({
-      binary: process.versions.bun ? expect.any(String) : process.execPath,
-      args: [entry],
-      env: {},
-      wrapperType: 'bundled-server',
-    });
-    const binary = createExecutable('openchamber-plain-opencode-');
-    expect(runtime.resolveManagedOpenCodeLaunchSpec(binary)).toEqual({ binary, args: [], wrapperType: null });
-  });
-
-  it.each(['env', 'settings'])('keeps an explicit desktop %s selection ahead of the bundled server', async (source) => {
-    process.env.OPENCHAMBER_RUNTIME = 'desktop';
-    delete process.env.OPENCODE_BINARY;
-    delete process.env.OPENCHAMBER_BUNDLED_OPENCODE_SERVER_DIR;
-    createBundledServer();
     const binary = createExecutable('openchamber-explicit-opencode-');
     if (source === 'env') process.env.OPENCODE_BINARY = binary;
     const { runtime, state } = createRuntime(source === 'settings' ? { opencodeBinary: binary } : {});
@@ -196,12 +133,10 @@ describe('OpenCode env runtime', () => {
     expect(process.env.OPENCODE_BINARY).toBe(binary);
   });
 
-  it('preserves automatic PATH binary export for desktop without a bundled server', () => {
+  it('exports the PATH binary for desktop', () => {
     process.env.OPENCHAMBER_RUNTIME = 'desktop';
     delete process.env.OPENCODE_BINARY;
-    delete process.env.OPENCHAMBER_BUNDLED_OPENCODE_SERVER_DIR;
     const binary = createExecutable('openchamber-path-opencode-');
-    Object.defineProperty(process, 'resourcesPath', { configurable: true, value: undefined });
     process.env.PATH = path.dirname(binary);
     const { runtime, state } = createRuntime({});
     expect(runtime.ensureOpencodeCliEnv()).toBe(binary);
@@ -312,22 +247,6 @@ describe('OpenCode env runtime', () => {
     }
   });
 
-  it.each([
-    '/Applications/OpenChamber.app/Contents/Resources/opencode-cli/opencode',
-    'C:\\Program Files\\OpenChamber\\resources\\opencode-cli\\opencode.exe',
-    '/opt/OpenChamber/resources/opencode-cli/',
-    '"/Applications/OpenChamber Canary.app/Contents/Resources/opencode-cli/opencode"',
-  ])('treats a saved path to the CLI older desktop builds shipped as no setting: %s', async (retired) => {
-    const { runtime, state } = createRuntime({ opencodeBinary: retired });
-    await expect(runtime.applyOpencodeBinaryFromSettings({ strict: true })).resolves.toBeNull();
-    expect(state.resolvedOpencodeBinarySource).toBeNull();
-  });
-
-  it('still reports a missing CLI under a folder that only resembles the old desktop layout', async () => {
-    const { runtime } = createRuntime({ opencodeBinary: '/srv/tools/resources/opencode-cli/opencode' });
-    await expect(runtime.applyOpencodeBinaryFromSettings({ strict: true })).rejects.toMatchObject({ code: 'OPENCODE_BINARY_INVALID' });
-  });
-
   it('throws a specific error for a missing configured OpenCode binary in strict mode', async () => {
     const { runtime } = createRuntime({ opencodeBinary: '/missing/opencode' });
 
@@ -401,8 +320,7 @@ describe('OpenCode env runtime', () => {
       return binary;
     };
 
-    it('wins over the user setting, the environment and the bundled server', async () => {
-      createBundledServer();
+    it('wins over the user setting and environment', async () => {
       process.env.OPENCODE_BINARY = createCli('openchamber-env-opencode-');
       const pinned = createCli('openchamber-pinned-opencode-');
       const { runtime, state } = createRuntime(
@@ -423,7 +341,6 @@ describe('OpenCode env runtime', () => {
     });
 
     it('refuses to start and never falls back when the pinned path is unusable', async () => {
-      createBundledServer();
       const { runtime, state } = createRuntime({ opencodeBinary: createCli('openchamber-settings-opencode-') }, { readPinnedOpencodeBinary: () => '/missing/opencode' });
 
       await expect(runtime.applyOpencodeBinaryFromSettings({ strict: true })).rejects.toMatchObject({
@@ -446,57 +363,6 @@ describe('OpenCode env runtime', () => {
       await expect(runtime.applyOpencodeBinaryFromSettings({ strict: true })).resolves.toBe(fromSettings);
       expect(state.resolvedOpencodeBinarySource).toBe('settings');
     });
-  });
-
-  it('prefers the bundled server over a user-installed OpenCode from PATH', () => {
-    const bundledDir = createTempDir('openchamber-bundled-opencode-');
-    const bundledEntry = path.join(bundledDir, 'serve.mjs');
-    fs.writeFileSync(bundledEntry, '');
-    process.env.OPENCHAMBER_BUNDLED_OPENCODE_SERVER_DIR = bundledDir;
-    process.env.PATH = path.dirname(createExecutable('openchamber-path-opencode-'));
-    delete process.env.OPENCODE_BINARY;
-    const { runtime, state } = createRuntime({});
-
-    expect(runtime.resolveOpencodeCliPath()).toBe(bundledEntry);
-    expect(state.resolvedOpencodeBinarySource).toBe('bundled');
-  });
-
-  it('recognizes the bundled server by canonical path', () => {
-    const bundledDir = createTempDir('openchamber-bundled-opencode-');
-    const bundledEntry = path.join(bundledDir, 'serve.mjs');
-    fs.writeFileSync(bundledEntry, '');
-    process.env.OPENCHAMBER_BUNDLED_OPENCODE_SERVER_DIR = bundledDir;
-    const { runtime } = createRuntime({});
-
-    expect(runtime.isBundledOpenCodePath(bundledEntry)).toBe(true);
-    expect(runtime.isBundledOpenCodePath(path.join(bundledDir, 'other'))).toBe(false);
-  });
-
-  it('keeps explicit OpenCode binary ahead of the bundled server', () => {
-    const bundledDir = createTempDir('openchamber-bundled-opencode-');
-    fs.writeFileSync(path.join(bundledDir, 'serve.mjs'), '');
-    const explicitBinary = createExecutable('openchamber-explicit-opencode-');
-    process.env.OPENCHAMBER_BUNDLED_OPENCODE_SERVER_DIR = bundledDir;
-    process.env.OPENCODE_BINARY = explicitBinary;
-    const { runtime, state } = createRuntime({});
-
-    expect(runtime.resolveOpencodeCliPath()).toBe(explicitBinary);
-    expect(state.resolvedOpencodeBinarySource).toBe('env');
-  });
-
-  it('resolves the bundled OpenCode server from Electron resourcesPath', () => {
-    const bundledEntry = createBundledServer();
-    process.env.PATH = createTempDir('openchamber-empty-path-');
-    delete process.env.OPENCHAMBER_BUNDLED_OPENCODE_SERVER_DIR;
-    delete process.env.OPENCODE_BINARY;
-    const emptyHome = createTempDir('openchamber-empty-home-');
-    const { runtime, state } = createRuntime({}, {
-      spawnSync: () => ({ status: 1, stdout: '', stderr: '' }),
-      homedir: () => emptyHome,
-    });
-
-    expect(runtime.resolveOpencodeCliPath()).toBe(bundledEntry);
-    expect(state.resolvedOpencodeBinarySource).toBe('bundled');
   });
 
   itIf(process.platform === 'darwin')('rejects known macOS OpenCode app bundle executable paths', async () => {

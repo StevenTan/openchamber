@@ -83,7 +83,6 @@ export async function registerSelectedSearch(ctx: SearchSelectionContext, provid
   const report = console.error.bind(console, "[agent-search] search selection updates failed:");
   let observer: Promise<void> | undefined;
   await ctx.session.hook("prompt", async () => {
-    // Configuration transforms are registered before prompt admission.
     observer ??= ctx.websearch.transform(editor => {
       selection = editor.default.get;
       updateRegistry().catch(report);

@@ -11,9 +11,6 @@ form fields, answers and conditions, and permission effects for shared UI consum
 Tool-name branching belongs in `tools.ts`; unknown plugin and MCP tools retain
 generic rendering.
 
-`session-listing.ts` owns session-list requests, backend list projection and page
-cursors. `projection.ts` translates directory paths for OpenCode requests.
-
 ## Invariants
 
 - `async-question.ts` classifies answered `openchamber-async-question` synthetic

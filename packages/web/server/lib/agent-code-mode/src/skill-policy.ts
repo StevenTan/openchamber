@@ -15,7 +15,6 @@ interface SystemPart {
 
 const virtual = (skill: Skill.Info) => skill.path.startsWith("skill://");
 
-// OpenCode 2.2.7's permission wildcard matching.
 function match(input: string, pattern: string) {
   let escaped = pattern.replaceAll("\\", "/").replace(/[.+^${}()|[\]\\]/g, "\\$&")
     .replace(/\*/g, ".*").replace(/\?/g, ".");
@@ -23,7 +22,6 @@ function match(input: string, pattern: string) {
   return new RegExp(`^${escaped}$`, process.platform === "win32" ? "si" : "s").test(input.replaceAll("\\", "/"));
 }
 
-// OpenCode 2.2.7's skill directory format, using file-backed entries.
 export function filterVirtualSkillGuidance(system: SystemPart[], skills: readonly Skill.Info[], rules: Permission.Ruleset) {
   if (!skills.some(virtual)) return;
   const available = skills.filter(skill => !virtual(skill) && skill.description !== undefined && skill.autoinvoke !== false

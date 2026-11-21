@@ -48,6 +48,24 @@ const FILES = {
     '  return [session, bridge, createWebAPIs];',
     '}',
   ],
+  'packages/web/server/lib/licensed.ts': [
+    '// Copyright (c) 2024-2025 Desktop Commander Contributors.',
+    '// Adapted from Desktop Commander. MIT; see ../LICENSE.',
+    'export const first = 1;',
+    '/* Copyright (c) OpenAI */',
+    'export const second = 2;',
+    '// SPDX-License-Identifier: Apache-2.0',
+    'export const third = 3;',
+    '// Apache-2.0; see ../vendor/codex-LICENSE.',
+    'export const fourth = 4;',
+    '// Adapted from OpenAI Codex.',
+    '// See ../codex-LICENSE and ../UPSTREAM.md.',
+    'export const fifth = 5;',
+    '/** @license MIT */',
+    'export const sixth = 6;',
+    '// An ordinary explanation.',
+    'export const seventh = 7;',
+  ],
   'packages/ui/src/hooks/useThing.ts': [
     "import { useEffect } from 'react';",
     'export function useThing() {',
@@ -231,8 +249,12 @@ test('object valueOf cannot hide an unchecked field shape behind its return type
   assert.deepEqual(linesOf('packages/web/server/lib/type-escape.ts', 'no-valueof-type-escape'), [1, 2]);
 });
 
-test('a comment is allowed only as an external reference, a SAFETY note or a directive', () => {
+test('ordinary explanations remain disallowed alongside external references, SAFETY notes and directives', () => {
   assert.deepEqual(linesOf('packages/ui/src/components/Panel.tsx', 'no-comments'), [5, 6, 7]);
+});
+
+test('license notices and source attribution remain valid comments', () => {
+  assert.deepEqual(linesOf('packages/web/server/lib/licensed.ts', 'no-comments'), [15]);
 });
 
 test('a hook may hold an effect but not a timer', () => {

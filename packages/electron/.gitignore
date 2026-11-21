@@ -9,8 +9,6 @@ dist-bundle/
 resources/web-dist/
 resources/web-dist-staging-*/
 resources/sidecar/
-resources/opencode-server/
-resources/antigravity/
 resources/ripgrep/*
 !resources/ripgrep/.gitkeep
 .cache/

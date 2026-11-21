@@ -44,7 +44,7 @@ type Dependencies = {
     largePasteState: Pick<ReturnType<typeof useComposerLargePasteState>, 'largeTextPasteGesture'>;
     sessionScope: Pick<ReturnType<typeof useComposerSessionScope>, 'clearAbortPrompt' | 'isBtwActive' | 'btwSessionId' | 'currentSessionId' | 'abortCurrentOperation' | 'pickSessionAgent' | 'inputMode'>;
     sessionLifecycle: Pick<ReturnType<typeof useComposerSessionLifecycle>, 'handleOpenMobilePanel'>;
-    selection: Pick<ReturnType<typeof useComposerSelection>, 'currentProviderId' | 'currentModelId' | 'agents' | 'currentAgentName' | 'setAgent' | 'antigravity'>;
+    selection: Pick<ReturnType<typeof useComposerSelection>, 'currentProviderId' | 'currentModelId' | 'agents' | 'currentAgentName' | 'setAgent'>;
     language: Pick<ReturnType<typeof useComposerLanguage>, 'pastedSessionIds' | 'linkPastedSessionId'>;
     referenceDrafts: Pick<ReturnType<typeof useComposerReferenceDrafts>, 'receivedPageBases' | 'updateLinkedReferences'>;
 };
@@ -75,7 +75,7 @@ export function useComposerEditorActions({
         pickSessionAgent, inputMode,
     } = sessionScope;
     const { handleOpenMobilePanel } = sessionLifecycle;
-    const { currentProviderId, currentModelId, agents, currentAgentName, setAgent, antigravity } = selection;
+    const { currentProviderId, currentModelId, agents, currentAgentName, setAgent } = selection;
     const { pastedSessionIds, linkPastedSessionId } = language;
     const { receivedPageBases, updateLinkedReferences } = referenceDrafts;
 
@@ -255,7 +255,7 @@ export function useComposerEditorActions({
         }
         const inputSource: FileMentionAutocompleteInputSource = isPasteInput ? 'paste' : 'manual';
 
-        if (!antigravity && !isBtwActive && inputMode === 'normal' && value.startsWith('!')) {
+        if (!isBtwActive && inputMode === 'normal' && value.startsWith('!')) {
             const shellCommand = value.slice(1);
             const nextCursor = Math.max(0, selection.start - 1);
             setInputMode('shell');
@@ -299,6 +299,6 @@ export function useComposerEditorActions({
         clearDropTextSuppression, scheduleDropTextSuppressionExpiry, handleCycleThinking,
         handleOpenThinkingPanel, handleComposerChange, updateAutocompleteOverlayPosition, handleAbort,
         autocompleteOverlayPosition, dictationHeightHostRef, dictationContentHeight, dictationHeightLimit,
-        useCompactChatPlaceholder, handleDictationContentHeightChange, antigravity,
+        useCompactChatPlaceholder, handleDictationContentHeightChange,
     };
 }

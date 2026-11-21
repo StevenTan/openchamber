@@ -16,7 +16,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '../../..');
 const electronDir = path.join(repoRoot, 'packages/electron');
-const bundledOpenCodeServerDir = path.join(electronDir, 'resources', 'opencode-server');
 const preferredHmrUiPort = Number(process.env.OPENCHAMBER_HMR_UI_PORT || '5173');
 const preferredHmrApiPort = Number(process.env.OPENCHAMBER_HMR_API_PORT || '3901');
 
@@ -52,18 +51,6 @@ function spawnProcess(command, args, options = {}) {
     windowsVerbatimArguments: isWindowsCommandScript,
     ...options,
   });
-}
-
-function resolveBundledOpenCodeServerEnv() {
-  const entry = path.join(bundledOpenCodeServerDir, 'serve.mjs');
-  if (!fs.existsSync(entry)) {
-    console.warn(
-      `[electron:dev] bundled OpenCode server missing at ${entry}; falling back to PATH. ` +
-        'Run `bun run --cwd packages/electron prepare:opencode-server` to stage it.',
-    );
-    return {};
-  }
-  return { OPENCHAMBER_BUNDLED_OPENCODE_SERVER_DIR: bundledOpenCodeServerDir };
 }
 
 function ensureElectronInstalled() {
@@ -225,7 +212,6 @@ async function main() {
   let hmrUiPort = '';
 
   ensureElectronInstalled();
-  const bundledOpenCodeServerEnv = resolveBundledOpenCodeServerEnv();
 
   if (useBundledUi) {
     await runProcess('bun', ['run', '--cwd', 'packages/electron', 'build:web-assets']);
@@ -239,8 +225,6 @@ async function main() {
     cwd: electronDir,
     env: {
       ...process.env,
-      ...bundledOpenCodeServerEnv,
-      OPENCHAMBER_BUNDLED_ANTIGRAVITY_DIR: path.join(electronDir, 'resources', 'antigravity'),
       OPENCHAMBER_ELECTRON_DEV: '1',
       NODE_OPTIONS: `${process.env.NODE_OPTIONS || ''} --conditions=openchamber-source --import=${pathToFileURL(path.join(repoRoot, 'packages/web/scripts/register-server-sources.mjs')).href}`.trim(),
       OPENCHAMBER_ELECTRON_DEV_RELAUNCH_EXIT_CODE: String(relaunchExitCode),
@@ -310,8 +294,6 @@ async function main() {
     devServer = spawnProcess('node', ['./scripts/dev-web-hmr.mjs'], {
       env: withUserEnv({
         ...process.env,
-        ...bundledOpenCodeServerEnv,
-        OPENCHAMBER_BUNDLED_ANTIGRAVITY_DIR: path.join(electronDir, 'resources', 'antigravity'),
         OPENCHAMBER_ELECTRON_DEV: '1',
         OPENCHAMBER_ELECTRON_DEV_DATA_DIR: process.env.OPENCHAMBER_DATA_DIR,
         OPENCHAMBER_HMR_UI_PORT: hmrUiPort,

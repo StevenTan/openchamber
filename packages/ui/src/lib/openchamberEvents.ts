@@ -19,7 +19,6 @@ import { z } from 'zod';
 import { trackedItemRecordsSchema } from './trackedItems/model';
 import type { SyncEvent } from './opencode/events';
 import { classifyStreamPayload } from '@/sync/event-pipeline';
-import { backendEventSchema, type BackendEvent } from './agent-backends/model';
 import { parseEnvelope, getEventProperties } from './control-event-envelope';
 
 type ScheduledTaskRanEvent = {
@@ -222,7 +221,6 @@ const notificationPropertiesSchema = z.object({
 });
 
 type OpenChamberEvent =
-  | { type: 'agent-backend'; directory: string; event: BackendEvent }
   | { type: 'terminal-sessions-changed' }
   | { type: 'notification'; payload: z.infer<typeof notificationPropertiesSchema> }
   | { type: 'event-stream-ready'; connectionId: string | null }
@@ -404,11 +402,6 @@ const resetHeartbeatTimer = () => {
 const guestServiceEventSchema = z.object({ guestId: z.string().min(1), topic: z.string().min(1), data: z.json() });
 
 const dispatchFromEnvelope = (envelope: { type: string; properties: unknown }) => {
-  if (envelope.type === 'openchamber:agent-backend') {
-    const parsed = z.object({ directory: z.string(), event: backendEventSchema }).safeParse(envelope.properties);
-    if (parsed.success) for (const listener of listeners) listener({ type: 'agent-backend', ...parsed.data });
-    return;
-  }
   if (envelope.type === 'openchamber:terminal-sessions-changed') {
     for (const listener of listeners) listener({ type: 'terminal-sessions-changed' });
     return;

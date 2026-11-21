@@ -1,9 +1,5 @@
 import type { OpenCodeClient } from '@opencode/client';
 import { z } from 'zod';
-import type { AcpSessionAdapter } from '../agent-backends/client';
-import { projectBackendSession } from '../agent-backends/model';
-import { isVSCodeRuntime } from '../desktop';
-import { isSpaceDirectory } from '../spaces/space-route';
 import { spaceMarkSchema, type SpaceMark } from '../spaces/spaces-store';
 import { compact, type Session, type Message, type Part } from './model';
 import { projectSession, toOpenCodeDirectory } from './projection';
@@ -40,7 +36,6 @@ export async function readSessionPage(
   client: OpenCodeClient,
   directory: string | undefined,
   options: SessionListOptions,
-  backend: AcpSessionAdapter,
   normalizeError: typeof normalizeOpencodeError,
 ): Promise<SessionPage> {
   let response: Awaited<ReturnType<OpenCodeClient['session']['list']>>;
@@ -57,14 +52,8 @@ export async function readSessionPage(
     throw normalizeError('session.list', error);
   }
   const spaces = options.global ? sessionPageSpacesSchema.safeParse(response).data?.spaces : undefined;
-  const additional = !options.cursor && !isVSCodeRuntime() && !isSpaceDirectory(directory)
-    ? (await backend.snapshot(directory)).sessions
-      .filter(() => options.parentID === undefined || options.parentID === null)
-      .filter(session => !options.search || session.title.toLowerCase().includes(options.search.toLowerCase()))
-      .map(projectBackendSession)
-    : [];
   return {
-    sessions: [...response.data.map(projectSession), ...additional],
+    sessions: response.data.map(projectSession),
     cursor: pageCursor(response.cursor),
     ...(spaces ? { spaces } : {}),
   };

@@ -85,7 +85,6 @@ export const dict: Record<I18nKey, string> = {
   'quota.value.spent': '{spent} 使用済み',
   'mobile.connect.headers.hint': 'このアドレスにのみ適用されます。Authorization はクライアントトークン用に予約されています。',
   'mobile.connect.headers.error': '接続ヘッダーを読み込むか保存することができませんでした。もう一度お試しください。',
-  "opencodeCompatibility.bundled": "OpenCode は OpenChamber に同梱されています。OpenCode v2 を利用するには OpenChamber を更新してください。",
   "opencodeCompatibility.title": "OpenCode v2 が必要です",
   "opencodeCompatibility.outdatedTitle": "OpenCode を更新してください",
   "opencodeCompatibility.outdatedLocal": "OpenCode {version} がインストールされています。このバージョンの OpenChamber には OpenCode {minimum} 以降が必要です。",
@@ -4063,5 +4062,4 @@ export const dict: Record<I18nKey, string> = {
   'chat.promptHistorySearch.hint': "↑ ↓ で閲覧 · Enter で読み込み · Esc で閉じる",
   'helpDialog.item.searchPromptHistory': "プロンプト履歴を検索（チャット入力）",
 
-  'chat.backend.label': "エージェントの実行環境",
 };

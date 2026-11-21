@@ -86,7 +86,6 @@ export const dict = {
   'quota.value.spent': 'تم إنفاق {spent}',
   'mobile.connect.headers.hint': 'تنطبق على هذا العنوان فقط. ترويسة Authorization محجوزة لرمز العميل.',
   'mobile.connect.headers.error': 'تعذرت قراءة ترويسات الاتصال أو حفظها. حاول مرة أخرى.',
-  'opencodeCompatibility.bundled': 'يأتي OpenCode مضمّنًا مع OpenChamber. حدّث OpenChamber للحصول على OpenCode v2.',
   'opencodeCompatibility.title': 'يلزم OpenCode v2',
   'opencodeCompatibility.outdatedTitle': 'تحديث OpenCode',
   'opencodeCompatibility.outdatedLocal': 'الإصدار المثبّت هو OpenCode {version}. يتطلب هذا الإصدار من OpenChamber الإصدار OpenCode {minimum} أو أحدث.',
@@ -4089,7 +4088,5 @@ export const dict = {
   'chat.promptHistorySearch.attachmentsPlural': "{count} مرفقات",
   'chat.promptHistorySearch.hint': "↑ ↓ للتصفح · Enter للتحميل · Esc للإغلاق",
   'helpDialog.item.searchPromptHistory': "البحث في سجل المطالبات (إدخال الدردشة)",
-
-  'chat.backend.label': "محرك الوكيل",
 
 } satisfies Record<keyof typeof englishDict, string>;

@@ -77,7 +77,7 @@ type Dependencies = {
     parallelRun: Pick<ReturnType<typeof useComposerParallelRun>, 'parallel'>;
     sessionLifecycle: Pick<ReturnType<typeof useComposerSessionLifecycle>, 'sessionPhase' | 'autoReviewRunning'>;
     queueState: Pick<ReturnType<typeof useComposerQueueState>, 'messageQueueTarget' | 'takeForSend'>;
-    selection: Pick<ReturnType<typeof useComposerSelection>, 'effectiveBtwSelection' | 'currentProviderId' | 'currentModelId' | 'currentAgentName' | 'currentVariant' | 'mailboxTarget' | 'antigravity'>;
+    selection: Pick<ReturnType<typeof useComposerSelection>, 'effectiveBtwSelection' | 'currentProviderId' | 'currentModelId' | 'currentAgentName' | 'currentVariant' | 'mailboxTarget'>;
     language: Pick<ReturnType<typeof useComposerLanguage>, 'readSessionMentionsBeforeSend' | 'guestCommands' | 'availableSkills' | 'linkedReferences' | 'referenceLinksIn' | 'sessionMentionsIn'>;
     preferences: Pick<ReturnType<typeof useComposerPreferences>, 'isMobile'>;
     expansion: Pick<ReturnType<typeof useComposerExpansion>, 'setExpandedInput'>;
@@ -186,7 +186,7 @@ export function useComposerSubmission({
             return;
         }
 
-        let commandPlan = !selection.antigravity && !queuedOnly && inputSnapshot.hasContent
+        let commandPlan = !queuedOnly && inputSnapshot.hasContent
             ? planLocalSlashCommand(inputSnapshot.message, inputMode, hasDrafts, Boolean(currentSessionId))
             : null;
         if (commandPlan?.kind === 'prompt') {

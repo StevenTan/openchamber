@@ -85,7 +85,6 @@ export const dict: Record<I18nKey, string> = {
   'quota.value.spent': '{spent} 사용',
   'mobile.connect.headers.hint': '이 주소에만 적용됩니다. Authorization은 클라이언트 토큰용으로 예약되어 있습니다.',
   'mobile.connect.headers.error': '연결 헤더를 읽거나 저장할 수 없습니다. 다시 시도하세요.',
-  "opencodeCompatibility.bundled": "OpenCode는 OpenChamber에 포함되어 있습니다. OpenCode v2를 사용하려면 OpenChamber를 업데이트하세요.",
   "opencodeCompatibility.title": "OpenCode v2가 필요합니다",
   "opencodeCompatibility.outdatedTitle": "OpenCode를 업데이트하세요",
   "opencodeCompatibility.outdatedLocal": "OpenCode {version}이 설치되어 있습니다. 이 버전의 OpenChamber에는 OpenCode {minimum} 이상이 필요합니다.",
@@ -4063,5 +4062,4 @@ export const dict: Record<I18nKey, string> = {
   'chat.promptHistorySearch.hint': "↑ ↓ 탐색 · Enter 불러오기 · Esc 닫기",
   'helpDialog.item.searchPromptHistory': "프롬프트 기록 검색(채팅 입력)",
 
-  'chat.backend.label': "에이전트 백엔드",
 };

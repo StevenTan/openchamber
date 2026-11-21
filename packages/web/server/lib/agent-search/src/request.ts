@@ -16,7 +16,6 @@ interface SearchMessage {
   content: Array<{ type: "input_text" | "output_text"; text: string }>;
 }
 
-// OpenAI Codex ext/web-search/src/history.rs and tools/src/response_history.rs.
 export function searchContext(messages: Awaited<ReturnType<SessionApi["context"]>>, messageID: string) {
   const current = messages.find(message => message.id === messageID);
   if (current?.type !== "assistant") throw new Error("Search requires the invoking assistant message.");
@@ -56,7 +55,6 @@ export interface SearchBackend {
   timeout?: number | undefined;
 }
 
-// OpenAI Codex http-client/src/retry_after.rs and codex-client/src/retry.rs.
 function retryDeadline(headers: Headers) {
   const value = headers.get("Retry-After")?.trim();
   if (!value) return undefined;

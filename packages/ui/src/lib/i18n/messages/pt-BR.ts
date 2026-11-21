@@ -85,7 +85,6 @@ export const dict: Record<I18nKey, string> = {
   'quota.value.spent': '{spent} gastos',
   'mobile.connect.headers.hint': 'Aplica-se apenas a este endereço. Authorization é reservado para o token do cliente.',
   'mobile.connect.headers.error': 'Não foi possível ler ou salvar os cabeçalhos da conexão. Tente novamente.',
-  "opencodeCompatibility.bundled": "O OpenCode está incluído no OpenChamber. Atualize o OpenChamber para obter o OpenCode v2.",
   "opencodeCompatibility.title": "OpenCode v2 necessário",
   "opencodeCompatibility.outdatedTitle": "Atualize o OpenCode",
   "opencodeCompatibility.outdatedLocal": "O OpenCode {version} está instalado. Esta versão do OpenChamber requer o OpenCode {minimum} ou mais recente.",
@@ -4064,5 +4063,4 @@ export const dict: Record<I18nKey, string> = {
   'chat.promptHistorySearch.hint': "↑ ↓ para navegar · Enter para carregar · Esc para fechar",
   'helpDialog.item.searchPromptHistory': "Pesquisar histórico de prompts (entrada de chat)",
 
-  'chat.backend.label': "Mecanismo do agente",
 };

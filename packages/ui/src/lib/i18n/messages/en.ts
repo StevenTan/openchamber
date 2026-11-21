@@ -85,7 +85,6 @@ export const dict = {
   'quota.value.spent': '{spent} spent',
   'mobile.connect.headers.hint': 'Applies only to this address. Authorization is reserved for the client token.',
   'mobile.connect.headers.error': 'Could not read or save the connection headers. Try again.',
-  "opencodeCompatibility.bundled": "OpenCode is bundled with OpenChamber. Update OpenChamber to get OpenCode v2.",
   "opencodeCompatibility.title": "OpenCode v2 required",
   "opencodeCompatibility.outdatedTitle": "Update OpenCode",
   "opencodeCompatibility.outdatedLocal": "OpenCode {version} is installed. This version of OpenChamber requires OpenCode {minimum} or newer.",
@@ -4064,7 +4063,6 @@ export const dict = {
   'chat.promptHistorySearch.hint': "↑ ↓ to browse · Enter to load · Esc to close",
   'helpDialog.item.searchPromptHistory': "Search prompt history (chat input)",
 
-  'chat.backend.label': "Agent backend",
 } as const;
 
 export type I18nKey = keyof typeof dict;

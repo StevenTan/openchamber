@@ -106,9 +106,6 @@ export function registerQuotaRoutes(app: Application, { getQuotaProviders, suppo
   app.post('/api/quota/configurations', express.json({ limit: '16kb' }), mutate);
   app.put('/api/quota/configurations/:id', express.json({ limit: '16kb' }), mutate);
   app.delete('/api/quota/configurations/:id', mutate);
-  // The usage providers installed extensions serve right now (id, name, icon,
-  // extension), which the UI draws beside its built-in list. Every client reads
-  // this on each stream connect, so it answers from memory and asks OpenCode nothing.
   app.get('/api/quota/extensions', (_req, res) => {
     res.json({ extensions: listExtensionQuotaProviders() });
   });
@@ -179,7 +176,6 @@ export function registerQuotaRoutes(app: Application, { getQuotaProviders, suppo
       const { fetchQuotaForProvider } = await getQuotaProviders();
       res.json(await fetchQuotaForProvider(providerId));
     } catch (error) {
-      // An extension's answer OpenChamber cannot use (`extension-quota.js`): the UI shows the message as the refresh failure, never an empty result.
       if (error instanceof QuotaRouteError) return res.status(error.status).json({ code: error.code, error: error.message });
       console.error('Failed to fetch quota:', error);
       res.status(500).json({ error: errorMessage(error) || 'Failed to fetch quota' });

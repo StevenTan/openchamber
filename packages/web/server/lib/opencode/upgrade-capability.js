@@ -2,7 +2,6 @@ export const resolveOpenCodeUpgradeCapability = ({
   isExternal,
   hasManagedProcess,
   activeBinary,
-  isBundledBinary,
   pinnedByPolicy = false,
 }) => {
   if (isExternal) {
@@ -26,14 +25,6 @@ export const resolveOpenCodeUpgradeCapability = ({
       supported: false,
       manager: null,
       reason: 'unavailable',
-    };
-  }
-
-  if (isBundledBinary(activeBinary)) {
-    return {
-      supported: false,
-      manager: 'openchamber',
-      reason: 'bundled',
     };
   }
 

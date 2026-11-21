@@ -57,7 +57,6 @@ Actions:
   start-web-dev                    Start web development loop
   mobile-tools                     Mobile build/sync/deploy helper menu
   start-electron-app               Start Electron app in dev mode
-  prepare-opencode-server          Bundle the OpenCode server for Electron
   build-electron-app               Build Electron app artifacts
   start-vscode-extension           Build + launch VS Code extension host
   install-vscode-extension-local   Build, package, and install local VSIX
@@ -212,8 +211,6 @@ function normalizeAction(action = '') {
     'mobile-menu': 'mobile-tools',
     'remote-deploy-web': 'remote-deploy-web',
     'electron-dev': 'start-electron-app',
-    'opencode-server': 'prepare-opencode-server',
-    'electron-opencode-server': 'prepare-opencode-server',
     'electron-build': 'build-electron-app',
     'vscode-dev': 'start-vscode-extension',
     'vscode-install-local': 'install-vscode-extension-local',
@@ -563,16 +560,10 @@ async function chooseOpencodeConfigDir(options, config) {
 
 async function startElectronApp(options, config) {
   const env = devAppEnv(await chooseOpencodeConfigDir(options, config));
-  prepareOpenCodeServer();
   run('bun', ['run', 'electron:dev'], { env });
 }
 
-function prepareOpenCodeServer() {
-  step('Preparing bundled OpenCode server', () => run('bun', ['--filter', '@openchamber/electron', 'prepare:opencode-server']));
-}
-
 function buildElectronApp() {
-  prepareOpenCodeServer();
   run('bun', ['run', 'electron:build'], { env: { CSC_IDENTITY_AUTO_DISCOVERY: 'false' } });
   const distDir = path.join(repoRoot, 'packages/electron/dist');
   if (!existsSync(distDir) || !isMac) return;
@@ -643,7 +634,6 @@ async function chooseAction(config) {
     { value: 'start-web-dev', label: 'Start web dev' },
     { value: 'mobile-tools', label: 'Mobile tools' },
     { value: 'start-electron-app', label: 'Start Electron app' },
-    { value: 'prepare-opencode-server', label: 'Prepare bundled OpenCode server' },
     { value: 'build-electron-app', label: 'Build Electron app' },
     { value: 'start-vscode-extension', label: 'Start VS Code extension' },
     { value: 'install-vscode-extension-local', label: 'Install VS Code extension locally' },
@@ -686,9 +676,6 @@ async function main() {
       break;
     case 'start-electron-app':
       await startElectronApp(options, config);
-      break;
-    case 'prepare-opencode-server':
-      prepareOpenCodeServer();
       break;
     case 'build-electron-app':
       buildElectronApp();

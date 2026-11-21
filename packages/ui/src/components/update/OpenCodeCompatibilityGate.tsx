@@ -67,14 +67,11 @@ export const OpenCodeCompatibilityGate: React.FC<React.PropsWithChildren<{ enabl
 
   if (!enabled || compatibility?.state !== 'incompatible') return <>{children}</>;
   const external = compatibility.installation === 'external';
-  const bundled = compatibility.installation === 'bundled';
   const minimum = compatibility.minimumVersion;
   const outdated = Boolean(minimum && compatibility.version?.startsWith('2.'));
-  const descriptionKey = bundled
-    ? 'opencodeCompatibility.bundled'
-    : outdated
-      ? external ? 'opencodeCompatibility.outdatedExternal' : 'opencodeCompatibility.outdatedLocal'
-      : external ? 'opencodeCompatibility.external' : 'opencodeCompatibility.local';
+  const descriptionKey = outdated
+    ? external ? 'opencodeCompatibility.outdatedExternal' : 'opencodeCompatibility.outdatedLocal'
+    : external ? 'opencodeCompatibility.external' : 'opencodeCompatibility.local';
   return (
     <ScrollableOverlay as="section" outerClassName="h-full min-h-0 bg-background" className="app-region-drag flex items-center justify-center px-6 py-10 text-foreground select-none" aria-labelledby={titleId} disableHorizontal>
       <div className="flex w-full max-w-sm flex-col items-center text-center">
@@ -109,7 +106,7 @@ export const OpenCodeCompatibilityGate: React.FC<React.PropsWithChildren<{ enabl
         </div>
         <a
           className="app-region-no-drag mt-6 inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-          href={bundled ? 'https://github.com/openchamber/openchamber/releases/latest' : 'https://opencode.ai/download'}
+          href="https://opencode.ai/download"
           target="_blank"
           rel="noopener noreferrer"
         >

@@ -3,7 +3,7 @@
 Electron desktop runtime for OpenChamber on macOS, Windows, and Linux.
 
 This custom distribution's desktop update check always reports no update.
-The app and its bundled OpenCode CLI are upgraded by replacing the desktop package.
+OpenCode runs from an installed CLI or a configured external server.
 
 On macOS, managed main windows enable Electron's `scrollBounce`. Chromium owns
 scroll elasticity. The desktop stylesheet contains scrolling at each viewport
@@ -245,9 +245,6 @@ IPC results if its endpoint changes while the read is pending.
 | `scripts/electron-dev.mjs` | Desktop dev launcher with Vite HMR support |
 | `scripts/ensure-electron.mjs` | Verifies the installed Electron binary is complete and repairs it via the postinstall under Bun |
 | `scripts/build-web-assets.mjs` | Builds `packages/web` and stages UI assets into `resources/web-dist` |
-| `opencode-server/` | The OpenCode server the app ships, built from OpenCode's npm packages; see its `DOCUMENTATION.md` |
-| `scripts/prepare-opencode-server.mjs` | Bundles the pinned OpenCode server and stages it, with the target's native files, into `resources/opencode-server` |
-| `scripts/verify-opencode-server.mjs` | Checks the staged (`--staged`) or packaged (`--packaged`) OpenCode server: version, target natives, `--version` |
 | `scripts/windows-executable.mjs` | Reads the CPU architecture of a Windows executable from its PE header |
 | `scripts/bundle-main.mjs` | Bundles Electron main code into `dist-bundle/{entry,main,early-startup}.mjs` for packaging |
 | `scripts/rebuild-native.mjs` | Rebuilds native modules against the Electron runtime |
@@ -328,7 +325,7 @@ bun run lint:electron
 
 `electron:dev:bundled` builds and uses packaged web assets instead of the HMR server. Use it when testing behavior closer to a packaged app.
 
-Both dev variants run the staged OpenCode server from `resources/opencode-server` (the one `prepare:opencode-server` stages and packaged builds ship), not the `opencode` on PATH. `electron-dev.mjs` passes the directory to the backend as `OPENCHAMBER_BUNDLED_OPENCODE_SERVER_DIR`; the HMR backend runs it on the machine's Node. When it is missing, the launcher warns and falls back to PATH.
+Both dev variants use the configured OpenCode CLI or discover it from PATH and standard install locations.
 
 ## Packaging
 
@@ -344,20 +341,17 @@ keeps working without a backend build.
 From the repo root:
 
 ```bash
-git submodule update --init vendor/opencode
 bun run electron:build
 ```
 
 That runs, in order:
 
 1. `build:web-assets` to build the web UI and copy it into `packages/electron/resources/web-dist`.
-2. `prepare:opencode-server` to install the fork's server dependencies and compile `vendor/opencode`, staging the server and the target architecture's native files into `packages/electron/resources/opencode-server`.
-   `prepare:antigravity` stages the pinned official Antigravity CLI binary into `resources/antigravity` for ACP sessions.
-3. `prepare:ripgrep` to download/cache the target architecture's ripgrep and copy it into `packages/electron/resources/ripgrep`.
+2. `prepare:ripgrep` to download/cache the target architecture's ripgrep and copy it into `packages/electron/resources/ripgrep`.
    `prepare:workspace-runtime` packages the target Python PDF runtime in `resources/workspace-runtime-bundle`.
-4. `bundle:main` to create `packages/electron/dist-bundle/{entry,main,early-startup}.mjs`.
-5. `rebuild:native` to rebuild native modules for Electron.
-6. `package.mjs` to run `electron-builder`; its `afterPack` hook stages the compiled macOS icon asset catalog and gives the macOS main executable its own UUID.
+3. `bundle:main` to create `packages/electron/dist-bundle/{entry,main,early-startup}.mjs`.
+4. `rebuild:native` to rebuild native modules for Electron.
+5. `package.mjs` to run `electron-builder`; its `afterPack` hook stages the compiled macOS icon asset catalog and gives the macOS main executable its own UUID.
 
 Build output goes to `packages/electron/dist`.
 
@@ -390,7 +384,7 @@ Making terminals and OpenCode their own responsible process (a private `responsi
 2. `build-installer` puts the signed `OpenChamber.exe` into the same unpacked app and builds the installer from it (`--prepackaged`), with the signed uninstaller in place. The request uses `windows-installer`.
 3. `finalize` regenerates the blockmap and `latest.yml`, which electron-builder computed from the unsigned installer.
 
-Only those executables are ours. Electron's DLLs, `elevate.exe`, the bundled OpenCode server's native files, ripgrep and node-pty's binaries come from upstream projects, and SignPath Foundation's terms forbid signing them with our certificate; they ship unsigned inside the signed installer.
+Only those executables are ours. Electron's DLLs, `elevate.exe`, ripgrep and node-pty's binaries come from upstream projects, and SignPath Foundation's terms forbid signing them with our certificate; they ship unsigned inside the signed installer.
 
 #### Why Windows releases get their own workflow
 
@@ -410,7 +404,7 @@ macOS packaging needs Xcode/build tools for notarized builds and icon asset comp
 
 Windows packaging needs NSIS support through `electron-builder`. If no Windows signing env is set, `package.mjs` disables code signing and builds an unsigned installer. `build.nsis.include` adds `resources/installer.nsh`, which declares the installer and uninstaller DPI-aware; without it Windows scales their windows as a bitmap and they look blurred at a display scale above 100% (#5010). Windows updates use `latest.yml` for x64 and the `latest-arm64.yml` channel for ARM64 so each installation resolves an architecture-matching installer.
 
-Linux packages must be built natively. Set `OPENCHAMBER_TARGET_ARCH=x64` or `OPENCHAMBER_TARGET_ARCH=arm64` when packaging; the build rejects a target that does not match the Linux host. The same target selects the bundled OpenCode server's native files, native Electron rebuild, and Electron Builder architecture. Linux identity is stable across architectures: executable `openchamber`, desktop file `openchamber.desktop`, icon `openchamber`, and `StartupWMClass=openchamber`.
+Linux packages must be built natively. Set `OPENCHAMBER_TARGET_ARCH=x64` or `OPENCHAMBER_TARGET_ARCH=arm64` when packaging; the build rejects a target that does not match the Linux host. The same target selects native Electron rebuild, and Electron Builder architecture. Linux identity is stable across architectures: executable `openchamber`, desktop file `openchamber.desktop`, icon `openchamber`, and `StartupWMClass=openchamber`.
 
 The Linux icon is the 512×512 `resources/icons/app-icon.png`, which the AppImage carries at `usr/share/icons/hicolor/512x512/apps/openchamber.png`. Keep it a PNG of at most 512×512: electron-builder's default AppImage path puts an SVG at `hicolor/scalable/` without the `apps/` directory, and the hicolor theme declares no size above 512, so in both cases launchers cannot resolve `Icon=openchamber` (#4766, #2934).
 
@@ -418,7 +412,7 @@ GNOME 46+ shows a window's icon only through a `.desktop` file that matches its 
 
 The `.deb` and `.rpm` install to `/opt/OpenChamber` and use their own `resources/linux/after-install.tpl` and `after-remove.tpl`: electron-builder's scripts minus the `/usr/bin/openchamber` link, because `openchamber` on `PATH` is the CLI of `@openchamber/web` and the link would replace it. The menu entry starts `/opt/OpenChamber/openchamber`. The package `Maintainer` and `Homepage` come from `linux.maintainer` and `homepage` in `package.json`; `fpm` refuses to build a `.deb` without them.
 
-After packaging, run `bun run --cwd packages/electron verify:linux-appimage`. The verifier extracts the final AppImage and checks its ELF architecture, desktop identity, theme icon and `.DirIcon`, Electron executable, the bundled OpenCode server (pinned version and the architecture of its native files), and all packaged native `.node` modules.
+After packaging, run `bun run --cwd packages/electron verify:linux-appimage`. The verifier extracts the final AppImage and checks its ELF architecture, desktop identity, theme icon and `.DirIcon`, Electron executable, all packaged native `.node` modules.
 
 Running a packaged Linux AppImage requires FUSE (`libfuse.so.2`, typically `libfuse2` / `libfuse2t64` on Debian/Ubuntu). Without FUSE, start with `APPIMAGE_EXTRACT_AND_RUN=1`. Keep the AppImage on a writable path so in-app updates can replace it.
 
@@ -484,19 +478,18 @@ window and works while the main window is hidden or minimized without revealing
 it. The menu can open with cached usage; the renderer pushes a new tray snapshot
 when the fetch lands. No quota timer runs for the tray.
 
-## Bundled OpenCode server
+## OpenCode runtime
 
-Packaged Desktop builds include OpenCode's server at the exact `@opencode/server` version pinned in `devDependencies` of `packages/electron/package.json` (OpenChamber requires OpenCode 2.x), built from OpenCode's npm packages rather than shipped as OpenCode's CLI binary. `prepare:opencode-server` bundles `opencode-server/serve.mjs` with Bun into `resources/opencode-server`, downloads the target platform's native packages (node-pty, the file watcher, FFF and its FFI binding, OpenCode's persistent PTY daemon) from npm at the versions their parent packages name, caches them under `packages/electron/.cache/opencode-server`, and stages their files under `resources/opencode-server/assets` with a `manifest.json`. The target architecture comes from `OPENCHAMBER_TARGET_ARCH` or `ELECTRON_BUILDER_ARCH`, falling back to the build host. `verify:opencode-server` and `verify:opencode-server:packaged` check the version, read the header of every native file (Mach-O, PE or ELF, `scripts/binary-architecture.mjs`) against the target architecture, and run `--version`: on the packaged app's own executable on macOS and Windows when this host can run it, else on Node, which needs no native code for it (the Linux executable loads GTK first, which CI runners need not have). The app runs the server on its own executable with `ELECTRON_RUN_AS_NODE=1`; `opencode-server/DOCUMENTATION.md` has the contract.
+OpenChamber requires an installed OpenCode 2.x CLI or a configured external server.
 
 Managed local Desktop startup prefers OpenCode binaries in this order:
 
 0. `opencodeBinary` in the machine policy file, when an administrator pinned one. It has no fallback: an unusable pin stops startup instead of trying the entries below (see `packages/web/server/lib/enterprise-mode.js`).
 1. `settings.opencodeBinary`.
 2. Environment overrides: `OPENCODE_BINARY`, `OPENCODE_PATH`, `OPENCHAMBER_OPENCODE_PATH`, or `OPENCHAMBER_OPENCODE_BIN`.
-3. The bundled Desktop server in `process.resourcesPath/opencode-server` (`OPENCHAMBER_BUNDLED_OPENCODE_SERVER_DIR` in development). It is a script, so it never goes on PATH or into `OPENCODE_BINARY`: terminals and agent shells keep the user's own `opencode`.
-4. System installs discovered from PATH.
-5. Known npm/Bun/Homebrew/Scoop/Chocolatey and other standard install locations.
-6. Platform discovery through `where opencode` on Windows or a login shell on macOS/Linux.
+3. System installs discovered from PATH.
+4. Known npm/Bun/Homebrew/Scoop/Chocolatey and other standard install locations.
+5. Platform discovery through `where opencode` on Windows or a login shell on macOS/Linux.
 
 Use an explicit override when testing a different OpenCode CLI build or when a user needs to point Desktop at a custom binary. The configured path must point to the standalone CLI, not the OpenCode Desktop app executable.
 

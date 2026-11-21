@@ -617,12 +617,6 @@ export function createMessageQueueRuntime({
     }));
   };
 
-  /**
-   * Captured context travels as synthetic messages in v2 — the composer's
-   * inline `synthetic: true` text parts are gone. One message per entry, an
-   * attached item's metadata riding along, and its reading instructions (a
-   * linked PR) going first.
-   */
   const toContextMessages = (part: QueuedContextPart) => {
     const body = { text: part.text, resume: false };
     if (part.kind !== 'context') return [body];
@@ -647,9 +641,9 @@ export function createMessageQueueRuntime({
   const sendItem = async (sessionId: string, directory: string, item: QueuedItem) => {
     const { providerID, modelID, variant } = item.sendConfig;
     let agent = item.sendConfig.agent;
-    let model = { id: modelID, providerID, ...(variant ? { variant } : {}) };
+    let model: QueueModel = { id: modelID, providerID };
+    if (variant) model.variant = variant;
     let promptFiles = item.attachments.map(toPromptFile);
-    // The goal briefing goes last, right before the message the goal is about.
     const synthetics = [
       ...item.context.flatMap(toContextMessages),
       ...(item.goal ? [{ text: buildGoalIntroText(item.goal.tokenBudget), resume: false }] : []),

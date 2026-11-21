@@ -85,7 +85,6 @@ export const dict = {
   'quota.value.spent': '{spent} dépensés',
   'mobile.connect.headers.hint': 'Valable uniquement pour cette adresse. Authorization est réservé au jeton client.',
   'mobile.connect.headers.error': "Impossible de lire ou d'enregistrer les en-têtes de connexion. Réessayez.",
-  "opencodeCompatibility.bundled": "OpenCode est inclus dans OpenChamber. Mettez OpenChamber à jour pour obtenir OpenCode v2.",
   "opencodeCompatibility.title": "OpenCode v2 requis",
   "opencodeCompatibility.outdatedTitle": "Mettre à jour OpenCode",
   "opencodeCompatibility.outdatedLocal": "OpenCode {version} est installé. Cette version d’OpenChamber nécessite OpenCode {minimum} ou une version plus récente.",
@@ -4063,5 +4062,4 @@ export const dict = {
   'chat.promptHistorySearch.hint': "↑ ↓ pour parcourir · Enter pour charger · Esc pour fermer",
    'helpDialog.item.searchPromptHistory': "Rechercher dans l'historique des prompts (saisie du chat)",
 
-  'chat.backend.label': "Moteur de l’agent",
 } as const;

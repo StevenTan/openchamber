@@ -34,7 +34,7 @@ FAIL composer.send.shift-enter (21.8s)
 
 A fresh stand warms up for about 40 s (Vite's first compile of the chat, Changes and Files) before the first scenario; a full run of about 200 scenarios takes about 25 minutes. With `--keep` the stand runs until Ctrl-C, and `--attach` runs against it in seconds, which is the loop for writing scenarios. Vite serves the checkout's UI source, so a UI edit shows in the next scenario without restarting the stand. The server runs the code it started with: a change under `packages/web/server` needs a new stand.
 
-The stand runs the OpenCode server the desktop app bundles, at the version this checkout pins (`@opencode/server` in `packages/electron/package.json`). It stages it into `packages/electron/resources/opencode-server` on first use, which downloads native packages from npm; without network access the stand stops at once and says so. `OPENCODE_BINARY` overrides it with an OpenCode CLI of that exact version; a separate official npm platform package can be extracted outside the checkout without changing `PATH`. For example, in Windows Command Prompt:
+The stand uses an installed OpenCode CLI from PATH, or the executable selected by `OPENCODE_BINARY`. The CLI must meet `MINIMUM_OPENCODE_VERSION` in `packages/web/server/lib/opencode/compatibility.js`. For example, in Windows Command Prompt:
 
 ```bat
 cd /d C:\Users\openc\projects\openchamber
@@ -189,7 +189,7 @@ The request-control test keeps each streamed `Response` until teardown. An unref
 
 ### Why Windows stops process trees
 
-Windows has no POSIX process groups or group signals. The stand uses `taskkill /PID <owned pid> /T /F` there, and macOS/Linux send signals to identified members, escalating survivors to SIGKILL. Windows uses the installed OpenChamber app's bundled OpenCode when present, resolving its path before redirecting the stand's user directories.
+Windows has no POSIX process groups or group signals. The stand uses `taskkill /PID <owned pid> /T /F` there, and macOS/Linux send signals to identified members, escalating survivors to SIGKILL.
 
 Shutdown drains process log pipes for at most 1 s, then detaches and closes them before flushing the log file. A descendant retaining an inherited pipe must not prevent the runner from finishing cleanup.
 
@@ -273,7 +273,7 @@ Stage and unstage move rows at once, before the index changes. After Unstage all
 
 ### Why an unreachable MCP server's toast is matched by its kind
 
-Connect and Test connection show OpenCode's error for the server as an error toast. Its text comes from the HTTP client of the OpenCode build: the bundled Node server says `fetch failed`, and a CLI build named `ECONNREFUSED`. The scenario counts one error toast per attempt, and the card's Failed status stays the proof of what happened.
+Connect and Test connection show OpenCode's error for the server as an error toast. Its text comes from the HTTP client of the OpenCode build: a Node runtime says `fetch failed`, and a CLI build named `ECONNREFUSED`. The scenario counts one error toast per attempt, and the card's Failed status stays the proof of what happened.
 
 ### Why prompt history waits for its caret
 

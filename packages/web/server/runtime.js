@@ -69,7 +69,6 @@ import { createSettingsNormalizationRuntime } from './lib/settings/settings-norm
 import { createSettingsHelpers, isMessageSearchEnabled } from './lib/settings/settings-helpers.js';
 import { createThemeRuntime } from './lib/appearance/theme-runtime.js';
 import { createFeatureRoutesRuntime } from './lib/server-frame/feature-routes-runtime.js';
-import { createControlEventsRuntime } from './lib/server-frame/control-events-runtime.js';
 import { createPluginSwitchStore } from './lib/opencode/plugin-switches.js';
 import { parseServeCliOptions } from './lib/server-frame/cli-options.js';
 import {
@@ -628,8 +627,11 @@ const broadcastOpenChamberUiEvent = createGlobalUiEventBroadcaster({
   writeSseEvent,
 });
 
-const controlEventsRuntime = createControlEventsRuntime(OPENCHAMBER_DATA_DIR, uiOpenChamberEventClients, writeSseEvent);
-const { broadcastControlSseEvent } = controlEventsRuntime;
+const broadcastControlSseEvent = createGlobalUiEventBroadcaster({
+  sseClients: uiOpenChamberEventClients,
+  wsClients: new Set(),
+  writeSseEvent,
+});
 const broadcastPermissionUiEvent = (payload) => {
   broadcastControlSseEvent(payload);
   broadcastGlobalUiEvent(payload);
@@ -934,7 +936,6 @@ const getLoginShellEnvSnapshot = (...args) => openCodeEnvRuntime.getLoginShellEn
 const ensureOpencodeCliEnv = (...args) => openCodeEnvRuntime.ensureOpencodeCliEnv(...args);
 const applyOpencodeBinaryFromSettings = (...args) => openCodeEnvRuntime.applyOpencodeBinaryFromSettings(...args);
 const resolveOpencodeCliPath = (...args) => openCodeEnvRuntime.resolveOpencodeCliPath(...args);
-const isBundledOpenCodePath = (...args) => openCodeEnvRuntime.isBundledOpenCodePath(...args);
 const isExecutable = (...args) => openCodeEnvRuntime.isExecutable(...args);
 const searchPathFor = (...args) => openCodeEnvRuntime.searchPathFor(...args);
 const resolveGitBinaryForSpawn = (...args) => openCodeEnvRuntime.resolveGitBinaryForSpawn(...args);
@@ -1839,10 +1840,9 @@ const getOpenCodeCompatibility = async () => {
     return describeOpenCodeCompatibility(version, 'external', false);
   }
   const binary = ensureOpencodeCliEnv();
-  const installation = isBundledOpenCodePath(binary) ? 'bundled' : 'managed';
   const version = await readOpenCodeCliVersion(resolveManagedOpenCodeLaunchSpec(binary)).catch(() => null);
   const pinnedByPolicy = Boolean(readEnterprisePolicy().opencodeBinary);
-  return describeOpenCodeCompatibility(version, installation, supportsOpenCodeV2Install() && !pinnedByPolicy, binary || null);
+  return describeOpenCodeCompatibility(version, 'managed', supportsOpenCodeV2Install() && !pinnedByPolicy, binary || null);
 };
 
 const getOpenCodeUpgradeCapability = () => {
@@ -1853,7 +1853,6 @@ const getOpenCodeUpgradeCapability = () => {
     isExternal: isExternalOpenCode,
     hasManagedProcess: Boolean(openCodeProcess),
     activeBinary,
-    isBundledBinary: isBundledOpenCodePath,
     pinnedByPolicy: Boolean(readEnterprisePolicy().opencodeBinary),
   });
 };
@@ -2344,7 +2343,6 @@ const gracefulShutdownRuntime = createGracefulShutdownRuntime({
   getRelayReconcileTimer: () => relayReconcileTimer,
   getSpacesHost: () => spacesHost,
   stopFolderWatches: () => {
-    controlEventsRuntime.stop();
     stopEnterprisePolicyWatch();
     featureRoutesRuntime.stopFolderWatches();
   },
@@ -2866,7 +2864,6 @@ async function main(options = {}) {
       }
     },
   });
-  controlEventsRuntime.registerRoutes(app);
   await featureRoutesRuntime.registerRoutes(app, {
     environmentStore,
     environmentRuntime,

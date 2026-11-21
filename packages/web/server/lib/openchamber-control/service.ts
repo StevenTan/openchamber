@@ -1200,11 +1200,7 @@ export const createOpenChamberControlService = (dependencies: ControlDependencie
       }
     }
 
-    // Page navigation and Playwright waits need time for their own deadlines
-    // and for the browser client to deliver the result.
     const timeoutMs = action === 'browser.open' || action === 'browser.playwright' ? 45_000 : 20_000;
-    // Where the call came from, for a provider that keeps one browser per
-    // project or chat. Filled by the tool plugin, never by the model.
     const context = {
       directory: asNonEmptyString(contextDirectory),
       sessionId: asNonEmptyString(contextSessionId),

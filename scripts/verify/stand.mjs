@@ -11,7 +11,6 @@ import { writeFixtureCommands } from "../perf/shell-command.mjs"
 import { fixtureProviderConfig } from "../perf/fixture-provider.mjs"
 import { REPO_ROOT, startFixture } from "../perf/isolated-server.mjs"
 import { resolveBunExecutable } from "../lib/bun-executable.mjs"
-import { bundledOpenCodeServerEnv, devOpenCodeEnv } from "../lib/bundled-opencode-server.mjs"
 import { prioritizeWindowsProcess } from "./windows-priority.mjs"
 import { createStandProcesses, reapStaleStands } from "./processes.mjs"
 
@@ -56,8 +55,7 @@ const standEnv = (info) => {
     env.APPDATA = join(info.root, "appdata")
     env.LOCALAPPDATA = join(info.root, "localappdata")
   }
-  // A CLI the caller names, else the pinned OpenCode of this checkout, the one the desktop app bundles.
-  Object.assign(env, devOpenCodeEnv(process.env, () => bundledOpenCodeServerEnv(REPO_ROOT)))
+  if (process.env.OPENCODE_BINARY) env.OPENCODE_BINARY = process.env.OPENCODE_BINARY
   return env
 }
 

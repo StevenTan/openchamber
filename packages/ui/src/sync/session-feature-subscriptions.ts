@@ -12,18 +12,12 @@ import { subscribePermissionPolicySync, subscribeSpacePermissionModes } from "./
 import { subscribeControlStreamSync } from "./control-stream-sync"
 import { subscribeSpaceCatalogs } from "./space-catalog-sync"
 import { subscribeSpaceSessionProject } from "./space-session-project"
-import { subscribeOpenchamberEvents } from '@/lib/openchamberEvents'
-import { projectBackendEvent } from '@/lib/agent-backends/model'
 import { applyControlStreamOnlyEvent } from "./sync-control-events"
 import type { ChildStoreManager } from "./child-store"
 import type { EventRoutingIndex } from "./event-routing-index"
 import { handleEvent } from "./sync-event-dispatch"
 
 export function subscribeSessionFeatures(runtimeKey: string, childStores: ChildStoreManager, routingIndex: EventRoutingIndex): () => void {
-  const unsubscribeAgentBackends = subscribeOpenchamberEvents(event => {
-    if (event.type !== 'agent-backend') return;
-    for (const payload of projectBackendEvent(event.event)) handleEvent(event.directory, payload, childStores, routingIndex, runtimeKey);
-  });
   const unsubscribeQueueEvents = subscribeMessageQueueSync(runtimeKey)
   const unsubscribeSessionAdmission = subscribeSessionAdmission()
   const unsubscribeAutoReviewEvents = subscribeAutoReviewSync(runtimeKey)
@@ -46,7 +40,6 @@ export function subscribeSessionFeatures(runtimeKey: string, childStores: ChildS
   const unsubscribeSpaceCatalogs = subscribeSpaceCatalogs(runtimeKey)
   const unsubscribeSpaceSessionProject = subscribeSpaceSessionProject(runtimeKey)
   return () => {
-    unsubscribeAgentBackends()
     unsubscribeQueueEvents()
     unsubscribeSessionAdmission()
     unsubscribeAutoReviewEvents()

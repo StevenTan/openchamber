@@ -85,7 +85,6 @@ export const dict: Record<I18nKey, string> = {
   'quota.value.spent': '已花费 {spent}',
   'mobile.connect.headers.hint': '仅适用于此地址。Authorization 保留用于客户端令牌。',
   'mobile.connect.headers.error': '无法读取或保存连接请求头。请重试。',
-  "opencodeCompatibility.bundled": "OpenCode 随 OpenChamber 一起提供。请更新 OpenChamber 以获取 OpenCode v2。",
   "opencodeCompatibility.title": "需要 OpenCode v2",
   "opencodeCompatibility.outdatedTitle": "请更新 OpenCode",
   "opencodeCompatibility.outdatedLocal": "已安装 OpenCode {version}。此版本的 OpenChamber 需要 OpenCode {minimum} 或更高版本。",
@@ -4063,7 +4062,5 @@ export const dict: Record<I18nKey, string> = {
   'chat.promptHistorySearch.attachmentsPlural': "{count} 个附件",
   'chat.promptHistorySearch.hint': "↑ ↓ 浏览 · Enter 加载 · Esc 关闭",
   'helpDialog.item.searchPromptHistory': "搜索提示历史记录（聊天输入）",
-
-  'chat.backend.label': "智能体后端",
 
 };

@@ -103,7 +103,7 @@ type Dependencies = {
     editorHandlers: Pick<ReturnType<typeof useComposerEditorHandlers>, 'handleEditorChange' | 'handleEditorKeyDown' | 'handleEditorKeyUp' | 'handleEditorSelectionChange' | 'handleEditorBlur'>;
     paste: Pick<ReturnType<typeof useComposerPaste>, 'handlePaste'>;
     dictation: Pick<ReturnType<typeof useComposerDictation>, 'handleDictationInsert' | 'handleDictationInsertAndSend' | 'markDictationStart'>;
-    selection: Pick<ReturnType<typeof useComposerSelection>, 'effectiveBtwSelection' | 'btwModelSelectorOpen' | 'setBtwModelSelectorOpen' | 'pinnedComposerSelection' | 'antigravity'>;
+    selection: Pick<ReturnType<typeof useComposerSelection>, 'effectiveBtwSelection' | 'btwModelSelectorOpen' | 'setBtwModelSelectorOpen' | 'pinnedComposerSelection'>;
 };
 
 export function renderComposerForm({
@@ -586,7 +586,7 @@ export function renderComposerForm({
                     />
                 ) : null}
                 </div>
-                {isMobile && !isBtwActive && !selection.antigravity ? (
+                {isMobile && !isBtwActive ? (
                     <MemoModelControls
                         className="hidden"
                         mobilePanel={mobileControlsPanel}

@@ -29,7 +29,7 @@
  *
  * `--compare <other .app>` alternates launches of two builds so machine drift
  * affects both equally. `--warmup` launches are discarded (the first launch of
- * a new binary pays the Gatekeeper scan). `--opencode warm` starts the bundled
+ * a new binary pays the Gatekeeper scan). `--opencode warm` starts the external
  * OpenCode CLI once before the runs and points every launch at it through
  * OPENCODE_PORT, so the measurement excludes OpenCode's own start.
  *
@@ -74,7 +74,7 @@ Options:
   --runs <n>               Measured launches per build (default: 5)
   --warmup <n>             Discarded launches per build before measuring (default: 1)
   --opencode cold|warm     cold: the app starts its own OpenCode on every launch
-                           (default). warm: one OpenCode from the bundled server is
+                           (default). warm: one OpenCode from PATH or OPENCODE_BINARY is
                            started before the runs and every launch attaches to it.
   --home <dir>             Isolated home directory (default: <tmp>/openchamber-bench-startup)
   --fresh                  Wipe the isolated home before every launch (first launch
@@ -169,16 +169,7 @@ const defaultApp = () => {
   return join(repoRoot, "packages/electron/dist/win-unpacked/OpenChamber.exe")
 }
 
-// How a build runs its bundled OpenCode: the server script on the app's own executable, or, in builds
-// from before it, the OpenCode CLI binary. Either answers `--version` and `serve`.
-const bundledOpenCode = (executable, resources) => {
-  const server = join(resources, "opencode-server", "serve.mjs")
-  if (existsSync(server)) return { command: executable, args: [server], env: { ELECTRON_RUN_AS_NODE: "1" }, path: server }
-  const cli = join(resources, "opencode-cli", process.platform === "win32" ? "opencode.exe" : "opencode")
-  return { command: cli, args: [], env: {}, path: cli }
-}
-
-// The executable to spawn and its bundled OpenCode, per platform layout.
+// The executable to spawn, per platform layout.
 const resolveBuild = (appPath, label) => {
   const app = resolve(appPath)
   if (!existsSync(app)) throw new Error(`Packaged app not found: ${app}. Run bun run electron:build or pass --app.`)
@@ -186,9 +177,9 @@ const resolveBuild = (appPath, label) => {
     const macos = join(app, "Contents", "MacOS")
     const executable = existsSync(macos) ? readdirSync(macos).map((name) => join(macos, name)).find((candidate) => existsSync(candidate)) : null
     if (!executable) throw new Error(`No executable inside ${app}`)
-    return { label, app, executable, opencode: bundledOpenCode(executable, join(app, "Contents", "Resources")) }
+    return { label, app, executable }
   }
-  return { label, app, executable: app, opencode: bundledOpenCode(app, join(app, "..", "resources")) }
+  return { label, app, executable: app }
 }
 
 // Where the app writes inside the isolated home. Settings follow
@@ -713,18 +704,9 @@ const launchWebOnce = async ({ run, options, chrome, profileDir }) => {
   }
 }
 
-// One OpenCode from the bundled server, shared by every launch of a warm run. The
-// compared builds must bundle the same OpenCode or the measurement would attach
-// each build to a different OpenCode.
-const startWarmOpenCode = async (builds, env, port) => {
-  const identities = builds.map((build) => {
-    if (!existsSync(build.opencode.path)) throw new Error(`Bundled OpenCode not found: ${build.opencode.path}`)
-    const version = spawnSync(build.opencode.command, [...build.opencode.args, "--version"], { encoding: "utf8", env: { ...env, ...build.opencode.env } })
-    return (version.stdout || "").trim()
-  })
-  if (new Set(identities).size > 1) throw new Error(`The compared builds bundle different OpenCode versions: ${identities.join(" vs ")}`)
-  const { command, args, env: launchEnv } = builds[0].opencode
-  const child = spawn(command, [...args, "serve", "--port", String(port), "--hostname", "127.0.0.1"], { env: { ...env, ...launchEnv }, stdio: "ignore", detached: true })
+// One external OpenCode shared by every launch of a warm run.
+const startWarmOpenCode = async (env, port) => {
+  const child = spawn(process.env.OPENCODE_BINARY || "opencode", ["serve", "--port", String(port), "--hostname", "127.0.0.1"], { env, stdio: "ignore", detached: true })
   child.unref()
   const deadline = Date.now() + 60_000
   while (Date.now() < deadline) {
@@ -892,7 +874,7 @@ const main = async () => {
   process.on("SIGINT", async () => { await cleanup(); process.exit(130) })
 
   if (opencodePort) {
-    opencodePid = await startWarmOpenCode(builds, isolatedEnv(home), opencodePort)
+    opencodePid = await startWarmOpenCode(isolatedEnv(home), opencodePort)
     console.log(`warm opencode at http://127.0.0.1:${opencodePort}`)
   }
 

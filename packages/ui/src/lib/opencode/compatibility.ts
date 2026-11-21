@@ -4,7 +4,7 @@ import { runtimeFetch } from '@/lib/runtime-fetch';
 const openCodeCompatibilitySchema = z.object({
   state: z.enum(['compatible', 'incompatible', 'unavailable']),
   version: z.string().nullable(),
-  installation: z.enum(['managed', 'external', 'bundled']),
+  installation: z.enum(['managed', 'external']),
   binary: z.string().nullable().optional(),
   minimumVersion: z.string().optional(),
   canInstall: z.boolean(),

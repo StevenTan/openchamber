@@ -95,7 +95,7 @@ jobs:
 
       - name: Install opencode
         run: |
-          version="$(node -p "require('./packages/electron/package.json').devDependencies['@opencode/server']")"
+          version="$(node -p "require('./packages/ui/package.json').dependencies['@opencode/client']")"
           npm install -g "@opencode/cli@${version}"
           opencode --version
 

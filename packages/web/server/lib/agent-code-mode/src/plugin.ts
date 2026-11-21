@@ -40,7 +40,6 @@ Example patchText:
 \`\`\``;
 
 function framePatch(text: string) {
-  // Separator newlines are outside the file sections; whitespace on hunk lines is content.
   const body = text.replace(/^(?:\r?\n)+|(?:\r?\n)+$/g, "");
   return `*** Begin Patch\n${body}\n*** End Patch`;
 }
@@ -78,7 +77,6 @@ interface PluginContext {
   event: { subscribe(input: { types: string[] }): Stream.Stream<{ data: { sessionID: string } }, unknown> };
 }
 
-// OpenCode 2.2.7's whole-tool filter uses the last matching action rule.
 function disabled(action: string, rules: Permission.Ruleset) {
   const rule = [...rules].reverse().find(rule => {
     const pattern = rule.action.replaceAll("\\", "/").replace(/[.+^${}()|[\]\\]/g, "\\$&")

@@ -80,9 +80,7 @@ describe('OpenCode compatibility', () => {
   it('only offers installation for a known managed CLI older than the minimum', () => {
     expect(describeOpenCodeCompatibility('1.18.32', 'managed', true)).toMatchObject({ state: 'incompatible', canInstall: true });
     expect(describeOpenCodeCompatibility('2.0.32', 'managed', true)).toMatchObject({ state: 'incompatible', canInstall: true });
-    for (const installation of ['external', 'bundled']) {
-      expect(describeOpenCodeCompatibility('1.18.32', installation, true).canInstall).toBe(false);
-    }
+    expect(describeOpenCodeCompatibility('1.18.32', 'external', true).canInstall).toBe(false);
     for (const version of [null, '2.2.4', '3.0.0']) {
       expect(describeOpenCodeCompatibility(version, 'managed', true).canInstall).toBe(false);
     }

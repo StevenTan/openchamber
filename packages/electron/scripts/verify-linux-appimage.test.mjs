@@ -38,8 +38,6 @@ const createPayload = () => {
 const verify = (root) => verifyExtractedPayload({
   root,
   targetArchitecture: 'x64',
-  expectedOpenCodeVersion: '1.17.18',
-  checkOpenCodeServer: () => ({ version: '1.17.18' }),
 });
 
 test('reads supported ELF architectures', () => {
@@ -59,14 +57,12 @@ test('AppImage artifact names use electron-builder arch suffixes', () => {
   assert.equal(linuxAppImageArchSuffix('arm64'), 'arm64');
 });
 
-test('verifies identity, version, and native payload architecture', () => {
+test('verifies identity and native payload architecture', () => {
   const root = createPayload();
   try {
     const result = verifyExtractedPayload({
       root,
       targetArchitecture: 'x64',
-      expectedOpenCodeVersion: '1.17.18',
-      checkOpenCodeServer: () => ({ version: '1.17.18' }),
     });
     assert.equal(result.nativeModuleCount, 2);
   } finally {
@@ -81,29 +77,19 @@ test('fails on a missing native module', () => {
     assert.throws(() => verifyExtractedPayload({
       root,
       targetArchitecture: 'x64',
-      expectedOpenCodeVersion: '1.17.18',
-      checkOpenCodeServer: () => ({ version: '1.17.18' }),
     }), /Missing packaged native module: pty\.node/);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
 
-test('fails on a failed bundled server check or native architecture', () => {
+test('fails on an incorrect native architecture', () => {
   const root = createPayload();
   try {
-    assert.throws(() => verifyExtractedPayload({
-      root,
-      targetArchitecture: 'x64',
-      expectedOpenCodeVersion: '1.17.18',
-      checkOpenCodeServer: () => { throw new Error('Bundled OpenCode server reports 1.17.17, expected 1.17.18'); },
-    }), /Bundled OpenCode server reports 1\.17\.17/);
     writeElf(path.join(root, 'resources/app.asar.unpacked/node_modules/pty.node'), 'arm64');
     assert.throws(() => verifyExtractedPayload({
       root,
       targetArchitecture: 'x64',
-      expectedOpenCodeVersion: '1.17.18',
-      checkOpenCodeServer: () => ({ version: '1.17.18' }),
     }), /Native module architecture mismatch/);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });

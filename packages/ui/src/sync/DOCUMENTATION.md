@@ -217,8 +217,6 @@ The VS Code queue gate and its live inputs are documented in
 | `input-store.ts` | Draft input state, attached files, synthetic parts, pending guest attach, destination-scoped fork replay handoff, the address the composer publishes (inline drafts and attachments) | Attachments and fork replay target runtime + directory + session; the published address is the composer's own session or `/btw` fork; other pending input is app UI state |
 | `selection-store.ts` | Model/agent/variant selections | App UI state |
 | `voice-store.ts` | Voice state | App UI state |
-| `draft-session-selection.ts` | Provider, model, agent and backend selection for draft creation | One draft send |
-| `session-feature-subscriptions.ts` | Feature event subscriptions and their cleanup, including backend event projection | One sync provider and runtime |
 
 Pending text keeps column insertions and session-keyed restores in separate
 mailboxes, so a quote or plugin insertion cannot overwrite a waiting revert.

@@ -10,7 +10,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { bundledOpenCodeServerEnv, devOpenCodeEnv } from '../lib/bundled-opencode-server.mjs';
 
 if (!process.versions.bun) await import('../../packages/web/scripts/register-server-sources.mjs');
 const { withoutInjectedEnv } = await import('../../packages/web/server/lib/injected-env.js');
@@ -138,10 +137,9 @@ const createInstance = async ({ mode, apiPort, models, instances }) => {
     XDG_CACHE_HOME: dirs.cache,
     XDG_STATE_HOME: dirs.state,
     OPENCHAMBER_DATA_DIR: dirs.oc,
-    // A CLI the caller names, else this checkout's pinned OpenCode, the one the desktop app bundles.
-    ...devOpenCodeEnv(process.env, () => bundledOpenCodeServerEnv(REPO_ROOT)),
     OPENCHAMBER_RELAY_HOST: 'off',
   });
+  if (process.env.OPENCODE_BINARY) env.OPENCODE_BINARY = process.env.OPENCODE_BINARY;
   // The API server alone: the bench needs no UI, and `bun run dev` instances
   // started side by side clear each other's Vite cache in the repository.
   const logFile = fs.openSync(path.join(root, 'server.log'), 'a');

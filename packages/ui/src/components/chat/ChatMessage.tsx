@@ -1,6 +1,5 @@
 import React from 'react';
 import { MessageSliceContext } from './message/messageSliceContext';
-import { isAcpSession } from '@/lib/agent-backends/model';
 import { modelVariantNames } from '@/lib/modelVariants';
 import { findCatalogModel, type Message, type Part } from '@/lib/opencode/model';
 import { readPromptOrigin } from '@/lib/opencode/prompt-origin';
@@ -642,8 +641,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                                                 onSelectMessages={onSelectMessages}
                                                 showReasoningTraces={showReasoningTraces}
                                                 agentMention={agentMention}
-                                                onRevert={isAcpSession(sessionId ?? '') ? undefined : handleRevert}
-                                                onFork={isUser && !isAcpSession(sessionId ?? '') ? handleFork : undefined}
+                                                onRevert={handleRevert}
+                                                onFork={isUser ? handleFork : undefined}
                                                 contextPinned={isPinnedIntoContext}
                                                 contextPinPending={pinPending}
                                                 onToggleContextPin={canPinIntoContext && messageCreatedAt ? handleToggleContextPin : undefined}
@@ -680,8 +679,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                                         onSelectMessages={onSelectMessages}
                                         showReasoningTraces={showReasoningTraces}
                                         agentMention={agentMention}
-                                        onRevert={isAcpSession(sessionId ?? '') ? undefined : handleRevert}
-                                        onFork={isUser && !isAcpSession(sessionId ?? '') ? handleFork : undefined}
+                                        onRevert={handleRevert}
+                                        onFork={isUser ? handleFork : undefined}
                                         contextPinned={isPinnedIntoContext}
                                         contextPinPending={pinPending}
                                         onToggleContextPin={canPinIntoContext && messageCreatedAt ? handleToggleContextPin : undefined}

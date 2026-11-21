@@ -84,11 +84,8 @@ maintainer's own app and dev shell, on the same machine.
   inside the desktop app inherits its `OPENCHAMBER_*` variables (UI password,
   dist dir, agent-tool URL and token) and `OPENCODE_PASSWORD`: start copies
   with `env -i HOME USER PATH SHELL TMPDIR` or unset them first. When
-  `~/.opencode/bin/opencode` lags the version the repo needs, run the OpenCode
-  the desktop bundles instead: `bun run --cwd packages/electron prepare:opencode-server`,
-  then `OPENCHAMBER_BUNDLED_OPENCODE_SERVER_DIR=$PWD/packages/electron/resources/opencode-server`
-  for a server started from `packages/web/server` (the CLI's `serve` still needs a real
-  CLI in `OPENCODE_BINARY`).
+  `~/.opencode/bin/opencode` lags the version the repo needs, select an installed
+  supported CLI with `OPENCODE_BINARY`.
 - **Dev server:** from the repo root, after the env is clean,
   `OPENCHAMBER_DATA_DIR=<scratch>/oc-data OPENCHAMBER_HMR_UI_PORT=5391 OPENCHAMBER_HMR_API_PORT=3991 bun run dev`
   in the background; the UI is at `http://127.0.0.1:5391/`. It runs React
@@ -758,7 +755,7 @@ load on the machine moves every figure by tens of percent between sessions.
 `--warmup` launches are discarded: the first launch of a new binary pays the
 Gatekeeper scan and takes seconds. `--opencode cold` (default) lets the app
 start its own OpenCode on every launch, the way a user's login does;
-`--opencode warm` starts one from the bundled CLI before the runs and attaches
+`--opencode warm` starts one from PATH or `OPENCODE_BINARY` before the runs and attaches
 every launch to it through `OPENCODE_PORT`, which isolates OpenChamber's own
 startup from OpenCode's. `--fresh` wipes the home before every launch to
 measure the first launch after an install.

@@ -30,7 +30,6 @@ const agentList = (...ids: string[]) => json({ data: ids.map((id) => ({ id })) }
 
 const runtimeFetchMock = mock<RuntimeFetch>(async (input, init) => {
   const url = input instanceof URL ? input : new URL(typeof input === "string" ? input : input.url, "http://runtime.test")
-  if (url.pathname === '/api/agent-backends/sessions') return json({ sessions: [], statuses: {}, forms: [] })
   const request: CapturedRequest = {
     url,
     method: String(init?.method ?? "GET").toUpperCase(),

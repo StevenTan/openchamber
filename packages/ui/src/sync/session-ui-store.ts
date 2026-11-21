@@ -7,9 +7,7 @@ import type { AttachedFile, SessionWorktreeAttachment } from "@/stores/types/ses
 import { permissionModeForNewSession, type PermissionMode } from "@/stores/utils/permissionAutoAccept"
 import type { WorktreeMetadata } from "@/types/worktree"
 import { opencodeClient, type SkillMentions } from "@/lib/opencode/client"
-import { isAcpSession } from '@/lib/agent-backends/model'
 import { draftSessionCreateSelection, trimAgent, type DraftSessionSelection } from "./draft-session-selection"
-import { useAgentBackendStore } from '@/lib/agent-backends/store'
 import { buildSkillMentionInstruction } from "@/lib/skillMentionInstruction"
 import { runtimeFetch } from "@/lib/runtime-fetch"
 import { useConfigStore } from "@/stores/useConfigStore"
@@ -197,7 +195,7 @@ export async function routeMessage(params: {
   const contextFiles = (params.additionalParts ?? []).flatMap((part) => part.files ?? [])
   const sendFiles = [...(params.files ?? []), ...contextFiles]
 
-  if (params.inputMode === "shell" && !isAcpSession(params.sessionId)) {
+  if (params.inputMode === "shell") {
     await params.ready
     assertRuntimeCurrent()
     params.beforeSend?.()
@@ -212,7 +210,7 @@ export async function routeMessage(params: {
   }
 
   let skills = params.skills
-  if (params.content.startsWith("/") && !isAcpSession(params.sessionId)) {
+  if (params.content.startsWith("/")) {
     const [head, ...tail] = params.content.split(" ")
     const cmdName = head.slice(1)
 
@@ -1029,7 +1027,7 @@ const finishDraftSession = (
     isSpaceDirectory(createdDirectory),
     useUIStore.getState().permissionDefaultMode,
   )
-  if (permissionMode && !isAcpSession(created.id)) {
+  if (permissionMode) {
     void import("@/stores/permissionStore")
       .then(({ usePermissionStore }) => usePermissionStore.getState().setSessionMode(created.id, permissionMode))
       .catch((error) => {
@@ -1049,7 +1047,6 @@ const finishDraftSession = (
 }
 
 const saveDraftSessionSelection = (sessionId: string, selection: DraftSessionSelection): string | undefined => {
-  if (isAcpSession(sessionId)) return undefined
   const configState = useConfigStore.getState()
   const effectiveDraftAgent = trimAgent(selection.agent) ?? configState.currentAgentName
   const variantOverride = resolveVariantToRecord(
@@ -1096,7 +1093,6 @@ export async function materializeOpenDraftSession(
   draftOverride?: NewSessionDraftState,
   expectedRuntimeKey = getRuntimeKey(),
 ): Promise<MaterializedDraftSession | null> {
-  selection = { ...selection, backend: selection.backend ?? useAgentBackendStore.getState().draftBackend }
   const draft = draftOverride ?? useSessionUIStore.getState().newSessionDraft
   if (!draft?.open) return null
   const assertRuntimeCurrent = () => {
@@ -1810,15 +1806,11 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
     const effortRevision = options?.effortRevision ?? readEffortRevision(providerID, modelID)
     const isCurrentRuntimeInstance = captureRuntimeInstance()
     const capturedRuntimeKey = capturedTarget?.runtimeKey ?? getRuntimeKey()
-    const draftBackend = useAgentBackendStore.getState().draftBackend
     if (capturedTarget && capturedTarget.runtimeKey !== getRuntimeKey()) {
       throw new Error("Message was not sent because the runtime changed.")
     }
     return runAfterOpenCodeStartup(async () => {
       const draft = options?.draftSnapshot ?? get().newSessionDraft
-      const antigravity = !capturedTarget && !options?.sessionId && draft?.open
-        ? draftBackend === 'antigravity'
-        : isAcpSession(capturedTarget?.sessionId ?? options?.sessionId ?? get().currentSessionId ?? '')
       const trimmedAgent = typeof agent === "string" && agent.trim().length > 0 ? agent.trim() : undefined
       if (capturedRuntimeKey !== getRuntimeKey()) {
         throw new Error("Message was not sent because the runtime changed.")
@@ -1828,7 +1820,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
         : fetchResponseStyleInstruction().catch(() => undefined)
 
       const queuedGoal = options?.queuedGoal
-      const goalArm = antigravity || inputMode === "shell" || content.trim().length === 0
+      const goalArm = inputMode === "shell" || content.trim().length === 0
         ? { armed: false, objectiveOverride: null }
         : queuedGoal !== undefined
           ? { armed: queuedGoal !== null, objectiveOverride: queuedGoal?.objective ?? null }
@@ -1856,7 +1848,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       if (!capturedTarget && !options?.sessionId && draft?.open) {
         if (sentDraftIds.has(draft.draftId)) throw new Error("The session is still being created.")
         sentDraftIds.add(draft.draftId)
-        const selection: DraftSessionSelection = { providerID, modelID, agent: trimmedAgent, variant, backend: draftBackend }
+        const selection: DraftSessionSelection = { providerID, modelID, agent: trimmedAgent, variant }
         let directory: string | null = null
         let chatDirectoryCleanup: CapturedChatDirectoryCleanup | null = null
         try {
@@ -1874,7 +1866,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
         }
         const sessionDirectory = directory
 
-        const sessionId = descendingId("ses").replace('ses_', selection.backend === 'antigravity' ? 'ses_acp_' : 'ses_')
+        const sessionId = descendingId("ses")
         adoptDraftPanelWorkspace(draftPanelOwner(draft, capturedRuntimeKey), sessionPanelOwner(sessionId, capturedRuntimeKey))
         options?.progress?.sessionMinted?.(sessionId, draft.target === "chat" ? sessionDirectory : null)
         const draftAgent = saveDraftSessionSelection(sessionId, selection)
@@ -1914,7 +1906,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
             }
             markSessionStatus(sessionId, createdDirectory, "busy")
             await applyArmedGoal(sessionId, createdDirectory)
-            if (inputMode !== "shell" && !isAcpSession(sessionId)) await syncSessionKnowledge(createdDirectory, sessionId, await responseStyleInstruction, capturedRuntimeKey)
+            if (inputMode !== "shell") await syncSessionKnowledge(createdDirectory, sessionId, await responseStyleInstruction, capturedRuntimeKey)
           } finally {
             resolveSessionCreated(false)
           }
@@ -1993,7 +1985,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       }
 
       const targetSessionId = capturedTarget?.sessionId ?? options?.sessionId ?? get().currentSessionId
-      const settleModelPick = targetSessionId && !antigravity
+      const settleModelPick = targetSessionId
         ? useSelectionStore.getState().captureSessionModelPickSettlement(targetSessionId, providerID, modelID, capturedRuntimeKey)
         : undefined
       const resumeAfterSend = options?.userInitiated && inputMode !== 'shell' && targetSessionId
@@ -2005,11 +1997,11 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       const configAgentName = useConfigStore.getState().currentAgentName
       const effectiveAgent = trimmedAgent || sessionAgentSelection || configAgentName || undefined
 
-      if (targetSessionId && !antigravity) {
+      if (targetSessionId) {
         useSelectionStore.getState().saveSessionModelSelection(targetSessionId, providerID, modelID)
       }
 
-      if (targetSessionId && effectiveAgent && !antigravity) {
+      if (targetSessionId && effectiveAgent) {
         useSelectionStore.getState().saveSessionAgentSelection(targetSessionId, effectiveAgent)
         useSelectionStore.getState().saveAgentModelVariantForSession(
           targetSessionId,
@@ -2056,7 +2048,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
         filename: attachmentWireName(a),
       }))
 
-      const knowledgeSync = responseStyleInstruction && targetSessionId && !isAcpSession(targetSessionId)
+      const knowledgeSync = responseStyleInstruction
         ? responseStyleInstruction.then((style) => syncSessionKnowledge(currentSessionDirectory, targetSessionId, style, capturedRuntimeKey))
         : undefined
 

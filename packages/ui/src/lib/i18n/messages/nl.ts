@@ -85,7 +85,6 @@ export const dict = {
   'quota.value.spent': '{spent} besteed',
   'mobile.connect.headers.hint': 'Geldt alleen voor dit adres. Authorization is gereserveerd voor het clienttoken.',
   'mobile.connect.headers.error': 'De verbindingsheaders konden niet worden gelezen of opgeslagen. Probeer het opnieuw.',
-  "opencodeCompatibility.bundled": "OpenCode is inbegrepen bij OpenChamber. Werk OpenChamber bij om OpenCode v2 te krijgen.",
   "opencodeCompatibility.title": "OpenCode v2 vereist",
   "opencodeCompatibility.outdatedTitle": "OpenCode bijwerken",
   "opencodeCompatibility.outdatedLocal": "OpenCode {version} is geïnstalleerd. Deze versie van OpenChamber vereist OpenCode {minimum} of nieuwer.",
@@ -4064,5 +4063,4 @@ export const dict = {
   'chat.promptHistorySearch.hint': "↑ ↓ om te bladeren · Enter om te laden · Esc om te sluiten",
   'helpDialog.item.searchPromptHistory': "Promptgeschiedenis doorzoeken (chatinvoer)",
 
-  'chat.backend.label': "Agentbackend",
 } as const;

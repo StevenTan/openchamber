@@ -70,8 +70,6 @@ export function createQuestionRuntime({ dataDir, client, globalEventHub, isSessi
   let retry: ReturnType<typeof setTimeout> | undefined;
   let unsubscribe: Array<() => void> = [];
 
-  // Mutations and snapshots share one sequence so a reply cannot be overwritten
-  // by a pending snapshot or a concurrent reconciliation.
   const run = <T>(operation: () => Promise<T>): Promise<T> => {
     const result = serial.then(operation);
     serial = result.then(() => undefined, () => undefined);
@@ -131,7 +129,6 @@ export function createQuestionRuntime({ dataDir, client, globalEventHub, isSessi
   const reconcileForm = async (entry: Entry) => {
     const api = client().session;
     const options = { signal: AbortSignal.timeout(15_000) };
-    // Session existence is checked before recreating an in-memory OpenCode form.
     await api.get({ sessionID: entry.sessionID }, options);
     if (entry.resolution.status === "pending") {
       let detail;
@@ -158,7 +155,6 @@ export function createQuestionRuntime({ dataDir, client, globalEventHub, isSessi
         if (reply.status === "answered") await api.form.reply({ sessionID: entry.sessionID, formID: entry.id, answer: reply.answer }, options);
         else await api.form.cancel({ sessionID: entry.sessionID, formID: entry.id }, options);
       } catch (error) {
-        // Settled forms return 409; OpenCode restarts discard its in-memory forms.
         if (![404, 409].includes(errorStatus(error) ?? 0)) throw error;
       }
     }
@@ -179,7 +175,6 @@ export function createQuestionRuntime({ dataDir, client, globalEventHub, isSessi
         delivery: "steer", resume: !await isSessionArchived(first.sessionID),
       }, options);
     } catch (error) {
-      // The same message ID may already have landed before a lost response.
       if (errorStatus(error) !== 409) throw error;
     }
     await commit([], group);

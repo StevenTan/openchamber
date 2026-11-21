@@ -213,12 +213,9 @@ gap.
 - Minimum supported version: `MINIMUM_OPENCODE_VERSION` in
   `packages/web/server/lib/opencode/compatibility.js`; raise it when OpenChamber
   starts depending on a route a newer tag added.
-- Pinned version: the `@opencode/*` devDependencies in
-  `packages/electron/package.json` (`@opencode/server` and the packages the
-  desktop's bundled server imports, `packages/electron/opencode-server`) and
-  `@opencode/client` / `@opencode/schema` in the root, ui, web and vscode
-  manifests, plus `@opencode/cli@` in the Dockerfile. They move together,
-  including `opencode.url` in `flake.nix` (see the bump steps).
+- Pinned version: `@opencode/client` / `@opencode/schema` in the root, ui,
+  web and vscode manifests, plus `@opencode/cli@` in the Dockerfile.
+  They move together, including `opencode.url` in `flake.nix` (see the bump steps).
 
   The web package's `@opencode/codemode` catalog dependency follows the same
   CLI version; its declared `effect` dependency follows that package's version.
@@ -228,7 +225,7 @@ gap.
 Answer from the diff. Done when every API-facing change between the pinned
 tag and the newest tag is classified.
 
-1. In the reference checkout: `git fetch origin --tags`, pinned = the `@opencode/server` version in `packages/electron/package.json`,
+1. In the reference checkout: `git fetch origin --tags`, pinned = the `@opencode/client` version in `packages/ui/package.json`,
    newest = `git tag -l 'v2.*' | sort -V | tail -1`, then
    `git diff --stat vPINNED..vNEWEST -- packages/schema/src packages/protocol/src packages/server/src packages/client packages/plugin/src`. Ignore `packages/tui`, `packages/app`, `packages/web`.
 2. Classify each change to a route, event, schema or plugin hook:
@@ -248,15 +245,8 @@ tests. A new message `type` or event needs a case in `model.ts` and
 `events.ts` before it renders. Verify `@opencode/cli@<tag>` exists on npm:
 the Docker image installs it.
 
-The desktop bundles OpenCode's server from those npm packages
-(`packages/electron/opencode-server`), and `server.mjs` there copies the
-option mapping of OpenCode's `packages/cli/src/server-process.ts`. Diff that
-file between the tags (`git diff vOLD..vNEW -- packages/cli/src/server-process.ts packages/cli/src/node packages/cli/vite.node.config.ts`)
-and carry over every change to the `default` and `stdio` modes: a new
-environment variable, option or startup step, and a new native loader or
-rewrite in the Node build. Then `bun run --cwd packages/electron prepare:opencode-server`
-and `verify:opencode-server`, and one real turn through the staged server
-(`packages/electron/opencode-server/DOCUMENTATION.md`).
+Verify one real turn using an installed CLI at the pinned version, selected with
+`OPENCODE_BINARY` when it differs from PATH.
 
 Set `opencode.url` in `flake.nix` to the same `vX.Y.Z` tag and run
 `nix flake update opencode` from the OpenChamber root. Include `flake.nix` and

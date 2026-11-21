@@ -10,7 +10,6 @@ const loadOutput = z.json();
 type Sessions = Map<string, Map<string, z.infer<typeof loadOutput>>>;
 const memoryKey = Symbol.for("openchamber.code-mode.session-memory");
 const host: typeof globalThis & { [memoryKey]?: { sessions: Sessions; listening: boolean } } = globalThis;
-// OpenCode reloads local plugin modules when a Location is recreated.
 export const processMemory = host[memoryKey] ??= { sessions: new Map(), listening: false };
 
 export function createSessionMemory(sessions: Sessions = new Map()) {

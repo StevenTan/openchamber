@@ -81,20 +81,6 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Get bundled OpenCode server version
-        id: opencode_server_version
-        run: |
-          VERSION=$(node -p "require('./packages/electron/package.json').devDependencies['@opencode/server']")
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
-      - name: Cache bundled OpenCode server native packages
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: packages/electron/.cache/opencode-server
-          key: opencode-server-${{ runner.os }}-${{ matrix.arch }}-${{ steps.opencode_server_version.outputs.version }}
-          restore-keys: |
-            opencode-server-${{ runner.os }}-${{ matrix.arch }}-
-
       - name: Install Apple Certificate
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -126,8 +112,6 @@ jobs:
           ELECTRON_BUILDER_ARCH: ${{ matrix.arch }}
         run: |
           bun run build:web-assets
-          bun run prepare:opencode-server
-          bun run verify:opencode-server
           bun run prepare:ripgrep
           bun run bundle:main
           # npmRebuild=false in package.json, so electron-builder won't
@@ -135,7 +119,6 @@ jobs:
           # Electron ABI before packaging, matching the release workflow.
           bun run rebuild:native
           bunx electron-builder --mac --${{ matrix.arch }} --publish=never
-          bun run verify:opencode-server:packaged
 
       - name: Verify signature + entitlements + notarization
         run: |
@@ -239,34 +222,17 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Get bundled OpenCode server version
-        id: opencode_server_version
-        shell: bash
-        run: |
-          VERSION=$(node -p "require('./packages/electron/package.json').devDependencies['@opencode/server']")
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
-      - name: Cache bundled OpenCode server native packages
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: packages/electron/.cache/opencode-server
-          key: opencode-server-${{ runner.os }}-${{ matrix.arch }}-${{ steps.opencode_server_version.outputs.version }}
-          restore-keys: |
-            opencode-server-${{ runner.os }}-${{ matrix.arch }}-
-
       - name: Build web assets
         working-directory: packages/electron
         run: bun run build:web-assets
 
-      - name: Prepare bundled OpenCode server
+      - name: Prepare ripgrep
         working-directory: packages/electron
         shell: bash
         env:
-          # Windows arm64 builds on an x64 runner; OpenCode and ripgrep need the target arch.
+          # Windows arm64 builds on an x64 runner; ripgrep needs the target arch.
           OPENCHAMBER_TARGET_ARCH: ${{ matrix.arch }}
         run: |
-          bun run prepare:opencode-server
-          bun run verify:opencode-server
           bun run prepare:ripgrep
 
       - name: Bundle main process
@@ -288,11 +254,9 @@ jobs:
         working-directory: packages/electron
         shell: bash
         env:
-          # verify:opencode-server:packaged checks the bundled server against the target arch.
           OPENCHAMBER_TARGET_ARCH: ${{ matrix.arch }}
         run: |
           node ./scripts/package.mjs --win --${{ matrix.arch }} --publish=never
-          bun run verify:opencode-server:packaged
 
       - name: Upload Windows installable artifacts
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -391,16 +355,7 @@ jobs:
         id: versions
         shell: bash
         run: |
-          echo "opencode_server=$(node -p "require('./packages/electron/package.json').devDependencies['@opencode/server']")" >> "$GITHUB_OUTPUT"
           echo "app=$(node -p "require('./packages/electron/package.json').version")" >> "$GITHUB_OUTPUT"
-
-      - name: Cache bundled OpenCode server native packages
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: packages/electron/.cache/opencode-server
-          key: opencode-server-${{ runner.os }}-${{ matrix.arch }}-${{ steps.versions.outputs.opencode_server }}
-          restore-keys: |
-            opencode-server-${{ runner.os }}-${{ matrix.arch }}-
 
       - name: Run focused Electron release tests
         working-directory: packages/electron
@@ -415,13 +370,10 @@ jobs:
         run: |
           set -euo pipefail
           bun run build:web-assets
-          bun run prepare:opencode-server
-          bun run verify:opencode-server
           bun run prepare:ripgrep
           bun run bundle:main
           bun run rebuild:native
           node ./scripts/package.mjs --linux --${{ matrix.arch }} --publish=never
-          bun run verify:opencode-server:packaged
           bun run verify:linux-appimage
 
       - name: Validate Linux update manifest

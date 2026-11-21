@@ -11,9 +11,7 @@ import type {
 } from "@opencode/client"
 import { z } from "zod"
 import type { FilesAPI } from "../api/types"
-import { getDesktopHomeDirectory, isVSCodeRuntime } from "../desktop"
-import { AcpSessionAdapter } from '../agent-backends/client'
-import { isAcpSession, type AgentBackendAdapter, type AgentBackendId } from '../agent-backends/model'
+import { getDesktopHomeDirectory } from "../desktop"
 import { isAmbiguousTransportFailure, isDefiniteTransportFailure, markAmbiguousTransportFailure, markDefiniteTransportFailure } from "@/lib/relay/transport-error"
 import { FilesystemError, parseFilesystemErrorReason } from "@/lib/api/files-errors"
 import type { ContextPartMetadata } from "@/lib/messages/contextParts"
@@ -606,7 +604,6 @@ class OpencodeService {
   }
 
   async setResponseStyleInstruction(directory: string, sessionID: string, instruction: string | null): Promise<void> {
-    if (isAcpSession(sessionID)) return;
     const entry = this.getScopedSdkClient(directory).experimental.session.instructions.entry
     const key = "openchamber.response-style"
     const value = instruction?.trim()
@@ -616,16 +613,11 @@ class OpencodeService {
 
   async captureSessionCleanup(directory: string | null | undefined, runtimeKey: string): Promise<(sessionID: string) => Promise<void>> {
     const cleanup = await captureRuntimeCleanup(runtimeKey)
-    return (sessionID) => cleanup(async (transport) => {
-      if (isAcpSession(sessionID)) {
-        const response = await transport.fetch(new URL(`/api/agent-backends/sessions/${sessionID}`, ensureAbsoluteBaseUrl(transport.baseUrl || '/')), { method: 'DELETE' });
-        if (!response.ok) throw new Error(`Session deletion failed: ${response.status}`);
-        return;
-      }
+    return (sessionID) => cleanup(async ({ fetch, baseUrl }) => {
       const client = OpenCode.make({
-        baseUrl: ensureAbsoluteBaseUrl(transport.baseUrl || "/"),
+        baseUrl: ensureAbsoluteBaseUrl(baseUrl || "/"),
         headers: directory ? { [OPENCODE_DIRECTORY_HEADER]: encodeURIComponent(toOpenCodeDirectory(directory)) } : undefined,
-        fetch: transport.fetch,
+        fetch,
       })
       try {
         await client.session.remove({ sessionID })
@@ -896,7 +888,7 @@ class OpencodeService {
   async listSessionsPage(options: SessionListOptions = {}): Promise<SessionPage> {
     const directory = options.global ? undefined : this.resolveDirectory(options.directory)
     const client = directory ? this.getScopedSdkClient(directory) : this.client
-    return readSessionPage(client, directory, options, acpBackend, normalizeOpencodeError)
+    return readSessionPage(client, directory, options, normalizeOpencodeError)
   }
 
   async listSessions(directory?: string | null): Promise<Session[]> {
@@ -923,26 +915,22 @@ class OpencodeService {
   }
 
   async getSession(id: string, directory?: string | null, signal?: AbortSignal): Promise<Session> {
-    if (isAcpSession(id)) return acpBackend.getSession(id, directory, signal);
     const info = await call("session.get", () => this.clientFor(directory).session.get({ sessionID: id }, { signal }))
     return projectSession(info)
   }
 
   // external: https://github.com/anomalyco/opencode/tree/v2.3.0/packages/core/src/session A moved session can retain a stale directory-scoped copy; resolving its directory needs an unscoped read.
   async getSessionUnscoped(id: string): Promise<Session> {
-    if (isAcpSession(id)) return acpBackend.getSession(id);
     const info = await call("session.get", () => this.client.session.get({ sessionID: id }))
     return projectSession(info)
   }
 
   async deleteSession(id: string, directory?: string | null): Promise<boolean> {
-    if (isAcpSession(id)) return acpBackend.deleteSession(id);
     await call("session.remove", () => this.clientFor(directory).session.remove({ sessionID: id }))
     return true
   }
 
   async renameSession(id: string, title: string, directory?: string | null): Promise<void> {
-    if (isAcpSession(id)) { await acpBackend.patch(id, { title }); return; }
     await call("session.update", () => this.clientFor(directory).session.update({ sessionID: id, title }))
   }
 
@@ -951,7 +939,6 @@ class OpencodeService {
   }
 
   async viewSession(id: string, idle: number, directory?: string | null): Promise<void> {
-    if (isAcpSession(id)) return;
     await call("session.view", () => this.clientFor(directory).session.view({ sessionID: id, idle }))
   }
 
@@ -976,7 +963,6 @@ class OpencodeService {
     options?: { limit?: number; cursor?: string; order?: "asc" | "desc"; partShells?: boolean },
     directory?: string | null,
   ): Promise<MessagePage> {
-    if (isAcpSession(id)) return acpBackend.getSessionMessages(id);
     const list = (headers?: Record<string, string>) => call("message.list", () =>
       this.clientFor(directory).message.list(
         {
@@ -1018,7 +1004,6 @@ class OpencodeService {
     id: string,
     directory?: string | null,
   ): Promise<readonly PendingInboxMessage[]> {
-    if (isAcpSession(id)) return [];
     const items = await call("session.inbox.list", () =>
       this.clientFor(directory).session.inbox.list({ sessionID: id }),
     )
@@ -1061,11 +1046,6 @@ class OpencodeService {
   }
 
   async getSessionMessage(id: string, messageID: string, directory?: string | null): Promise<{ info: Message; parts: Part[] }> {
-    if (isAcpSession(id)) {
-      const item = (await acpBackend.getSessionMessages(id)).items.find(item => item.info.id === messageID);
-      if (!item) throw new Error('Message not found.');
-      return item;
-    }
     const info = await call("session.message.get", () => this.clientFor(directory).session.message.get({ sessionID: id, messageID }))
     const [projected] = projectMessages([info], id)
     return { info: projected.message, parts: projected.parts }
@@ -1245,10 +1225,6 @@ class OpencodeService {
     commitRevert?: () => Promise<void>
   }): Promise<string> {
     this.assertRuntimeUnchanged(params.runtimeKey)
-    if (isAcpSession(params.id)) {
-      if (params.files?.length) throw new Error('Antigravity attachments are not supported by this integration.');
-      return acpBackend.sendMessage(params);
-    }
 
     const context = (params.context ?? [])
       .filter((item) => item.text.trim())
@@ -1382,7 +1358,6 @@ class OpencodeService {
   }
 
   async abortSession(id: string, directory?: string | null): Promise<boolean> {
-    if (isAcpSession(id)) return acpBackend.abortSession(id);
     const result = await call("session.interrupt", () => this.clientFor(directory).session.interrupt({ sessionID: id }))
     return result.interrupted
   }
@@ -1479,7 +1454,6 @@ class OpencodeService {
       const active = activeSessionSnapshotSchema.parse(await call("session.active", () => client.session.active()))
       const statuses: Record<string, SessionStatus> = {}
       for (const sessionID of Object.keys(active)) statuses[sessionID] = { type: "busy" }
-      if (!isVSCodeRuntime() && !isSpaceDirectory(directory)) Object.assign(statuses, (await acpBackend.snapshot(directory)).statuses);
       return statuses
     } catch {
       return null
@@ -1496,17 +1470,7 @@ class OpencodeService {
         return null;
       }
       const parsed = hostSessionStatusSnapshotSchema.safeParse(await response.json().catch(() => null));
-      if (!parsed.success) return null;
-      const snapshot = parsed.data;
-      if (!isVSCodeRuntime()) {
-        const backend = await acpBackend.snapshot();
-        for (const [id, state] of Object.entries(backend.statuses)) snapshot.sessions[id] = { status: state.type, lastUpdateAt: snapshot.serverTime };
-        for (const form of backend.forms) {
-          snapshot.pending ??= {};
-          snapshot.pending[form.sessionID] = { permissions: [], forms: backend.forms.filter(item => item.sessionID === form.sessionID), pages: [] };
-        }
-      }
-      return snapshot;
+      return parsed.success ? parsed.data : null;
     } catch {
       return null;
     }
@@ -1600,13 +1564,11 @@ class OpencodeService {
 
 
   async replyToForm(sessionID: string, formID: string, answer: FormAnswer, directory?: string | null): Promise<boolean> {
-    if (isAcpSession(sessionID)) return acpBackend.answer(sessionID, formID, answer);
     await call("session.form.reply", () => this.clientFor(directory).session.form.reply({ sessionID, formID, answer }))
     return true
   }
 
   async cancelForm(sessionID: string, formID: string, directory?: string | null, message?: string): Promise<boolean> {
-    if (isAcpSession(sessionID)) return acpBackend.answer(sessionID, formID, null);
     await call("session.form.cancel", () => this.clientFor(directory).session.form.cancel({ sessionID, formID, message }))
     return true
   }
@@ -1620,9 +1582,7 @@ class OpencodeService {
         ),
       ),
     )
-    const forms = dedupeById(lists);
-    if (!isVSCodeRuntime()) forms.push(...(await acpBackend.snapshot()).forms);
-    return forms;
+    return dedupeById(lists)
   }
 
 
@@ -2239,5 +2199,3 @@ class OpencodeService {
 }
 
 export const opencodeClient = new OpencodeService()
-const acpBackend = new AcpSessionAdapter()
-export const agentBackends = { opencode: opencodeClient, antigravity: acpBackend } satisfies Record<AgentBackendId, AgentBackendAdapter>
