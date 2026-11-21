@@ -4068,4 +4068,5 @@ export const dict: Record<I18nKey, string> = {
   'chat.promptHistorySearch.hint': "↑ ↓ aby przeglądać · Enter aby wczytać · Esc aby zamknąć",
   'helpDialog.item.searchPromptHistory': "Przeszukaj historię poleceń (pole czatu)",
 
+  'chat.backend.label': "Zaplecze agenta",
 } as const;

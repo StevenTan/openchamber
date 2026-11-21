@@ -69,6 +69,7 @@ import { createSettingsNormalizationRuntime } from './lib/settings/settings-norm
 import { createSettingsHelpers, isMessageSearchEnabled } from './lib/settings/settings-helpers.js';
 import { createThemeRuntime } from './lib/appearance/theme-runtime.js';
 import { createFeatureRoutesRuntime } from './lib/server-frame/feature-routes-runtime.js';
+import { createControlEventsRuntime } from './lib/server-frame/control-events-runtime.js';
 import { createPluginSwitchStore } from './lib/opencode/plugin-switches.js';
 import { parseServeCliOptions } from './lib/server-frame/cli-options.js';
 import {
@@ -627,11 +628,8 @@ const broadcastOpenChamberUiEvent = createGlobalUiEventBroadcaster({
   writeSseEvent,
 });
 
-const broadcastControlSseEvent = createGlobalUiEventBroadcaster({
-  sseClients: uiOpenChamberEventClients,
-  wsClients: new Set(),
-  writeSseEvent,
-});
+const controlEventsRuntime = createControlEventsRuntime(OPENCHAMBER_DATA_DIR, uiOpenChamberEventClients, writeSseEvent);
+const { broadcastControlSseEvent } = controlEventsRuntime;
 const broadcastPermissionUiEvent = (payload) => {
   broadcastControlSseEvent(payload);
   broadcastGlobalUiEvent(payload);
@@ -2346,6 +2344,7 @@ const gracefulShutdownRuntime = createGracefulShutdownRuntime({
   getRelayReconcileTimer: () => relayReconcileTimer,
   getSpacesHost: () => spacesHost,
   stopFolderWatches: () => {
+    controlEventsRuntime.stop();
     stopEnterprisePolicyWatch();
     featureRoutesRuntime.stopFolderWatches();
   },
@@ -2867,6 +2866,7 @@ async function main(options = {}) {
       }
     },
   });
+  controlEventsRuntime.registerRoutes(app);
   await featureRoutesRuntime.registerRoutes(app, {
     environmentStore,
     environmentRuntime,

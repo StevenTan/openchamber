@@ -4062,4 +4062,5 @@ export const dict = {
   'chat.promptHistorySearch.hint': "↑ ↓ zum Durchsuchen · Enter zum Laden · Esc zum Schließen",
   'helpDialog.item.searchPromptHistory': "Prompt-Verlauf durchsuchen (Chat-Eingabe)",
 
+  'chat.backend.label': "Agent-Backend",
 };

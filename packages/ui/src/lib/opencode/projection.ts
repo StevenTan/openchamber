@@ -592,3 +592,7 @@ export function configModelIdentifier(value: Config["model"]): string | undefine
 }
 
 export const projectAgent = (info: AgentInfo): Agent => ({ ...info, name: info.id, displayName: info.name })
+
+// external: https://github.com/anomalyco/opencode/tree/v2.3.0/packages/core/src OpenCode treats slash-prefixed Windows UNC paths as POSIX paths; backslashes preserve the share.
+export const toOpenCodeDirectory = (directory: string): string =>
+  /^\/\/[^/]/.test(directory) ? directory.replace(/\//g, "\\") : directory

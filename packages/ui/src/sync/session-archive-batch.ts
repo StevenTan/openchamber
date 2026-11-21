@@ -4,6 +4,8 @@ import { z } from 'zod';
 
 import { toStoredLinkedIssue, type LinkedIssue } from '@/lib/linkedIssues';
 import { runtimeFetch } from '@/lib/runtime-fetch';
+import { isAcpSession } from '@/lib/agent-backends/model';
+import { AcpSessionAdapter } from '@/lib/agent-backends/client';
 
 const archiveResponseSchema = z.object({
   archived: z.array(z.object({ id: z.string().min(1), archivedAt: z.number() })),
@@ -21,6 +23,18 @@ export async function requestSessionArchiveBatch(
   ids: string[],
   archivedAt: number,
 ): Promise<SessionArchiveBatchResult> {
+  const acpIds = ids.filter(isAcpSession);
+  if (acpIds.length) {
+    const adapter = new AcpSessionAdapter();
+    const nativeIds = ids.filter(id => !isAcpSession(id));
+    const native = nativeIds.length ? await requestSessionArchiveBatch(directory, nativeIds, archivedAt) : null;
+    const results = await Promise.allSettled(acpIds.map(id => adapter.patch(id, { archivedAt })));
+    return {
+      outcome: 'archived',
+      archived: [...(native?.outcome === 'archived' ? native.archived : []), ...results.flatMap((result, index) => result.status === 'fulfilled' ? [{ id: acpIds[index]!, archivedAt }] : [])],
+      failedIds: [...(native?.outcome === 'archived' ? native.failedIds : nativeIds), ...results.flatMap((result, index) => result.status === 'rejected' ? [acpIds[index]!] : [])],
+    };
+  }
   let response: Response;
   try {
     response = await runtimeFetch('/api/openchamber/sessions/archive', {
@@ -66,6 +80,18 @@ export type SessionUnarchiveBatchResult =
   | { outcome: 'unavailable'; reason: string };
 
 export async function requestSessionUnarchiveBatch(ids: string[], directory?: string | null): Promise<SessionUnarchiveBatchResult> {
+  const acpIds = ids.filter(isAcpSession);
+  if (acpIds.length) {
+    const adapter = new AcpSessionAdapter();
+    const nativeIds = ids.filter(id => !isAcpSession(id));
+    const native = nativeIds.length ? await requestSessionUnarchiveBatch(nativeIds, directory) : null;
+    const results = await Promise.allSettled(acpIds.map(id => adapter.patch(id, { archivedAt: null })));
+    return {
+      outcome: 'restored',
+      restored: [...(native?.outcome === 'restored' ? native.restored : []), ...results.flatMap((result, index) => result.status === 'fulfilled' ? [acpIds[index]!] : [])],
+      failedIds: [...(native?.outcome === 'restored' ? native.failedIds : nativeIds), ...results.flatMap((result, index) => result.status === 'rejected' ? [acpIds[index]!] : [])],
+    };
+  }
   let response: Response;
   try {
     response = await runtimeFetch('/api/openchamber/sessions/unarchive', {
@@ -119,6 +145,10 @@ export async function requestSessionMetadataUpdate(
   patch: Metadata,
   directory?: string | null,
 ): Promise<SessionMetadataUpdateResult> {
+  if (isAcpSession(sessionID)) {
+    const session = await new AcpSessionAdapter().patch(sessionID, { metadata: patch });
+    return { outcome: 'updated', metadata: session.metadata ?? {} };
+  }
   let response: Response;
   try {
     response = await runtimeFetch(`/api/openchamber/sessions/${encodeURIComponent(sessionID)}/metadata`, {

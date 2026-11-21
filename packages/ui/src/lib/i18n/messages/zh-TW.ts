@@ -4063,4 +4063,6 @@ export const dict: Record<I18nKey, string> = {
   'chat.promptHistorySearch.hint': "↑ ↓ 瀏覽 · Enter 載入 · Esc 關閉",
   'helpDialog.item.searchPromptHistory': "搜尋提示歷史記錄（聊天輸入）",
 
+  'chat.backend.label': "智慧體後端",
+
 };

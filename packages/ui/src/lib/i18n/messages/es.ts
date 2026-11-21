@@ -4064,4 +4064,5 @@ export const dict: Record<I18nKey, string> = {
   'chat.promptHistorySearch.hint': "↑ ↓ para explorar · Enter para cargar · Esc para cerrar",
   'helpDialog.item.searchPromptHistory': "Buscar en el historial de indicaciones (entrada de chat)",
 
+  'chat.backend.label': "Motor del agente",
 };

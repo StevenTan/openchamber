@@ -4064,6 +4064,7 @@ export const dict = {
   'chat.promptHistorySearch.hint': "↑ ↓ to browse · Enter to load · Esc to close",
   'helpDialog.item.searchPromptHistory': "Search prompt history (chat input)",
 
+  'chat.backend.label': "Agent backend",
 } as const;
 
 export type I18nKey = keyof typeof dict;

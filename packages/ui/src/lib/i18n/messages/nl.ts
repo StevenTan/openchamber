@@ -4064,4 +4064,5 @@ export const dict = {
   'chat.promptHistorySearch.hint': "↑ ↓ om te bladeren · Enter om te laden · Esc om te sluiten",
   'helpDialog.item.searchPromptHistory': "Promptgeschiedenis doorzoeken (chatinvoer)",
 
+  'chat.backend.label': "Agentbackend",
 } as const;

@@ -4062,4 +4062,5 @@ export const dict = {
   'chat.promptHistorySearch.hint': "↑ ↓ ile gezin · Enter ile yükle · Esc ile kapat",
   'helpDialog.item.searchPromptHistory': "İstem geçmişinde ara (sohbet girişi)",
 
+  'chat.backend.label': "Ajan arka ucu",
 };

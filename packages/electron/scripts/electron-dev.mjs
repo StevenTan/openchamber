@@ -240,6 +240,7 @@ async function main() {
     env: {
       ...process.env,
       ...bundledOpenCodeServerEnv,
+      OPENCHAMBER_BUNDLED_ANTIGRAVITY_DIR: path.join(electronDir, 'resources', 'antigravity'),
       OPENCHAMBER_ELECTRON_DEV: '1',
       NODE_OPTIONS: `${process.env.NODE_OPTIONS || ''} --conditions=openchamber-source --import=${pathToFileURL(path.join(repoRoot, 'packages/web/scripts/register-server-sources.mjs')).href}`.trim(),
       OPENCHAMBER_ELECTRON_DEV_RELAUNCH_EXIT_CODE: String(relaunchExitCode),
@@ -310,6 +311,7 @@ async function main() {
       env: withUserEnv({
         ...process.env,
         ...bundledOpenCodeServerEnv,
+        OPENCHAMBER_BUNDLED_ANTIGRAVITY_DIR: path.join(electronDir, 'resources', 'antigravity'),
         OPENCHAMBER_ELECTRON_DEV: '1',
         OPENCHAMBER_ELECTRON_DEV_DATA_DIR: process.env.OPENCHAMBER_DATA_DIR,
         OPENCHAMBER_HMR_UI_PORT: hmrUiPort,

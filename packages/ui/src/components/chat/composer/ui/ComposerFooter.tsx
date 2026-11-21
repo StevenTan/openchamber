@@ -16,6 +16,9 @@ import { useConfigStore } from '@/stores/useConfigStore';
 import { isVSCodeRuntime } from '@/lib/desktop';
 import { isDictationCaptureSupported } from '@/lib/dictation/use-dictation-audio-source';
 import { ModelControls } from '../../ModelControls';
+import { AgentBackendPicker } from '../../AgentBackendPicker';
+import { isAcpSession } from '@/lib/agent-backends/model';
+import { useAgentBackendStore } from '@/lib/agent-backends/store';
 import { ComposerActionButtons } from './ComposerActionButtons';
 import { ComposerAttachmentControls, type ComposerTrackerPicker } from './ComposerAttachmentControls';
 import { PermissionAutoAcceptButton } from './PermissionAutoAcceptButton';
@@ -147,6 +150,8 @@ function ComposerFooterView(props: ComposerFooterProps) {
     const dictationEnabled = useConfigStore((state) => state.dictationEnabled);
     const [dictationSupported] = React.useState(() => !isVSCodeRuntime() && isDictationCaptureSupported());
     const showDictation = dictationEnabled && dictationSupported;
+    const draftBackend = useAgentBackendStore(state => state.draftBackend);
+    const antigravity = newSessionDraftOpen ? draftBackend === 'antigravity' : isAcpSession(currentSessionId ?? '');
 
     return (
         <div
@@ -168,7 +173,8 @@ function ComposerFooterView(props: ComposerFooterProps) {
                 <>
                     <div className="flex w-full items-center justify-between gap-x-1.5">
                         <div className="composer-mobile-actions flex items-center gap-x-2 ps-1">
-                            <ComposerAttachmentControls
+                            {newSessionDraftOpen && !isBtw ? <AgentBackendPicker /> : null}
+                            {!antigravity ? <ComposerAttachmentControls
                                 isVSCode={isVSCode}
                                 footerIconButtonClass={footerIconButtonClass}
                                 iconSizeClass={iconSizeClass}
@@ -181,22 +187,22 @@ function ComposerFooterView(props: ComposerFooterProps) {
                                 attachGuests={attachGuests}
                                 onOpenGuestAttach={onOpenGuestAttach}
                                 filesOnly={isBtw}
-                            />
-                            <PermissionAutoAcceptButton
+                            /> : null}
+                            {!antigravity ? <PermissionAutoAcceptButton
                                 footerIconButtonClass={footerIconButtonClass}
                                 iconSizeClass={iconSizeClass}
                                 isInteractive={isPermissionAutoAcceptInteractive}
                                 permissionMode={permissionMode}
                                 handlePermissionModeCycle={onCyclePermissionMode}
-                            />
-                            {!isBtw ? <SessionGoalButton
+                            /> : null}
+                            {!isBtw && !antigravity ? <SessionGoalButton
                                 sessionId={currentSessionId}
                                 directory={directory}
                                 draftOpen={newSessionDraftOpen}
                                 footerIconButtonClass={footerIconButtonClass}
                                 iconSizeClass={iconSizeClass}
                             /> : null}
-                            {!isBtw ? <SessionGoalObjectiveCounter length={messageLength} /> : null}
+                            {!isBtw && !antigravity ? <SessionGoalObjectiveCounter length={messageLength} /> : null}
                         </div>
                         <div className="flex items-center min-w-0 gap-x-1 justify-end">
                             {waitingForOpenCode ? <OpenCodeStartupNote /> : null}
@@ -237,7 +243,7 @@ function ComposerFooterView(props: ComposerFooterProps) {
             ) : (
                 <>
                     <div className={cn("flex items-center flex-shrink-0", footerGapClass)}>
-                        <ComposerAttachmentControls
+                        {!antigravity ? <ComposerAttachmentControls
                             isVSCode={isVSCode}
                             footerIconButtonClass={footerIconButtonClass}
                             iconSizeClass={iconSizeClass}
@@ -249,16 +255,16 @@ function ComposerFooterView(props: ComposerFooterProps) {
                             attachGuests={attachGuests}
                             onOpenGuestAttach={onOpenGuestAttach}
                             filesOnly={isBtw}
-                        />
-                        <PermissionAutoAcceptButton
+                        /> : null}
+                        {!antigravity ? <PermissionAutoAcceptButton
                             footerIconButtonClass={footerIconButtonClass}
                             iconSizeClass={iconSizeClass}
                             isInteractive={isPermissionAutoAcceptInteractive}
                             permissionMode={permissionMode}
                             handlePermissionModeCycle={onCyclePermissionMode}
                             withTooltip
-                        />
-                        {!isBtw ? <SessionGoalButton
+                        /> : null}
+                        {!isBtw && !antigravity ? <SessionGoalButton
                             sessionId={currentSessionId}
                             directory={directory}
                             draftOpen={newSessionDraftOpen}
@@ -266,11 +272,12 @@ function ComposerFooterView(props: ComposerFooterProps) {
                             iconSizeClass={iconSizeClass}
                             withTooltip
                         /> : null}
-                        {!isBtw ? <SessionGoalObjectiveCounter length={messageLength} /> : null}
+                        {!isBtw && !antigravity ? <SessionGoalObjectiveCounter length={messageLength} /> : null}
                     </div>
                     <div className={cn('flex items-center flex-1 justify-end', isVSCode ? cn(footerGapClass, 'md:gap-x-3') : 'gap-x-2')} data-dictation-chain="true">
                         {waitingForOpenCode ? <OpenCodeStartupNote className="flex-shrink-0" /> : null}
-                        {parallelRun ? <MemoModelControls className={cn('flex-1 min-w-0')} agentOnly /> : isBtw ? <ModelControls className={cn('flex-1 min-w-0 justify-end')} sessionId={modelSessionId ?? null} selection={btwSelection} rememberVariantPicks={false} modelSelectorOpen={btwModelSelectorOpen} onModelSelectorOpenChange={onBtwModelSelectorOpenChange} /> : pinnedSelection ? <ModelControls className={cn('flex-1 min-w-0 justify-end')} sessionId={currentSessionId} selection={pinnedSelection} rememberVariantPicks /> : <MemoModelControls className={cn('flex-1 min-w-0 justify-end')} onRunInParallel={onRunInParallel} />}
+                        {newSessionDraftOpen && !isBtw ? <AgentBackendPicker /> : null}
+                        {antigravity ? (newSessionDraftOpen ? null : <span className="typography-meta text-muted-foreground">Antigravity</span>) : parallelRun ? <MemoModelControls className={cn('flex-1 min-w-0')} agentOnly /> : isBtw ? <ModelControls className={cn('flex-1 min-w-0 justify-end')} sessionId={modelSessionId ?? null} selection={btwSelection} rememberVariantPicks={false} modelSelectorOpen={btwModelSelectorOpen} onModelSelectorOpenChange={onBtwModelSelectorOpenChange} /> : pinnedSelection ? <ModelControls className={cn('flex-1 min-w-0 justify-end')} sessionId={currentSessionId} selection={pinnedSelection} rememberVariantPicks /> : <MemoModelControls className={cn('flex-1 min-w-0 justify-end')} onRunInParallel={onRunInParallel} />}
                         {!isBtw ? <MemoComposerDictation
                             radius={chatInputRadius}
                             isMobile={isMobile}

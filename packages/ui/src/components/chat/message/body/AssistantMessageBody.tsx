@@ -1,4 +1,5 @@
 import React from 'react';
+import { isAcpSession } from '@/lib/agent-backends/model';
 import { MessageFilesDisplay } from '../../FileAttachment';
 import type { StreamPhase } from '../types';
 import { cn } from '@/lib/utils';
@@ -106,7 +107,7 @@ export const AssistantMessageBody = React.memo(({
     const isVSCode = isVSCodeRuntime();
     const isMiniChatSurface = chatSurfaceMode === 'mini-chat';
     const canUseProjectPlanActions = !isVSCode && !isMiniChatSurface && !isMobile;
-    const canShowMultiRunAction = !isVSCode && !isMiniChatSurface && !isMobile;
+    const canShowMultiRunAction = !isVSCode && !isMiniChatSurface && !isMobile && !isAcpSession(sessionId ?? '');
 
 
     const effectiveDirectory = useEffectiveDirectory();
@@ -247,6 +248,7 @@ export const AssistantMessageBody = React.memo(({
 
 
     const footerSheetActions = useFooterSheetActions({
+        canFork: !isAcpSession(sessionId ?? ''),
         assistantPlanText,
         canUseProjectPlanActions,
         contextPinPending,

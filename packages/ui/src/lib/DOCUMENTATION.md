@@ -46,6 +46,8 @@ Image capture still needs the page after its source fallback succeeds, so detach
 
 The library owns shared session metadata readers, runtime transport and credentials, project API clients, file and selection helpers, and device-local coordination. Subfolder documents own their specialized contracts. The OpenChamber server owns stored project data and execution; the native shells own privileged device operations; sync owns authoritative session and transcript state.
 
+`control-event-envelope.ts` decodes control-stream envelopes and their property records. `openchamberEvents.ts` owns the connection lifecycle and event dispatch.
+
 ## Invariants
 
 ### Session identity and side conversations

@@ -7,6 +7,9 @@ import type { AttachedFile, SessionWorktreeAttachment } from "@/stores/types/ses
 import { permissionModeForNewSession, type PermissionMode } from "@/stores/utils/permissionAutoAccept"
 import type { WorktreeMetadata } from "@/types/worktree"
 import { opencodeClient, type SkillMentions } from "@/lib/opencode/client"
+import { isAcpSession } from '@/lib/agent-backends/model'
+import { draftSessionCreateSelection, trimAgent, type DraftSessionSelection } from "./draft-session-selection"
+import { useAgentBackendStore } from '@/lib/agent-backends/store'
 import { buildSkillMentionInstruction } from "@/lib/skillMentionInstruction"
 import { runtimeFetch } from "@/lib/runtime-fetch"
 import { useConfigStore } from "@/stores/useConfigStore"
@@ -194,7 +197,7 @@ export async function routeMessage(params: {
   const contextFiles = (params.additionalParts ?? []).flatMap((part) => part.files ?? [])
   const sendFiles = [...(params.files ?? []), ...contextFiles]
 
-  if (params.inputMode === "shell") {
+  if (params.inputMode === "shell" && !isAcpSession(params.sessionId)) {
     await params.ready
     assertRuntimeCurrent()
     params.beforeSend?.()
@@ -209,7 +212,7 @@ export async function routeMessage(params: {
   }
 
   let skills = params.skills
-  if (params.content.startsWith("/")) {
+  if (params.content.startsWith("/") && !isAcpSession(params.sessionId)) {
     const [head, ...tail] = params.content.split(" ")
     const cmdName = head.slice(1)
 
@@ -935,22 +938,6 @@ const resolveVariantToRecord = (
   return describesThisSend ? config.currentVariantSelection.override : sentVariant
 }
 
-type DraftSessionSelection = {
-  providerID: string
-  modelID: string
-  agent?: string
-  variant?: string | null
-}
-
-const trimAgent = (agent: string | undefined): string | undefined => (
-  typeof agent === "string" && agent.trim().length > 0 ? agent.trim() : undefined
-)
-
-const draftSessionCreateSelection = (selection: DraftSessionSelection): SessionCreateSelection => ({
-  model: { providerID: selection.providerID, id: selection.modelID, variant: selection.variant },
-  agent: trimAgent(selection.agent),
-})
-
 const draftSessionMetadata = (draft: NewSessionDraftState): Metadata | undefined => {
   const draftPins = draft.projectContextPins ?? { notes: [], plans: [] }
   return draftPins.notes.length > 0 || draftPins.plans.length > 0
@@ -1042,7 +1029,7 @@ const finishDraftSession = (
     isSpaceDirectory(createdDirectory),
     useUIStore.getState().permissionDefaultMode,
   )
-  if (permissionMode) {
+  if (permissionMode && !isAcpSession(created.id)) {
     void import("@/stores/permissionStore")
       .then(({ usePermissionStore }) => usePermissionStore.getState().setSessionMode(created.id, permissionMode))
       .catch((error) => {
@@ -1062,6 +1049,7 @@ const finishDraftSession = (
 }
 
 const saveDraftSessionSelection = (sessionId: string, selection: DraftSessionSelection): string | undefined => {
+  if (isAcpSession(sessionId)) return undefined
   const configState = useConfigStore.getState()
   const effectiveDraftAgent = trimAgent(selection.agent) ?? configState.currentAgentName
   const variantOverride = resolveVariantToRecord(
@@ -1108,6 +1096,7 @@ export async function materializeOpenDraftSession(
   draftOverride?: NewSessionDraftState,
   expectedRuntimeKey = getRuntimeKey(),
 ): Promise<MaterializedDraftSession | null> {
+  selection = { ...selection, backend: selection.backend ?? useAgentBackendStore.getState().draftBackend }
   const draft = draftOverride ?? useSessionUIStore.getState().newSessionDraft
   if (!draft?.open) return null
   const assertRuntimeCurrent = () => {
@@ -1821,11 +1810,15 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
     const effortRevision = options?.effortRevision ?? readEffortRevision(providerID, modelID)
     const isCurrentRuntimeInstance = captureRuntimeInstance()
     const capturedRuntimeKey = capturedTarget?.runtimeKey ?? getRuntimeKey()
+    const draftBackend = useAgentBackendStore.getState().draftBackend
     if (capturedTarget && capturedTarget.runtimeKey !== getRuntimeKey()) {
       throw new Error("Message was not sent because the runtime changed.")
     }
     return runAfterOpenCodeStartup(async () => {
       const draft = options?.draftSnapshot ?? get().newSessionDraft
+      const antigravity = !capturedTarget && !options?.sessionId && draft?.open
+        ? draftBackend === 'antigravity'
+        : isAcpSession(capturedTarget?.sessionId ?? options?.sessionId ?? get().currentSessionId ?? '')
       const trimmedAgent = typeof agent === "string" && agent.trim().length > 0 ? agent.trim() : undefined
       if (capturedRuntimeKey !== getRuntimeKey()) {
         throw new Error("Message was not sent because the runtime changed.")
@@ -1835,7 +1828,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
         : fetchResponseStyleInstruction().catch(() => undefined)
 
       const queuedGoal = options?.queuedGoal
-      const goalArm = inputMode === "shell" || content.trim().length === 0
+      const goalArm = antigravity || inputMode === "shell" || content.trim().length === 0
         ? { armed: false, objectiveOverride: null }
         : queuedGoal !== undefined
           ? { armed: queuedGoal !== null, objectiveOverride: queuedGoal?.objective ?? null }
@@ -1863,7 +1856,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       if (!capturedTarget && !options?.sessionId && draft?.open) {
         if (sentDraftIds.has(draft.draftId)) throw new Error("The session is still being created.")
         sentDraftIds.add(draft.draftId)
-        const selection: DraftSessionSelection = { providerID, modelID, agent: trimmedAgent, variant }
+        const selection: DraftSessionSelection = { providerID, modelID, agent: trimmedAgent, variant, backend: draftBackend }
         let directory: string | null = null
         let chatDirectoryCleanup: CapturedChatDirectoryCleanup | null = null
         try {
@@ -1881,7 +1874,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
         }
         const sessionDirectory = directory
 
-        const sessionId = descendingId("ses")
+        const sessionId = descendingId("ses").replace('ses_', selection.backend === 'antigravity' ? 'ses_acp_' : 'ses_')
         adoptDraftPanelWorkspace(draftPanelOwner(draft, capturedRuntimeKey), sessionPanelOwner(sessionId, capturedRuntimeKey))
         options?.progress?.sessionMinted?.(sessionId, draft.target === "chat" ? sessionDirectory : null)
         const draftAgent = saveDraftSessionSelection(sessionId, selection)
@@ -1921,7 +1914,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
             }
             markSessionStatus(sessionId, createdDirectory, "busy")
             await applyArmedGoal(sessionId, createdDirectory)
-            if (inputMode !== "shell") await syncSessionKnowledge(createdDirectory, sessionId, await responseStyleInstruction, capturedRuntimeKey)
+            if (inputMode !== "shell" && !isAcpSession(sessionId)) await syncSessionKnowledge(createdDirectory, sessionId, await responseStyleInstruction, capturedRuntimeKey)
           } finally {
             resolveSessionCreated(false)
           }
@@ -2000,7 +1993,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       }
 
       const targetSessionId = capturedTarget?.sessionId ?? options?.sessionId ?? get().currentSessionId
-      const settleModelPick = targetSessionId
+      const settleModelPick = targetSessionId && !antigravity
         ? useSelectionStore.getState().captureSessionModelPickSettlement(targetSessionId, providerID, modelID, capturedRuntimeKey)
         : undefined
       const resumeAfterSend = options?.userInitiated && inputMode !== 'shell' && targetSessionId
@@ -2012,11 +2005,11 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       const configAgentName = useConfigStore.getState().currentAgentName
       const effectiveAgent = trimmedAgent || sessionAgentSelection || configAgentName || undefined
 
-      if (targetSessionId) {
+      if (targetSessionId && !antigravity) {
         useSelectionStore.getState().saveSessionModelSelection(targetSessionId, providerID, modelID)
       }
 
-      if (targetSessionId && effectiveAgent) {
+      if (targetSessionId && effectiveAgent && !antigravity) {
         useSelectionStore.getState().saveSessionAgentSelection(targetSessionId, effectiveAgent)
         useSelectionStore.getState().saveAgentModelVariantForSession(
           targetSessionId,
@@ -2063,7 +2056,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
         filename: attachmentWireName(a),
       }))
 
-      const knowledgeSync = responseStyleInstruction
+      const knowledgeSync = responseStyleInstruction && targetSessionId && !isAcpSession(targetSessionId)
         ? responseStyleInstruction.then((style) => syncSessionKnowledge(currentSessionDirectory, targetSessionId, style, capturedRuntimeKey))
         : undefined
 

@@ -42,6 +42,7 @@
     "build": "bun -e \"process.exit(0)\"",
     "ensure:electron": "node ./scripts/ensure-electron.mjs",
     "prepare:opencode-server": "bun install --cwd ../../vendor/opencode --frozen-lockfile --filter @opencode/server && bun ./scripts/prepare-opencode-server.mjs",
+    "prepare:antigravity": "node ./scripts/prepare-antigravity.mjs",
     "prepare:ripgrep": "node ./scripts/prepare-ripgrep.mjs",
     "prepare:workspace-runtime": "node ./scripts/prepare-workspace-runtime.mjs",
     "verify:opencode-server": "node ./scripts/verify-opencode-server.mjs --staged",
@@ -56,7 +57,7 @@
     "test:linux-desktop": "node --test ./linux-autostart.test.mjs ./linux-desktop-entry.test.mjs && node ./scripts/smoke-linux-app-discovery.mjs && node ./scripts/smoke-path-open-utils.mjs",
     "updater:e2e:fixture": "node ./scripts/updater-e2e-fixture.mjs",
     "verify:update-manifest": "node ./scripts/verify-update-manifest.mjs",
-    "package": "bun run build:web-assets && bun run prepare:opencode-server && bun run prepare:ripgrep && bun run prepare:workspace-runtime && bun run bundle:main && bun run rebuild:native && node ./scripts/package.mjs",
+    "package": "bun run build:web-assets && bun run prepare:opencode-server && bun run prepare:antigravity && bun run prepare:ripgrep && bun run prepare:workspace-runtime && bun run bundle:main && bun run rebuild:native && node ./scripts/package.mjs",
     "finalize:latest-yml": "node ./scripts/finalize-latest-yml.mjs",
     "type-check": "node --check ./entry.mjs && node --check ./early-startup.mjs && node --check ./main.mjs && node --check ./preload.mjs && node --check ./browser-panel-preload.cjs",
     "lint": "node -e \"process.exit(0)\""
@@ -119,6 +120,10 @@
       {
         "from": "resources/opencode-server",
         "to": "opencode-server"
+      },
+      {
+        "from": "resources/antigravity",
+        "to": "antigravity"
       },
       {
         "from": "resources/ripgrep",

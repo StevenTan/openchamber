@@ -7,6 +7,7 @@ import { useI18n } from '@/lib/i18n';
 export type FooterSheetAction = { id: string; label: string; icon: React.ReactNode; disabled?: boolean; onPointerRow?: true; onSelect: () => void };
 
 type FooterSheetActionsParams = {
+    canFork: boolean;
     assistantPlanText: string;
     canUseProjectPlanActions: boolean;
     contextPinPending: boolean | undefined;
@@ -32,6 +33,7 @@ type FooterSheetActionsParams = {
 };
 
 export const useFooterSheetActions = ({
+    canFork,
     assistantPlanText,
     canUseProjectPlanActions,
     contextPinPending,
@@ -141,7 +143,7 @@ export const useFooterSheetActions = ({
                 onSelect: () => { onToggleContextPin(); },
             });
         }
-        if (!isMiniChatSurface && !isReviewSessionView) {
+        if (canFork && !isMiniChatSurface && !isReviewSessionView) {
             actions.push({
                 id: 'fork-from-here',
                 onPointerRow: true,
@@ -163,5 +165,5 @@ export const useFooterSheetActions = ({
             }
         }
         return actions;
-    }, [assistantPlanText, canUseProjectPlanActions, contextPinPending, contextPinned, currentProjectRef, extraActions, handleForkClick, handleForkFromHere, handleSaveAsPlanClick, hasCopyableText, isFooterTTSPlaying, isMiniChatSurface, isReviewSessionView, onCopyFooter, onCopyLink, onSelectMessages, onToggleContextPin, playFooterTTS, reviewTransferAction, shareTurnAsImage, showMessageTTSButtons, stopFooterTTS, t]);
+    }, [assistantPlanText, canFork, canUseProjectPlanActions, contextPinPending, contextPinned, currentProjectRef, extraActions, handleForkClick, handleForkFromHere, handleSaveAsPlanClick, hasCopyableText, isFooterTTSPlaying, isMiniChatSurface, isReviewSessionView, onCopyFooter, onCopyLink, onSelectMessages, onToggleContextPin, playFooterTTS, reviewTransferAction, shareTurnAsImage, showMessageTTSButtons, stopFooterTTS, t]);
 };

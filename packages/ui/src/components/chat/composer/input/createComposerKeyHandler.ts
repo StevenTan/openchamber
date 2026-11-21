@@ -32,7 +32,7 @@ type Dependencies = {
     mobileActions: Pick<ReturnType<typeof useComposerMobileActions>, 'handlePromptHistoryShortcut'>;
     sessionScope: Pick<ReturnType<typeof useComposerSessionScope>, 'isBtwActive' | 'inputMode' | 'currentSessionId' | 'attachedFiles'>;
     sessionLifecycle: Pick<ReturnType<typeof useComposerSessionLifecycle>, 'handleExitBtw' | 'currentSessionPhase' | 'autoReviewRunning'>;
-    editorActions: Pick<ReturnType<typeof useComposerEditorActions>, 'handleCycleAgent'>;
+    editorActions: Pick<ReturnType<typeof useComposerEditorActions>, 'handleCycleAgent' | 'antigravity'>;
     queueState: Pick<ReturnType<typeof useComposerQueueState>, 'queuedMessages' | 'followUpBehavior'>;
     queueActions: Pick<ReturnType<typeof useComposerQueueActions>, 'handleQueuedMessageEdit' | 'handleQueueMessage'>;
     draftHistory: Pick<ReturnType<typeof useComposerDraftHistory>, 'messageHistory' | 'applyHistoryValue'>;
@@ -85,7 +85,7 @@ export function createComposerKeyHandler({
             return;
         }
 
-        if (!isBtwActive && inputMode === 'normal' && e.key === '!') {
+        if (!editorActions.antigravity && !isBtwActive && inputMode === 'normal' && e.key === '!') {
             const selection = composerRef.current?.getSelection();
             if (selection?.start === 0 && selection.end === 0) {
                 e.preventDefault();

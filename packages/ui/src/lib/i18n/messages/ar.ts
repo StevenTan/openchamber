@@ -4090,4 +4090,6 @@ export const dict = {
   'chat.promptHistorySearch.hint': "↑ ↓ للتصفح · Enter للتحميل · Esc للإغلاق",
   'helpDialog.item.searchPromptHistory': "البحث في سجل المطالبات (إدخال الدردشة)",
 
+  'chat.backend.label': "محرك الوكيل",
+
 } satisfies Record<keyof typeof englishDict, string>;

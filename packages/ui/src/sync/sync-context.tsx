@@ -12,7 +12,6 @@ import { updateChangedStreamingSessions, updateStreamingState } from "./streamin
 import { runBackgroundNetworkTask } from "@/lib/background-network"
 import { noteDeferredAnswersLoaded } from "./recoverable-questions"
 import { setActionRefs } from "./session-actions"
-import { subscribeSessionAdmission } from "./session-admission"
 import { setSyncRefs } from "./sync-refs"
 import { useSessionUIStore } from "./session-ui-store"
 import { useUIStore } from "@/stores/useUIStore"
@@ -23,19 +22,6 @@ import { opencodeClient } from "@/lib/opencode/client"
 import { usePermissionStore } from "@/stores/permissionStore"
 import { useMessageQueueStore } from "@/stores/messageQueueStore"
 import { isAutoReviewAvailable, useAutoReviewStore } from "@/stores/useAutoReviewStore"
-import { subscribeMessageQueueSync } from "./message-queue-sync"
-import { subscribeAutoReviewSync } from "./auto-review-sync"
-import { subscribePrWatchSync } from "./pr-watch-sync"
-import { subscribeExtensionWaitsSync } from "./extension-waits-sync"
-import { subscribeLaterPagesSync } from "./later-pages-sync"
-import { subscribeSessionWarmingSync } from "./session-warming-sync"
-import { subscribeSessionTodosSync } from "./session-todos-sync"
-import { subscribeSessionFoldersSync } from "./session-folders-sync"
-import { subscribeSessionDraftsSync } from "./session-drafts-sync"
-import { subscribePermissionPolicySync, subscribeSpacePermissionModes } from "./permission-mode-sync"
-import { subscribeControlStreamSync } from "./control-stream-sync"
-import { subscribeSpaceCatalogs } from "./space-catalog-sync"
-import { subscribeSpaceSessionProject } from "./space-session-project"
 import { useConfigStore } from "@/stores/useConfigStore"
 import { useGlobalSessionsStore } from "@/stores/useGlobalSessionsStore"
 import { spaceIdOfDirectory } from "@/lib/spaces/space-route"
@@ -72,7 +58,7 @@ import { resyncBlockingRequestsForActiveDirectory } from "./blocking-request-rec
 import { dormantLocations, wakeDormantLocations } from "./dormant-locations"
 import { isUiFocused } from "./surface-notifications"
 import { handleEvent } from "./sync-event-dispatch"
-import { applyControlStreamOnlyEvent } from "./sync-control-events"
+import { subscribeSessionFeatures } from "./session-feature-subscriptions"
 import { createDirectoryEventBatch, publishDirectoryEventBatch } from "./directory-event-batch"
 import { dropCachedSessionMessageRecordsSnapshots } from "./session-message-records"
 
@@ -516,27 +502,7 @@ export function SyncProvider(props: {
   }, [props.sdk])
 
   useEffect(() => {
-    const unsubscribeQueueEvents = subscribeMessageQueueSync(runtimeKey)
-    const unsubscribeSessionAdmission = subscribeSessionAdmission()
-    const unsubscribeAutoReviewEvents = subscribeAutoReviewSync(runtimeKey)
-    const unsubscribePrWatchEvents = subscribePrWatchSync(runtimeKey)
-    const unsubscribeExtensionWaitEvents = subscribeExtensionWaitsSync(runtimeKey)
-    const unsubscribeLaterPageEvents = subscribeLaterPagesSync(runtimeKey)
-    const unsubscribeSessionWarming = subscribeSessionWarmingSync(runtimeKey)
-    const unsubscribeSessionTodos = subscribeSessionTodosSync(runtimeKey)
-    const unsubscribeFolderEvents = subscribeSessionFoldersSync(runtimeKey)
-    const unsubscribeDraftEvents = subscribeSessionDraftsSync(runtimeKey)
-    const unsubscribeSpaceModes = subscribeSpacePermissionModes(runtimeKey)
-    const unsubscribePermissionPolicy = subscribePermissionPolicySync(
-      runtimeKey,
-      (event) => handleEvent("global", event, childStores, routingIndex, runtimeKey),
-    )
-    const unsubscribeControlStream = subscribeControlStreamSync(runtimeKey, (event) => {
-      if (event.type === "session.patched") handleEvent("global", event, childStores, routingIndex, runtimeKey)
-      else applyControlStreamOnlyEvent(event)
-    })
-    const unsubscribeSpaceCatalogs = subscribeSpaceCatalogs(runtimeKey)
-    const unsubscribeSpaceSessionProject = subscribeSpaceSessionProject(runtimeKey)
+    const unsubscribeSessionFeatures = subscribeSessionFeatures(runtimeKey, childStores, routingIndex)
     const resyncAfterStreamGap = (reason: SessionMaterializationReason) => {
       messageLoader.markHistoryStale()
       const gapEndedAt = Date.now()
@@ -655,21 +621,7 @@ export function SyncProvider(props: {
         pipelineReconnectRef.current = null
       }
       pipeline.cleanup()
-      unsubscribeQueueEvents()
-      unsubscribeSessionAdmission()
-      unsubscribeAutoReviewEvents()
-      unsubscribePrWatchEvents()
-      unsubscribeExtensionWaitEvents()
-      unsubscribeLaterPageEvents()
-      unsubscribeSessionWarming()
-      unsubscribeSessionTodos()
-      unsubscribeFolderEvents()
-      unsubscribeDraftEvents()
-      unsubscribeSpaceModes()
-      unsubscribePermissionPolicy()
-      unsubscribeControlStream()
-      unsubscribeSpaceCatalogs()
-      unsubscribeSpaceSessionProject()
+      unsubscribeSessionFeatures()
     }
   }, [props.sdk, childStores, messageLoader, routingIndex, messageStreamTransport, runtimeKey, triggerDirectoryResync])
 

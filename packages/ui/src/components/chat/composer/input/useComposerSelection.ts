@@ -13,11 +13,13 @@ import { selectAutoReady, useRoutingStore } from '@/stores/useRoutingStore';
 import { useKeybinds } from '@/hooks/useKeybind';
 import { getNextFavoriteModel } from '@/lib/modelRefs';
 import { modelVariantNames, nextThinkingVariant } from '@/lib/modelVariants';
+import { isAcpSession } from '@/lib/agent-backends/model';
+import { useAgentBackendStore } from '@/lib/agent-backends/store';
 
 type Dependencies = {
     column: Pick<ReturnType<typeof useComposerColumn>, 'columnPinned'>;
     editorState: Pick<ReturnType<typeof useComposerEditorState>, 'composerFormRef'>;
-    sessionScope: Pick<ReturnType<typeof useComposerSessionScope>, 'currentSessionId' | 'currentDirectory' | 'isBtwActive' | 'btwComposerSessionId' | 'sessionAgentPick' | 'btwAgentSelection' | 'btwModelSelection'>;
+    sessionScope: Pick<ReturnType<typeof useComposerSessionScope>, 'currentSessionId' | 'currentDirectory' | 'isBtwActive' | 'btwComposerSessionId' | 'sessionAgentPick' | 'btwAgentSelection' | 'btwModelSelection' | 'newSessionDraftOpen'>;
 };
 
 export function useComposerSelection({
@@ -29,6 +31,8 @@ export function useComposerSelection({
         currentSessionId, currentDirectory, isBtwActive, btwComposerSessionId, sessionAgentPick,
         btwAgentSelection, btwModelSelection,
     } = sessionScope;
+    const draftBackend = useAgentBackendStore(state => state.draftBackend);
+    const antigravity = sessionScope.newSessionDraftOpen ? draftBackend === 'antigravity' : isAcpSession(currentSessionId ?? '');
 
     const pinnedComposerSelection = usePinnedComposerSelection({
         enabled: columnPinned,
@@ -44,11 +48,11 @@ export function useComposerSelection({
 
     const configModelId = useConfigStore((state) => state.currentModelId);
 
-    const configCatalogLoaded = useConfigStore((state) => state.providersLoaded && state.agentsLoaded);
+    const configCatalogLoaded = useConfigStore((state) => antigravity || (state.providersLoaded && state.agentsLoaded));
 
-    const currentProviderId = pinnedComposerSelection?.model?.providerId ?? configProviderId;
+    const currentProviderId = antigravity ? 'antigravity' : pinnedComposerSelection?.model?.providerId ?? configProviderId;
 
-    const currentModelId = pinnedComposerSelection?.model?.modelId ?? configModelId;
+    const currentModelId = antigravity ? 'Antigravity' : pinnedComposerSelection?.model?.modelId ?? configModelId;
 
     const modelsMetadata = useConfigStore((state) => state.modelsMetadata);
 
@@ -71,7 +75,7 @@ export function useComposerSelection({
 
     const configAgentName = useConfigStore((state) => state.currentAgentName);
 
-    const currentAgentName = pinnedComposerSelection?.agent ?? sessionAgentPick ?? configAgentName;
+    const currentAgentName = antigravity ? undefined : pinnedComposerSelection?.agent ?? sessionAgentPick ?? configAgentName;
 
     const setAgent = useConfigStore((state) => state.setAgent);
 
@@ -177,6 +181,6 @@ export function useComposerSelection({
     return {
         currentProviderId, currentModelId, currentModelMetadata, agents, mailboxTarget, shownSessionId,
         currentAgentName, currentVariant, effectiveBtwSelection, configCatalogLoaded, setAgent,
-        btwModelSelectorOpen, setBtwModelSelectorOpen, pinnedComposerSelection,
+        btwModelSelectorOpen, setBtwModelSelectorOpen, pinnedComposerSelection, antigravity,
     };
 }

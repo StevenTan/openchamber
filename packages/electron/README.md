@@ -352,6 +352,7 @@ That runs, in order:
 
 1. `build:web-assets` to build the web UI and copy it into `packages/electron/resources/web-dist`.
 2. `prepare:opencode-server` to install the fork's server dependencies and compile `vendor/opencode`, staging the server and the target architecture's native files into `packages/electron/resources/opencode-server`.
+   `prepare:antigravity` stages the pinned official Antigravity CLI binary into `resources/antigravity` for ACP sessions.
 3. `prepare:ripgrep` to download/cache the target architecture's ripgrep and copy it into `packages/electron/resources/ripgrep`.
    `prepare:workspace-runtime` packages the target Python PDF runtime in `resources/workspace-runtime-bundle`.
 4. `bundle:main` to create `packages/electron/dist-bundle/{entry,main,early-startup}.mjs`.

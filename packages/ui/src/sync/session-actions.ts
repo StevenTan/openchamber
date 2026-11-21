@@ -28,7 +28,7 @@ import { useInputStore } from "./input-store"
 import type { ChildStoreManager } from "./child-store"
 import { computeSubtreeIds } from "./scoped-blocking-requests"
 import { withUserWorkTitle } from "@/lib/sessionWorkTitle"
-import { opencodeClient, type SyntheticContextInput } from "@/lib/opencode/client"
+import { opencodeClient, agentBackends, type SyntheticContextInput } from "@/lib/opencode/client"
 import { withSessionMetadata } from "@/lib/opencode/projection"
 import { findMessagePageItem } from "@/lib/opencode/messagePaging"
 import { toJsonRecord } from "@/lib/opencode/json"
@@ -1045,7 +1045,7 @@ async function resolveBlockingRequestTarget(
 }
 
 
-export type SessionCreateSelection = { model?: ModelSelection; agent?: string }
+export type SessionCreateSelection = { model?: ModelSelection; agent?: string; backend?: keyof typeof agentBackends }
 
 export async function createSession(
   title?: string,
@@ -1065,7 +1065,7 @@ export async function createSession(
     const cleanupSession = await opencodeClient.captureSessionCleanup(effectiveDirectory, runtimeKey)
     if (getRuntimeKey() !== runtimeKey || opencodeClient.getSdkClient() !== runtimeClient) return null
     const sessionMetadata = title ? withUserWorkTitle(metadata ?? {}, title) : metadata
-    const session = await opencodeClient.createSession(
+    const session = await agentBackends[selection?.backend ?? 'opencode'].createSession(
       { id, title, metadata: sessionMetadata, model: selection?.model, agent: selection?.agent },
       effectiveDirectory,
     )
