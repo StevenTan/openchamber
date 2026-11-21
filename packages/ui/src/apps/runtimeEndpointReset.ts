@@ -4,7 +4,7 @@ import { resetSpaceModelAccess } from '@/lib/spaces/space-model-access';
 import { resetSpaceCreationRequests } from '@/lib/spaces/space-creation-requests';
 import { useGuestsStore } from '@/lib/guests/store';
 import { useGuestOauthStore } from '@/lib/guests/oauth-store';
-import { opencodeClient } from '@/lib/opencode/client';
+import { getAgentBackend } from '@/lib/agent/active';
 import { subscribeRuntimeEndpointChanged, type RuntimeEndpointChangedDetail } from '@/lib/runtime-switch';
 import { disposeTerminalInputTransport } from '@/lib/terminalApi';
 import { useConfigStore } from '@/stores/useConfigStore';
@@ -57,7 +57,7 @@ import { useSessionMultiSelectStore } from '@/stores/useSessionMultiSelectStore'
 
 export const reconnectAppForTransportSwitch = (): void => {
   disposeTerminalInputTransport();
-  opencodeClient.reconnectToRuntimeBaseUrl();
+  getAgentBackend().runtime.reconnectToRuntimeBaseUrl();
   resetStreamingState();
 };
 
@@ -69,7 +69,7 @@ export const resetAppForRuntimeEndpointChange = (detail: RuntimeEndpointChangedD
   resetLaterPagesForRuntimeSwitch();
   disposeTerminalInputTransport();
   useTerminalStore.getState().clearAll();
-  opencodeClient.reconnectToRuntimeBaseUrl();
+  getAgentBackend().runtime.reconnectToRuntimeBaseUrl();
   useConfigStore.setState({
     providers: [],
     agents: [],

@@ -1,4 +1,4 @@
-import { opencodeClient } from '@/lib/opencode/client';
+import { getAgentBackend } from '@/lib/agent/active';
 import { normalizePath } from '@/lib/pathNormalization';
 import { useDirectoryStore } from '@/stores/useDirectoryStore';
 
@@ -16,7 +16,7 @@ export const resolveInitialDirectoryKey = (): string => {
         return DIRECTORY_KEY_GLOBAL;
     }
 
-    const directory = opencodeClient.getDirectory() ?? useDirectoryStore.getState().currentDirectory;
+    const directory = getAgentBackend().runtime.getDirectory() ?? useDirectoryStore.getState().currentDirectory;
     return toConfigDirectoryKey(directory);
 };
 

@@ -55,6 +55,7 @@ export function translateWireEvent(event: OpenCodeEvent): SyncEvent[] {
     case "session.created": {
       const info: Session = compact({
         id: event.data.sessionID,
+        backendID: 'opencode',
         parentID: sessionParentID(event.data),
         projectID: event.data.projectID,
         directory: event.data.location.directory,

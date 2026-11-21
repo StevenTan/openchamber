@@ -1797,7 +1797,7 @@ The global stream can omit a directory for a session-addressed event. OpenCode 2
 ### Runtime context versus directory context
 
 `SyncProvider` publishes two contexts. `SyncRuntimeContext` (`useSyncRuntime()`)
-holds the child-store manager, message loader, SDK, runtime key, and a
+holds the child-store manager, message loader, runtime key, and a
 subscribable `currentDirectory` source; its value changes only on runtime
 reconfiguration. `SyncContext` (`useSyncSystem()` / `useSync()`) adds the
 current directory string, so every consumer re-renders on each directory

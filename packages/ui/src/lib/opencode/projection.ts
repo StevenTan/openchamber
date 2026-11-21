@@ -61,6 +61,7 @@ export function withSessionMetadata(session: Session, metadata: Metadata): Sessi
 export function projectSession(info: SessionInfo): Session {
   return compact({
     id: info.id,
+    backendID: 'opencode',
     parentID: sessionParentID(info),
     projectID: info.projectID,
     directory: info.location.directory,

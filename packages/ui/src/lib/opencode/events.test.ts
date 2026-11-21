@@ -29,6 +29,7 @@ describe("translateWireEvent", () => {
       properties: {
         info: {
           id: "ses_1",
+          backendID: 'opencode',
           projectID: "proj_1",
           directory: "/repo",
           title: "One",

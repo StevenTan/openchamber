@@ -1,3 +1,4 @@
+import type { AgentRuntime } from "@/lib/agent/runtime"
 import type { StoreApi } from "zustand"
 import type { SessionStatus } from "@/lib/opencode/model"
 import { type DirectoryStore } from "./child-store"
@@ -5,7 +6,7 @@ import { runBackgroundNetworkTask } from "@/lib/background-network"
 import { selectHeldSessionStatuses } from "./directory-recovery-snapshots"
 import { hasPromptInFlight, withPromptsInFlight } from "./prompts-in-flight"
 import { getReconnectCandidateSessionIds } from "./reconnect-recovery"
-import { opencodeClient } from "@/lib/opencode/client"
+import { getAgentBackend } from "@/lib/agent/active"
 import { applyGlobalSessionStatusSnapshot, getDirectoryOwnedSessionIds } from "./global-session-status"
 import { getViewedSessionMaterializationTarget } from "./viewed-sessions"
 
@@ -35,7 +36,7 @@ export function getLiveSessionCandidateIds(state: DirectoryStore): string[] {
 }
 
 type DirectorySessionStatusSnapshot = NonNullable<
-  Awaited<ReturnType<typeof opencodeClient.getActiveSessionStatuses>>
+  Awaited<ReturnType<AgentRuntime["getActiveSessionStatuses"]>>
 >
 
 type StatusSnapshotMode = "monotonic" | "authoritative"
@@ -100,7 +101,7 @@ export async function resyncDirectorySessionStatuses(
   isStale?: () => boolean,
 ): Promise<DirectorySessionStatusSnapshot | null> {
   const invalidatedAtStart = store.getState().sessionStatusInvalidated
-  const nextStatuses = await opencodeClient.getActiveSessionStatuses(directory)
+  const nextStatuses = await getAgentBackend().runtime.getActiveSessionStatuses(directory)
   if (nextStatuses === null || isStale?.()) return null
   const currentInvalidated = store.getState().sessionStatusInvalidated
   const eligibleIds = candidateSessionIds.filter((id) => (

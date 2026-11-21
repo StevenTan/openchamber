@@ -1,4 +1,5 @@
-import { conversationClient } from "@/lib/agent/active"
+import { rememberSessionBackend } from "@/lib/agent/registry"
+import { conversationClient, getAgentBackend } from "@/lib/agent/active"
 import { syncEventMessageID, syncEventSessionID, type SyncEvent } from "@/lib/agent/events"
 import type { PermissionRequest } from "@/lib/opencode/model"
 import { isVSCodeRuntime } from "@/lib/desktop"
@@ -84,6 +85,7 @@ export function handleEvent(
   batch?: DirectoryEventBatch,
   globalEffectsAlreadyApplied = false,
 ) {
+  if (payload.type === "session.created") rememberSessionBackend(payload.properties.info)
   if (payload.type === "openchamber.notification") {
     handleUiNotificationEvent(payload.properties, normalizeEventDirectory(rawDirectory))
     return
@@ -113,7 +115,7 @@ export function handleEvent(
 
   if (payload.type === "location.shutdown") {
     if (!directory || directory === "global" || expectedRuntimeKey !== getRuntimeKey()) return
-    if (directory !== opencodeClient.getDirectory()) {
+    if (directory !== getAgentBackend().runtime.getDirectory()) {
       forgetMcpStatus(directory)
       return
     }
@@ -216,7 +218,7 @@ export function handleEvent(
       }
       if (!recent) {
         getImperativeSessionMessageLoader()?.markHistoryStale()
-        const refreshing = childStores.refreshAfterStreamRestart(opencodeClient.getDirectory())
+        const refreshing = childStores.refreshAfterStreamRestart(getAgentBackend().runtime.getDirectory())
         for (const dir of directoriesWithRunningShells()) {
           if (refreshing.has(normalizePath(dir) ?? dir)) continue
           void runBackgroundNetworkTask(() => refreshBackgroundShells(dir, (target) => opencodeClient.listRunningShells(target)))

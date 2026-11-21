@@ -142,7 +142,8 @@ The preload bridge exposes desktop-only APIs to the web UI through `window.__OPE
 `browser-playwright.mjs` binds the official Playwright MCP page tools to a
 panel webview through a local-page-gated IPC command. It uses Electron's native
 debugger as a single-page CDP transport, preserving the panel's session and page.
-Native input is routed to that view and text uses `webContents.insertText`.
+Keyboard events use that view's `webContents.sendInputEvent`, and text insertion
+uses `webContents.insertText`, independently of the app's keyboard focus.
 The connection has no browser-wide debug listener; app windows and other panel
 tabs are outside its target scope. OpenChamber owns tab creation and closing,
 viewport sizing and screenshot placement.

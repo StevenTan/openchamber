@@ -48,6 +48,21 @@ async function fixture(execute = () => Effect.succeed({ content: 'FILE_CONTENT',
   return { tools, permissions, skills, request, toolHooks };
 }
 
+it('returns stored values through the native output encoder', async () => {
+  const { tools } = await fixture();
+  const context = { sessionID: 'ses_memory', agent: 'build', messageID: 'msg_memory', id: 'call_memory' };
+  const value = { marker: 'expected', n: 17 };
+  const store = tools.get('store');
+  const load = tools.get('load');
+  const input = await Effect.runPromise(Schema.decodeUnknownEffect(store.input)({ key: 'probe', value }));
+  await Effect.runPromise(store.execute(input, context));
+  const result = await Effect.runPromise(load.execute({ key: 'probe' }, context));
+  const output = Schema.isSchema(load.output)
+    ? await Effect.runPromise(Schema.encodeEffect(load.output)(result.output))
+    : (await load.output['~standard'].validate(result.output)).value;
+  expect(output).toEqual(value);
+});
+
 it('hides virtual skills registered after activation and rejects their loading', async () => {
   const f = await fixture();
   f.skills.push(

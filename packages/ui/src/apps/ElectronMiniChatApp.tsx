@@ -1,4 +1,4 @@
-import { createOpenCodeBackend } from "@/lib/opencode/backend"
+import { getAgentBackend } from "@/lib/agent/active"
 import React from 'react';
 import { z } from 'zod';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
@@ -15,7 +15,6 @@ import { usePushVisibilityBeacon } from '@/hooks/usePushVisibilityBeacon';
 import { useWindowTitle } from '@/hooks/useWindowTitle';
 import { useRoutingSync } from '@/hooks/useRoutingSync';
 import { useRootScrollLock } from '@/hooks/useRootScrollLock';
-import { opencodeClient } from '@/lib/opencode/client';
 import { openSession } from '@/lib/router/openSessionFromRoute';
 import type { RuntimeAPIs } from '@/lib/api/types';
 import { useDirectoryStore } from '@/stores/useDirectoryStore';
@@ -306,7 +305,7 @@ export function ElectronMiniChatApp({ apis }: ElectronMiniChatAppProps) {
   const currentDirectory = useDirectoryStore((state) => state.currentDirectory);
 
   React.useEffect(() => {
-    opencodeClient.setDirectory(currentDirectory || config.directory || undefined);
+    getAgentBackend().runtime.setDirectory(currentDirectory || config.directory || undefined);
   }, [config.directory, currentDirectory]);
 
   React.useEffect(() => {
@@ -323,7 +322,7 @@ export function ElectronMiniChatApp({ apis }: ElectronMiniChatAppProps) {
 
   return (
     <ErrorBoundary>
-      <SyncProvider backend={createOpenCodeBackend(opencodeClient.getSdkClient())} directory={currentDirectory || config.directory || ''}>
+      <SyncProvider backend={getAgentBackend()} directory={currentDirectory || config.directory || ''}>
         <RuntimeAPIProvider apis={apis}>
           <TooltipProvider delayDuration={300} skipDelayDuration={150}>
             <div className="h-full text-foreground bg-background">

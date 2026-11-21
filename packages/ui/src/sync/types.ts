@@ -1,15 +1,14 @@
+import type { FormRequest, PermissionRequest } from "@/lib/agent/requests"
+import type { ConversationConfiguration } from "@/lib/agent/runtime"
 import type {
-  Config,
-  FormRequest,
   Message,
   Part,
-  PermissionRequest,
   Project,
   Session,
   SessionStatus,
   Vcs,
-} from "@/lib/opencode/model"
-import type { ProviderCatalog } from "@/lib/opencode/client"
+} from "@/lib/agent/model"
+import type { ProviderCatalog } from "@/lib/agent/client"
 
 export type Path = {
   directory: string
@@ -33,7 +32,7 @@ export type State = {
   project: string
   projectMeta: ProjectMeta | undefined
   icon: string | undefined
-  config: Config
+  config: ConversationConfiguration
   path: Path
   session: Session[]
   sessionTotal: number
@@ -58,7 +57,7 @@ export type GlobalState = {
   path: Path
   projects: Project[]
   providers: ProviderCatalog
-  config: Config
+  config: ConversationConfiguration
   reload: undefined | "pending" | "complete"
 }
 

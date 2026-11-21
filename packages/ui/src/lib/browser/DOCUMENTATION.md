@@ -13,6 +13,11 @@ This folder is the UI half of the in-app browser and of agent browser control. T
 
 ## Invariants
 
+- Agent page actions share one drawing and focus lifetime in
+  `components/browser/useWebviewFocusGuard.ts`. A hidden stage stays composited
+  at zero opacity while actions run and restores its original style after the
+  last action finishes. Playwright operations and captures use this same entry.
+
 - The browser surface has one vocabulary. Code in this folder does not branch on whether the view is a Chromium `<webview>` or an iframe.
 - Every field an annotation consumer dereferences is checked by `isBrowserAnnotationPayload` at the boundary. The overlay script, the prompt formatter and the screenshot renderer never assume a field is present because another one looked right.
 - The annotation overlay runs in a page we do not control. It imports nothing, reads no OpenChamber CSS variable, keeps every piece of chrome in one closed shadow root, and receives every color and label already resolved and translated.

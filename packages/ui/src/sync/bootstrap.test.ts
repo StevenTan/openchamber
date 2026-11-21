@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import { createStore } from "zustand/vanilla"
 import { opencodeClient } from "@/lib/opencode/client"
-import type { FormRequest, Session } from "@/lib/opencode/model"
+import type { Config, FormRequest, Session } from "@/lib/opencode/model"
 import { bootstrapDirectory } from "./bootstrap"
 import { INITIAL_STATE, type State } from "./types"
 import { getBackgroundNetworkState, runBackgroundNetworkTask } from "../lib/background-network"
@@ -197,7 +197,7 @@ describe("bootstrapDirectory", () => {
   })
 
   test("an in-flight response cannot commit after its initialization is superseded", async () => {
-    const response = deferred<State["config"]>()
+    const response = deferred<Config>()
     const started = deferred<void>()
     let stale = false
     config.mockImplementation(() => { started.resolve(); return response.promise })

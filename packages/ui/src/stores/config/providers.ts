@@ -1,10 +1,9 @@
-import { conversationClient } from "@/lib/agent/active"
+import { conversationClient, getAgentBackend } from "@/lib/agent/active"
 import { type ConfigSlice, type ConfigStore, type DirectoryScopedConfig, type ProviderModel, type ProviderWithModelList } from './types';
 import { toDirectoryKey, fromDirectoryKey, normalizeConfigPath as resolveConfigDirectory } from './directories';
 import { getProjectDefaultsForConfigDirectory } from './projectDefaults';
 import { captureConfigRuntimeContext, isConfigRuntimeContextCurrent } from './runtime';
 import { markStartupTrace, measureStartupTrace } from '@/lib/startupTrace';
-import { opencodeClient } from '@/lib/opencode/client';
 import {
     catalogLifecycle,
     markCatalogLoaded,
@@ -134,7 +133,7 @@ export const createProviderCatalog: ConfigSlice<'invalidateProviderCache' | 'loa
             markStartupTrace('loadProviders:skippedUnknownDirectory', { requestedDirectory, source: options?.source ?? 'unknown' });
             return;
         }
-        const effectiveDirectory = configDirectory ?? opencodeClient.getDirectory() ?? null;
+        const effectiveDirectory = configDirectory ?? getAgentBackend().runtime.getDirectory() ?? null;
         const directoryKey = toDirectoryKey(configDirectory);
         const inFlightKey = getConfigLoadKey(runtimeContext, directoryKey);
         const source = options?.source ?? 'unknown';

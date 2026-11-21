@@ -2,7 +2,7 @@ import type { StoreApi } from "zustand"
 import { ChildStoreManager, type DirectoryStore } from "./child-store"
 import { countSyncPerformance } from "./performance-diagnostics"
 import { syncDebug } from "./debug"
-import { opencodeClient } from "@/lib/opencode/client"
+import { getAgentBackend } from "@/lib/agent/active"
 import { getSessionMaterializationRequestKey, isSessionMaterializationStillNeeded, type SessionMaterializationRequest } from "./materialization"
 import { getRuntimeKey } from "@/lib/runtime-switch"
 import { getImperativeSessionMessageLoader } from "./session-message-loader"
@@ -111,9 +111,9 @@ async function materializeSessionFromServer(
   options?: SessionMaterializationRequest & { isStale?: () => boolean },
 ) {
   const runtimeKey = getRuntimeKey()
-  const sdk = opencodeClient.getSdkClient()
+  const sdk = getAgentBackend().events.identity
   const isStale = () => options?.isStale?.() || getRuntimeKey() !== runtimeKey
-    || opencodeClient.getSdkClient() !== sdk
+    || getAgentBackend().events.identity !== sdk
   const statusBeforeMaterialization = store.getState().session_status?.[sessionID]
   syncDebug.recovery.materializing({
     reason: options?.reason ?? "ensure-session-messages",

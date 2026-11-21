@@ -54,6 +54,24 @@ async function connectPanelPage(target, cursor, requests) {
           await target.insertText(params.text);
           return {};
         }
+        if (method === 'Input.dispatchKeyEvent') {
+          const modifiers = ['alt', 'control', 'meta', 'shift'].filter((_, index) => params.modifiers & (1 << index));
+          if (/^[A-Z]$/.test(params.key) && !modifiers.includes('shift')) modifiers.push('shift');
+          if (params.autoRepeat) modifiers.push('isAutoRepeat');
+          if (params.isKeypad) modifiers.push('isKeypad');
+          target.sendInputEvent({
+            type: params.type === 'keyUp' ? 'keyUp' : 'keyDown',
+            keyCode: params.key.replace(/^Arrow/, ''),
+            modifiers,
+          });
+          if (params.text) target.sendInputEvent({ type: 'char', keyCode: params.text, modifiers });
+          for (const command of params.commands ?? []) {
+            if (['selectAll', 'cut', 'copy', 'paste', 'undo', 'redo'].includes(command)) {
+              await target.executeJavaScript(`document.execCommand(${JSON.stringify(command)})`, true);
+            }
+          }
+          return {};
+        }
         if (method === 'Page.setInterceptFileChooserDialog') {
           if (params.enabled) fileChooserSessions.add(sessionId);
           else fileChooserSessions.delete(sessionId);

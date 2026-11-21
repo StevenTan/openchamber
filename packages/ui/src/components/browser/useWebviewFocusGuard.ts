@@ -10,6 +10,23 @@ export const isStageShown = (stage: HTMLElement): boolean => {
     && stage.checkVisibility({ opacityProperty: true, visibilityProperty: true });
 };
 
+const revealStageForAction = (stage: HTMLElement | null): (() => void) => {
+  if (!stage || isStageShown(stage)) return () => {};
+  const rect = stage.getBoundingClientRect();
+  const previousStyle = stage.style.cssText;
+  Object.assign(stage.style, {
+    position: 'fixed',
+    top: `${rect.top}px`,
+    left: `${Math.max(0, Math.min(rect.left, window.innerWidth - rect.width))}px`,
+    width: `${rect.width}px`,
+    height: `${rect.height}px`,
+    visibility: 'visible',
+    opacity: '0',
+    pointerEvents: 'none',
+  });
+  return () => { stage.style.cssText = previousStyle; };
+};
+
 const focusTarget = (event: FocusEvent): HTMLElement | null => {
   const target = event.composedPath()[0];
   return target instanceof HTMLElement ? target : null;
@@ -27,6 +44,7 @@ export const useWebviewFocusGuard = (
 ) => {
   const agentActionsRef = React.useRef(0);
   const agentFocusActionsRef = React.useRef(0);
+  const restoreStageRef = React.useRef<() => void>(() => {});
   const settleUntilRef = React.useRef(0);
   const lastFocusedRef = React.useRef<HTMLElement | null>(null);
 
@@ -89,16 +107,18 @@ export const useWebviewFocusGuard = (
       }
       return releasePageFocus;
     };
+    if (agentActionsRef.current === 0) restoreStageRef.current = revealStageForAction(stageRef.current);
     agentActionsRef.current += 1;
     try {
       return await run(holdPageFocus);
     } finally {
       agentActionsRef.current -= 1;
+      if (agentActionsRef.current === 0) restoreStageRef.current();
       settleUntilRef.current = Date.now() + AGENT_SETTLE_MS;
       releasePageFocus();
       if (!userWasInPage && agentFocusActionsRef.current === 0) giveFocusBack();
     }
-  }, [giveFocusBack, webview]);
+  }, [giveFocusBack, stageRef, webview]);
 };
 
 export type HoldPageFocus = () => () => void;

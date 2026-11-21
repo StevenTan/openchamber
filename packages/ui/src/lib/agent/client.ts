@@ -1,6 +1,7 @@
 import type { ContextPartMetadata } from '@/lib/messages/contextParts';
 import type { SpaceMark } from '@/lib/spaces/spaces-store';
-import type { Agent, FormValue, Model, Provider } from '../opencode/model';
+import type { Agent, Model, Provider } from './catalog';
+import type { FormValue } from './requests';
 import type { Message, Metadata, ModelRef, ModelSelection, Part, Session, SyntheticMessage, UserMessage } from './model';
 
 export type SessionPage = {

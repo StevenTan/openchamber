@@ -196,9 +196,11 @@ generic rendering.
 
 ### Why unchanged catalog and form types use domain aliases
 
-Integration, form and permission contracts retain their complete SDK shapes
-through aliases in `model.ts`. Consumers import these names from the adapter so
-an upstream API change has one owning folder without adding runtime conversion.
+Integration configuration retains its SDK shape in `model.ts`. Conversation
+catalogs, forms and permission requests use the application contracts from
+`../agent`; native records satisfy these structural contracts without discarding
+provider settings or form fields. `runtime.ts` supplies OpenCode health,
+location initialization and conversation defaults to the common backend runtime.
 
 ### Why fresh provider reads wait for post-call requests
 

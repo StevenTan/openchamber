@@ -1,4 +1,5 @@
-import { type Model, type Provider, type Agent, type Config } from '@/lib/opencode/model';
+import type { ConversationConfiguration } from "@/lib/agent/runtime";
+import { type Model, type Provider, type Agent } from '@/lib/agent/catalog';
 import { type ProjectConfigError } from '@/lib/opencode/configError';
 import { type ModelMetadata } from '@/types';
 import { type VoiceApiKeyState, type VoiceApiKeyKind } from '@/lib/voiceKeysApi';
@@ -177,7 +178,7 @@ export interface ConfigStore {
     applyDefaultModelAgentSelection: (options?: { projectDefaultAgent?: string; projectDefaultModel?: string; projectDefaultVariant?: string }) => void;
     resolveDirectoryDefaultSelection: (directory: string) => Promise<DirectoryDefaultSelection | null>;
     dropStaleAutoSelection: () => void;
-    applyOpenCodeConfigDefaults: (directory?: string | null, source?: string, config?: Config) => void;
+    applyOpenCodeConfigDefaults: (directory?: string | null, source?: string, config?: ConversationConfiguration) => void;
     setSelectedProvider: (providerId: string) => void;
     setSettingsDefaultModel: (model: string | undefined) => void;
     setSettingsDefaultVariant: (variant: string | undefined) => void;

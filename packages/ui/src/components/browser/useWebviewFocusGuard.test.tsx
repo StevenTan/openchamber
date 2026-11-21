@@ -96,6 +96,41 @@ describe('webview focus guard', () => {
     expect(document.activeElement).toBe(composer);
   });
 
+  test('a hidden page is composited transparently for the action and restored afterwards', async () => {
+    stage.style.visibility = 'hidden';
+    const original = stage.style.cssText;
+    await guardAgentAction(async () => {
+      expect(stage.style.visibility).toBe('visible');
+      expect(stage.style.opacity).toBe('0');
+      expect(stage.style.pointerEvents).toBe('none');
+      expect(stage.style.position).toBe('fixed');
+    });
+    expect(stage.style.cssText).toBe(original);
+  });
+
+  test('a failed action restores the hidden page', async () => {
+    stage.style.visibility = 'hidden';
+    const original = stage.style.cssText;
+    await expect(guardAgentAction(async () => { throw new Error('Click failed'); })).rejects.toThrow('Click failed');
+    expect(stage.style.cssText).toBe(original);
+  });
+
+  test('parallel actions retain the composited page until both finish', async () => {
+    stage.style.visibility = 'hidden';
+    const original = stage.style.cssText;
+    let finishFirst!: () => void;
+    let finishSecond!: () => void;
+    const first = guardAgentAction(() => new Promise<void>(resolve => { finishFirst = resolve; }));
+    const second = guardAgentAction(() => new Promise<void>(resolve => { finishSecond = resolve; }));
+    finishFirst();
+    await first;
+    expect(stage.style.visibility).toBe('visible');
+    expect(stage.style.opacity).toBe('0');
+    finishSecond();
+    await second;
+    expect(stage.style.cssText).toBe(original);
+  });
+
   test('a page the user can see takes focus when nothing drives it', () => {
     stageShown = true;
     webview.focus();

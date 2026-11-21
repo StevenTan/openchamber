@@ -1,3 +1,4 @@
+import type { ConversationConfiguration } from "@/lib/agent/runtime";
 import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import type { Agent, Config } from '@/lib/opencode/model';
 import type { ModelMetadata } from '@/types';
@@ -3099,7 +3100,7 @@ describe('useConfigStore provider persistence', () => {
       },
     });
 
-    emitSyncConfigChanged(worktree, { default_agent: 'review', model: 'openai/gpt-5.5' });
+    emitSyncConfigChanged(worktree, { defaultAgent: 'review', defaultModel: 'openai/gpt-5.5' });
 
     const state = useConfigStore.getState();
     expect(state.directoryScoped[worktree]?.opencodeDefaultAgent).toBe('review');
@@ -3141,7 +3142,7 @@ describe('useConfigStore provider persistence', () => {
       },
     });
 
-    emitSyncConfigChanged(DIRECTORY, { default_agent: 'review', model: 'openai/gpt-5.5' });
+    emitSyncConfigChanged(DIRECTORY, { defaultAgent: 'review', defaultModel: 'openai/gpt-5.5' });
 
     const state = useConfigStore.getState();
     expect(state.currentAgentName).toBe('plan');
@@ -3179,7 +3180,7 @@ describe('useConfigStore provider persistence', () => {
       },
     });
 
-    emitSyncConfigChanged(DIRECTORY, { default_agent: 'review', model: 'openai/gpt-5.5' });
+    emitSyncConfigChanged(DIRECTORY, { defaultAgent: 'review', defaultModel: 'openai/gpt-5.5' });
 
     const state = useConfigStore.getState();
     expect(state.currentAgentName).toBe('review');
@@ -3222,7 +3223,7 @@ describe('useConfigStore provider persistence', () => {
     const unsubscribe = useConfigStore.subscribe(() => {
       updates += 1;
     });
-    emitSyncConfigChanged(DIRECTORY, { default_agent: 'review', model: 'openai/gpt-5.5' });
+    emitSyncConfigChanged(DIRECTORY, { defaultAgent: 'review', defaultModel: 'openai/gpt-5.5' });
     unsubscribe();
 
     expect(updates).toBe(0);
@@ -3256,7 +3257,7 @@ describe('useConfigStore provider persistence', () => {
     });
     liveAgents = [testAgent('build'), testAgent('review')];
 
-    emitSyncConfigChanged(worktree, { default_agent: 'review', model: 'openai/gpt-5.5' });
+    emitSyncConfigChanged(worktree, { defaultAgent: 'review', defaultModel: 'openai/gpt-5.5' });
     await useConfigStore.getState().loadAgents({ directory: worktree, source: 'test:preserveWorktreeDefaults' });
 
     const state = useConfigStore.getState();
@@ -3279,8 +3280,8 @@ describe('useConfigStore provider persistence', () => {
     });
 
     emitSyncConfigChanged(DIRECTORY, {
-      default_agent: 'review',
-      model: { providerID: 'openai', model: 'gpt-5.5', variant: 'xhigh' },
+      defaultAgent: 'review',
+      defaultModel: 'openai/gpt-5.5#xhigh',
     });
 
     const state = useConfigStore.getState();
@@ -3306,7 +3307,7 @@ describe('useConfigStore provider persistence', () => {
     });
 
     emitSyncConfigChanged(DIRECTORY, {
-      model: { providerID: 'openai', model: 'gpt-5.5', variant: 'ultra' },
+      defaultModel: 'openai/gpt-5.5#ultra',
     });
 
     const state = useConfigStore.getState();
@@ -3317,8 +3318,8 @@ describe('useConfigStore provider persistence', () => {
   });
 
   test('loadAgents reads the short string form with a variant', async () => {
-    const syncConfigs = new Map<string, Config>([
-      [DIRECTORY, { default_agent: 'review', model: 'openai/gpt-5.5#xhigh' }],
+    const syncConfigs = new Map<string, ConversationConfiguration>([
+      [DIRECTORY, { defaultAgent: 'review', defaultModel: 'openai/gpt-5.5#xhigh' }],
     ]);
     // SAFETY: the mock implements only the child-store surface getSyncConfig reads.
     setSyncRefs({

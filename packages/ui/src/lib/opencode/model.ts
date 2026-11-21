@@ -1,22 +1,14 @@
 
 import type {
-  AgentInfo,
   CommandInfo,
   ConfigEntry,
   ConnectionInfo,
-  FormField as FormFieldWire,
-  FormInfo,
-  FormValue as FormValueWire,
-  FormWhen as FormWhenWire,
   IntegrationExternalMethod as IntegrationExternalMethodWire,
   IntegrationInfo,
   IntegrationKeyMethod as IntegrationKeyMethodWire,
   IntegrationOAuthMethod as IntegrationOAuthMethodWire,
   McpServer,
   ModelInfo,
-  PermissionRequest as PermissionRequestWire,
-  PermissionEffect as PermissionEffectWire,
-  ProviderInfo,
   SkillInfo,
 } from "@opencode/client"
 
@@ -26,35 +18,23 @@ export type { JsonValue, Metadata, ModelRef, ModelSelection, TokenUsageInfo, Per
 
 type MessageRole = Message["role"]
 
-export type Agent = Omit<AgentInfo, "name"> & { name: string; displayName: string }
+
 export type Command = CommandInfo
 export type Skill = SkillInfo
-export type Provider = ProviderInfo
+
 export type Integration = IntegrationInfo
 export type IntegrationConnection = ConnectionInfo
 export type IntegrationExternalMethod = IntegrationExternalMethodWire
 export type IntegrationKeyMethod = IntegrationKeyMethodWire
 export type IntegrationOAuthMethod = IntegrationOAuthMethodWire
-export type FormField = FormFieldWire
-export type FormValue = FormValueWire
-export type FormWhen = FormWhenWire
-export type PermissionEffect = PermissionEffectWire
-export type Model = ModelInfo
-export type McpServerStatus = McpServer
-export type Vcs = { branch?: string; defaultBranch?: string }
 
-export type Project = {
-  id: string
-  worktree: string
-  vcs?: string
-  name?: string
-  icon?: { url?: string; override?: string; color?: string }
-  commands?: { start?: string }
-  time: { created: number; updated: number }
-  sandboxes: string[]
-}
+
+
+
+export type McpServerStatus = McpServer
 export type ConfigDocument = Extract<ConfigEntry, { type: "document" }>
 export type Config = ConfigDocument["info"]
+export type OpenCodeModel = ModelInfo
 
 
 export function toModelRef({ providerID, id, variant }: ModelSelection): ModelRef {
@@ -84,10 +64,10 @@ export function compact<T extends object>(value: T): T {
 
 
 
-export type PermissionRequest = PermissionRequestWire
+
 export type PermissionReply = "once" | "always" | "reject"
 
-export type FormRequest = FormInfo
+
 
 
 export const partIds = {
@@ -131,3 +111,7 @@ export const getLastConversationRecord = <T extends { info: Message }>(
 
 export const isIncompleteAssistantTurn = (message: Message | undefined): boolean =>
   message?.role === "assistant" && message.time.completed === undefined
+
+export type { Agent, Model, Provider } from "../agent/catalog"
+export type { FormField, FormValue, FormWhen, FormRequest, PermissionRequest, PermissionEffect } from "../agent/requests"
+export type { Project, Vcs } from "../agent/model"

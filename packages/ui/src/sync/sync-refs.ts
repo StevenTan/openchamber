@@ -1,5 +1,5 @@
 
-import type { Config } from "@/lib/opencode/model"
+import type { ConversationConfiguration } from "@/lib/agent/runtime"
 import type { ChildStoreManager } from "./child-store"
 import { getSessionMaterializationStatus } from "./materialization"
 import type { State } from "./types"
@@ -7,7 +7,7 @@ import type { State } from "./types"
 let _childStores: ChildStoreManager | null = null
 let _directory: string = ""
 let _registerSessionDirectory: ((sessionID: string, directory: string) => void) | null = null
-const configListeners = new Set<(directory: string, config: Config) => void>()
+const configListeners = new Set<(directory: string, config: ConversationConfiguration) => void>()
 let cachedSessionManager: ChildStoreManager | null = null
 let cachedSessionSlices = new Map<string, State["session"]>()
 let cachedSessionsById = new Map<string, State["session"][number]>()
@@ -48,19 +48,19 @@ export function getDirectoryState(directory?: string): State | undefined {
   return stores.getState(dir)
 }
 
-export function getSyncConfig(directory?: string): Config | undefined {
+export function getSyncConfig(directory?: string): ConversationConfiguration | undefined {
   const config = getDirectoryState(directory)?.config
   return config && Object.keys(config).length > 0 ? config : undefined
 }
 
-export function subscribeToSyncConfigChanges(listener: (directory: string, config: Config) => void): () => void {
+export function subscribeToSyncConfigChanges(listener: (directory: string, config: ConversationConfiguration) => void): () => void {
   configListeners.add(listener)
   return () => {
     configListeners.delete(listener)
   }
 }
 
-export function emitSyncConfigChanged(directory: string, config: Config): void {
+export function emitSyncConfigChanged(directory: string, config: ConversationConfiguration): void {
   if (!directory) return
   for (const listener of configListeners) {
     listener(directory, config)

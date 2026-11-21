@@ -3,8 +3,10 @@
 ## Ownership
 
 This module owns the application conversation model, conversation operations and
-normalized event subscription contract. `active.ts` composes the application's
-conversation client. The OpenCode adapter owns SDK calls, native event decoding
+normalized event subscription and runtime contracts. `active.ts` dispatches
+conversation operations through the backend registry. `../agentBackends.ts`
+registers the application's backend factories and selects the startup backend.
+The OpenCode adapter owns SDK calls, native event decoding
 and transport in `../opencode`. Sync owns transcript membership and store writes.
 
 ## Invariants
@@ -15,9 +17,16 @@ and transport in `../opencode`. Sync owns transcript membership and store writes
   selection, sends, interruption and answers to pending requests.
 - Failed authoritative reads reject. Successful empty pages retain their cursor
   semantics; a transport failure cannot become an empty conversation.
-- An `AgentBackend` supplies the conversation client and its event source.
+- Session records carry `backendID`. Loaded history, new sessions, live creation
+  events and persisted records establish runtime-scoped ownership. Operations
+  on a known session use its owning backend even when another backend is selected.
+  Persisted records without `backendID` belong to OpenCode.
+- An `AgentBackend` supplies the conversation client, event source and runtime.
   The source's identity identifies the connection whose replacement restarts sync.
   A subscription owns its existing reconnect and cleanup behavior.
+- The runtime supplies health, directory initialization, conversation defaults
+  and pending-request snapshots. Native configuration files and authentication
+  remain owned by the corresponding adapter and its settings.
 - Web, Electron, VS Code, hosted mobile and Capacitor use the same contracts.
   Their runtime transport continues to own authentication and relay routing.
 
@@ -28,6 +37,12 @@ and transport in `../opencode`. Sync owns transcript membership and store writes
 The common client exposes conversation operations. OpenCode-specific filesystem,
 configuration and advanced session operations remain with the OpenCode adapter,
 alongside the native projections used by those operations.
+
+### Conversation defaults
+
+Shared configuration snapshots contain the default agent and formatted model
+selection. Native settings are read and interpreted by the adapter before these
+snapshots reach sync and composer selection.
 
 ### Transport ownership
 

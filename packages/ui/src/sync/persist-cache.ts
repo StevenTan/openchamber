@@ -1,3 +1,4 @@
+import { rememberSessionBackend } from "@/lib/agent/registry"
 
 import { parseMetadata } from "@/lib/metadataParse"
 import type { Session, Vcs } from "@/lib/opencode/model"
@@ -250,6 +251,7 @@ export type PersistedDirCache = {
 const cachedSessionSchema = z.looseObject({
   id: z.string().min(1),
   directory: z.string(),
+  backendID: z.string().optional(),
   projectID: z.string(),
   title: z.string(),
   time: z.looseObject({ created: z.number(), updated: z.number(), archived: z.number().optional() }),
@@ -258,11 +260,14 @@ const cachedSessionSchema = z.looseObject({
 function parseCachedSessions(records: readonly unknown[]): Session[] {
   return records.flatMap((record) => {
     const parsed = cachedSessionSchema.safeParse(record)
+    if (!parsed.success) return []
     // SAFETY: the parsed record carries every field read before bootstrap and
     // keeps its remaining keys, which is all a stale-while-revalidate seed
     // needs. Persisted records omit usage and permissions (`PersistedSession`);
     // the authoritative list replaces every seeded record before they matter.
-    return parsed.success ? [parsed.data as Session] : []
+    const session = parsed.data as Session
+    rememberSessionBackend(session)
+    return [session]
   })
 }
 

@@ -8,6 +8,9 @@ connection state. `../useConfigStore.ts` composes the slices and retains the
 public import path. Session-specific picks belong to `sync/selection-store.ts`;
 the conversation client supplies model and agent catalogs; the backend adapter
 owns transport and native-record conversion.
+Connection probes and directory initialization use the selected backend runtime.
+Synced defaults contain application agent and model selections; native settings
+remain with each backend's configuration editor.
 
 ## Invariants
 

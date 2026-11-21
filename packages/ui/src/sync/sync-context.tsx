@@ -1,4 +1,4 @@
-import { conversationClient } from "@/lib/agent/active"
+import { conversationClient, getAgentBackend } from "@/lib/agent/active"
 /* oxlint-disable react/only-export-components */
 import React, { useEffect, useRef, useCallback, useMemo } from "react"
 import type { StoreApi } from "zustand"
@@ -19,7 +19,6 @@ import { useUIStore } from "@/stores/useUIStore"
 import { selectNewChildSessions } from "./child-session-discovery"
 import { normalizePath } from "@/lib/pathNormalization"
 import { mergeBootstrapSessions } from "./reconnect-recovery"
-import { opencodeClient } from "@/lib/opencode/client"
 import { usePermissionStore } from "@/stores/permissionStore"
 import { useMessageQueueStore } from "@/stores/messageQueueStore"
 import { isAutoReviewAvailable, useAutoReviewStore } from "@/stores/useAutoReviewStore"
@@ -156,10 +155,10 @@ export function SyncProvider(props: {
   }, [childStores])
   const runtimeKey = getRuntimeKey()
   const messageLoaderDisposalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  messageLoader.configure({ sdk: props.backend.client, runtimeKey })
+  messageLoader.configure({ sdk: conversationClient, runtimeKey })
   useEffect(() => {
-    opencodeClient.learnMessagePageShellsSupport()
-  }, [runtimeKey])
+    props.backend.runtime.prepare()
+  }, [runtimeKey, props.backend.runtime])
   const routingIndexRef = useRef<EventRoutingIndex | null>(null)
   if (!routingIndexRef.current) routingIndexRef.current = createEventRoutingIndex()
   const routingIndex = routingIndexRef.current
@@ -180,7 +179,7 @@ export function SyncProvider(props: {
   const previousDirectoryRef = useRef(props.directory)
   useEffect(() => {
     const expectedRuntimeKey = getRuntimeKey()
-    const sdkEpoch = opencodeClient.getSdkClient()
+    const sdkEpoch = getAgentBackend().events.identity
     const release = createRealLocationRelease({
       releaseDelayMs: (directory) => {
         if (isChatDirectoryPath(directory)) return CHAT_LOCATION_RELEASE_DELAY_MS
@@ -194,8 +193,8 @@ export function SyncProvider(props: {
         ? "busy"
         : directoryUse(directory, childStores.getChild(directory)?.getState()),
       release: async (directory) => {
-        if (getRuntimeKey() !== expectedRuntimeKey || opencodeClient.getSdkClient() !== sdkEpoch) return
-        await opencodeClient.releaseLocation(directory)
+        if (getRuntimeKey() !== expectedRuntimeKey || getAgentBackend().events.identity !== sdkEpoch) return
+        await props.backend.runtime.releaseLocation(directory)
       },
     })
     locationReleaseRef.current = release
@@ -205,7 +204,7 @@ export function SyncProvider(props: {
       release.dispose()
       if (locationReleaseRef.current === release) locationReleaseRef.current = null
     }
-  }, [childStores, props.backend.events.identity])
+  }, [childStores, props.backend.events.identity, props.backend.runtime])
   useEffect(() => {
     const previous = previousDirectoryRef.current
     previousDirectoryRef.current = props.directory
@@ -255,10 +254,10 @@ export function SyncProvider(props: {
 
     if (reason !== "stream-replayed") lastFullResyncAtByDirectoryRef.current.set(directory, Date.now())
     resyncing.add(directory)
-    const sdk = opencodeClient.getSdkClient()
+    const sdk = getAgentBackend().events.identity
     const expectedRuntimeKey = getRuntimeKey()
     const isStale = () => getRuntimeKey() !== expectedRuntimeKey
-      || opencodeClient.getSdkClient() !== sdk || childStores.children.get(directory) !== store
+      || getAgentBackend().events.identity !== sdk || childStores.children.get(directory) !== store
       || staleResyncBackoffByDirectoryRef.current !== staleResyncBackoff
     void resyncDirectoryAfterReconnect(directory, store, routingIndex, reason, isStale)
       .then((succeeded) => {
@@ -319,10 +318,10 @@ export function SyncProvider(props: {
 
   useEffect(() => {
     const expectedRuntimeKey = getRuntimeKey()
-    const sdkEpoch = opencodeClient.getSdkClient()
+    const sdkEpoch = getAgentBackend().events.identity
     return childStores.configure({
       bootstrapConcurrency: 2,
-      isCurrentScope: () => getRuntimeKey() === expectedRuntimeKey && opencodeClient.getSdkClient() === sdkEpoch,
+      isCurrentScope: () => getRuntimeKey() === expectedRuntimeKey && getAgentBackend().events.identity === sdkEpoch,
       onBootstrap: async (context: DirectoryBootstrapContext) => {
         const { directory } = context
         const isCurrent = context.isCurrent
@@ -349,6 +348,7 @@ export function SyncProvider(props: {
           const globalState = useGlobalSyncStore.getState()
           const bootstrap = bootstrapDirectory({
             directory,
+            runtime: props.backend.runtime,
             store,
             set: (patch) => {
               if (!isCurrent()) return
@@ -452,7 +452,7 @@ export function SyncProvider(props: {
       },
       isLoadingSessions: () => false,
     })
-  }, [childStores, messageLoader, props.backend.events.identity, routingIndex])
+  }, [childStores, messageLoader, props.backend.events.identity, routingIndex, props.backend.runtime])
 
   useEffect(() => {
     let previous = knownSpaceIds(useSpacesStore.getState())
@@ -484,7 +484,7 @@ export function SyncProvider(props: {
       if (globalBootstrapGeneration === generation) {
         globalActions.set(patch)
       }
-    })
+    }, props.backend.runtime)
       .then(() => {
         if (globalBootstrapGeneration === generation) {
           bootedAt = Date.now()
@@ -500,7 +500,7 @@ export function SyncProvider(props: {
         bootingRoot = false
       }
     }
-  }, [props.backend.events.identity])
+  }, [props.backend.events.identity, props.backend.runtime])
 
   useEffect(() => {
     const unsubscribeSessionFeatures = subscribeSessionFeatures(runtimeKey, childStores, routingIndex)
@@ -577,7 +577,7 @@ export function SyncProvider(props: {
         }
         void useMessageQueueStore.getState().resync().catch(() => undefined)
         renewWatchedFiles()
-        void runBackgroundNetworkTask(() => refreshBackgroundImages(() => opencodeClient.listRunningImageJobs()))
+        void runBackgroundNetworkTask(() => refreshBackgroundImages(() => props.backend.runtime.listRunningImageJobs()))
           .catch(() => undefined)
         useConfigStore.setState({
           isConnected: true,
@@ -623,7 +623,7 @@ export function SyncProvider(props: {
       pipeline.cleanup()
       unsubscribeSessionFeatures()
     }
-  }, [props.backend.events.identity, childStores, messageLoader, routingIndex, messageStreamTransport, runtimeKey, triggerDirectoryResync])
+  }, [props.backend.events.identity, childStores, messageLoader, routingIndex, messageStreamTransport, runtimeKey, triggerDirectoryResync, props.backend.runtime])
 
   useEffect(() => {
     let stopped = false
@@ -848,7 +848,7 @@ export function SyncProvider(props: {
     })
     setActionRefs(
       childStores,
-      () => opencodeClient.getDirectory() || props.directory,
+      () => props.backend.runtime.getDirectory() || props.directory,
       (directory, sessionID, messageID) => {
         enqueueSessionMaterialization(directory, sessionID, childStores, {
           reason: "settled-running-tool",
@@ -861,7 +861,7 @@ export function SyncProvider(props: {
         setImperativeSessionMessageLoader(null)
       }
     }
-  }, [props.backend.events.identity, props.directory, childStores, messageLoader, routingIndex])
+  }, [props.backend.events.identity, props.directory, childStores, messageLoader, routingIndex, props.backend.runtime])
 
   useEffect(() => {
     if (messageLoaderDisposalTimerRef.current) {

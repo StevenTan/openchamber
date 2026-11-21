@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import type { Session } from '@/lib/opencode/model';
-import { opencodeClient } from '@/lib/opencode/client';
-import { conversationClient } from "@/lib/agent/active"
+import { conversationClient, getAgentBackend } from "@/lib/agent/active"
 import { addUnlistedLiveSessions, filterManagedChatsForRuntime, listGlobalSessionPages, splitGlobalSessionsByArchived, type SessionPageLister } from '@/stores/globalSessions';
 import { getReviewTransferDirection, type ReviewTransferDirection } from '@/lib/reviewFlow';
 import { getOriginalSessionID, getReviewSessionID } from '@/lib/sessionReviewMetadata';
@@ -289,7 +288,7 @@ const fetchDirectoryPages = async (
   directories: Set<string>,
 ): Promise<DirectoryPageResult> => {
   const isCurrent = captureRuntimeInstance();
-  const currentDirectory = normalizePath(opencodeClient.getDirectory());
+  const currentDirectory = normalizePath(getAgentBackend().runtime.getDirectory());
   const orderedDirectories = [...directories].sort((left, right) => {
     if (left === currentDirectory) return -1;
     if (right === currentDirectory) return 1;

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { editableCapabilities, resolveDiscoveredCapabilities } from './model-capabilities';
-import type { Model } from '@/lib/opencode/model';
+import type { OpenCodeModel as Model } from '@/lib/opencode/model';
 import type { CustomProviderIcon } from '@/lib/customProviderIcons';
 import { storedCapabilitiesSchema, storedLimitSchema, storedVariantsSchema, type InheritedCanonical, type StoredProviderSource } from './stored-provider-entry';
 

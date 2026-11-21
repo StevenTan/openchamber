@@ -29,7 +29,7 @@ import type { ChildStoreManager } from "./child-store"
 import { computeSubtreeIds } from "./scoped-blocking-requests"
 import { withUserWorkTitle } from "@/lib/sessionWorkTitle"
 import { opencodeClient, type SyntheticContextInput } from "@/lib/opencode/client"
-import { conversationClient } from "@/lib/agent/active"
+import { conversationClient, getAgentBackend } from "@/lib/agent/active"
 import { withSessionMetadata } from "@/lib/opencode/projection"
 import { findMessagePageItem } from "@/lib/opencode/messagePaging"
 import { toJsonRecord } from "@/lib/opencode/json"
@@ -524,7 +524,7 @@ export async function readSessionsLiveActivity(sessionIds: string[], directory: 
   if (activities.includes("active")) return "active"
   if (!activities.includes("unknown")) return "idle"
 
-  const activeStatuses = await opencodeClient.getActiveSessionStatuses(directory)
+  const activeStatuses = await getAgentBackend().runtime.getActiveSessionStatuses(directory)
   if (activeStatuses === null) return "unknown"
   return sessionIds.some((id) => activeStatuses[id] || isSessionBusyNow(id)) ? "active" : "idle"
 }
@@ -1059,19 +1059,19 @@ export async function createSession(
   expectedRuntimeKey?: string,
 ): Promise<Session | null> {
   const runtimeKey = expectedRuntimeKey ?? getRuntimeKey()
-  const runtimeClient = opencodeClient.getSdkClient()
+  const runtimeClient = getAgentBackend().events.identity
   try {
-    if (getRuntimeKey() !== runtimeKey || opencodeClient.getSdkClient() !== runtimeClient) return null
+    if (getRuntimeKey() !== runtimeKey || getAgentBackend().events.identity !== runtimeClient) return null
     const effectiveDirectory = directoryOverride ?? dir()
     const cleanupSession = await opencodeClient.captureSessionCleanup(effectiveDirectory, runtimeKey)
-    if (getRuntimeKey() !== runtimeKey || opencodeClient.getSdkClient() !== runtimeClient) return null
+    if (getRuntimeKey() !== runtimeKey || getAgentBackend().events.identity !== runtimeClient) return null
     const sessionMetadata = title ? withUserWorkTitle(metadata ?? {}, title) : metadata
     const session = await conversationClient.createSession(
       { id, title, metadata: sessionMetadata, model: selection?.model, agent: selection?.agent },
       effectiveDirectory,
     )
 
-    if (getRuntimeKey() !== runtimeKey || opencodeClient.getSdkClient() !== runtimeClient) {
+    if (getRuntimeKey() !== runtimeKey || getAgentBackend().events.identity !== runtimeClient) {
       await cleanupSession(session.id)
       return null
     }
@@ -1702,7 +1702,7 @@ async function restoreArchivedSession(
     const store = sessionDirectory ? _childStores?.getChild(sessionDirectory) : undefined
     if (store) {
       const before = store.getState()
-      const statuses = await opencodeClient.getActiveSessionStatuses(sessionDirectory).catch(() => null)
+      const statuses = await getAgentBackend().runtime.getActiveSessionStatuses(sessionDirectory).catch(() => null)
       if (!isStaleRuntime(expectedRuntimeKey) && statuses !== null) {
         store.setState((current) => {
           if (current.sessionStatusInvalidated !== before.sessionStatusInvalidated
@@ -2320,7 +2320,7 @@ export async function resolveAsyncQuestions(forms: FormRequest[], answers?: Reco
   })
   if (response.status !== 204) {
     if ((response.status === 404 || response.status === 409) && isCurrentRuntime()) {
-      const pending = await opencodeClient.listPendingForms({ directories: [directory] })
+      const pending = await getAgentBackend().runtime.listPendingForms({ directories: [directory] })
       assertRuntimeCurrent()
       const remaining = new Set(pending.filter(form => form.sessionID === sessionId).map(form => form.id))
       for (const form of forms) if (!remaining.has(form.id)) removeFormRequestFromChildStores(sessionId, form.id)

@@ -1,4 +1,5 @@
-import { opencodeClient, type OpencodeHealthProbe, OpencodeApiError } from '@/lib/opencode/client';
+import { getAgentBackend } from '@/lib/agent/active';
+import type { BackendHealth } from '@/lib/agent/runtime';
 import { type ConfigSlice } from './types';
 import { captureConfigRuntimeContext, isConfigRuntimeContextCurrent, configRuntime } from './runtime';
 import { markStartupTrace, measureStartupTrace } from '@/lib/startupTrace';
@@ -14,16 +15,14 @@ import { useSessionUIStore } from '@/sync/session-ui-store';
 import { resolveChatsRootDirectory } from '@/lib/chatDirectories';
 import { hydrateConfigCatalogFromCache } from './catalogHydration';
 import { _agentsLoadErrors } from './projectErrors';
-import { isOpenCodeTrustPending } from '@/lib/opencodeTrust';
-import { isLocationNotFoundError } from '@/lib/opencode/location-errors';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const CONNECTION_PROBE_TIMEOUT_MS = 800;
 const CONNECTION_HEALTH_WAIT_MS = 3_000;
 
-const probeOpenCodeHealth = async (timeoutMs = CONNECTION_PROBE_TIMEOUT_MS): Promise<boolean> => {
+const probeBackendHealth = async (timeoutMs = CONNECTION_PROBE_TIMEOUT_MS): Promise<boolean> => {
     return Promise.race([
-        opencodeClient.checkHealth().catch(() => false),
+        getAgentBackend().runtime.checkHealth().catch(() => false),
         sleep(Math.max(1, timeoutMs)).then(() => false),
     ]);
 };
@@ -32,7 +31,7 @@ let _initializeAppInFlight: Promise<void> | null = null;
 
 export const createConfigConnection: ConfigSlice<'probeConnection' | 'checkConnection' | 'initializeApp'> = (set, get) => ({
     probeConnection: async (options?: { timeoutMs?: number }) => {
-        const isHealthy = await probeOpenCodeHealth(options?.timeoutMs);
+        const isHealthy = await probeBackendHealth(options?.timeoutMs);
         if (isHealthy) {
             set({ isConnected: true, hasEverConnected: true, connectionPhase: "connected" });
             return true;
@@ -57,7 +56,7 @@ export const createConfigConnection: ConfigSlice<'probeConnection' | 'checkConne
         const maxAttempts = 5;
         let attempt = 0;
         let lastError: unknown = null;
-        let lastProbe: OpencodeHealthProbe = 'unreachable';
+        let lastProbe: BackendHealth = 'unreachable';
 
         while (attempt < maxAttempts) {
             if (!isConfigRuntimeContextCurrent(runtimeContext)) return false;
@@ -66,7 +65,7 @@ export const createConfigConnection: ConfigSlice<'probeConnection' | 'checkConne
                 const probeStarted = Date.now();
                 lastProbe = await measureStartupTrace(
                     'checkConnection:health',
-                    () => opencodeClient.probeHealth({ waitMs: CONNECTION_HEALTH_WAIT_MS }),
+                    () => getAgentBackend().runtime.probeHealth({ waitMs: CONNECTION_HEALTH_WAIT_MS }),
                     { attempt: attempt + 1 },
                 );
                 const isHealthy = lastProbe === 'healthy';
@@ -103,7 +102,7 @@ export const createConfigConnection: ConfigSlice<'probeConnection' | 'checkConne
 
         if (!isConfigRuntimeContextCurrent(runtimeContext)) return false;
         if (lastError) {
-            console.warn("[ConfigStore] Failed to reach OpenCode after retrying:", lastError);
+            console.warn("[ConfigStore] Failed to reach agent backend after retrying:", lastError);
         }
         set({
             isConnected: false,
@@ -151,7 +150,7 @@ export const createConfigConnection: ConfigSlice<'probeConnection' | 'checkConne
                 markStartupTrace('initApp:skipped', { reason: 'checkConnection already verified health' });
 
 
-                const initialDirectory = opencodeClient.getDirectory()
+                const initialDirectory = getAgentBackend().runtime.getDirectory()
                     ?? useDirectoryStore.getState().currentDirectory
                     ?? fromDirectoryKey(get().activeDirectoryKey);
                 const resolvedProject = isSpaceDirectory(initialDirectory) ? null : resolveProjectForSessionDirectory(
@@ -180,7 +179,7 @@ export const createConfigConnection: ConfigSlice<'probeConnection' | 'checkConne
                         initialDirectory,
                         configDirectory,
                     });
-                    opencodeClient.setDirectory(configDirectory);
+                    getAgentBackend().runtime.setDirectory(configDirectory);
                     useDirectoryStore.getState().setDirectory(configDirectory, { showOverlay: false });
                 }
                 const configDirectoryKey = toDirectoryKey(configDirectory);
@@ -199,16 +198,13 @@ export const createConfigConnection: ConfigSlice<'probeConnection' | 'checkConne
                 if (!agentsLoaded) {
                     const configError = get().projectConfigErrors[configDirectoryKey];
                     const agentsError = _agentsLoadErrors.get(configDirectoryKey);
-                    const awaitsTrust = !configError && agentsError instanceof OpencodeApiError && agentsError.status === 403
-                        && await isOpenCodeTrustPending(configDirectory);
+                    const failure = configError ? null : await getAgentBackend().runtime.classifyDirectoryError(agentsError, configDirectory);
                     if (!isConfigRuntimeContextCurrent(runtimeContext)) return;
                     if (configError) {
                         markStartupTrace('initializeApp:projectConfigInvalid', { configDirectoryKey, name: configError.name });
-                    } else if (awaitsTrust) {
+                    } else if (failure === 'trust-pending') {
                         markStartupTrace('initializeApp:projectAwaitsTrust', { configDirectoryKey });
-                    } else if (isLocationNotFoundError(agentsError)
-                        || await opencodeClient.getDirectoryAvailability(configDirectory) === 'missing') {
-                        if (!isConfigRuntimeContextCurrent(runtimeContext)) return;
+                    } else if (failure === 'missing') {
                         markStartupTrace('initializeApp:projectDirectoryMissing', { configDirectoryKey });
                     } else {
                         set({ lastInitFailure: { step: 'loadAgents', message: _agentsLoadErrors.get(configDirectoryKey)?.message || null } });

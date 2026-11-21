@@ -1,4 +1,4 @@
-import { createOpenCodeBackend } from "@/lib/opencode/backend"
+import { getAgentBackend } from "@/lib/agent/active"
 import React from 'react';
 import { FireworksProvider } from '@/contexts/FireworksContext';
 import { RuntimeAPIProvider } from '@/contexts/RuntimeAPIProvider';
@@ -26,7 +26,6 @@ import { useDeviceInfo } from '@/lib/device';
 import { getVSCodeBootstrapConfig } from '@/lib/vscodeBootstrap';
 import { useConfigStore } from '@/stores/useConfigStore';
 import { toast } from '@/components/ui';
-import { opencodeClient } from '@/lib/opencode/client';
 import type { RuntimeAPIs } from '@/lib/api/types';
 import { useSourceControlAuthStore } from '@/stores/useSourceControlAuthStore';
 import { useSourceControlProviderRegistry } from '@/lib/source-control/providers/registry';
@@ -127,7 +126,7 @@ export function VSCodeApp({ apis }: VSCodeAppProps) {
 
   return (
     <ErrorBoundary>
-      <SyncProvider backend={createOpenCodeBackend(opencodeClient.getSdkClient())} directory={isSettingsPanel ? '' : currentDirectory || ''}>
+      <SyncProvider backend={getAgentBackend()} directory={isSettingsPanel ? '' : currentDirectory || ''}>
         <RuntimeAPIProvider apis={apis}>
           <FireworksProvider>
             <TooltipProvider delayDuration={300} skipDelayDuration={150}>

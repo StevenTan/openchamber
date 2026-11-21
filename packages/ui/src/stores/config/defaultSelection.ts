@@ -23,8 +23,7 @@ import { useSelectionStore } from '@/sync/selection-store';
 import { notifyAutoUnavailable } from '@/lib/routing/autoUnavailableNotice';
 import { captureConfigRuntimeContext, isConfigRuntimeContextCurrent } from './runtime';
 import { getSyncConfig } from '@/sync/sync-refs';
-import { opencodeClient } from '@/lib/opencode/client';
-import { configModelIdentifier } from '@/lib/opencode/projection';
+import { getAgentBackend } from '@/lib/agent/active';
 import { markStartupTrace } from '@/lib/startupTrace';
 
 export const createDefaultSelection: ConfigSlice<
@@ -172,7 +171,7 @@ export const createDefaultSelection: ConfigSlice<
         const [, , config] = await Promise.all([
             get().loadProviders({ directory: configDirectory, source }).catch(() => undefined),
             get().loadAgents({ directory: configDirectory, source }).catch(() => false),
-            getSyncConfig(configDirectory) ?? opencodeClient.getConfig(configDirectory).catch(() => undefined),
+            getSyncConfig(configDirectory) ?? getAgentBackend().runtime.getConfiguration(configDirectory).catch(() => undefined),
         ]);
         if (!isConfigRuntimeContextCurrent(runtimeContext)) return null;
 
@@ -187,8 +186,8 @@ export const createDefaultSelection: ConfigSlice<
             settingsDefaultAgent: state.settingsDefaultAgent,
             settingsDefaultModel: state.settingsDefaultModel,
             settingsDefaultVariant: state.settingsDefaultVariant,
-            opencodeDefaultAgent: config ? normalizeOptionalString(config.default_agent) : snapshot?.opencodeDefaultAgent,
-            opencodeDefaultModel: config ? configModelIdentifier(config.model) : snapshot?.opencodeDefaultModel,
+            opencodeDefaultAgent: config ? normalizeOptionalString(config.defaultAgent) : snapshot?.opencodeDefaultAgent,
+            opencodeDefaultModel: config ? config.defaultModel : snapshot?.opencodeDefaultModel,
             allowFallback: state.settingsDefaultsLoaded,
             fallbackPrefs: readFallbackModelPrefs(get().settingsDefaultsLoaded),
         });
@@ -212,8 +211,8 @@ export const createDefaultSelection: ConfigSlice<
             return;
         }
 
-        const opencodeDefaultAgent = normalizeOptionalString(syncedConfig.default_agent);
-        const opencodeDefaultModel = configModelIdentifier(syncedConfig.model);
+        const opencodeDefaultAgent = normalizeOptionalString(syncedConfig.defaultAgent);
+        const opencodeDefaultModel = syncedConfig.defaultModel;
         const projectDefaults = getProjectDefaultsForConfigDirectory(configDirectory);
 
         set((state) => {

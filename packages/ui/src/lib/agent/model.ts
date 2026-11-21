@@ -18,6 +18,7 @@ export type SessionOutcome = "succeeded" | "failed" | "interrupted"
 
 export type Session = {
   id: string
+  backendID?: string
   parentID?: string
   projectID: string
   directory: string
@@ -43,6 +44,21 @@ export type Session = {
     boundary: SessionForkBoundary
   }
 }
+
+export type Project = {
+  id: string
+  worktree: string
+  vcs?: string
+  name?: string
+  icon?: { url?: string; override?: string; color?: string }
+  commands?: { start?: string }
+  time: { created: number; updated: number }
+  sandboxes: string[]
+}
+export type Vcs = { branch?: string; defaultBranch?: string }
+export type RunningShell = { id: string; sessionID: string; command: string; file: string; startedAt: number }
+export type ShellEnd = { kind: 'exited'; status: 'exited' | 'timeout' | 'killed'; exit?: number } | { kind: 'removed' }
+export type RunningImageJob = { id: string; sessionID: string; path: string; model: string; startedAt: number }
 
 
 export type StructuredError = { type: string; message: string; status?: number; response?: { body: string }; retryAfterMs?: number }

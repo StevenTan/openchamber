@@ -1,10 +1,9 @@
-import { conversationClient } from "@/lib/agent/active"
+import { conversationClient, getAgentBackend } from "@/lib/agent/active"
 import { type ConfigSlice, type DirectoryScopedConfig, type ConfigStore } from './types';
 import { captureConfigRuntimeContext, isConfigRuntimeContextCurrent } from './runtime';
 import { fromDirectoryKey, normalizeConfigPath as resolveConfigDirectory, toDirectoryKey } from './directories';
 import { getProjectDefaultsForConfigDirectory } from './projectDefaults';
 import { markStartupTrace, measureStartupTrace } from '@/lib/startupTrace';
-import { opencodeClient } from '@/lib/opencode/client';
 import {
     catalogLifecycle,
     markCatalogLoaded,
@@ -23,7 +22,6 @@ import {
     resolveSelectionWithManualGuard,
     variantAfterResolve,
 } from './selectionResolution';
-import { configModelIdentifier } from '@/lib/opencode/projection';
 import { updateDesktopSettings } from '@/lib/persistence';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { hasLiveCatalog } from './directorySnapshots';
@@ -39,7 +37,7 @@ export const createAgentCatalog: ConfigSlice<'loadAgents'> = (set, get) => ({
             markStartupTrace('loadAgents:skippedUnknownDirectory', { requestedDirectory, source: options?.source ?? 'unknown' });
             return false;
         }
-        const effectiveDirectory = configDirectory ?? opencodeClient.getDirectory() ?? null;
+        const effectiveDirectory = configDirectory ?? getAgentBackend().runtime.getDirectory() ?? null;
         const directoryKey = toDirectoryKey(configDirectory);
         const inFlightKey = getConfigLoadKey(runtimeContext, directoryKey);
         const source = options?.source ?? 'unknown';
@@ -105,10 +103,10 @@ export const createAgentCatalog: ConfigSlice<'loadAgents'> = (set, get) => ({
                     ?? getSyncConfig(configDirectoryPath ?? undefined);
                 const hasLatestSyncedOpencodeConfig = latestSyncedOpencodeConfig !== undefined;
                 const latestSyncedOpencodeDefaultAgent = hasLatestSyncedOpencodeConfig
-                    ? normalizeOptionalString(latestSyncedOpencodeConfig.default_agent)
+                    ? normalizeOptionalString(latestSyncedOpencodeConfig.defaultAgent)
                     : undefined;
                 const latestSyncedOpencodeDefaultModel = hasLatestSyncedOpencodeConfig
-                    ? configModelIdentifier(latestSyncedOpencodeConfig.model)
+                    ? latestSyncedOpencodeConfig.defaultModel
                     : undefined;
 
                 const providers = get().activeDirectoryKey === directoryKey

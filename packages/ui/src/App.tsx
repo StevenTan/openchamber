@@ -58,8 +58,7 @@ import { parseRoute } from '@/lib/router';
 import { beginLastSessionRestore, type LastSessionRestoreResult } from '@/sync/last-session-restore';
 import { markSessionViewed } from '@/sync/notification-store';
 import { useDirectoryStore } from '@/stores/useDirectoryStore';
-import { opencodeClient } from '@/lib/opencode/client';
-import { createOpenCodeBackend } from "@/lib/opencode/backend"
+import { getAgentBackend } from "@/lib/agent/active"
 import { getRuntimeKey, subscribeRuntimeEndpointChanged } from '@/lib/runtime-switch';
 import { SyncProvider } from '@/sync/sync-context';
 import { ConfigUpdateOverlay } from '@/components/ui/ConfigUpdateOverlay';
@@ -496,7 +495,7 @@ function App({ apis }: AppProps) {
     if (!isConnected) {
       return;
     }
-    opencodeClient.setDirectory(currentDirectory);
+    getAgentBackend().runtime.setDirectory(currentDirectory);
 
     // Session loading is handled by the sync system's bootstrap — no manual loadSessions needed.
   }, [currentDirectory, isSwitchingDirectory, isConnected, isVSCodeRuntime]);
@@ -869,7 +868,7 @@ function App({ apis }: AppProps) {
 
   return (
     <ErrorBoundary>
-      <SyncProvider key={runtimeEndpointEpoch} backend={createOpenCodeBackend(opencodeClient.getSdkClient())} directory={currentDirectory || ''}>
+      <SyncProvider key={runtimeEndpointEpoch} backend={getAgentBackend()} directory={currentDirectory || ''}>
         <RuntimeAPIProvider apis={apis}>
           <FireworksProvider>
               <TooltipProvider delayDuration={300} skipDelayDuration={150}>

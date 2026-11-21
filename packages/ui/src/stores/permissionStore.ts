@@ -16,7 +16,7 @@ import { spaceIdOfDirectory } from "@/lib/spaces/space-route";
 import { isVSCodeRuntime } from "@/lib/desktop";
 import { createDeferredSafeJSONStorage } from "./utils/safeStorage";
 import { useSessionUIStore } from "@/sync/session-ui-store";
-import { opencodeClient } from "@/lib/opencode/client";
+import { getAgentBackend } from "@/lib/agent/active";
 import { getRuntimeKey } from "@/lib/runtime-switch";
 
 interface PermissionStore {
@@ -187,7 +187,7 @@ export const usePermissionStore = create<PermissionStore>()(persist((set, get) =
         set({ saving: true });
         try {
             const directory = sessionDirectoryOf(sessionId, getAllSyncSessionMap())
-                ?? opencodeClient.getDirectory()
+                ?? getAgentBackend().runtime.getDirectory()
                 ?? undefined;
             const snapshot = await putSessionMode(sessionId, mode, directory);
             if (!isCurrentOperation(operation)) return;

@@ -1,7 +1,7 @@
 import type { WorkflowRun } from "@/lib/workflows/model"
 import type { FilePart, JsonValue, Message, Metadata, ModelRef, Part, PermissionRuleset, Session, SessionStatus, SessionOutcome, StructuredError, TokenUsageInfo } from "./model"
-import type { FormRequest, PermissionRequest } from "../opencode/model"
-import type { RunningShell, ShellEnd } from "../opencode/background-shell"
+import type { FormRequest, PermissionRequest } from "./requests"
+import type { RunningShell, ShellEnd } from "./model"
 
 export type SessionPatch = {
   title?: string

@@ -101,10 +101,12 @@ afterEach(() => {
 describe("persisted directory sessions", () => {
   test("keeps one runtime-scoped startup snapshot for managed chats", async () => {
     const chat = session(1, 2, "Chat", "/home/user/.config/openchamber/chats/2026-08-21/session-a")
+    chat.backendID = 'opencode'
     persistManagedChatSessions([session(2, 3), chat])
     await waitForPersistence()
 
     expect(readManagedChatSessions().map((item) => item.id)).toEqual([chat.id])
+    expect(readManagedChatSessions()[0].backendID).toBe('opencode')
 
     switchRuntimeEndpoint({ apiBaseUrl: "https://runtime-other.test", runtimeKey: "runtime-other" })
     expect(readManagedChatSessions()).toEqual([])

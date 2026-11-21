@@ -137,28 +137,6 @@ const waitForTwoFrames = (): Promise<boolean> => new Promise((resolve) => {
   arm();
 });
 
-/**
- * Puts a stage where the compositor draws it but the user cannot see it, for a
- * screenshot, and returns what undoes that. A stage already on screen is left
- * alone. Style overrides only: moving the node would reload its webview.
- */
-const revealStageForCapture = (stage: HTMLElement | null): (() => void) => {
-  if (!stage || isStageShown(stage)) return () => {};
-  const rect = stage.getBoundingClientRect();
-  const previousStyle = stage.style.cssText;
-  Object.assign(stage.style, {
-    position: 'fixed',
-    top: `${rect.top}px`,
-    left: `${Math.max(0, Math.min(rect.left, window.innerWidth - rect.width))}px`,
-    width: `${rect.width}px`,
-    height: `${rect.height}px`,
-    visibility: 'visible',
-    opacity: '0',
-    pointerEvents: 'none',
-  });
-  return () => { stage.style.cssText = previousStyle; };
-};
-
 const WebviewBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory: tabsDirectory, siteDirectory: directory, tabID, ownerSessionId, visible }) => {
   const { t } = useI18n();
   const panelUI = usePanelWorkspaceApi();
@@ -480,31 +458,20 @@ const WebviewBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory: tab
     }
 
     if (action === 'browser.capture') {
-      // Agents work the browser in the background, but Chromium keeps no
-      // composited surface for a webview that is hidden, clipped away by a
-      // closed panel, or outside the window, so capturePage() fails with
-      // UnknownVizError. A fully transparent one is still composited: for the
-      // capture, the stage is pinned inside the window at its own size and
-      // made visible at zero opacity. The panel itself never moves.
-      const restoreStage = revealStageForCapture(stageRef.current);
-      try {
-        if (!await waitForTwoFrames()) {
-          throw new Error('The OpenChamber window is not being drawn (minimized, on a workspace or tab that is not shown, or the screen is locked or off), so nothing can be captured. browser.snapshot still reads the page.');
-        }
-        if (await waitForIdle()) await waitForQuiet(webview, CAPTURE_QUIET_MAX_MS);
-        const capture = await annotationHost.capturePage();
-        if (!capture) throw new Error('The page could not be captured');
-        let title = '';
-        try { title = webview.getTitle() || ''; } catch { title = ''; }
-        return {
-          ...capture,
-          url: toDisplayUrl(webview.getURL()),
-          title,
-          viewport: viewportSummary(viewportRef.current),
-        };
-      } finally {
-        restoreStage();
+      if (!await waitForTwoFrames()) {
+        throw new Error('The OpenChamber window is not being drawn (minimized, on a workspace or tab that is not shown, or the screen is locked or off), so nothing can be captured. browser.snapshot still reads the page.');
       }
+      if (await waitForIdle()) await waitForQuiet(webview, CAPTURE_QUIET_MAX_MS);
+      const capture = await annotationHost.capturePage();
+      if (!capture) throw new Error('The page could not be captured');
+      let title = '';
+      try { title = webview.getTitle() || ''; } catch { title = ''; }
+      return {
+        ...capture,
+        url: toDisplayUrl(webview.getURL()),
+        title,
+        viewport: viewportSummary(viewportRef.current),
+      };
     }
 
     if (action === 'browser.resize') {

@@ -3,17 +3,8 @@ import { z } from "zod"
 
 import type { Message, Metadata, ToolPart } from "./model"
 
-export type RunningShell = {
-  id: string
-  sessionID: string
-  command: string
-  file: string
-  startedAt: number
-}
-
-export type ShellEnd =
-  | { kind: "exited"; status: "exited" | "timeout" | "killed"; exit?: number }
-  | { kind: "removed" }
+import type { RunningShell } from "../agent/model"
+export type { RunningShell, ShellEnd } from "../agent/model"
 
 export type ShellCompletion = {
   shellID: string

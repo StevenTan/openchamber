@@ -1,3 +1,4 @@
+import { OpencodeApiError } from "./api-error"
 
 import { AgentUnavailableError } from "./agent-unavailable-error"
 import { isLocationNotFoundError } from "./location-errors"
@@ -73,7 +74,7 @@ import {
 } from "./projection"
 
 import type { ConversationClient, SendMessageInput, PendingInboxMessage, ProviderCatalog, SyntheticContextInput } from "../agent/client"
-export type { PendingInboxMessage, ProviderCatalog, SkillMentions, SyntheticContextInput } from "../agent/client"
+export type { PendingInboxMessage, SkillMentions, SyntheticContextInput } from "../agent/client"
 
 export type { OpenCodeClient }
 
@@ -111,25 +112,9 @@ const STATUS_BY_TAG = new Map<string, number>([
   ["UnknownError", 500],
 ])
 
-export type OpencodeHealthProbe = "healthy" | "unhealthy" | "unreachable"
+type OpencodeHealthProbe = "healthy" | "unhealthy" | "unreachable"
 
-export class OpencodeApiError extends Error {
-  readonly operation: string
-  readonly status: number | undefined
-  readonly tag: string | undefined
-  readonly detail: string
-  readonly ref: string | undefined
-
-  constructor(operation: string, message: string, options: { status?: number; tag?: string; ref?: string; cause?: unknown }) {
-    super(`${operation} failed${options.status ? ` (${options.status})` : ""}: ${message}`, { cause: options.cause })
-    this.name = "OpencodeApiError"
-    this.operation = operation
-    this.status = options.status
-    this.tag = options.tag
-    this.detail = message
-    this.ref = options.ref
-  }
-}
+export { OpencodeApiError } from "./api-error"
 
 export { AgentUnavailableError }
 

@@ -7,7 +7,7 @@ import type { AttachedFile, SessionWorktreeAttachment } from "@/stores/types/ses
 import { permissionModeForNewSession, type PermissionMode } from "@/stores/utils/permissionAutoAccept"
 import type { WorktreeMetadata } from "@/types/worktree"
 import { opencodeClient, type SkillMentions } from "@/lib/opencode/client"
-import { conversationClient } from "@/lib/agent/active"
+import { conversationClient, getAgentBackend } from "@/lib/agent/active"
 import { draftSessionCreateSelection, trimAgent, type DraftSessionSelection } from "./draft-session-selection"
 import { buildSkillMentionInstruction } from "@/lib/skillMentionInstruction"
 import { runtimeFetch } from "@/lib/runtime-fetch"
@@ -812,7 +812,7 @@ const recoverMissingDraftDirectory = async (draft: NewSessionDraftState, directo
   if (!isRecoverableDraftDirectory(draft, directory)) return directory
   const activeProjectDirectory = resolveActiveProjectDirectory(draft)
   if (!activeProjectDirectory || normalizePath(directory) === activeProjectDirectory) return directory
-  const availability = await opencodeClient.getDirectoryAvailability(directory)
+  const availability = await getAgentBackend().runtime.getDirectoryAvailability(directory)
   return availability === "missing" ? activeProjectDirectory : directory
 }
 
@@ -820,7 +820,7 @@ const resolveCreatableDraftDirectory = async (
   draft: NewSessionDraftState,
   requestedDirectory: string | null | undefined,
 ): Promise<{ status: "ok"; directory: string | null | undefined } | { status: "aborted" }> => {
-  const directory = requestedDirectory ?? opencodeClient.getDirectory() ?? null
+  const directory = requestedDirectory ?? getAgentBackend().runtime.getDirectory() ?? null
   if (!isRecoverableDraftDirectory(draft, directory)) {
     return { status: "ok", directory }
   }
@@ -832,7 +832,7 @@ const resolveCreatableDraftDirectory = async (
 
   const runtimeKey = getRuntimeKey()
   const draftDirectory = draft.directoryOverride
-  const availability = await opencodeClient.getDirectoryAvailability(directory)
+  const availability = await getAgentBackend().runtime.getDirectoryAvailability(directory)
   const currentDraft = useSessionUIStore.getState().newSessionDraft
   const currentDirectory = normalizePath(currentDraft.directoryOverride)
   const capturedDirectory = normalizePath(draftDirectory)
@@ -1249,7 +1249,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       id,
       (sid) => get().worktreeMetadata.get(sid),
     )
-    const fallbackDir = opencodeClient.getDirectory() ?? directoryState.currentDirectory ?? null
+    const fallbackDir = getAgentBackend().runtime.getDirectory() ?? directoryState.currentDirectory ?? null
     const knownDir = (directoryHint ? normalizePath(directoryHint) : null) ?? sessionDir
     const resolvedDir = knownDir ?? fallbackDir
     const isGuessedDir = knownDir === null
@@ -1380,7 +1380,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       sessionAbortFlags: new Map(),
         })
     if (admitted) {
-      setActiveSession(restoredDirectory ?? opencodeClient.getDirectory() ?? "", restoredSessionId)
+      setActiveSession(restoredDirectory ?? getAgentBackend().runtime.getDirectory() ?? "", restoredSessionId)
     } else {
       setActiveSession("", "")
       if (!restoredSessionId && restoredDraft.open && restoredDraft.worktreeStartDirectory?.directory === null) {
@@ -1835,7 +1835,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
         try {
           chatDirectoryCleanup = await captureChatDirectoryCleanup(draft.target, capturedRuntimeKey)
           if (getRuntimeKey() !== capturedRuntimeKey) throw new Error("Message was not sent because the runtime changed.")
-          directory = (await resolveDraftTargetDirectory(draft)) ?? opencodeClient.getDirectory() ?? null
+          directory = (await resolveDraftTargetDirectory(draft)) ?? getAgentBackend().runtime.getDirectory() ?? null
           if (!directory) throw new Error("Failed to create session")
           if (getRuntimeKey() !== capturedRuntimeKey) {
             throw new Error("Message was not sent because the runtime changed.")

@@ -3,13 +3,8 @@ import { z } from "zod"
 
 import type { Message, Metadata } from "./model"
 
-export type RunningImageJob = {
-  id: string
-  sessionID: string
-  path: string
-  model: string
-  startedAt: number
-}
+import type { RunningImageJob } from "../agent/model"
+export type { RunningImageJob } from "../agent/model"
 
 const startMetadataSchema = z.object({
   jobID: z.string().startsWith("image_"),

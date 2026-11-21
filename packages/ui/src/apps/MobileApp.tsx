@@ -42,8 +42,7 @@ import { useBrowserProviderSync } from '@/hooks/useBrowserProviderSync';
 import { useGuestCatalogSync } from '@/hooks/useGuestCatalogSync';
 import { useGuestMarksSync } from '@/hooks/useGuestMarksSync';
 import { resolvePlanRequestOwner } from '@/hooks/useProjectContextOwner';
-import { opencodeClient } from '@/lib/opencode/client';
-import { createOpenCodeBackend } from "@/lib/opencode/backend"
+import { getAgentBackend } from "@/lib/agent/active"
 import { conversationClient } from "@/lib/agent/active"
 import type { RuntimeAPIs } from '@/lib/api/types';
 import type { ProjectRef } from '@/lib/projectContextApi';
@@ -1148,7 +1147,7 @@ function MobileAppContent({ apis }: MobileAppProps) {
 
   React.useEffect(() => {
     if (!isConnected) return;
-    opencodeClient.setDirectory(currentDirectory);
+    getAgentBackend().runtime.setDirectory(currentDirectory);
   }, [currentDirectory, isConnected]);
 
   React.useEffect(() => {
@@ -1285,7 +1284,7 @@ function MobileAppContent({ apis }: MobileAppProps) {
 
   return (
     <ErrorBoundary>
-      <SyncProvider key={runtimeEndpointEpoch} backend={createOpenCodeBackend(opencodeClient.getSdkClient())} directory={currentDirectory || ''}>
+      <SyncProvider key={runtimeEndpointEpoch} backend={getAgentBackend()} directory={currentDirectory || ''}>
         <RuntimeAPIProvider apis={apis}>
           <TooltipProvider delayDuration={300} skipDelayDuration={150}>
             <div className="h-full bg-background text-foreground">

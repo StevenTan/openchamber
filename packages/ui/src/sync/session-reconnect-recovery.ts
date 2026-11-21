@@ -7,7 +7,7 @@ import { hasPromptInFlight } from "./prompts-in-flight"
 import { stripSessionDiffSnapshots } from "./sanitize"
 import { upsertSessionRecord } from "./session-records"
 import { syncDebug } from "./debug"
-import { opencodeClient } from "@/lib/opencode/client"
+import { getAgentBackend } from "@/lib/agent/active"
 import { resolveGlobalSessionDirectory, useGlobalSessionsStore } from "@/stores/useGlobalSessionsStore"
 import { isSpaceDirectory } from "@/lib/spaces/space-route"
 import { applyGlobalSessionStatusEvents, buildActiveListReconcileEvents, watchGlobalSessionStatusWrites } from "./global-session-status"
@@ -78,10 +78,10 @@ export async function resyncDirectoryAfterReconnect(
 }
 
 export async function reconcileActivityAfterGap(childStores: ChildStoreManager): Promise<void> {
-  const runtime = { key: getRuntimeKey(), sdk: opencodeClient.getSdkClient() }
+  const runtime = { key: getRuntimeKey(), sdk: getAgentBackend().events.identity }
   const writes = watchGlobalSessionStatusWrites()
   try {
-    const active = await opencodeClient.getActiveSessionStatuses()
+    const active = await getAgentBackend().runtime.getActiveSessionStatuses()
     if (!active || !isCatalogRuntimeCurrent(runtime)) return
     const activeSessionIds = new Set(Object.keys(active))
     const events = buildActiveListReconcileEvents(activeSessionIds, {

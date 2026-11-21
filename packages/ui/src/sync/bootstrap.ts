@@ -1,8 +1,8 @@
-import type { Project } from "@/lib/opencode/model"
-import { opencodeClient } from "@/lib/opencode/client"
+import type { Project } from "@/lib/agent/model"
+import { getAgentBackend } from "@/lib/agent/active"
+import type { AgentRuntime } from "@/lib/agent/runtime"
 import { retry } from "./retry"
 import type { GlobalState, State } from "./types"
-import { runtimeFetch } from "../lib/runtime-fetch"
 import { emitSyncConfigChanged } from "./sync-refs"
 import { warmChatsRootDirectory } from "../lib/chatDirectories"
 import { runBackgroundNetworkTask } from "../lib/background-network"
@@ -25,16 +25,16 @@ function projectID(directory: string, projects: Project[]) {
 }
 
 
-export async function bootstrapGlobal(set: (patch: Partial<GlobalState>) => void) {
+export async function bootstrapGlobal(set: (patch: Partial<GlobalState>) => void, runtime: AgentRuntime = getAgentBackend().runtime) {
   const results = await Promise.allSettled([
     warmChatsRootDirectory(),
     retry(async () => {
-      const [location, home] = await Promise.all([opencodeClient.getLocation(), opencodeClient.getFilesystemHome()])
+      const [location, home] = await Promise.all([runtime.getLocation(), runtime.getFilesystemHome()])
       set({ path: { directory: location.directory, worktree: location.project.directory, home: home ?? "" } })
     }),
-    retry(() => opencodeClient.getConfig().then((config) => set({ config }))),
+    retry(() => runtime.getConfiguration().then((config) => set({ config }))),
     retry(() =>
-      opencodeClient.listProjects().then((data) => {
+      runtime.listProjects().then((data) => {
         const projects = data
           .filter((p) => !!p.worktree && !p.worktree.includes("opencode-test"))
           .sort((a, b) => cmp(a.id, b.id))
@@ -51,20 +51,7 @@ export async function bootstrapGlobal(set: (patch: Partial<GlobalState>) => void
   }
 
   if (errors.length === results.length) {
-    let message = errors[0] instanceof Error ? errors[0].message : String(errors[0])
-    try {
-      const healthRes = await runtimeFetch("/health", { signal: AbortSignal.timeout(4000) })
-      if (healthRes.ok) {
-        const health = await healthRes.json()
-        if (health.lastOpenCodeError) {
-          message = health.lastOpenCodeError
-        } else if (!health.openCodeRunning) {
-          message = "OpenCode process is not running"
-        }
-      }
-    } catch {
-      // health endpoint itself unreachable — use the original error
-    }
+    const message = await runtime.getInitializationError(errors[0] instanceof Error ? errors[0].message : String(errors[0]))
     set({ ready: true, error: { type: "init", message } })
   } else {
     set({ ready: true, error: undefined })
@@ -74,6 +61,7 @@ export async function bootstrapGlobal(set: (patch: Partial<GlobalState>) => void
 
 type DirectoryBootstrapInput = {
   directory: string
+  runtime?: AgentRuntime
   store: DirectoryRecoverySource
   set: (patch: Partial<State>) => void
   isStale?: () => boolean
@@ -105,6 +93,7 @@ export function bootstrapDirectory(input: DirectoryBootstrapInput) {
 
 async function initializeDirectory(input: DirectoryBootstrapInput, sessions: Promise<BootstrapResult>): Promise<BootstrapResult> {
   const { directory, store, set, global: g } = input
+  const runtime = input.runtime ?? getAgentBackend().runtime
   const read = <T>(request: () => Promise<T>, priority?: "active-session") => retry(() => runBackgroundNetworkTask(() => {
     if (input.isStale?.()) throw new Error("Directory initialization superseded")
     return request()
@@ -129,7 +118,7 @@ async function initializeDirectory(input: DirectoryBootstrapInput, sessions: Pro
       if (listed !== "complete") return
       await read(async () => {
         const session_status = await readDirectoryStatusSnapshot(store, async () => {
-          const statuses = await opencodeClient.getActiveSessionStatuses(directory)
+          const statuses = await runtime.getActiveSessionStatuses(directory)
           if (statuses === null) throw new Error("session.active failed")
           return selectHeldSessionStatuses(statuses, store.getState().session)
         })
@@ -138,21 +127,21 @@ async function initializeDirectory(input: DirectoryBootstrapInput, sessions: Pro
     }),
     read(async () => {
       const form = await readDirectoryFormSnapshot(store, () => (
-        opencodeClient.listPendingForms({ directories: [directory] })
+        runtime.listPendingForms({ directories: [directory] })
       ))
       if (commit({ form })) noteQuestionFormSnapshot(directory, Object.values(form).flat())
     }),
     read(async () => {
       const permission = await readDirectoryPermissionSnapshot(store, () => (
-        opencodeClient.listPendingPermissions({ directories: [directory] })
+        runtime.listPendingPermissions({ directories: [directory] })
       ))
       commit({ permission })
     }),
-    read(() => opencodeClient.getConfig(directory).then((config) => {
+    read(() => runtime.getConfiguration(directory).then((config) => {
       if (commit({ config })) emitSyncConfigChanged(directory, config)
     })),
     read(() =>
-      opencodeClient.getLocation(directory).then((location) => {
+      runtime.getLocation(directory).then((location) => {
         commit({
           project: location.project.id,
           path: { directory: location.directory, worktree: location.project.directory, home: g.path.home },
@@ -161,8 +150,8 @@ async function initializeDirectory(input: DirectoryBootstrapInput, sessions: Pro
     ),
   ])
   const enrichment = Promise.allSettled([
-    read(() => opencodeClient.getVcs(directory).then((vcs) => commit({ vcs }))),
-    read(() => refreshBackgroundShells(directory, (target) => opencodeClient.listRunningShells(target))),
+    read(() => runtime.getVcs(directory).then((vcs) => commit({ vcs }))),
+    read(() => refreshBackgroundShells(directory, (target) => runtime.listRunningShells(target))),
   ])
   const [results, enrichmentResults] = await Promise.all([critical, enrichment])
   if (input.isStale?.()) return "stale"

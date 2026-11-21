@@ -3,7 +3,7 @@ import type { FormRequest, PermissionRequest } from "@/lib/opencode/model"
 import { isVSCodeRuntime } from "@/lib/desktop"
 import { ChildStoreManager, type DirectoryStore } from "./child-store"
 import { noteQuestionFormSnapshot, readLiveForms } from "./recoverable-questions"
-import { opencodeClient } from "@/lib/opencode/client"
+import { getAgentBackend } from "@/lib/agent/active"
 import { processVSCodeReconciledPermissionAutoAccept } from "./vscode-permission-auto-accept"
 import { toast } from "@/components/ui"
 import { showPermissionNeededToast } from "./permission-toast"
@@ -44,7 +44,7 @@ export async function resyncBlockingRequestsForDirectory(
     const beforeSignatures = new Map(
       candidates.map((sessionId) => [sessionId, requestSignature(before.form[sessionId])]),
     )
-    const applied = await readLiveForms(() => opencodeClient.listPendingForms({ directories: [directory] }), (liveForms) => {
+    const applied = await readLiveForms(() => getAgentBackend().runtime.listPendingForms({ directories: [directory] }), (liveForms) => {
       if (!isCurrentRuntime()) return false
       noteQuestionFormSnapshot(directory, liveForms)
       const grouped: Record<string, FormRequest[]> = {}
@@ -103,7 +103,7 @@ export async function resyncBlockingRequestsForDirectory(
     const beforeSignatures = new Map(
       candidates.map((sessionId) => [sessionId, requestSignature(before.permission[sessionId])]),
     )
-    const pendingPermissions = await opencodeClient.listPendingPermissions({ directories: [directory] })
+    const pendingPermissions = await getAgentBackend().runtime.listPendingPermissions({ directories: [directory] })
     if (!isCurrentRuntime()) return false
     const grouped: Record<string, PermissionRequest[]> = {}
     for (const permission of pendingPermissions) {

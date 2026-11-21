@@ -1,6 +1,6 @@
 
 import type { CatalogKind } from "@/lib/agent/events";
-import { opencodeClient } from "@/lib/opencode/client";
+import { getAgentBackend } from "@/lib/agent/active";
 import { captureRuntimeInstance } from "@/lib/runtime-switch";
 import { notifyCredentialChanged } from "@/lib/opencode/integration-catalog";
 import { getConfigDirectory, invalidateAgentsLoadCache, useAgentsStore } from "@/stores/useAgentsStore";
@@ -75,11 +75,11 @@ const refreshProviders = async (): Promise<void> => {
 const PROVIDER_REREAD_AFTER_CREDENTIAL_MS = 5000;
 
 const refreshProvidersAfterCredentialChange = async (): Promise<void> => {
-  const sdk = opencodeClient.getSdkClient();
+  const sdk = getAgentBackend().events.identity;
   const isCurrent = captureRuntimeInstance();
   await refreshProviders();
   await new Promise((resolve) => setTimeout(resolve, PROVIDER_REREAD_AFTER_CREDENTIAL_MS));
-  if (!isCurrent() || sdk !== opencodeClient.getSdkClient()) return;
+  if (!isCurrent() || sdk !== getAgentBackend().events.identity) return;
   await refreshProviders();
 };
 
@@ -135,7 +135,7 @@ const inFlightRefreshes = new WeakMap<object, Map<string | RefreshTask, Map<stri
 export async function refreshStoresForCatalogKinds(
   reloads: ReadonlyMap<CatalogKind, readonly string[]>,
 ): Promise<void> {
-  const sdk = opencodeClient.getSdkClient();
+  const sdk = getAgentBackend().events.identity;
   const inFlight = inFlightRefreshes.get(sdk) ?? new Map<string | RefreshTask, Map<string, RefreshRequest>>();
   inFlightRefreshes.set(sdk, inFlight);
   const tasks = new Map<string | (() => Promise<void>), () => Promise<void>>();
