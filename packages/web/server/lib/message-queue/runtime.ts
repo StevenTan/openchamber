@@ -16,6 +16,8 @@ import { attachmentHint } from '../routing/runtime.js';
 import { buildGoalIntroText, createSessionGoal } from '../session-goal/create.js';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
+import type { JsonObject, JsonValue } from '../shared/json-values.js';
+import type { ModelCatalogEntry } from './opencode-types.js';
 
 const QUEUE_FILE_NAME = 'message-queue.json';
 const QUEUE_FILE_VERSION = 1;
@@ -160,12 +162,6 @@ interface PromptBody {
   text: string;
   files?: PromptFile[];
   agents?: { name: string }[];
-}
-
-interface ModelCatalogEntry {
-  providerID: unknown;
-  modelID: unknown;
-  capabilities?: unknown;
 }
 
 interface OpenCodeFetchOptions {
@@ -522,8 +518,9 @@ export function createMessageQueueRuntime({
   };
 
   function openCodeFetch(fetchPath: '/api/model', options?: OpenCodeFetchOptions): Promise<ModelCatalogEntry[]>;
+  function openCodeFetch(fetchPath: '/api/info' | '/api/experimental/fs/write', options?: OpenCodeFetchOptions): Promise<JsonObject | null | undefined>;
   function openCodeFetch(fetchPath: string, options?: OpenCodeFetchOptions): Promise<ReturnType<typeof unwrapOpenCodeResponse>>;
-  async function openCodeFetch(fetchPath: string, { directory, method = 'GET', body, query }: OpenCodeFetchOptions = {}) {
+  async function openCodeFetch(fetchPath: string, { directory, method = 'GET', body, query }: OpenCodeFetchOptions = {}): Promise<JsonValue | ModelCatalogEntry[] | undefined> {
     const base = buildOpenCodeUrl(fetchPath, '');
     const params = new URLSearchParams(query || {});
     if (directory) params.set('directory', directory);

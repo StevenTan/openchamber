@@ -27,6 +27,7 @@ UI-side queue and foreground auto-send hook.
 types come from boundary schemas, which retain the existing defaults and
 TypeError refusals. Context metadata is checked only as a non-array object and
 passed through by reference; its properties remain unchecked until read.
+`opencode-types.ts` declares the OpenCode model-catalog fields read by the queue.
 Scheduled items may omit their provider and model to retain the session's
 selection. Goal creation accepts numeric budgets and omitted unused fields
 through the declaration on `../session-goal/create.js`.

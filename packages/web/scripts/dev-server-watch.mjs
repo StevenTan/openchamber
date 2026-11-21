@@ -40,7 +40,7 @@ export function createDevServerWatchCommand(options = {}) {
           '--watch',
           'server',
           '--ext',
-          'js',
+          'js,ts',
           '--exec',
           `bun server/index.js --port ${port}`,
         ],
