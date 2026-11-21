@@ -31,27 +31,22 @@ export const compareMessagesChronologically = (left: MessageOrderKey, right: Mes
   return 0
 }
 
-export const sortMessagesChronologically = <T extends Message>(messages: readonly T[]): T[] => (
-  [...messages].sort(compareMessagesChronologically)
-)
-
 export const findMessageIndex = (messages: readonly Message[], messageID: string): number => (
   messages.findIndex((message) => message.id === messageID)
 )
 
-export const insertMessageChronologically = <T extends Message>(messages: T[], message: T): number => {
-  let low = 0
-  let high = messages.length
-  while (low < high) {
-    const middle = (low + high) >>> 1
-    if (compareMessagesChronologically(messages[middle], message) < 0) {
-      low = middle + 1
-    } else {
-      high = middle
+export const insertMessageInEventOrder = <T extends Message>(messages: T[], message: T): number => {
+  let prompt = -1
+  if (message.role === "synthetic" && !message.pending) {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role !== "user" || messages[i].time.created !== message.time.created) continue
+      prompt = i
+      break
     }
   }
-  messages.splice(low, 0, message)
-  return low
+  const index = prompt < 0 ? messages.length : prompt
+  messages.splice(index, 0, message)
+  return index
 }
 
 export const messagesBefore = <T extends Message>(messages: readonly T[], messageID?: string): T[] => {

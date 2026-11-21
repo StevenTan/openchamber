@@ -98,6 +98,7 @@ import { createTurnStartReader } from './lib/opencode/turn-start.js';
 import { createSessionActivityProbe } from './lib/opencode/session-activity.js';
 import { createSessionAssistRuntime } from './lib/session-assist/runtime.js';
 import { createSessionGoalRuntime } from './lib/session-goal/runtime.js';
+import { createGoalPersistence } from './lib/session-goal/interruption.js';
 import { createContextObligatoryRuntime } from './lib/context-obligatory/runtime.js';
 import { createSessionWarmingRuntime } from './lib/session-warming/runtime.js';
 import { createSessionTodosRuntime } from './lib/session-todos/runtime.js';
@@ -111,7 +112,7 @@ import { isAutoModel, JEV_BACKGROUND_TIMEOUT_MS } from './lib/routing/defaults.j
 import { createMessageSearchRuntime } from './lib/message-search/runtime.js';
 import { applyOwnedArchiveState } from './lib/opencode/proxy.js';
 import { createScheduledTasksRuntime } from './lib/scheduled-tasks/runtime.js';
-import { resolveSessionDefaults } from './lib/scheduled-tasks/session-defaults.js';
+import { createReadSessionDefaults, resolveSessionDefaults } from './lib/scheduled-tasks/session-defaults.js';
 import { createChatsScope } from './lib/scheduled-tasks/chats-scope.js';
 import { createChatDirectoryCleanupRuntime } from './lib/chat-directories/runtime.js';
 import { createUnregisteredScheduledWorktreeBridge } from './lib/scheduled-tasks/worktree-bridge.js';
@@ -204,6 +205,7 @@ import { createRelayKeyStore } from './lib/relay/key-store.js';
 import { createAgentToolRuntime } from './lib/agent-tool/runtime.js';
 import { createQuestionRuntime, questionStoreDirectory } from './lib/agent-question/src/runtime.js';
 import { createBrowserControlBroker } from './lib/browser-control/broker.js';
+import { createBrowserClientEvents } from './lib/browser-control/client-events.js';
 import { createBrowserControlRouter } from './lib/browser-control/provider.js';
 import { createDevServerScanner } from './lib/dev-servers/routes.js';
 import { createDevTunnelRuntime } from './lib/dev-tunnel/runtime.js';
@@ -225,7 +227,7 @@ import { OpenChamberControlError } from './lib/openchamber-control/error.js';
 import { createSessionLinker } from './lib/openchamber-sessions/session-link.js';
 import { linkedWorktreeOf } from './lib/openchamber-sessions/work-naming.js';
 import { createFileOpenRequester } from './lib/openchamber-control/file-open.js';
-import { createSecretFiles } from './lib/openchamber-control/secret-request.js';
+import { createSavedSecrets, createSecretFiles } from './lib/openchamber-control/secret-request.js';
 import { applyConnectAttemptTimeout } from './lib/network-defaults.js';
 import { applyOutboundProxyFromEnv } from './lib/outbound-proxy.js';
 import { applySystemCertificates } from './lib/system-ca.js';
@@ -1096,7 +1098,7 @@ const notificationTriggerRuntime = createNotificationTriggerRuntime({
   buildOpenCodeUrl,
   getOpenCodeAuthHeaders,
   readSessionMetadata: readStoredSessionMetadata,
-  spaceFetchFor: (spaceId) => spacesHost?.openCodeFetchFor(spaceId) ?? null,
+  getSpacesHost: () => spacesHost,
   isInAutoReview: (sessionId, turnEndedAt) => autoReviewRuntime.speaksFor(sessionId, turnEndedAt),
   deliverToExtensionChannels: (delivery) => extensionNotificationChannels.deliver(delivery),
 });
@@ -1137,13 +1139,7 @@ const sessionGoalRuntime = createSessionGoalRuntime({
   classifierEndpoint: () => routingRuntime.classifierEndpoint(),
   jev: createJevClient({ timeoutMs: JEV_BACKGROUND_TIMEOUT_MS }),
   readSessionMetadata: readStoredSessionMetadata,
-  persistSessionGoal: async (sessionID, directory, goal, canWrite) => {
-    if (!canWrite) return persistSessionMetadataPatch(sessionID, { openchamber: { goal } }, { directory });
-    const result = await updateSessionMetadataWith(sessionID, (metadata) => (
-      canWrite(metadata) ? { openchamber: { goal } } : null
-    ), { directory });
-    return result.changed;
-  },
+  persistSessionGoal: createGoalPersistence(persistSessionMetadataPatch, updateSessionMetadataWith),
   emitGoalNotification: async ({ sessionId, directory, status, goal }) => {
     const settings = await readSettingsFromDisk();
     if (settings.notifyOnCompletion === false) {
@@ -1679,9 +1675,8 @@ const waitForOpenCodePort: typeof serverUtilsRuntime.waitForOpenCodePort = (...a
 const buildAugmentedPath: typeof serverUtilsRuntime.buildAugmentedPath = (...args) => serverUtilsRuntime.buildAugmentedPath(...args);
 const buildManagedOpenCodePath: typeof serverUtilsRuntime.buildManagedOpenCodePath = (...args) => serverUtilsRuntime.buildManagedOpenCodePath(...args);
 
-const environmentStore = createEnvironmentStore({
-  filePath: path.join(OPENCHAMBER_USER_CONFIG_ROOT, 'environment.json'),
-});
+const savesSecrets = !process.env.OPENCHAMBER_SPACE_IDLE_STOP_FILE;
+const environmentStore = createEnvironmentStore({ filePath: path.join(OPENCHAMBER_USER_CONFIG_ROOT, 'environment.json'), savesSecrets });
 const listConfiguredProjects = async () => {
   const settings = await readSettingsFromDiskMigrated();
   return sanitizeProjects(settings?.projects || []) ?? [];
@@ -1970,11 +1965,11 @@ const scheduledTasksRuntime = createScheduledTasksRuntime({
   },
   removeTaskWorktree: (input) => scheduledWorktreeBridge.remove(input),
   isGitRepository: (projectDirectory) => scheduledWorktreeBridge.isGitRepository(projectDirectory),
-  readSessionDefaults: async (projectID) => {
-    const settings = await readSettingsFromDiskMigrated();
-    const project = (sanitizeProjects(settings?.projects || []) ?? []).find((entry) => entry.id === projectID) ?? null;
-    return resolveSessionDefaults({ settings, project });
-  },
+  readSessionDefaults: createReadSessionDefaults({
+    readSettings: readSettingsFromDiskMigrated,
+    sanitizeProjects,
+    chatsScopeID: scheduledChatsScope.id,
+  }),
   resolveAutoSelection: (input) => routingRuntime.resolveAutoSelection(input),
   listProjects: async () => {
     const settings = await readSettingsFromDiskMigrated();
@@ -2097,30 +2092,10 @@ const openChamberSessionService = createOpenChamberSessionService({
   isAutoReady: async () => (await routingRuntime.describe()).autoReady,
   readProjectSetup: (projectID) => projectConfigRuntime.readProjectSetup(projectID),
 });
+const browserClientEvents = createBrowserClientEvents({ clients: uiOpenChamberEventClients, writeEvent: writeSseEvent });
 const browserControlBroker = createBrowserControlBroker({
   createId: () => `browser-${crypto.randomUUID()}`,
-  emitRequest: (request) => {
-    const needsBrowserView = request.action !== 'browser.open';
-    let delivered = 0;
-    for (const client of uiOpenChamberEventClients) {
-      if (needsBrowserView && client.openchamberBrowserCapable !== true) continue;
-      try {
-        writeSseEvent(client, {
-          type: 'openchamber:browser-control-request',
-          properties: {
-            requestId: request.requestId,
-            action: request.action,
-            parameters: request.parameters,
-            context: request.context,
-          },
-        });
-        delivered += 1;
-      } catch {
-        uiOpenChamberEventClients.delete(client);
-      }
-    }
-    return delivered;
-  },
+  emitRequest: browserClientEvents.emitRequest,
 });
 
 const emitBrowserProviderResetEvent = ({ guestId, guestName }: BrowserProviderReset) => {
@@ -2265,7 +2240,7 @@ const openChamberControlService = createOpenChamberControlService({
     const settings = await readSettingsFromDiskMigrated().catch(() => null);
     return settings?.agentSecretToolEnabled !== false;
   },
-  secretFiles,
+  secretFiles, savedSecrets: savesSecrets ? createSavedSecrets({ store: environmentStore, projectIdFor: environmentRuntime.projectIdFor }) : null,
   onPageWaitChange: (change) => {
     sessionRuntime.trackWaitingPage(change);
     if (change.type === 'waiting') {
@@ -2822,7 +2797,7 @@ async function main(options: WebUiServerOptions = {}) {
     removeApnsToken,
     updateUiVisibility,
     clearPendingPushBadge: () => clearPendingPushBadge(),
-    clearSessionPushNotifications: (sessionId) => notificationTriggerRuntime.clearSessionPushNotifications(sessionId),
+    clearSessionPushNotifications: notificationTriggerRuntime.clearSessionPushNotifications,
     isUiVisible,
     getUiNotificationClients: () => uiNotificationClients,
     writeSseEvent,
@@ -2920,11 +2895,11 @@ async function main(options: WebUiServerOptions = {}) {
     },
   });
   relayServiceInstance = relayService;
-  relayService.registerRoutes(app);
+  relayService.registerRoutes(app, server);
   registerSharePageRoutes(app, sharePagesRuntime);
   registerReceivedPageRoutes(app, receivedPagesRuntime);
 
-  registerBrowserControlRoutes(app, { express, broker: browserControlBroker });
+  registerBrowserControlRoutes(app, { express, broker: browserControlBroker, preferredClient: browserClientEvents.preferredClient });
 
   const devServerScanner = createDevServerScanner({ spawn, platform: process.platform });
   const listDevServers = () => devServerScanner.discover({

@@ -252,6 +252,17 @@ take priority. Attachments, queued messages, pending forms, BTW and drafts hide
 the prediction. Mobile also displays it in the collapsed pill; tapping it accepts
 and expands the editor. Web, Electron, VS Code and mobile share this SDK path.
 
+A paused goal's row shows a hint ("Paused during chat") in place of the status
+word, because sending a message moves the chat on while the goal stays paused.
+While paused, the hint and Resume own the row: below a 28rem row (a phone,
+Mini Chat) the token count leaves it, and the goal dialog keeps the full
+used/budget numbers; on a wider row the count gives up its width first. The
+objective keeps 40px either way. Other statuses keep their layout.
+`scripts/perf/session-goal-row.browser.test.mjs` checks that every translation
+shows whole beside Resume at 360, 375 and 390px with a long objective and a
+token budget, in Liberation Sans and in a wider face standing in for DejaVu
+Sans, and that a wide row shows the whole count.
+
 While a session's first send is pending (`pendingDraftSends` in
 `session-ui-store`, from Enter in the draft until the request that starts the
 turn has left), the composer keeps what is typed and sends nothing: Send is
@@ -779,7 +790,7 @@ comment mode").
 | `parallel/` | "Run in parallel": the launch state of a new-session draft (prompt variants, models per variant, worktrees, setup, auto-fusion) and the strip that renders it above the editor |
 | `text.ts` | How inserted text meets the text already there |
 | `largeTextPaste.ts` | Detect large plain-text pastes, own the double-paste gesture, and build virtual `.txt` files |
-| `largeTextPasteOffer.ts` | Large-paste choice offer id begin/resolve (supersede + double-apply guards) |
+| `largeTextPasteOffer.ts` | Offer id begin/resolve for the choice above the composer, large paste or office documents (supersede + double-apply guards) |
 
 `ChatInput.handlePaste` owns paste orchestration: URL-over-selection markdown
 links, clipboard files, and large plain-text pastes. Pasted, dropped and picked files share `attachFiles` and appear in the attachment cards outside the editable text. File names and paths stay in attachment metadata. Clipboard text that merely names its files is suppressed; other pasted text remains editable.
@@ -1733,8 +1744,9 @@ one app-wide composer state is split per column:
   composer is the pinned chat's when the user last clicked or focused into
   that column and it is still on screen, the main chat's otherwise. Input
   stays where it is when its target takes text or is a button, link, tab,
-  list or menu item, while a dialog, menu, open select, settings or the BTW
-  composer is on screen, during IME composition, and while text is selected, because typing
+  list or menu item, while a dialog, menu, open select, settings, the BTW
+  composer or the choice above the composer (large paste, office documents)
+  is on screen, during IME composition, and while text is selected, because typing
   over a selection starts a comment on it. The window-focus refocus skips a
   focused field, terminal, editor or embedded page and keeps a selection.
   `useKeyboardShortcuts` calls it after the shortcut dispatcher, so a
@@ -2026,7 +2038,8 @@ composer (see "Enter preference"): its Send action attaches.
 While the comment is open, the selection menu keeps the quoted range painted
 through its existing highlight overlay (rAF on scroll/resize, no polling); the
 Range lives in that menu component only and is released when the comment
-ends or the message unmounts.
+ends or the message unmounts. A desktop inline comment moves to the next menu
+of the same message instead (see the message module's invariants).
 
 Voice: the comment shell mounts its own `ComposerDictation` whose insert
 callbacks target the comment draft (insert-and-send attaches; it never sends).

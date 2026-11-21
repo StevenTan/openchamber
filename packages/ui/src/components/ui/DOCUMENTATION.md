@@ -76,6 +76,7 @@ This folder owns runtime-independent controls and their Base UI integration, inc
 - Enabled buttons, links, tabs and semantic actions use the pointer cursor.
   The base-layer rule lets controls keep explicit text, drag and resize cursors.
 
+- A dialog that covers the whole window passes `fullWindow`, which leaves out `pwa-dialog-content` and `oc-window-corners` (an unlayered radius that beats a caller's `rounded-none`). In an installed app window 768 px wide or narrower, `mobile.css` gives that class a max height and padding outside any cascade layer, so it beats the caller's Tailwind classes and would shrink the dialog off the window's edges.
 - Tab strips keep their scrollbar hidden. `SortableTabsStrip` maps vertical mouse wheels to horizontal scrolling only when `scrollWithWheel` is enabled and the layout is scrollable. Scrolling never selects a tab. Horizontal gestures, Shift+wheel and Ctrl/Cmd+wheel keep their native behavior. The shared `tab-strip-wheel.ts` handler also serves the header session tabs.
 - `AttachedOverlayScrollbar` needs a positioned ancestor sharing the library-owned scroller's top and right edges. Its track inset stays identical in rendering and drag calculations, and thumb drags notify the owner because the sibling thumb bypasses the scroller's gesture listeners.
 - Scrollbar bindings follow the current container node on every commit because virtualized timelines replace that node on session switches. Prop changes update the existing binding; mounting and unmounting own browser resources.

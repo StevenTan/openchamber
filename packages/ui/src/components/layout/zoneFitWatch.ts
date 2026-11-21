@@ -13,14 +13,12 @@ type ZoneFitWatch = {
   readRowWidth: () => number | undefined;
 };
 
-/**
- * Keeps the chat usable for one project's zones (`ZoneFitArbiter`): a side
- * zone that opens without room folds the session sidebar, then closes the
- * zone on the other side (`planZoneFit`), and both come back when it closes,
- * the sidebar only if the user has not toggled it since. An expanded zone
- * folds the sidebar too and gives it back on collapse. Returns the
- * unsubscribe.
- */
+const displacedZones = new Set<string>();
+const displacedKey = (directoryKey: string, zone: string) => `${directoryKey}\0${zone}`;
+
+export const isZoneDisplaced = (directoryKey: string, zone: string): boolean =>
+  displacedZones.has(displacedKey(directoryKey, zone));
+
 export const watchZoneFit = ({ directoryKey, folded, readRowWidth, store = useUIStore }: ZoneFitWatch): (() => void) => {
   const sidesShown = (state: UIState) => {
     const panel = state.contextPanelByDirectory[directoryKey];
@@ -42,6 +40,11 @@ export const watchZoneFit = ({ directoryKey, folded, readRowWidth, store = useUI
   };
 
   let displaced: { side: Side; by: Side; tabId: string } | null = null;
+  const setDisplaced = (next: typeof displaced) => {
+    if (displaced) displacedZones.delete(displacedKey(directoryKey, displaced.side));
+    displaced = next;
+    if (next) displacedZones.add(displacedKey(directoryKey, next.side));
+  };
   let settingSidebar = false;
   let previous = sidesShown(store.getState());
   let previousExpanded = anyZoneExpanded(store.getState());
@@ -87,7 +90,7 @@ export const watchZoneFit = ({ directoryKey, folded, readRowWidth, store = useUI
     });
     if (plan.displace) {
       const tabId = getZoneView(state.contextPanelByDirectory[directoryKey], plan.displace).activeTabId;
-      if (tabId) displaced = { side: plan.displace, by: opening, tabId };
+      if (tabId) setDisplaced({ side: plan.displace, by: opening, tabId });
     }
     if (plan.collapseSidebar) {
       setFoldReason(opening);
@@ -102,7 +105,7 @@ export const watchZoneFit = ({ directoryKey, folded, readRowWidth, store = useUI
       return;
     }
     const restore = displaced?.by === closed ? displaced : null;
-    if (restore) displaced = null;
+    if (restore) setDisplaced(null);
     if (folded.current === closed) {
       if (restore) {
         setFoldReason(restore.side);
@@ -113,8 +116,7 @@ export const watchZoneFit = ({ directoryKey, folded, readRowWidth, store = useUI
     if (restore) store.getState().setActiveContextPanelTab(directoryKey, restore.tabId);
   };
 
-  return store.subscribe((state, prevState) => {
-    // The user's own sidebar toggle is theirs to keep.
+  const unsubscribe = store.subscribe((state, prevState) => {
     if (state.isSidebarOpen !== prevState.isSidebarOpen && !settingSidebar) setFoldReason(null);
     const shown = sidesShown(state);
     const expanded = anyZoneExpanded(state);
@@ -129,7 +131,7 @@ export const watchZoneFit = ({ directoryKey, folded, readRowWidth, store = useUI
       const opposite = side === 'left' ? 'right' : 'left';
       if (!opened.includes(opposite)) continue;
       if (folded.current === side) setFoldReason(opposite);
-      if (displaced?.by === side) displaced = null;
+      if (displaced?.by === side) setDisplaced(null);
     }
     for (const side of closed) giveBack(side);
     for (const side of opened) makeRoom(state, side, shown);
@@ -140,4 +142,8 @@ export const watchZoneFit = ({ directoryKey, folded, readRowWidth, store = useUI
       unfoldSidebar();
     }
   });
+  return () => {
+    unsubscribe();
+    setDisplaced(null);
+  };
 };

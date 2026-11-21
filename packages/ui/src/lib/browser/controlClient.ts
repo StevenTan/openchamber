@@ -37,15 +37,24 @@
  */
 import { z } from 'zod';
 import { runtimeFetch } from '@/lib/runtime-fetch';
-import { subscribeOpenchamberEvents, type BrowserControlRequestContext } from '@/lib/openchamberEvents';
+import { subscribeOpenchamberEvents } from '@/lib/openchamberEvents';
+import type { BrowserControlRequestContext } from './controlEvents';
 import { normalizeContextPanelDirectoryKey } from '@/stores/useUIStore';
 import { canDriveBrowserPage } from './hostCapability';
+import {
+  isPreferredElsewhere,
+  noteBrowserPreferredConnection,
+  noteBrowserStreamConnection,
+  startReportingBrowserInput,
+  stopReportingBrowserInput,
+} from './preferredClient';
 
 type BrowserControlRequest = {
   readonly requestId: string;
   readonly action: string;
   readonly parameters: Record<string, unknown>;
   readonly context: BrowserControlRequestContext;
+  readonly preferredConnectionId: string | null;
 };
 
 /** Where a tab belongs; fixed for the tab's lifetime. */
@@ -124,7 +133,8 @@ const VIEW_ATTACH_POLL_MS = 50;
  */
 const UNKNOWN_TAB_CLAIM_DELAY_MS = 400;
 
-/** Mounted views by tab id, in registration order. */
+const PREFERRED_CLIENT_HEAD_START_MS = 1_500;
+
 const controllers = new Map<string, BrowserController>();
 const pageRequests = new Map<string, { cancelled: boolean; controller?: BrowserController }>();
 /** Tabs with no view yet, by tab id. A mounted view takes precedence. */
@@ -489,7 +499,9 @@ const handlePageRequest = async (request: BrowserControlRequest): Promise<void> 
     // tab, so that one claims first; otherwise the agent hears why at once
     // instead of waiting out the timeout.
     if (!caller.sessionId) return;
-    await new Promise((resolve) => setTimeout(resolve, UNKNOWN_TAB_CLAIM_DELAY_MS));
+    const noTabDelay = UNKNOWN_TAB_CLAIM_DELAY_MS
+      + (request.preferredConnectionId !== null ? PREFERRED_CLIENT_HEAD_START_MS : 0);
+    await new Promise((resolve) => setTimeout(resolve, noTabDelay));
     if (!await claimRequest(request.requestId)) return;
     await answer(request, { ok: false, error: noTabForSessionError(caller) });
     return;
@@ -497,8 +509,14 @@ const handlePageRequest = async (request: BrowserControlRequest): Promise<void> 
   // Falling back to the user's tab: a client holding the session's own tab
   // must get the request, so it claims first.
   const usesOpener = isOpen && opener !== null;
-  if (!usesOpener && caller.sessionId && tabOf(targetTabId!)?.ownerSessionId !== caller.sessionId) {
-    await new Promise((resolve) => setTimeout(resolve, UNKNOWN_TAB_CLAIM_DELAY_MS));
+  const usesSessionTab = !usesOpener && caller.sessionId !== null
+    && tabOf(targetTabId!)?.ownerSessionId === caller.sessionId;
+  const fallsBack = !usesOpener && caller.sessionId !== null && !usesSessionTab;
+  const yieldsToPreferred = !usesSessionTab && isPreferredElsewhere(request.preferredConnectionId);
+  const claimDelay = (fallsBack ? UNKNOWN_TAB_CLAIM_DELAY_MS : 0)
+    + (yieldsToPreferred ? PREFERRED_CLIENT_HEAD_START_MS : 0);
+  if (claimDelay > 0) {
+    await new Promise((resolve) => setTimeout(resolve, claimDelay));
   }
 
   // Nothing below this line may touch a page without the server's grant.
@@ -636,13 +654,23 @@ const runAction = async (
 
 const ensureSubscribed = (): void => {
   if (unsubscribe) return;
+  startReportingBrowserInput();
   unsubscribe = subscribeOpenchamberEvents((event) => {
+    if (event.type === 'event-stream-ready') {
+      noteBrowserStreamConnection(event.connectionId);
+      return;
+    }
+    if (event.type === 'browser-control-preferred') {
+      noteBrowserPreferredConnection(event.connectionId);
+      return;
+    }
     if (event.type !== 'browser-control-request') return;
     void handleRequest({
       requestId: event.requestId,
       action: event.action,
       parameters: event.parameters,
       context: event.context,
+      preferredConnectionId: event.preferredConnectionId,
     }).catch(error => console.warn('[browser-control] request failed:', error));
   });
 };
@@ -651,6 +679,7 @@ const releaseIfIdle = (): void => {
   if (controllers.size > 0 || sleepingTabs.size > 0 || opener || closer || !unsubscribe) return;
   unsubscribe();
   unsubscribe = null;
+  stopReportingBrowserInput();
 };
 
 /**

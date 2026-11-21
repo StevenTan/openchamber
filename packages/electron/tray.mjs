@@ -1,6 +1,7 @@
 
 import { Tray, Menu, nativeImage } from 'electron';
-import { buildTrayMenuTemplate, trayMenuKey } from './tray-menu.mjs';
+import { buildTrayMenuTemplate, computeTrayTooltip, trayMenuKey } from './tray-menu.mjs';
+import { normalizeMenuLocale } from './menu-locales.mjs';
 import { TRAY_BREATH_INTERVAL_MS } from './tray-animation.mjs';
 
 const isMac = process.platform === 'darwin';
@@ -23,16 +24,6 @@ const computeIconState = (counts, animationEnabled) => {
   return 'idle';
 };
 
-const computeTooltip = (counts, sessionCount) => {
-  if (sessionCount === 0) return 'OpenChamber — no active sessions';
-  const bits = [];
-  if (counts.approvals > 0) bits.push(`${counts.approvals} awaiting approval`);
-  if (counts.error > 0) bits.push(`${counts.error} with errors`);
-  if (counts.busy > 0) bits.push(`${counts.busy} working`);
-  if (counts.unseen > 0) bits.push(`${counts.unseen} unread`);
-  const suffix = bits.length ? ` · ${bits.join(', ')}` : ' · idle';
-  return `OpenChamber — ${sessionCount} session${sessionCount === 1 ? '' : 's'}${suffix}`;
-};
 
 const toTemplateImage = (p) => {
   let image = nativeImage.createFromPath(p);
@@ -51,11 +42,27 @@ const toTemplateImage = (p) => {
   return image;
 };
 
-// idleIconPath: translucent rear panel (calm state). unseenIconPath: opaque rear
-// panel (a finished session left unread). breathIconPaths: eased rear-panel
-// opacity frames the busy state ping-pongs through.
-export const createTrayController = ({ idleIconPath, unseenIconPath, breathIconPaths, statusIconPaths, onAction, animationEnabled = true }) => {
+export const createTrayLocaleRouter = (applyLocale) => {
+  const localeBySender = new WeakMap();
+  let owner = null;
+  return {
+    setLocale: (sender, locale) => {
+      if (!sender || !locale) return;
+      localeBySender.set(sender, locale);
+      if (sender === owner) applyLocale(locale);
+    },
+    publish: (sender) => {
+      owner = sender ?? null;
+      const locale = owner ? localeBySender.get(owner) : undefined;
+      if (locale) applyLocale(locale);
+    },
+  };
+};
+
+export const createTrayController = ({ idleIconPath, unseenIconPath, breathIconPaths, statusIconPaths, onAction, locale: initialLocale, animationEnabled = true }) => {
   let tray = null;
+  let locale = normalizeMenuLocale(initialLocale);
+  let lastSnapshot = null;
   let lastTitle = null;
   let lastTooltip = null;
   let lastMenuKey = null;
@@ -125,13 +132,14 @@ export const createTrayController = ({ idleIconPath, unseenIconPath, breathIconP
   };
 
   const buildMenu = (snapshot) => {
-    const menu = Menu.buildFromTemplate(buildTrayMenuTemplate(snapshot, { onAction, statusIcons }));
+    const menu = Menu.buildFromTemplate(buildTrayMenuTemplate(snapshot, { onAction, statusIcons, locale }));
     menu.on('menu-will-show', () => onAction({ type: 'menu-opened' }));
     return menu;
   };
 
   const update = (rawSnapshot) => {
     const snapshot = rawSnapshot && typeof rawSnapshot === 'object' ? rawSnapshot : {};
+    lastSnapshot = snapshot;
     const sessions = Array.isArray(snapshot.sessions) ? snapshot.sessions : [];
     const approvals = Array.isArray(snapshot.approvals) ? snapshot.approvals : [];
 
@@ -150,12 +158,12 @@ export const createTrayController = ({ idleIconPath, unseenIconPath, breathIconP
       lastTitle = title;
     }
     applyIconState(computeIconState(counts, animationEnabled));
-    const tooltip = computeTooltip(counts, sessions.length);
+    const tooltip = computeTrayTooltip(counts, sessions.length, locale);
     if (tooltip !== lastTooltip) {
       widget.setToolTip(tooltip);
       lastTooltip = tooltip;
     }
-    const key = trayMenuKey(snapshot);
+    const key = trayMenuKey(snapshot, locale);
     if (key !== lastMenuKey) {
       widget.setContextMenu(buildMenu(snapshot));
       lastMenuKey = key;
@@ -168,6 +176,7 @@ export const createTrayController = ({ idleIconPath, unseenIconPath, breathIconP
       tray.destroy();
     }
     tray = null;
+    lastSnapshot = null;
     lastTitle = null;
     lastTooltip = null;
     lastMenuKey = null;
@@ -179,5 +188,13 @@ export const createTrayController = ({ idleIconPath, unseenIconPath, breathIconP
     applyIconState(computeIconState(lastCounts, animationEnabled));
   };
 
-  return { update, destroy, setAnimationEnabled };
+  const setLocale = (nextLocale) => {
+    const normalized = normalizeMenuLocale(nextLocale);
+    if (locale === normalized) return;
+    locale = normalized;
+    if (lastSnapshot) update(lastSnapshot);
+  };
+
+  update({ sessions: [], approvals: [] });
+  return { update, destroy, setLocale, setAnimationEnabled };
 };

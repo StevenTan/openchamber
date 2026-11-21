@@ -16,7 +16,9 @@ import {
   forgetBrowserTabOpenedWithAddress,
   subscribeBrowserTabLoadRequests,
   wasBrowserTabOpenedWithAddress,
+  type BrowserTabReferrer,
 } from '@/lib/browser/devServerWait';
+import { browserTabRequestSchema, openBrowserTabFromLink, useBrowserTabReferrer } from '@/hooks/useBrowserTabReferrer';
 import {
   cancelAnnotationSession,
   runAnnotationSession,
@@ -96,11 +98,6 @@ const browserPartitionOf = (directory: string): string => {
   return spaceId ? `openchamber-space-preview:${spaceId}` : BROWSER_PARTITION;
 };
 const BROWSER_OPEN_TAB_EVENT = 'openchamber:browser-panel-open-tab';
-const browserTabRequestSchema = z.object({
-  webContentsId: z.number(),
-  url: z.string().min(1),
-  background: z.boolean(),
-});
 const CONSOLE_PROBLEM_LIMIT = 20;
 const VIEW_READY_TIMEOUT_MS = 15_000;
 const PAGE_QUIET_MS = 500;
@@ -180,8 +177,8 @@ const WebviewBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory: tab
 
   const initialUrlRef = React.useRef(normalizeBrowserUrl(initialUrl));
   const startUrl = initialUrlRef.current !== BLANK_URL ? initialUrlRef.current : '';
-
   const [initialSrc, setInitialSrc] = React.useState<string | null>(startUrl ? null : BLANK_URL);
+  const [linkTarget, setLinkTarget] = React.useState(startUrl);
   const spaceMark = useSpaceMarkLabel(directory);
 
   const [address, setAddress] = React.useState(startUrl);
@@ -247,7 +244,7 @@ const WebviewBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory: tab
     [history, address],
   );
 
-  const loadUrl = React.useCallback((value: string) => {
+  const loadUrl = React.useCallback((value: string, referrer?: BrowserTabReferrer) => {
     const next = normalizeBrowserUrl(value);
     if (next === BLANK_URL) return;
     restoredLoadRef.current = false;
@@ -260,7 +257,7 @@ const WebviewBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory: tab
         return;
       }
       try {
-        webview.loadURL(target);
+        webview.loadURL(target, referrer ? { httpReferrer: referrer } : undefined);
       } catch {
         setInitialSrc(target);
       }
@@ -273,7 +270,7 @@ const WebviewBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory: tab
     if (!startUrl) return;
     let active = true;
     void resolveBrowsableUrl(startUrl, directory)
-      .then((target) => { if (active) setInitialSrc(target); })
+      .then((target) => { if (active) { setLinkTarget(target); setInitialSrc(target); } })
       .catch((error: unknown) => {
         if (!active) return;
         if (error instanceof DevTunnelUnavailableError) {
@@ -685,9 +682,9 @@ const WebviewBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory: tab
   }, [webviewElement]);
 
   const retunneledUrlsRef = React.useRef(new Set<string>());
-  const loadUrlFromUser = React.useCallback((value: string) => {
+  const loadUrlFromUser = React.useCallback((value: string, referrer?: BrowserTabReferrer) => {
     retunneledUrlsRef.current.clear();
-    loadUrl(value);
+    loadUrl(value, referrer);
   }, [loadUrl]);
   const navStatusRef = React.useRef(navigation.status);
   navStatusRef.current = navigation.status;
@@ -706,13 +703,14 @@ const WebviewBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory: tab
     restoredLoadRef,
     reload: reloadView,
   });
+  const initialReferrer = useBrowserTabReferrer(webviewElement, tabDirectory, tabID, initialSrc, linkTarget, rearmServerWait);
   const hasShownPageRef = React.useRef(false);
   if (navigation.status.kind === 'ready' && navigation.status.url) hasShownPageRef.current = true;
   React.useEffect(
-    () => subscribeBrowserTabLoadRequests(tabDirectory, tabID, (url) => {
+    () => subscribeBrowserTabLoadRequests(tabDirectory, tabID, (url, referrer) => {
       if (!acceptsBrowserTabLoadRequest(navStatusRef.current, hasShownPageRef.current)) return;
       rearmServerWait();
-      loadUrlFromUser(url);
+      loadUrlFromUser(url, referrer);
     }),
     [loadUrlFromUser, rearmServerWait, tabDirectory, tabID],
   );
@@ -763,7 +761,7 @@ const WebviewBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory: tab
         return;
       }
       if (request.data.webContentsId !== ownId) return;
-      panelUI.getState().openContextBrowser(tabDirectory, request.data.url, { reveal: !request.data.background });
+      openBrowserTabFromLink(tabDirectory, request.data.referrer, () => panelUI.getState().openContextBrowser(tabDirectory, request.data.url, { reveal: !request.data.background }), panelUI);
     };
     window.addEventListener(BROWSER_OPEN_TAB_EVENT, onOpenTab);
     return () => window.removeEventListener(BROWSER_OPEN_TAB_EVENT, onOpenTab);
@@ -903,9 +901,8 @@ const WebviewBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory: tab
         {initialSrc !== null && sessionReady ? (
           <webview
             ref={attachWebview}
-            src={initialSrc}
+            src={initialReferrer ? BLANK_URL : initialSrc}
             partition={browserPartitionOf(directory)}
-            // React 19 uses React.JSX, not the legacy global JSX in desktop.d.ts.
             // @ts-expect-error @types/react's WebViewHTMLAttributes requires boolean, which React omits from the DOM.
             allowpopups="true"
             // external: https://www.electronjs.org/docs/latest/api/browser-window#new-browserwindowoptions Background throttling slows hidden agent pages, so only agent tabs disable it.

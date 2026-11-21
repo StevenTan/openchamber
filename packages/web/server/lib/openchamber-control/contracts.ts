@@ -105,6 +105,7 @@ export interface ControlInput {
   placeholder?: unknown;
   program?: unknown;
   inputs?: unknown;
+  saved?: unknown;
   projectId?: unknown;
   directory?: unknown;
   kind?: unknown;

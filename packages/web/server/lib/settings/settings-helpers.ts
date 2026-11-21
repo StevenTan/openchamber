@@ -251,7 +251,7 @@ type StringSettingsKey =
 type ClearableStringSettingsKey =
   | 'managedRemoteTunnelHostname' | 'managedRemoteTunnelSelectedPresetId' | 'defaultModel' | 'defaultVariant'
   | 'defaultAgent' | 'smallModelOverride' | 'smallModelVariant' | 'walkthroughModelOverride' | 'walkthroughModelVariant'
-  | 'fallbackModel' | 'fallbackVariant' | 'defaultGitIdentityId' | 'zenModel';
+  | 'fallbackModel' | 'fallbackVariant' | 'defaultGitIdentityId' | 'zenModel' | 'chatsDefaultModel' | 'chatsDefaultVariant' | 'chatsDefaultAgent';
 
 type NumberSettingsKey =
   | 'inputHistoryLimit' | 'sidebarSessionBatchSize' | 'liveBrowserTabLimit' | 'sessionGoalMaxAutoTurns'
@@ -1040,7 +1040,7 @@ export const createSettingsHelpers = (dependencies: SettingsHelpersDependencies)
     if (candidate.walkthroughModelVariant !== undefined) {
       result.walkthroughModelVariant = asNonEmptyString(candidate.walkthroughModelVariant) ?? undefined;
     }
-    for (const key of ['fallbackModel', 'fallbackVariant'] as const) {
+    for (const key of ['fallbackModel', 'fallbackVariant', 'chatsDefaultModel', 'chatsDefaultVariant', 'chatsDefaultAgent'] as const) {
       const value = z.string().trim().safeParse(candidate[key]);
       if (value.success) result[key] = value.data.length > 0 ? value.data : undefined;
     }

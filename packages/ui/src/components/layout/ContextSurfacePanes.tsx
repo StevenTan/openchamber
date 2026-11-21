@@ -8,6 +8,7 @@ import { BrowserPane } from '@/components/browser/BrowserPane';
 import { ChatView } from '@/components/views/ChatView';
 import { Icon } from '@/components/icon/Icon';
 import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
+import { useGuestTabsInScope } from '@/hooks/useGuestSurfaces';
 import { useDraftSpaceTarget } from '@/lib/spaces/useDraftSpaceTarget';
 import { panelContentDirectory } from '@/lib/spaces/space-creation-requests';
 import { spaceIdOfDirectory } from '@/lib/spaces/space-route';
@@ -44,6 +45,7 @@ import { useZoneHostsStore } from './zoneHosts';
 import { useRightSlotStore } from './rightSlot';
 import { useOpenUntilSettled, useOpenWhenSettled } from './useOpenUntilSettled';
 import { useClosingZoneTab } from './useClosingZoneTab';
+import { isZoneDisplaced } from './zoneFitWatch';
 import { isZoneExposed, ZoneInteractiveContext } from './zoneInteractiveContext';
 import { PauseClock } from '@/components/ui/pause-clock';
 import { DockedPanelSurfaceContext } from '@/hooks/usePageColors';
@@ -312,7 +314,7 @@ const WorkspaceSurfacePanes: React.FC = () => {
     () => (effectiveDirectory ? normalizeContextPanelDirectoryKey(effectiveDirectory) : ''),
     [effectiveDirectory],
   );
-  const panelState = useUIStore((state) => (directoryKey ? state.contextPanelByDirectory[directoryKey] : undefined));
+  const panelState = useGuestTabsInScope(useUIStore((state) => (directoryKey ? state.contextPanelByDirectory[directoryKey] : undefined)));
   const draftSpace = useDraftSpaceTarget();
   const spacePreparing = draftSpace?.kind === 'preparing';
   const draftSpaceDirectory = draftSpace?.kind === 'ready' ? draftSpace.directory : null;
@@ -770,7 +772,7 @@ const WorkspaceSurfacePanes: React.FC = () => {
             className={cn('absolute inset-0', shown ? 'block' : 'hidden')}
           >
             <React.Suspense fallback={null}>
-              <GuestPanelContent mode={tab.mode} sharedSurface={sharedSurface} docking={docking ?? null} surfaceMounted={surfaceMounted} />
+              <GuestPanelContent mode={tab.mode} sharedSurface={sharedSurface} docking={docking ?? null} surfaceMounted={surfaceMounted} panelOpen={Boolean(panelState && getZoneView(panelState, pluginZone.zone).isOpen) || isZoneDisplaced(directoryKey, pluginZone.zone)} />
             </React.Suspense>
           </ZonePane>
         );

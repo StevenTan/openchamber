@@ -8,7 +8,7 @@ import { CONTEXT_ZONES, getZoneView, resolveZoneActiveTabId, withZoneView, zoneO
 import { directoryMayHaveActiveProjectAction, useTerminalStore } from '@/stores/useTerminalStore';
 
 import { isVSCodeRuntime } from '@/lib/desktop';
-import { noteBrowserTabOpenedWithAddress, requestBrowserTabLoad } from '@/lib/browser/devServerWait';
+import { forgetBrowserTabOpenedWithAddress, noteBrowserTabOpenedWithAddress, requestBrowserTabLoad } from '@/lib/browser/devServerWait';
 import { normalizeDirectoryPath, normalizeContextTargetPath, normalizeContextTargetDirectory, contextPanelModeKeepsTargetDirectory, isTrackerBranchTab, normalizePendingDiffScope, normalizeContextPanelTabDedupeKey, buildContextPanelTabID } from './contextTabs';
 import { touchContextPanelState, upsertContextPanelTab, closeContextPanelTabs, reorderContextPanelTabs, setContextPanelTabTargetPath, moveContextPanelFileTabs, clampContextPanelRoots } from './contextPanelState';
 
@@ -494,6 +494,7 @@ export function createPanelActions(set: PanelSetter, get: () => UIStore): Pick<U
             .filter((tab): tab is ContextPanelTab => Boolean(tab));
 
           const commitClose = (tabs: typeof closedTabs) => {
+            for (const tab of tabs) if (tab.mode === 'browser') forgetBrowserTabOpenedWithAddress(normalizedDirectory, tab.id);
             const closingIds = tabs.map((tab) => tab.id);
             set((state) => {
               const placement = state.contextSurfaceZones;

@@ -318,6 +318,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
             isDesktopExpandedInput={isDesktopExpandedInput}
             isMobile={isMobile}
             formsInChat={formsInChat}
+            tableExpansion={!pinned}
             floatingComposer={floatingComposer}
             statusRowClearance={sessionIsWorking ? composerOverlayHeight : 0}
             directory={effectiveSessionDirectory}
