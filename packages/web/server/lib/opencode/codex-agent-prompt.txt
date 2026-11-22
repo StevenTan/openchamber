@@ -137,7 +137,7 @@ The complete Code Mode catalog supplies the available tool descriptions, paramet
 
 Call tools listed in the Code Mode catalog as JavaScript inside `execute`, using their documented `tools` paths and schemas. Use each directly exposed tool through its own tool entry. Await calls whose results matter; run independent calls concurrently with `Promise.allSettled` and inspect each result. Keep dependent work and conflicting mutations sequential. Return the results needed for subsequent reasoning.
 
-When listed in the catalog, start commands with `tools.exec_command` and continue running commands with `tools.write_stdin` inside `execute`, using the returned `session_id`. Follow their current definitions for input delivery, terminal mode, EOF and wait parameters. Use the returned `status` to distinguish running and completed commands. A completed session can retain its identifier for output inspection.
+When available, call the MCP tools `openchamber_commands_exec_command` and `openchamber_commands_write_stdin` directly to start and continue commands, using the returned `session_id`. Follow their current definitions for input delivery, terminal mode, EOF and wait parameters. Use the returned `status` to distinguish running and completed commands. A completed session can retain its identifier for output inspection.
 
 Use `tools.clock.sleep` inside `execute` for a deliberate time delay and follow its interruption result when new user input arrives.
 

@@ -9,6 +9,8 @@ import { createAgentToolRuntime } from '../agent-tool/runtime.js';
 import { EventEmitter, on } from 'node:events';
 import { setImmediate } from 'node:timers/promises';
 import { TerminalManager } from './dist/terminal-manager.js';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
 const quote = (value) => "'" + value.replaceAll("'", "'\"'\"'") + "'";
 const nodeCommand = (script) => `${quote(process.execPath)} -e ${quote(script)}`;
@@ -21,6 +23,10 @@ let childEnv;
 let cleanupPlugin;
 let inputEvents;
 let hasPendingInput;
+let registered;
+let nativeClient;
+let nativeTransport;
+let mcpConfig;
 const context = { sessionID: 'session-a', agent: 'build', messageID: 'message-a', id: 'call-a', progress: async () => {}, signal: new AbortController().signal };
 
 beforeEach(async () => {
@@ -42,21 +48,43 @@ beforeEach(async () => {
   const directory = await runtime.materializeCommandPlugin();
   const plugin = await import(pathToFileURL(path.join(directory, 'index.js')).href);
   approvals = vi.fn(async () => {});
-  const registered = new Map([['shell', {}]]);
+  registered = new Map([['shell', {}]]);
+  const hooks = new Map();
   cleanupPlugin = await plugin.default.setup({
     location: { directory: root }, permission: { assert: approvals },
-    tool: { transform: async transform => transform({ remove: id => registered.delete(id), namespace: () => {}, add: tool => registered.set(tool.options.namespace ? `${tool.options.namespace}_${tool.name}` : tool.name, tool) }) },
+    tool: { transform: async transform => transform({ remove: id => registered.delete(id), namespace: () => {}, add: tool => registered.set(tool.options.namespace ? `${tool.options.namespace}_${tool.name}` : tool.name, tool) }), hook: async (name, handler) => hooks.set(name, handler) },
+    mcp: { transform: async transform => transform({ set: (name, config) => { mcpConfig = { name, ...config }; } }) },
     event: {
       async *subscribe({ signal }) {
         for await (const [event] of on(inputEvents, 'input', { signal })) yield event;
       },
     },
   });
-  tools = registered;
+  nativeClient = new Client({ name: 'opencode', version: '2.3.2' });
+  nativeTransport = new StreamableHTTPClientTransport(new URL(mcpConfig.url), { requestInit: { headers: mcpConfig.headers } });
+  await nativeClient.connect(nativeTransport);
+  const catalog = await nativeClient.listTools();
+  tools = new Map(registered);
+  for (const tool of catalog.tools) {
+    tools.set(tool.name, {
+      ...tool, input: tool.inputSchema,
+      async execute(input, caller) {
+        const event = { ...caller, tool: mcpConfig.name + '_' + tool.name, input };
+        await hooks.get('execute.before')(event);
+        const response = await mcpCall(nativeClient, tool.name, event.input, caller);
+        if (response.isError) throw new Error(response.content.map(part => part.text).join('\n'));
+        const result = { output: response.structuredContent, content: response.content };
+        await hooks.get('execute.after')({ ...event, status: 'completed', result });
+        return result;
+      },
+    });
+  }
 });
 
 afterEach(async () => {
   await cleanupPlugin();
+  await nativeTransport.terminateSession();
+  await nativeClient.close();
   vi.useRealTimers();
   await runtime.closeCommands();
   await new Promise(resolve => server.close(resolve));
@@ -64,22 +92,89 @@ afterEach(async () => {
   vi.unstubAllEnvs();
 });
 
-const run = async (name, input, caller = context) => JSON.parse((await tools.get(name).execute(input, caller)).content);
+const run = async (name, input, caller = context) => (await tools.get(name).execute(input, caller)).output;
 const enqueueInput = async sessionID => {
   inputEvents.emit('input', { type: 'session.inbox.enqueued', data: { sessionID } });
   await setImmediate();
 };
+const withMcpClient = async use => {
+  const client = new Client({ name: 'command-test', version: '1.0.0' });
+  const transport = new StreamableHTTPClientTransport(new URL('/api/openchamber/command-tool/mcp', childEnv.OPENCHAMBER_AGENT_TOOL_URL), {
+    requestInit: { headers: { authorization: `Bearer ${childEnv.OPENCHAMBER_AGENT_TOOL_TOKEN}` } },
+  });
+  try {
+    await client.connect(transport);
+    return await use(client);
+  } finally {
+    try { await transport.terminateSession(); }
+    finally { await client.close(); }
+  }
+};
+const mcpCall = (client, name, input, caller = context) => client.callTool({
+  name, arguments: input, _meta: { 'ai.opencode/sessionID': caller.sessionID },
+}, undefined, { signal: caller.signal });
 
 describe('managed command tools', () => {
+  it('exposes the command contracts and structured results through MCP', async () => {
+    await withMcpClient(async client => {
+      const catalog = await client.listTools();
+      expect(catalog.tools.map(tool => tool.name)).toEqual(['exec_command', 'write_stdin']);
+      for (const tool of catalog.tools) {
+        expect(tool.description).toBe(tools.get(tool.name).description);
+        expect(tool.inputSchema.required).toEqual(tools.get(tool.name).input.required);
+        expect(tool.inputSchema.properties).not.toHaveProperty('sessionID');
+        expect(tool.outputSchema.properties).toHaveProperty('session_id');
+      }
+      const value = { text: '引号 "OK"、反斜杠 \\ 和换行\n第二行', nested: { value: 7 } };
+      const result = await mcpCall(client, 'exec_command', { cmd: nodeCommand(`console.log(${JSON.stringify(JSON.stringify(value))})`) });
+      expect(result.structuredContent).toMatchObject({ status: 'completed', exit_code: 0 });
+      expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
+      expect(JSON.parse(result.structuredContent.output)).toEqual(value);
+    });
+  });
+
+  it('shares command handles across MCP connections while isolating sessions', async () => {
+    const started = await run('exec_command', { cmd: nodeCommand('process.stdin.pipe(process.stdout)'), yield_time_ms: 0 });
+    await withMcpClient(async client => {
+      const denied = await mcpCall(client, 'write_stdin', { session_id: started.session_id, chars: 'other' }, { ...context, sessionID: 'session-b' });
+      expect(denied.isError).toBe(true);
+      const result = await mcpCall(client, 'write_stdin', { session_id: started.session_id, chars: '完整内容 "OK"\\\n', close_stdin: true, yield_time_ms: 5000 });
+      expect(result.structuredContent).toMatchObject({ status: 'completed', exit_code: 0, output: '完整内容 "OK"\\' });
+      const retained = await run('write_stdin', { session_id: started.session_id, offset: -1 });
+      expect(retained.output).toBe(result.structuredContent.output);
+    });
+  });
+
+  it('cancels an MCP launch through the standard cancellation notification', async () => {
+    await withMcpClient(async client => {
+      const marker = path.join(root, 'mcp-launch-pid');
+      const controller = new AbortController();
+      const launching = mcpCall(client, 'exec_command', { cmd: nodeCommand(`require("node:fs").writeFileSync(${JSON.stringify(marker)}, String(process.pid)); setInterval(() => {}, 1000)`), yield_time_ms: 10000 }, { ...context, signal: controller.signal });
+      const rejected = expect(launching).rejects.toThrow('MCP launch cancelled');
+      let pid;
+      await expect.poll(async () => {
+        try { pid = Number(await fs.readFile(marker, 'utf8')); return true; }
+        catch (error) { if (error.code !== 'ENOENT') throw error; return false; }
+      }).toBe(true);
+      controller.abort(new Error('MCP launch cancelled'));
+      await rejected;
+      await expect.poll(() => {
+        try { process.kill(pid, 0); return false; }
+        catch (error) { if (error.code !== 'ESRCH') throw error; return true; }
+      }).toBe(true);
+    });
+  });
+
   it('returns structured command output for script continuations', async () => {
     const result = await tools.get('exec_command').execute({ cmd: nodeCommand('console.log("structured")') }, context);
-    expect(result.output).toEqual(JSON.parse(result.content));
+    expect(result.output).toEqual(JSON.parse(result.content[0].text));
     expect(result.output).toMatchObject({ status: 'completed', exit_code: 0 });
   });
 
-  it('exposes command execution and continuation as direct tools', () => {
-    expect([...tools.keys()]).toEqual(['exec_command', 'write_stdin', 'clock_sleep']);
-    expect([...tools.values()].every(tool => tool.options.codemode === false)).toBe(true);
+  it('exposes command execution and continuation through native MCP discovery', () => {
+    expect([...registered.keys()]).toEqual(['clock_sleep']);
+    expect(mcpConfig).toMatchObject({ name: 'openchamber_commands', type: 'remote', codemode: false, oauth: false });
+    expect([...tools.keys()]).toEqual(['clock_sleep', 'exec_command', 'write_stdin']);
     expect(tools.get('exec_command').input.required).toEqual(['cmd']);
     expect(tools.get('write_stdin').input.required).toEqual(['session_id']);
     expect(tools.get('clock_sleep').input.required).toEqual(['duration_ms']);
@@ -350,9 +445,15 @@ describe('managed command tools', () => {
   it('rejects unauthenticated callbacks and invalid inputs', async () => {
     const endpoint = new URL('/api/openchamber/command-tool', childEnv.OPENCHAMBER_AGENT_TOOL_URL);
     expect((await fetch(endpoint, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).status).toBe(401);
+    expect((await fetch(new URL('/api/openchamber/command-tool/mcp', endpoint), { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).status).toBe(401);
     const response = await fetch(endpoint, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${childEnv.OPENCHAMBER_AGENT_TOOL_TOKEN}` }, body: JSON.stringify({ sessionID: 'session-a', tool: 'exec_command', input: { cmd: 'touch invalid-file', yield_time_ms: -1 } }) });
     expect(response.status).toBe(400);
     await expect(fs.stat(path.join(root, 'invalid-file'))).rejects.toMatchObject({ code: 'ENOENT' });
+    await withMcpClient(async client => {
+      const result = await mcpCall(client, 'exec_command', { cmd: 'touch invalid-file', yield_time_ms: -1 });
+      expect(result.isError).toBe(true);
+      await expect(fs.stat(path.join(root, 'invalid-file'))).rejects.toMatchObject({ code: 'ENOENT' });
+    });
   });
 
   it('keeps command handles across plugin materialization and retires them on session deletion', async () => {

@@ -2,8 +2,8 @@
 
 ## Ownership
 
-This module owns command processes for managed OpenCode sessions, their output
-buffers, and the `openchamber-command-tool` plugin. `exec_command` starts a process;
+This module owns session-scoped command processes, their output buffers, the
+command MCP service, and the `openchamber-command-tool` policy and clock plugin. `exec_command` starts a process;
 `write_stdin` waits on it, reads new output, and sends pipe or raw PTY input.
 The same plugin provides `clock.sleep`, exposed as `clock_sleep` on OpenCode's
 direct tool list. Its timer runs in the plugin process.
@@ -11,14 +11,25 @@ The neighbouring `terminal` module owns the user's visible terminals and the
 shared PTY provider and process-tree shutdown implementation.
 
 The agent-tool runtime supplies same-machine callback authentication and the
-managed-child environment. The managed config registers this plugin for Web and
-Electron. Hosted and Capacitor mobile clients use those server-side processes.
+managed-child environment. OpenCode's native MCP client discovers and invokes
+the command tools. The plugin configures the `openchamber_commands` MCP server
+and installs command permission and activity hooks. The managed config registers
+this plugin for Web and Electron. Hosted and Capacitor mobile clients use those server-side processes.
 External OpenCode and VS Code lifecycles receive no plugin injection.
 
 ## Invariants
 
-- Each command belongs to the OpenCode session that started it. Other sessions
+- Each command belongs to the application session that started it. Other sessions
   cannot read its output or send input through its handle.
+- `contracts.ts` supplies the MCP tool descriptions and input/output schemas.
+  Command tools are exposed directly to the model through native MCP discovery.
+  Backend integration resolves the authoritative calling session from MCP metadata,
+  outside model arguments. OpenCode supplies `ai.opencode/sessionID`.
+- `/api/openchamber/command-tool/mcp` uses Streamable HTTP and the existing
+  same-machine bearer authentication. MCP connection IDs belong to the protocol;
+  command ownership uses the application session ID across connections. The SDK
+  routes cancellation notifications to the active call. Connection termination
+  preserves processes whose launch has already returned a running handle.
 - `yield_time_ms` collects output until the deadline or process completion;
   individual output chunks do not end a wait. A running command remains available through
   its `session_id`. Completion closes native handles and retains output for
@@ -48,7 +59,7 @@ External OpenCode and VS Code lifecycles receive no plugin injection.
 - A pipe command owns its POSIX process group. On command exit, remaining jobs
   in that group terminate before the session completes. Tasks that explicitly
   detach from the group have their own lifecycle.
-- The plugin checks OpenCode's shell permission before launching commands and
+- The plugin's before-execution hook checks OpenCode's shell permission before launching commands and
   sending terminal input. Launch permissions use OpenCode's portable shell
   scanner and directory analysis, vendored with its MIT notice in `vendor`.
   `shell` selects the binary for both permission analysis and process creation;
@@ -68,16 +79,17 @@ External OpenCode and VS Code lifecycles receive no plugin injection.
   clear timers and cancel outstanding inbox queries. Inbox-query and event-stream
   failures surface as tool errors.
 
-Command tools expose their result object alongside display text. Native Code Mode
-scripts can inspect `status`, `session_id`, output and exit status directly.
+Command tools expose their result object in MCP `structuredContent` alongside
+display text. OpenCode's native MCP tool executor preserves that object in tool
+output. The after-execution hook records command status and handles for activity.
 
 ## Decisions
 
 ### Why the server owns processes
 
-The server already packages the native PTY dependencies. The generated plugin
-uses an authenticated callback, so OpenCode needs no native dependency installed
-in its generated plugin directory.
+The server already packages the native PTY dependencies. OpenCode invokes the
+authenticated MCP service with its native client, so its policy plugin needs no
+native dependency or MCP client bundle.
 
 ### Source ownership
 
@@ -108,7 +120,7 @@ open indefinitely. Running commands retain their pipes throughout execution.
 
 TypeScript in `src` is the maintained source. `bun run build:server` in
 `packages/web` checks it with strict types, then emits JavaScript into `dist`.
-The server loads `dist/runtime.js`; generated files are ignored by Git.
+The server imports the compiled runtime; generated files are ignored by Git.
 The separate emit configuration skips duplicate checking after the strict pass.
 
 Web builds, package preparation, tests and development startup compile this

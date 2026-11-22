@@ -17,6 +17,8 @@ async function fixture(execute = () => Effect.succeed({ content: 'FILE_CONTENT',
     ['patch', { id: 'patch', name: 'patch', description: 'PATCH_FORMAT_EXAMPLE\n*** Begin Patch\n*** Update File: a.txt\n*** End Patch', input: Schema.Struct({ patchText: Schema.String.annotate({ description: 'The full patch text describing add, update, and delete operations' }) }), options: { codemode: false }, execute }],
     ['openchamber_render', { id: 'openchamber_render', name: 'openchamber_render', input: {}, options: { codemode: false } }],
     ['subagent', { id: 'subagent', name: 'subagent', input: {}, options: { codemode: false } }],
+    ['openchamber_commands_exec_command', { id: 'openchamber_commands_exec_command', name: 'exec_command', input: {}, options: { namespace: 'openchamber_commands', codemode: false } }],
+    ['openchamber_commands_write_stdin', { id: 'openchamber_commands_write_stdin', name: 'write_stdin', input: {}, options: { namespace: 'openchamber_commands', codemode: false } }],
   ]);
   const sessionHooks = new Map();
   const toolHooks = new Map();
@@ -121,6 +123,10 @@ it('supplies complete descriptions and parameter signatures while preserving dir
   expect(f.tools.get('example_file').options.codemode).toBe(true);
   expect(f.tools.get('example_file').options.pinned).toBe(true);
   expect(f.tools.get('subagent').options.codemode).toBe(false);
+  expect(f.tools.get('openchamber_commands_exec_command').options.codemode).toBe(false);
+  expect(f.tools.get('openchamber_commands_write_stdin').options.codemode).toBe(false);
+  expect(text).not.toContain('tools.openchamber_commands.exec_command(');
+  expect(text).not.toContain('tools.openchamber_commands.write_stdin(');
 });
 
 it('supplies native patch boundaries for file operation sections', async () => {

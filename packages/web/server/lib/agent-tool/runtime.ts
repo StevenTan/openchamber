@@ -60,7 +60,7 @@ import { controlErrorFields } from '../openchamber-control/error.js';
 import type { ControlInput } from '../openchamber-control/contracts.js';
 import type { ControlOptions, createOpenChamberControlService } from '../openchamber-control/service.js';
 import type { Application, ExpressFactory, Request, RequestHandler } from '../shared/http-contracts.js';
-import type { createCommandToolRuntime as commandRuntime } from '../agent-command/src/runtime.js';
+import { z } from 'zod';
 import type { createQuestionRuntime } from '../agent-question/src/runtime.js';
 
 interface ParameterSchema {
@@ -129,8 +129,8 @@ export interface AgentToolDependencies {
   getActiveHost?: () => string | null | undefined;
   executeAction?: ReturnType<typeof createOpenChamberControlService>['execute'];
   resolveSessionDirectory: ReturnType<typeof createOpenChamberControlService>['resolveSessionDirectory'];
-  getCommandEnvironment?: Parameters<typeof commandRuntime>[0]['getEnvironment'];
-  hasPendingInput: Parameters<typeof commandRuntime>[0]['hasPendingInput'];
+  getCommandEnvironment?: Parameters<typeof createCommandToolRuntime>[0]['getEnvironment'];
+  hasPendingInput: Parameters<typeof createCommandToolRuntime>[0]['hasPendingInput'];
   questionRuntime: ReturnType<typeof createQuestionRuntime>;
 }
 
@@ -1107,7 +1107,7 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
   };
 
   const registerRoutes = (app: Application, express: Pick<ExpressFactory, 'json'>) => {
-    commandToolRuntime.registerRoutes(app, express, { authorize, trackInflight });
+    commandToolRuntime.registerRoutes(app, express);
     app.post<Parameters<typeof questionRuntime.ask>[0]>('/api/openchamber/async-question', express.json({ limit: '1mb' }), (req, res) => {
       if (!authorize(req)) return res.status(401).json({ error: 'Unauthorized' });
       return questionRuntime.ask(req.body).then(
@@ -1140,7 +1140,7 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
     });
   };
 
-  const commandToolRuntime = createCommandToolRuntime({ instanceDir, resolveSessionDirectory, getEnvironment: getCommandEnvironment, hasPendingInput });
+  const commandToolRuntime = createCommandToolRuntime({ instanceDir, resolveSessionDirectory, getEnvironment: getCommandEnvironment, hasPendingInput, authorize, trackInflight, resolveMcpSessionID: request => z.string().min(1).parse(request._meta?.['ai.opencode/sessionID']) });
 
   const registerQuestionFormRoutes = (app: Application, express: Pick<ExpressFactory, 'json'>) => {
     app.post<Parameters<typeof questionRuntime.resolveBatch>[0]>('/api/openchamber/async-question/resolve', express.json({ limit: '1mb' }), (req, res) => {
