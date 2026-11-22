@@ -11,6 +11,7 @@ import { createCallActivity } from "./call-activity.js";
 import { FILE_MCP_TOOLS } from "../../agent-file/contracts.js";
 import { assertFileSkill, filterVirtualSkillGuidance, type SkillRegistry } from "./skill-policy.js";
 import { BROWSER_MCP_TOOLS } from "../../browser-control/tools.js";
+import { CONTROL_MCP_TOOLS } from "../../agent-tool/control-mcp.js";
 
 const directTools = new Set([
   "openchamber_render", "openchamber_secret", "openchamber_image",
@@ -21,6 +22,7 @@ const directTools = new Set([
   ...BROWSER_MCP_TOOLS,
   "request_user_input_async",
   ...FILE_MCP_TOOLS,
+  ...CONTROL_MCP_TOOLS,
 ]);
 const skillInput = Schema.Struct({ id: Schema.String });
 

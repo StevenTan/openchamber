@@ -7,7 +7,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { truncateOutput } from "./output.js";
 import { commandWait, continuationWait } from "./wait.js";
 import { commandInput, stdinInput, commandTools, type CommandArguments, type CommandResult, type RuntimeResult, type CommandToolName, type CommandToolContext } from "./contracts.js";
-import { createCommandMcpRuntime, type McpInvocation } from "./mcp.js";
+import { createCommandMcpRuntime } from "./mcp.js";
+import type { ResolveMcpContext } from "../../agent-tool/mcp-context.js";
 import { createSleepClock } from "./sleep.js";
 import { createSessionMemory } from "./session-memory.js";
 import type { JsonValue } from "../../event-stream/contracts.js";
@@ -22,7 +23,7 @@ interface CommandRuntimeOptions extends CallbackAuthorization {
   resolveSessionDirectory: (sessionID: string) => Promise<string | null>;
   getEnvironment?: (() => NodeJS.ProcessEnv) | undefined;
   hasPendingInput: (sessionID: string, signal: AbortSignal) => Promise<boolean>;
-  resolveMcpSessionID: (request: McpInvocation) => string;
+  resolveMcpContext: ResolveMcpContext;
 }
 
 interface CallbackRequest extends IncomingMessage {
@@ -56,7 +57,7 @@ export function createCommandToolRuntime({
   hasPendingInput,
   authorize,
   trackInflight,
-  resolveMcpSessionID,
+  resolveMcpContext,
   abortSession,
 }: CommandRuntimeOptions) {
   const pluginDirectory = path.join(
@@ -194,7 +195,7 @@ export function createCommandToolRuntime({
     } finally {
       untrack();
     }
-  }, resolveMcpSessionID);
+  }, resolveMcpContext);
 
   const registerRoutes = (
     app: CallbackApp,

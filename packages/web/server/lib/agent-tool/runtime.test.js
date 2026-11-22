@@ -12,10 +12,18 @@ import { createOpenChamberControlService } from '../openchamber-control/service.
 import { createProjectContextRuntime } from '../project-context/runtime.js';
 import { createProjectIdFromPath } from '../projects/project-id.js';
 import { OPENCHAMBER_AGENT_TOOL_ACTION_DEFINITIONS, OPENCHAMBER_CONTROL_ACTION_DEFINITIONS } from '../openchamber-control/actions.js';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
 const temporaryDirectories = [];
+const mcpCleanup = [];
+const managedInstances = new Map();
+const nativeFetch = globalThis.fetch;
 
 afterEach(async () => {
+  for (const close of mcpCleanup.splice(0).reverse()) await close();
+  managedInstances.clear();
+  vi.unstubAllEnvs();
   await Promise.all(temporaryDirectories.splice(0).map((directory) => fs.rm(directory, { recursive: true, force: true })));
 });
 
@@ -84,7 +92,10 @@ const createPageWaitSignals = () => {
 /** What a managed OpenCode child start does: write the plugin, mint a token. */
 const prepareManagedEnv = async (runtime, options) => {
   const pluginDirectory = await runtime.materializePlugin(options);
-  return { pluginDirectory, ...runtime.createChildEnv() };
+  const env = runtime.createChildEnv();
+  managedInstances.set(path.dirname(path.dirname(pluginDirectory)), { runtime, env });
+  for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
+  return { pluginDirectory, ...env };
 };
 
 /** Loads the generated plugin and returns the tools it registers, by name. */
@@ -96,11 +107,14 @@ const loadTools = async (dataDir, tag, hooks = {}, removed = [], namespaces = []
   const entrypoint = path.join(pluginDirectoryFor(dataDir), 'index.js');
   const pluginModule = await import(`${pathToFileURL(entrypoint).href}?${tag}=${Date.now()}`);
   const registered = {};
+  const mcpServers = new Map();
+  const toolHooks = new Map();
   await pluginModule.default.setup({
-    mcp: { transform: async () => {} },
+    mcp: { transform: async run => run({ set: (name, config) => mcpServers.set(name, config) }) },
+    permission: { assert: vi.fn(async () => {}) },
     ...context,
     tool: {
-      hook: async () => {},
+      hook: async (name, callback) => toolHooks.set(name, callback),
       transform: (edit) => {
         edit({
           add: (tool) => { registered[tool.name] = tool; },
@@ -113,8 +127,65 @@ const loadTools = async (dataDir, tag, hooks = {}, removed = [], namespaces = []
       hook: async (name, callback) => { hooks[name] = callback; },
     },
   });
+  const config = mcpServers.get('openchamber');
+  if (config) {
+    const { runtime } = managedInstances.get(dataDir);
+    const app = express();
+    runtime.registerRoutes(app, express);
+    const listener = await new Promise(resolve => { const server = app.listen(0, '127.0.0.1', () => resolve(server)); });
+    mcpCleanup.push(async () => { await runtime.closeCommands(); await new Promise(resolve => listener.close(resolve)); });
+    const client = new Client({ name: 'control-test', version: '1' });
+    const endpoint = new URL(config.url);
+    endpoint.port = String(listener.address().port);
+    const transport = new StreamableHTTPClientTransport(endpoint, { requestInit: { headers: config.headers }, fetch: nativeFetch });
+    await client.connect(transport);
+    mcpCleanup.push(() => client.close());
+    for (const tool of (await client.listTools()).tools) {
+      const name = `openchamber_${tool.name}`;
+      expect(registered).not.toHaveProperty(name);
+      registered[name] = { description: tool.description, input: tool.inputSchema, output: tool.outputSchema,
+        options: { codemode: false, namespace: 'openchamber' },
+        execute: async (input, context) => {
+          const event = { ...context, agent: 'build', messageID: 'message', id: crypto.randomUUID(), tool: name, input };
+          await toolHooks.get('execute.before')(event);
+          const result = await client.callTool({ name: tool.name, arguments: input, _meta: { 'ai.opencode/sessionID': context.sessionID } });
+          const after = { ...event, status: 'completed', result: { output: result.structuredContent } };
+          await toolHooks.get('execute.after')(after);
+          return { content: JSON.stringify(result.structuredContent), metadata: after.result.metadata };
+        } };
+    }
+  }
   return registered;
 };
+
+it('uses the backend context for direct MCP calls and retains permissions and activity metadata', async () => {
+  const { runtime, dataDir, executeAction } = await createRuntime({
+    resolveMcpContext: request => ({ sessionID: 'app-session', callID: String(request.requestId), signal: request.signal }),
+    resolveSessionDirectory: async sessionID => sessionID === 'app-session' ? '/project' : undefined,
+  });
+  await prepareManagedEnv(runtime, { includeControl: false, includeWeb: false, includeKnowledge: true, includeUsage: true, includeNotify: true });
+  const permission = { assert: vi.fn(async () => {}) };
+  const tools = await loadTools(dataDir, 'shared-context', {}, [], [], { permission });
+  const context = { sessionID: 'backend-session', agent: 'build' };
+  for (const [name, action, parameters] of [
+    ['memory', 'memory.list', {}],
+    ['knowledge', 'knowledge.list', { kind: 'note' }],
+    ['usage', 'usage.read', {}],
+    ['notify', 'notify.send', { title: 'Done', message: 'Finished' }],
+  ]) {
+    const result = await tools[`openchamber_${name}`].execute({ action, parameters }, context);
+    expect(JSON.parse(result.content)).toMatchObject({ action, ok: true });
+    expect(result.metadata.openchamber).toMatchObject({ action, ok: true });
+    expect(permission.assert).toHaveBeenLastCalledWith(expect.objectContaining({ action: `openchamber_${name}`, sessionID: 'backend-session' }));
+  }
+  expect(executeAction.mock.calls.find(([action]) => action === 'knowledge.list')).toEqual([
+    'knowledge.list', { action: 'knowledge.list', kind: 'note' }, '/project', { contextSessionId: 'app-session', contextCallId: expect.any(String), signal: expect.any(AbortSignal) },
+  ]);
+  const count = executeAction.mock.calls.length;
+  permission.assert.mockRejectedValueOnce(new Error('Denied'));
+  await expect(tools.openchamber_memory.execute({ action: 'memory.list' }, context)).rejects.toThrow('Denied');
+  expect(executeAction).toHaveBeenCalledTimes(count);
+});
 
 describe('agent tool action allowlist', () => {
   it('defines a short title and agent description for every action', () => {
@@ -330,7 +401,7 @@ describe('managed agent tool runtime', () => {
       expect(await projectContextRuntime.readContext(owner)).toMatchObject({ notes: [], plans: [], todos: [{ text: 'UI item' }] });
       expect(onChanged.mock.calls.every(([projectId]) => projectId === owner)).toBe(true);
       process.env.OPENCHAMBER_AGENT_TOOL_TOKEN = 'wrong-token';
-      expect((await call('list')).ok).toBe(false);
+      await request(app).post('/api/openchamber/control-tool/mcp').set('authorization', 'Bearer wrong-token').send({}).expect(401);
     } finally {
       if (originalUrl === undefined) delete process.env.OPENCHAMBER_AGENT_TOOL_URL;
       else process.env.OPENCHAMBER_AGENT_TOOL_URL = originalUrl;
@@ -397,7 +468,7 @@ describe('managed agent tool runtime', () => {
   it('introduces the worktree move and leaves the choice to the user', async () => {
     const { runtime, dataDir } = await createRuntime();
 
-    await runtime.materializePlugin({});
+    await prepareManagedEnv(runtime, {});
     const tool = await loadTools(dataDir, 'worktree-intro');
 
     expect(tool.openchamber.description).toContain('Whether that fits depends on how the user works');
@@ -584,7 +655,7 @@ describe('managed agent tool runtime', () => {
   });
 
   it('normalizes the two string boolean spellings a model sends, and nothing else', async () => {
-    const { runtime, dataDir } = await createRuntime();
+    const { runtime, dataDir, executeAction } = await createRuntime();
     const prepared = await prepareManagedEnv(runtime, { includeKnowledge: true });
     const tools = await loadTools(dataDir, 'boolean-strings');
 
@@ -630,8 +701,8 @@ describe('managed agent tool runtime', () => {
     }
 
     expect(sent.slice(0, 8).map(({ input }) => input.withStatus)).toEqual([true, false, true, false, true, false, true, false]);
-    expect(sent[8].input.completed).toBe(false);
-    expect(sent.slice(9, 16).map(({ input }) => input.withStatus)).toEqual(['TRUE', 'False', 'yes', '1', 1, 0, null]);
+    expect(executeAction.mock.calls.find(([action]) => action === 'knowledge.save')[1].completed).toBe(false);
+    expect(sent.slice(8, 15).map(({ input }) => input.withStatus)).toEqual(['TRUE', 'False', 'yes', '1', 1, 0, null]);
   });
 
   it('omits a tool the user turned off', async () => {
@@ -678,7 +749,7 @@ describe('managed agent tool runtime', () => {
 
     expect(Object.keys(tool)).toEqual(['openchamber', 'openchamber_notify']);
     expect(Object.keys(tool.openchamber_notify.input.properties.parameters.properties).sort())
-      .toEqual(['body', 'showWhenFocused', 'title']);
+      .toEqual(['body', 'title']);
     expect(Object.keys(tool.openchamber.input.properties.parameters.properties)).not.toContain('showWhenFocused');
 
     const { runtime: plain, dataDir: plainDir } = await createRuntime();
@@ -706,9 +777,10 @@ describe('managed agent tool runtime', () => {
 
     expect(Object.keys(tool)).toEqual(['openchamber_usage']);
     expect(Object.keys(tool.openchamber_usage.input.properties.parameters.properties)).toEqual(['providerId']);
-    expect(tool.openchamber_usage.options).toEqual({ codemode: true });
+    expect(tool.openchamber_usage.options).toEqual({ codemode: false, namespace: 'openchamber' });
     // Its catalog line names when to read it, so agents do not check limits before every task.
-    expect(namespaces).toEqual([expect.objectContaining({ name: 'openchamber_usage', description: expect.stringContaining('when the user asks about limits') })]);
+    expect(namespaces).toEqual([]);
+    expect(tool.openchamber_usage.description).toContain('when the user asks about limits');
     expect(tool.openchamber_usage.description.length).toBeLessThanOrEqual(2048);
 
     await runtime.materializePlugin({ includeControl: true, includeWeb: false, includeMemory: false });
@@ -1198,20 +1270,20 @@ describe('managed agent tool runtime', () => {
     }
   });
 
-  it('puts the control, schedule, memory, knowledge and notify tools behind Code Mode, and the render tool direct', async () => {
+  it('exposes memory, knowledge and notify through MCP, control and schedule through Code Mode, and render directly', async () => {
     const { runtime, dataDir } = await createRuntime();
     await prepareManagedEnv(runtime, { includeControl: true, includeSchedule: true, includeWeb: true, includeMemory: true, includeKnowledge: true, includeNotify: true, includeRender: true });
     const namespaces = [];
     const { openchamber_render: render, ...behindExecute } = await loadTools(dataDir, 'codemode', {}, [], namespaces);
     const names = ['openchamber', 'openchamber_knowledge', 'openchamber_memory', 'openchamber_notify', 'openchamber_schedule'];
     expect(Object.keys(behindExecute).filter(name => behindExecute[name].options.namespace !== 'browser').sort()).toEqual(names);
-    for (const tool of Object.values(behindExecute)) {
+    for (const tool of Object.values(behindExecute).filter(tool => tool.options.namespace !== 'openchamber')) {
       expect(tool.options).toMatchObject({ codemode: true });
     }
     expect(render.options).toEqual({ codemode: false });
     // Names stay as they are; each tool gets a namespace of its own name, so
     // its catalog row says what it is even when the catalog lists none of it.
-    expect(namespaces.map((namespace) => namespace.name).sort()).toEqual(names);
+    expect(namespaces.map((namespace) => namespace.name).sort()).toEqual(['openchamber', 'openchamber_schedule']);
 
     // A tool switched off takes its namespace along.
     await prepareManagedEnv(runtime, { includeControl: true, includeWeb: false, includeMemory: false, includeRender: true });
@@ -1274,7 +1346,6 @@ describe('managed agent tool runtime', () => {
     ['session.list', 'openchamber', { withStatus: 'true' }, 'withStatus'],
     ['browser.type', 'openchamber_web', { selector: '#q', value: 'x', submit: 'yes' }, 'submit'],
     ['knowledge.save', 'openchamber_knowledge', { kind: 'todo', id: 't1', completed: 'false' }, 'completed'],
-    ['notify.send', 'openchamber_notify', { title: 't', showWhenFocused: 1 }, 'showWhenFocused'],
     ['secret.forget', 'openchamber_secret', { saved: 'yes' }, 'saved'],
   ])('refuses a %s whose boolean %s field is not a boolean', async (action, tool, input, field) => {
     const { runtime, executeAction } = await createRuntime();
@@ -1504,7 +1575,7 @@ describe('managed agent tool runtime', () => {
     ['not a url', 'localhost', 'localhost'],
   ])('keeps the callback %s away from an environment proxy', async (callbackUrl, existing, expected) => {
     const { runtime, dataDir } = await createRuntime();
-    await prepareManagedEnv(runtime);
+    await prepareManagedEnv(runtime, { includeMemory: false, includeWeb: false });
     const keys = ['OPENCHAMBER_AGENT_TOOL_URL', 'NO_PROXY', 'no_proxy'];
     const previous = keys.map((key) => process.env[key]);
     try {

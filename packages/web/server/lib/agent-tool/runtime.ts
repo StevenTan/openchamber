@@ -60,12 +60,14 @@ import { controlErrorFields } from '../openchamber-control/error.js';
 import type { ControlInput } from '../openchamber-control/contracts.js';
 import type { ControlOptions, createOpenChamberControlService } from '../openchamber-control/service.js';
 import type { Application, ExpressFactory, Request, RequestHandler } from '../shared/http-contracts.js';
-import { z } from 'zod';
 import type { createQuestionRuntime } from '../agent-question/src/runtime.js';
 import { createQuestionMcpRuntime } from '../agent-question/src/mcp.js';
 import { createFileMcpRuntime } from '../agent-file/mcp.js';
+import { createControlMcpRuntime, controlMcpSetup, type ControlMcpTool } from './control-mcp.js';
+import { resolveOpenCodeMcpContext } from '../opencode/mcp-context.js';
+import type { ResolveMcpContext } from './mcp-context.js';
 
-interface ParameterSchema {
+export interface ParameterSchema {
   type: string | string[];
   description?: string;
   enum?: string[];
@@ -80,7 +82,7 @@ interface ParameterSchema {
   maxLength?: number;
 }
 
-interface ActionDefinition {
+export interface ActionDefinition {
   action: string;
   description: string;
 }
@@ -134,6 +136,7 @@ export interface AgentToolDependencies {
   getCommandEnvironment?: Parameters<typeof createCommandToolRuntime>[0]['getEnvironment'];
   hasPendingInput: Parameters<typeof createCommandToolRuntime>[0]['hasPendingInput'];
   questionRuntime: ReturnType<typeof createQuestionRuntime>;
+  resolveMcpContext?: ResolveMcpContext;
 }
 
 interface ToolEntryOptions {
@@ -339,7 +342,6 @@ const KNOWLEDGE_PARAMETER_PROPERTIES = {
 const NOTIFY_PARAMETER_PROPERTIES = {
   title: { type: 'string', description: 'Up to 120 characters' },
   body: { type: 'string', description: 'Up to 500 characters' },
-  showWhenFocused: { type: 'boolean', description: 'Show it while the user is in OpenChamber too, otherwise it shows only while they are away. Only for what cannot wait' },
 };
 
 const IMAGE_PARAMETER_PROPERTIES = {
@@ -757,7 +759,7 @@ const OPENCODE_TOOLS_REPLACED_BY_CONTROL = ['opencode_worktree_create', 'opencod
 
 const createPluginSource = ({ includeControl, includeSchedule, includeWeb, includeMemory, includeKnowledge, includeNotify, includeRender, includeShare, includeImage, includeSecret, includeUsage, includeTerminal, includeWorkflow }: Required<PluginOptions>) => {
   const entries = [];
-  const included = { openchamber: includeControl, openchamber_schedule: includeSchedule, openchamber_memory: includeMemory, openchamber_knowledge: includeKnowledge, openchamber_notify: includeNotify, openchamber_usage: includeUsage, openchamber_terminal: includeTerminal };
+  const included = { openchamber: includeControl, openchamber_schedule: includeSchedule, openchamber_terminal: includeTerminal };
   for (const [name, description] of Object.entries(CODE_MODE_CATALOG_LINES)
     .filter((entry): entry is [keyof typeof included, string] => Object.hasOwn(included, entry[0]))) {
     if (included[name]) entries.push(`    tools.namespace(${JSON.stringify({ name, description })})
@@ -782,33 +784,6 @@ const createPluginSource = ({ includeControl, includeSchedule, includeWeb, inclu
       description: SCHEDULE_TOOL_DESCRIPTION,
       definitions: OPENCHAMBER_SCHEDULE_ACTION_DEFINITIONS,
       parameters: SCHEDULE_PARAMETER_PROPERTIES,
-      codeMode: true,
-    }));
-  }
-  if (includeMemory) {
-    entries.push(createToolEntry({
-      name: 'openchamber_memory',
-      description: MEMORY_TOOL_DESCRIPTION,
-      definitions: OPENCHAMBER_MEMORY_ACTION_DEFINITIONS,
-      parameters: MEMORY_PARAMETER_PROPERTIES,
-      codeMode: true,
-    }));
-  }
-  if (includeKnowledge) {
-    entries.push(createToolEntry({
-      name: 'openchamber_knowledge',
-      description: KNOWLEDGE_TOOL_DESCRIPTION,
-      definitions: OPENCHAMBER_KNOWLEDGE_ACTION_DEFINITIONS,
-      parameters: KNOWLEDGE_PARAMETER_PROPERTIES,
-      codeMode: true,
-    }));
-  }
-  if (includeNotify) {
-    entries.push(createToolEntry({
-      name: 'openchamber_notify',
-      description: NOTIFY_TOOL_DESCRIPTION,
-      definitions: OPENCHAMBER_NOTIFY_ACTION_DEFINITIONS,
-      parameters: NOTIFY_PARAMETER_PROPERTIES,
       codeMode: true,
     }));
   }
@@ -840,15 +815,6 @@ const createPluginSource = ({ includeControl, includeSchedule, includeWeb, inclu
       definitions: OPENCHAMBER_IMAGE_ACTION_DEFINITIONS,
       parameters: IMAGE_PARAMETER_PROPERTIES,
       codeMode: false,
-    }));
-  }
-  if (includeUsage) {
-    entries.push(createToolEntry({
-      name: 'openchamber_usage',
-      description: USAGE_TOOL_DESCRIPTION,
-      definitions: OPENCHAMBER_USAGE_ACTION_DEFINITIONS,
-      parameters: USAGE_PARAMETER_PROPERTIES,
-      codeMode: true,
     }));
   }
   if (includeTerminal) {
@@ -921,7 +887,7 @@ export default {
   setup: async (ctx) => {
     exemptCallbackFromProxy()
     await ctx.tool.transform((tools) => {
-${entries.join('')}    })${includeWeb ? browserMcpSetup(AGENT_TOOL_ACTION_TITLES) : ''}${includeRender || includeSecret ? `
+${entries.join('')}    })${includeWeb ? browserMcpSetup(AGENT_TOOL_ACTION_TITLES) : ''}${includeMemory || includeKnowledge || includeUsage || includeNotify ? controlMcpSetup(AGENT_TOOL_ACTION_TITLES) : ''}${includeRender || includeSecret ? `
     await ctx.session.hook("prompt", (event) => {
       // An agent's prompt is not the user writing, and a queued one arrives
       // only after the turn: the page keeps waiting for the user.
@@ -959,12 +925,14 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
     getCommandEnvironment,
     hasPendingInput,
     questionRuntime,
+    resolveMcpContext = resolveOpenCodeMcpContext,
   } = dependencies;
   const pluginRoot = path.join(instanceDir, 'agent-tool');
   const pluginDirectory = path.join(pluginRoot, PLUGIN_ID);
   const pluginPath = path.join(pluginDirectory, 'index.js');
   const pluginManifestPath = path.join(pluginDirectory, 'package.json');
   let activeToken: string | null = null;
+  let controlTools: ControlMcpTool[] = [];
 
   const { callbackHost, isSameMachineAddress } = createCallbackAddress(getActiveHost);
 
@@ -972,6 +940,12 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
     if (!includeControl && !includeSchedule && !includeWeb && !includeMemory && !includeKnowledge && !includeNotify && !includeRender && !includeImage && !includeSecret && !includeUsage && !includeTerminal && !includeWorkflow) {
       throw new Error('At least one OpenChamber managed tool must be enabled to inject the plugin');
     }
+    controlTools = [
+      ...includeMemory ? [{ name: 'memory', description: CODE_MODE_CATALOG_LINES.openchamber_memory + '\n\n' + MEMORY_TOOL_DESCRIPTION, definitions: OPENCHAMBER_MEMORY_ACTION_DEFINITIONS, parameters: MEMORY_PARAMETER_PROPERTIES }] : [],
+      ...includeKnowledge ? [{ name: 'knowledge', description: CODE_MODE_CATALOG_LINES.openchamber_knowledge + '\n\n' + KNOWLEDGE_TOOL_DESCRIPTION, definitions: OPENCHAMBER_KNOWLEDGE_ACTION_DEFINITIONS, parameters: KNOWLEDGE_PARAMETER_PROPERTIES }] : [],
+      ...includeUsage ? [{ name: 'usage', description: CODE_MODE_CATALOG_LINES.openchamber_usage + '\n\n' + USAGE_TOOL_DESCRIPTION, definitions: OPENCHAMBER_USAGE_ACTION_DEFINITIONS, parameters: USAGE_PARAMETER_PROPERTIES }] : [],
+      ...includeNotify ? [{ name: 'notify', description: CODE_MODE_CATALOG_LINES.openchamber_notify + '\n\n' + NOTIFY_TOOL_DESCRIPTION, definitions: OPENCHAMBER_NOTIFY_ACTION_DEFINITIONS, parameters: NOTIFY_PARAMETER_PROPERTIES }] : [],
+    ];
     await fsPromises.mkdir(pluginDirectory, { recursive: true });
     await fsPromises.writeFile(pluginManifestPath, PLUGIN_PACKAGE_JSON, { mode: 0o600 });
     await fsPromises.writeFile(pluginPath, createPluginSource({ includeControl, includeSchedule, includeWeb, includeMemory, includeKnowledge, includeNotify, includeRender, includeShare: includeRender && includeShare, includeImage, includeSecret, includeUsage, includeTerminal, includeWorkflow }), { mode: 0o600 });
@@ -1076,7 +1050,7 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
 
   const registerRoutes = (app: Application, express: Pick<ExpressFactory, 'json'>) => {
     commandToolRuntime.registerRoutes(app, express);
-    for (const [route, mcp, limit] of [['browser-tool', browserMcp, '1mb'], ['async-question', questionMcp, '1mb'], ['file-tool', fileMcp, '50mb']] as const) {
+    for (const [route, mcp, limit] of [['browser-tool', browserMcp, '1mb'], ['async-question', questionMcp, '1mb'], ['file-tool', fileMcp, '50mb'], ['control-tool', controlMcp, '1mb']] as const) {
       app.all(`/api/openchamber/${route}/mcp`, express.json({ limit }), async (req, res) => {
         if (!authorize(req)) return res.status(401).json({ error: 'Unauthorized' });
         await mcp.handleRequest(req, res);
@@ -1107,7 +1081,7 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
     });
   };
 
-  const commandToolRuntime = createCommandToolRuntime({ instanceDir, resolveSessionDirectory, getEnvironment: getCommandEnvironment, hasPendingInput, authorize, trackInflight, abortSession, resolveMcpSessionID: request => z.string().min(1).parse(request._meta?.['ai.opencode/sessionID']) });
+  const commandToolRuntime = createCommandToolRuntime({ instanceDir, resolveSessionDirectory, getEnvironment: getCommandEnvironment, hasPendingInput, authorize, trackInflight, abortSession, resolveMcpContext });
   const browserMcp = createBrowserMcpRuntime({
     name: 'panel',
     description: WEB_TOOL_DESCRIPTION,
@@ -1120,9 +1094,10 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
       required: ['action'], additionalProperties: true,
     },
     outputSchema: { ...TOOL_OUTPUT_SCHEMA, type: 'object' },
-  }, execute, trackInflight);
-  const questionMcp = createQuestionMcpRuntime(questionRuntime);
-  const fileMcp = createFileMcpRuntime(resolveSessionDirectory);
+  }, execute, trackInflight, resolveMcpContext);
+  const questionMcp = createQuestionMcpRuntime(questionRuntime, resolveMcpContext);
+  const fileMcp = createFileMcpRuntime(resolveSessionDirectory, resolveMcpContext);
+  const controlMcp = createControlMcpRuntime(() => controlTools, execute, resolveMcpContext, trackInflight, { ...TOOL_OUTPUT_SCHEMA, type: 'object' });
 
   const registerQuestionFormRoutes = (app: Application, express: Pick<ExpressFactory, 'json'>) => {
     app.post<Parameters<typeof questionRuntime.resolveBatch>[0]>('/api/openchamber/async-question/resolve', express.json({ limit: '1mb' }), (req, res) => {
@@ -1153,7 +1128,7 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
     materializeCommandPlugin: commandToolRuntime.materializePlugin,
     materializeSearchPlugin: () => materializeSearchPlugin(instanceDir),
     materializeQuestionPlugin: () => questionRuntime.materializePlugin(instanceDir),
-    closeCommands: () => Promise.all([commandToolRuntime.close(), browserMcp.close(), questionMcp.close(), fileMcp.close()]),
+    closeCommands: () => Promise.all([commandToolRuntime.close(), browserMcp.close(), questionMcp.close(), fileMcp.close(), controlMcp.close()]),
     observeCommandEvent: commandToolRuntime.observeEvent,
   };
 };

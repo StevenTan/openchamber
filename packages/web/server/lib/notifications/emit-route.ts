@@ -15,11 +15,10 @@ const emitBodySchema = z.object({
   tag: optionalText(128),
   sessionId: optionalText(128),
   directory: optionalText(4096),
-  showWhenFocused: z.boolean().optional(),
 }).refine((value) => value.title || value.body, { message: 'title or body required' });
 
 interface PluginNotificationDependencies {
-  readSettingsFromDiskMigrated: () => Promise<{ nativeNotificationsEnabled?: boolean; notificationMode?: string }>;
+  readSettingsFromDiskMigrated: () => Promise<{ nativeNotificationsEnabled?: boolean }>;
   emitDesktopNotification: (payload: NotificationPayload) => boolean;
   broadcastUiNotification: (payload: NotificationPayload, options: { desktopNotificationDelivered: boolean }) => void;
   now?: () => number;
@@ -73,7 +72,7 @@ export const createPluginNotificationEmitter = (dependencies: PluginNotification
       sessionId: parsed.data.sessionId,
       directory: parsed.data.directory,
       requireHidden: true,
-      showWhenFocused: parsed.data.showWhenFocused === true || settings.notificationMode === 'always',
+      showWhenFocused: true,
     };
     const desktopNotificationDelivered = emitDesktopNotification(payload) === true;
     broadcastUiNotification(payload, { desktopNotificationDelivered });

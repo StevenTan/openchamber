@@ -24,7 +24,8 @@ External OpenCode and VS Code lifecycles receive no plugin injection.
 - `contracts.ts` supplies the MCP tool descriptions and input/output schemas.
   All five tools are exposed directly to the model through native MCP discovery.
   Backend integration resolves the authoritative calling session from MCP metadata,
-  outside model arguments. OpenCode supplies `ai.opencode/sessionID`.
+  outside model arguments, through the shared `ResolveMcpContext` contract.
+  OpenCode's adapter decodes `ai.opencode/sessionID`.
 - `/api/openchamber/command-tool/mcp` uses Streamable HTTP and the existing
   same-machine bearer authentication. MCP connection IDs belong to the protocol;
   command ownership uses the application session ID across connections. The SDK

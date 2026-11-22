@@ -6,6 +6,7 @@ import type { AgentToolInput, AgentToolPayload, ResultFields } from '../agent-to
 import type { ControlOptions } from '../openchamber-control/service.js';
 import { getPlaywrightToolDefinitions } from './playwright.js';
 import { BROWSER_MCP_TOOLS } from './tools.js';
+import type { ResolveMcpContext } from '../agent-tool/mcp-context.js';
 
 const panelInput = z.object({ action: z.string(), parameters: z.record(z.string(), z.unknown()).optional() }).catchall(z.unknown());
 
@@ -13,6 +14,7 @@ export function createBrowserMcpRuntime(
   panel: Tool,
   execute: (payload: AgentToolPayload, options: ControlOptions) => Promise<ResultFields & { schemaVersion: number }>,
   trackInflight: (sessionID: string, controller: AbortController) => () => void,
+  resolveContext: ResolveMcpContext,
 ) {
   return createMcpRuntime(async () => {
     const pageTools = await getPlaywrightToolDefinitions();
@@ -25,7 +27,7 @@ export function createBrowserMcpRuntime(
     const server = new Server({ name: 'openchamber-browser', version: '1.0.0' }, { capabilities: { tools: {} } });
     server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools }));
     server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
-      const sessionID = z.string().min(1).parse(extra._meta?.['ai.opencode/sessionID']);
+      const { sessionID, callID } = resolveContext(extra);
       let input: AgentToolInput;
       if (request.params.name === 'panel') {
         const { action, parameters, ...flattened } = panelInput.parse(request.params.arguments);
@@ -40,7 +42,7 @@ export function createBrowserMcpRuntime(
       const signal = AbortSignal.any([extra.signal, controller.signal]);
       const untrack = trackInflight(sessionID, controller);
       try {
-        const payload: AgentToolPayload = { tool: 'openchamber_web', input, sessionID, callID: String(extra.requestId) };
+        const payload: AgentToolPayload = { tool: 'openchamber_web', input, sessionID, callID };
         const result = await execute(payload, { signal });
         signal.throwIfAborted();
         if (request.params.name === 'panel') return { structuredContent: result, content: [{ type: 'text', text: JSON.stringify(result) }] };

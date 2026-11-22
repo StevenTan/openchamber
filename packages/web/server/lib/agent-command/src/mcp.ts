@@ -3,19 +3,18 @@ import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/proto
 import type { CallToolResult, ServerNotification, ServerRequest } from "@modelcontextprotocol/sdk/types.js";
 import { commandTools, type CommandArguments, type RuntimeResult, type CommandToolContext, type CommandToolName } from "./contracts.js";
 import { createMcpRuntime } from "../../agent-tool/mcp.js";
-
-export type McpInvocation = Pick<RequestHandlerExtra<ServerRequest, ServerNotification>, "_meta">;
+import type { ResolveMcpContext } from "../../agent-tool/mcp-context.js";
 
 export function createCommandMcpRuntime(
   execute: (tool: CommandToolName, input: CommandArguments, context: CommandToolContext) => Promise<RuntimeResult>,
-  resolveSessionID: (request: McpInvocation) => string,
+  resolveContext: ResolveMcpContext,
 ) {
-  return createMcpRuntime(() => createCommandMcpServer(execute, resolveSessionID));
+  return createMcpRuntime(() => createCommandMcpServer(execute, resolveContext));
 }
 
 function createCommandMcpServer(
   execute: (tool: CommandToolName, input: CommandArguments, context: CommandToolContext) => Promise<RuntimeResult>,
-  resolveSessionID: (request: McpInvocation) => string,
+  resolveContext: ResolveMcpContext,
 ) {
   const server = new McpServer({ name: "openchamber-commands", version: "1.0.0" });
   for (const name of ["exec_command", "write_stdin", "clock_sleep", "store", "load"] as const) {
@@ -25,7 +24,7 @@ function createCommandMcpServer(
       inputSchema: definition.input,
       outputSchema: definition.output,
     }, async (input: CommandArguments, extra: RequestHandlerExtra<ServerRequest, ServerNotification>): Promise<CallToolResult> => {
-      const result = await execute(name, input, { sessionID: resolveSessionID(extra), signal: extra.signal });
+      const result = await execute(name, input, resolveContext(extra));
       return { structuredContent: result, content: [{ type: "text", text: JSON.stringify(result) }] };
     });
   }

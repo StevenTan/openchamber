@@ -97,7 +97,6 @@ export interface ControlInput {
   gone?: unknown;
   timeoutMs?: unknown;
   paths?: unknown;
-  showWhenFocused?: unknown;
   link?: unknown;
   identifier?: unknown;
   existingBranch?: unknown;

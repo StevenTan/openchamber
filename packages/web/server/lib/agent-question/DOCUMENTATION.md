@@ -16,8 +16,9 @@ before returning. Its execution and input schema remain native. Use it when the
 answer is required before further work; use `request_user_input_async` when
 independent work can continue while the question is pending.
 
-Each MCP invocation receives its session from OpenCode's `ai.opencode/sessionID`
-metadata and an independent request identity. The plugin retains the native
+Each MCP invocation receives its session, request identity and cancellation signal
+through the injected shared context resolver. OpenCode's adapter reads its
+`ai.opencode/sessionID` metadata. The plugin retains the native
 `question` permission and question ID activity metadata. The tool is called directly
 and is excluded from the Code Mode catalog.
 

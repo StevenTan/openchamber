@@ -48,7 +48,7 @@ describe('POST /api/notifications/emit', () => {
         sessionId: 'ses_1',
         directory: undefined,
         requireHidden: true,
-        showWhenFocused: false,
+        showWhenFocused: true,
       },
       options: { desktopNotificationDelivered: false },
     }]);
@@ -106,7 +106,7 @@ describe('POST /api/notifications/emit', () => {
     expect(delivered).toHaveLength(11);
   });
 
-  it('follows the notifications setting and the always mode', async () => {
+  it('follows the notifications setting and shows enabled notices while focused', async () => {
     const off = createApp({ settings: { nativeNotificationsEnabled: false } });
     const skipped = await request(off.app).post('/api/notifications/emit').set('Authorization', PLUGIN_TOKEN).send({ body: 'x' });
     expect(skipped.body).toEqual({ delivered: false, reason: 'notifications-disabled' });
@@ -118,9 +118,8 @@ describe('POST /api/notifications/emit', () => {
     expect(always.delivered[0].payload.showWhenFocused).toBe(true);
 
     const focused = createApp();
-    await request(focused.app).post('/api/notifications/emit').set('Authorization', PLUGIN_TOKEN).send({ body: 'x', showWhenFocused: true }).expect(200);
+    await request(focused.app).post('/api/notifications/emit').set('Authorization', PLUGIN_TOKEN).send({ body: 'x' }).expect(200);
     expect(focused.delivered[0].payload.requireHidden).toBe(true);
     expect(focused.delivered[0].payload.showWhenFocused).toBe(true);
-    await request(focused.app).post('/api/notifications/emit').set('Authorization', PLUGIN_TOKEN).send({ body: 'x', showWhenFocused: 'yes' }).expect(400);
   });
 });

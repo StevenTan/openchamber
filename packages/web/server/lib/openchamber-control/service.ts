@@ -80,7 +80,7 @@ export interface ControlDependencies {
   isWorktreePinned?: (directory: string) => Promise<boolean>;
   browserControl?: ReturnType<typeof createBrowserControlRouter> | null;
   fileOpen?: ReturnType<typeof createFileOpenRequester> | null;
-  notifyUser?: ((input: { title: unknown; body: unknown; showWhenFocused: unknown; sessionId: string | undefined; directory: string | undefined }) => Promise<{ status: number; body: { error?: string } }>) | null;
+  notifyUser?: ((input: { title: unknown; body: unknown; sessionId: string | undefined; directory: string | undefined }) => Promise<{ status: number; body: { error?: string } }>) | null;
   agentMemoryActions?: { execute: (action: string, input: ControlInput, directory: ControlInput['directory']) => ReturnType<ReturnType<typeof createAgentMemoryActions>['execute']> } | null;
   sessionLinks?: ReturnType<typeof createSessionLinker> | null;
   workNaming?: Omit<Parameters<typeof createWorkNamer>[0], 'getSession' | 'createError'> | null;
@@ -1205,7 +1205,6 @@ export const createOpenChamberControlService = (dependencies: ControlDependencie
         const result = await notifyUser({
           title: input.title,
           body: input.body,
-          showWhenFocused: input.showWhenFocused,
           sessionId: asNonEmptyString(options.contextSessionId) || undefined,
           directory: asNonEmptyString(contextDirectory) || undefined,
         });

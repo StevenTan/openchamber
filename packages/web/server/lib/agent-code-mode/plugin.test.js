@@ -26,6 +26,7 @@ async function fixture(execute = () => Effect.succeed({ content: 'FILE_CONTENT',
     ['browser_click', { id: 'browser_click', name: 'click', input: {}, options: { namespace: 'browser', codemode: false } }],
     ...['write', 'edit', 'patch', 'view_image'].map(name => [`file_${name}`, { id: `file_${name}`, name, input: {}, options: { namespace: 'file', codemode: false } }]),
     ['request_user_input_async', { id: 'request_user_input_async', name: 'user_input_async', input: {}, options: { namespace: 'request', codemode: false } }],
+    ...['memory', 'knowledge', 'usage', 'notify'].map(name => [`openchamber_${name}`, { id: `openchamber_${name}`, name, input: {}, options: { namespace: 'openchamber', codemode: false } }]),
   ]);
   const sessionHooks = new Map();
   const toolHooks = new Map();
@@ -132,6 +133,10 @@ it('supplies complete descriptions and parameter signatures while preserving dir
   for (const name of ['clock_sleep', 'store', 'load']) {
     expect(f.tools.get(`openchamber_commands_${name}`).options.codemode).toBe(false);
     expect(text).not.toContain(`tools.openchamber_commands.${name}(`);
+  }
+  for (const name of ['memory', 'knowledge', 'usage', 'notify']) {
+    expect(f.tools.get(`openchamber_${name}`).options.codemode).toBe(false);
+    expect(text).not.toContain(`tools.openchamber.${name}(`);
   }
 });
 

@@ -13,6 +13,7 @@ The pinned official `@opencode/codemode` dependency generates descriptors only.
   subagent cards keep direct entries because their UI reads the top-level call.
   Asynchronous question forms and child-agent controls support script calls.
   Command execution, continuation, sleep, session memory, file mutations and image viewing keep their native MCP direct entries.
+  Long-term memory, project knowledge, usage and notifications also keep native MCP direct entries.
 - Code Mode tools are pinned, so their native catalog listings include complete
   parameter signatures.
 - The request catalog uses the registered schemas and descriptions, filtered by

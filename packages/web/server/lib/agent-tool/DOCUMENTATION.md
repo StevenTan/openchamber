@@ -2,8 +2,8 @@
 
 ## Purpose
 
-This module exposes typed OpenCode custom tools and configures native MCP tools
-for managed OpenCode. Session control and browser operations are independently enabled:
+This module exposes typed OpenCode custom tools and shared native MCP services.
+Session control and browser operations are independently enabled:
 
 - `openchamber` — projects, sessions, worktrees, and showing a file to the
   user (`file.open`). Enabled while the persisted `agentControlToolEnabled`
@@ -161,9 +161,8 @@ for managed OpenCode. Session control and browser operations are independently e
   enabled only while `agentUsageToolEnabled` is `true`, and the action reads
   the setting on every call and refuses while it is not. Each call runs the
   page's readers again, so the description tells agents to read once per
-  decision and that a rate-limited provider answers with its last sample. It
-  sits behind Code Mode like notify, since the chat draws nothing from its
-  call, and its catalog line says to read it when the user asks about limits
+  decision and that a rate-limited provider answers with its last sample. Its
+  native MCP description says to read it when the user asks about limits
   or a model choice depends on them, never before every task.
 - `openchamber_terminal` — `terminal.list` and `terminal.read`, the terminal
   panel read-only (`../openchamber-control/terminal-read.js`): the terminals
@@ -176,7 +175,7 @@ for managed OpenCode. Session control and browser operations are independently e
   (512 KiB retained, at most 256 KiB of text per read); nothing is typed,
   started or stopped. Only this callback reaches the actions: the ordinary
   control route refuses `terminal.*`. VS Code has no such tool, since the
-  plugin is not injected there. It sits behind Code Mode like usage, and its catalog line says to
+  plugin is not injected there. It sits behind Code Mode, and its catalog line says to
   read it when the answer is in a terminal the user is looking at.
 - `openchamber_workflow` — `workflow.*`, scripts that fan a large task out to
   many agents, run by OpenChamber (`../workflows/DOCUMENTATION.md`). Off by
@@ -441,7 +440,7 @@ makes the trade visible and reversible, the same shape `openchamber_image`,
 `openchamber_notify` and `openchamber_usage` use, and the setting is read again
 on each call so a materialized plugin cannot outlive the decision.
 
-It sits behind Code Mode like usage: two actions with a short result are worth
+It sits behind Code Mode: two actions with a short result are worth
 one namespace line in the catalog, and the catalog line says when to read it —
 the answer is in a terminal the user is looking at — so an agent does not
 sample the panel on every task.
@@ -518,8 +517,18 @@ OpenCode. Their service shares this runtime's authenticated callback channel.
 Its command ownership, waiting, session memory and PTY contracts are in
 `../agent-command/DOCUMENTATION.md`.
 
-`mcp.ts` owns Streamable HTTP connection handling shared by the command, browser and question
-services. They use the same listener and callback authentication.
+`control-mcp.ts` exposes memory, project knowledge, usage and notifications through
+the `openchamber` MCP server at `/api/openchamber/control-tool/mcp`. Its four direct
+tools retain their `openchamber_*` names, settings and action result envelopes.
+The managed OpenCode policy hooks check permissions before invocation and attach
+activity metadata after completion. Execution uses the existing control service.
+
+`mcp.ts` owns Streamable HTTP connection handling shared by the command, browser,
+question, file and control services. They use the same listener and callback authentication.
+`mcp-context.ts` defines the injected session, call and cancellation context.
+Backend adapters resolve that identity outside model arguments; OpenCode's adapter
+in `../opencode/mcp-context.ts` reads its session metadata. The host resolves the
+working directory from the application session.
 
 - Web and Desktop managed OpenCode: injected automatically.
 - External OpenCode selected with `OPENCODE_HOST` or skip-start: not injected,

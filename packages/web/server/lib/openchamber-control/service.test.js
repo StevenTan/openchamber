@@ -1361,9 +1361,9 @@ describe('notify.send', () => {
     const notifyUser = vi.fn(async () => ({ status: 200, body: { delivered: true } }));
     const { service } = createService({ notifyUser });
 
-    const result = await service.execute('notify.send', { title: 'Done', body: 'All green', showWhenFocused: true }, '/repo', { contextSessionId: 'ses_1' });
+    const result = await service.execute('notify.send', { title: 'Done', body: 'All green' }, '/repo', { contextSessionId: 'ses_1' });
 
-    expect(notifyUser).toHaveBeenCalledWith({ title: 'Done', body: 'All green', showWhenFocused: true, sessionId: 'ses_1', directory: '/repo' });
+    expect(notifyUser).toHaveBeenCalledWith({ title: 'Done', body: 'All green', sessionId: 'ses_1', directory: '/repo' });
     expect(result).toEqual({ delivered: true });
   });
 

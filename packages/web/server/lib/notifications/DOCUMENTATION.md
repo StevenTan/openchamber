@@ -203,9 +203,9 @@ The relay has no route for it, and sends only ever start from this server's list
 - `createPluginNotificationEmitter(dependencies)` owns validation, the rate window and delivery; one instance is shared by the HTTP route and the `openchamber_notify` agent tool (`notify.send`).
 - `registerNotificationEmitRoutes(app, dependencies)` returns `registerPluginRoute()` and `registerApiRoute(apiAuth)`. The plugin route is registered first and answers only a plugin-token request, otherwise it falls through. The API route carries the server's own `/api` gate (`requireApiAuth`, returned by `registerAuthAndAccessRoutes`) on the route, so its authorization does not depend on where the router was mounted. Registration without that gate throws.
 - Callers: a plugin in the managed OpenCode (agent-tool bearer token, the only reason for the pre-auth registration) or any client that passes regular API auth. No other auth path exists.
-- Body `{ title?, body?, tag?, sessionId?, directory?, showWhenFocused? }`, at least one of title/body; title ≤120, body ≤500 chars, 16kb JSON. `kind` is always `plugin` so callers cannot trigger kinds the UI treats specially.
+- Body `{ title?, body?, tag?, sessionId?, directory? }`, at least one of title/body; title ≤120, body ≤500 chars, 16kb JSON. `kind` is always `plugin` so callers cannot trigger kinds the UI treats specially.
 - One shared rate window: 10 notifications per 10s, then 429 with `Retry-After`.
-- Follows `nativeNotificationsEnabled` (returns `{ delivered: false }`) and `notificationMode`; focused plugin notices use an in-app info toast, while OS/browser notifications stay hidden until the window is not focused. `showWhenFocused: true` opts into the focused toast. Live delivery only: no web push or APNs fanout.
+- Follows `nativeNotificationsEnabled` (returns `{ delivered: false }`). Enabled plugin notices always use an in-app info toast while focused; OS/browser notifications display while the window is not focused. Live delivery only: no web push or APNs fanout.
 - Advertised as the `api.notifications.emit.v1` server capability.
 
 ### Template runtime API (template-runtime.js)

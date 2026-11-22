@@ -1,21 +1,21 @@
 import fs from 'node:fs/promises';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { z } from 'zod';
 import { Effect } from 'effect';
 import { createMcpRuntime } from '../agent-tool/mcp.js';
 import { fileCall, fileTools } from './contracts.js';
 import { applyFileChanges, fileCallPaths, prepareFileMutation, resolveFile } from './files.js';
 import { fileDiff } from './diff.js';
 import { makeFileLocks } from './vendor/keyed-mutex.js';
+import type { ResolveMcpContext } from '../agent-tool/mcp-context.js';
 
-export function createFileMcpRuntime(resolveDirectory: (sessionID: string) => Promise<string | null>) {
+export function createFileMcpRuntime(resolveDirectory: (sessionID: string) => Promise<string | null>, resolveContext: ResolveMcpContext) {
   const withLock = makeFileLocks();
   return createMcpRuntime(() => {
     const server = new Server({ name: 'openchamber-files', version: '1.0.0' }, { capabilities: { tools: {} } });
     server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: fileTools }));
     server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
-      const sessionID = z.string().min(1).parse(extra._meta?.['ai.opencode/sessionID']);
+      const { sessionID } = resolveContext(extra);
       const directory = await resolveDirectory(sessionID);
       if (!directory) throw new Error('Session directory is unavailable');
       const call = fileCall.parse({ name: request.params.name, input: request.params.arguments });

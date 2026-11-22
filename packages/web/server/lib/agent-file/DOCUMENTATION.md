@@ -15,7 +15,7 @@ own plugins.
 ## Invariants
 
 - The authenticated MCP endpoint resolves the calling session's directory from
-  backend metadata. Model arguments contain file operations only.
+  the injected shared context resolver. Model arguments contain file operations only.
 - Relative paths resolve against the session directory. External targets require
   `external_directory` approval before `read` or `edit` approval. Mutation approval
   shows the proposed file diffs.
