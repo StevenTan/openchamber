@@ -68,12 +68,12 @@ const harness = async (storage = new Map(), directory) => {
 };
 
 describe('recorded turn file diffs', () => {
-  it('records relative and absolute operations on one file under one baseline', async () => {
+  it.each([['write', 'edit'], ['file_write', 'file_edit']])('records relative and absolute %s/%s operations on one file under one baseline', async (write, edit) => {
     const h = await harness();
     const file = path.join(h.directory, 'code.txt');
     await fs.writeFile(file, 'before\n');
-    await h.tool('write', { path: 'code.txt' }, () => fs.writeFile(file, 'middle\n'));
-    await h.tool('edit', { path: file }, () => fs.writeFile(file, 'after\n'));
+    await h.tool(write, { path: 'code.txt' }, () => fs.writeFile(file, 'middle\n'));
+    await h.tool(edit, { path: file }, () => fs.writeFile(file, 'after\n'));
     const record = await h.read();
     expect(record.files).toHaveLength(1);
     expect(record.files[0]).toMatchObject({ file: 'code.txt', additions: 1, deletions: 1 });

@@ -20,6 +20,9 @@ for managed OpenCode. Session control and browser operations are independently e
   the `browser` MCP server and retains the `openchamber_web` permission.
   Their session, page execution and cancellation contract is owned by
   `../browser-control/DOCUMENTATION.md`.
+- `file_write`, `file_edit`, `file_patch` and `file_view_image` use the shared
+  file MCP service. Its policy plugin owns file permissions and activity metadata;
+  execution and image attachments are described in `../agent-file/DOCUMENTATION.md`.
 - `openchamber_notify` — `notify.send`, a notification to the user through
   `lib/notifications/emit-route.js` (same limits and rate window as
   `POST /api/notifications/emit`). Off by default: enabled only while

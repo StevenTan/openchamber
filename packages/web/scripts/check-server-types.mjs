@@ -23,7 +23,7 @@ export const JAVASCRIPT_ENTRIES = [
 ];
 
 const NOT_IMPLEMENTATION = /(?:\.(?:test|spec|fixture|test-support|bench)\.|(?:^|\/)(?:tests?|__tests__|test-support)(?:\/|$)|-live-support\.)/;
-const GENERATED_PLUGIN = /^server\/lib\/(?:agent-command|agent-search|agent-question|agent-code-mode|workspace-dependencies|turn-diffs)\/dist\//;
+const GENERATED_PLUGIN = /^server\/lib\/(?:agent-command|agent-search|agent-question|agent-file|agent-code-mode|workspace-dependencies|turn-diffs)\/dist\//;
 
 export function findServerJavaScript(root = webRoot) {
   return ['server', 'bin'].flatMap((folder) => fs.readdirSync(path.join(root, folder), { recursive: true, withFileTypes: true })

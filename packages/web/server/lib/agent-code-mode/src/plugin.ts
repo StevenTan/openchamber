@@ -8,7 +8,7 @@ import type { Session } from "@opencode/schema/session";
 import type { Tool } from "@opencode/schema/tool";
 import type { Permission } from "@opencode/schema/permission";
 import { createCallActivity } from "./call-activity.js";
-import { adaptFileTools, type FileToolEditor } from "./file-tools.js";
+import { FILE_MCP_TOOLS } from "../../agent-file/contracts.js";
 import { assertFileSkill, filterVirtualSkillGuidance, type SkillRegistry } from "./skill-policy.js";
 import { BROWSER_MCP_TOOLS } from "../../browser-control/tools.js";
 
@@ -20,33 +20,9 @@ const directTools = new Set([
   "openchamber_commands_clock_sleep", "openchamber_commands_store", "openchamber_commands_load",
   ...BROWSER_MCP_TOOLS,
   "request_user_input_async",
+  ...FILE_MCP_TOOLS,
 ]);
-const patchTextDescription = "File operation sections beginning with '*** Add File:', '*** Update File:' or '*** Delete File:'. The tool supplies the outer '*** Begin Patch' and '*** End Patch' lines.";
 const skillInput = Schema.Struct({ id: Schema.String });
-const patchDescription = `${patchTextDescription}
-
-Each file operation starts with its action header:
-- *** Add File: <path> creates a file. Prefix every content line with +.
-- *** Delete File: <path> deletes a file.
-- *** Update File: <path> updates a file. *** Move to: <path> optionally renames it.
-
-Within an update, prefix unchanged lines with a space, removed lines with -, and added lines with +. Use @@ or @@ <context> to identify a change section.
-
-Example patchText:
-\`\`\`diff
-*** Add File: hello.txt
-+Hello world
-*** Update File: src/app.py
-@@ def greet():
--print("Hi")
-+print("Hello, world!")
-*** Delete File: obsolete.txt
-\`\`\``;
-
-function framePatch(text: string) {
-  const body = text.replace(/^(?:\r?\n)+|(?:\r?\n)+$/g, "");
-  return `*** Begin Patch\n${body}\n*** End Patch`;
-}
 
 type Registration = Pick<Tool.Info, "name" | "description" | "input" | "output" | "options"> & { id: string };
 interface InstructionSource { key: string; text: string }
@@ -69,7 +45,7 @@ interface PluginContext {
   session: Pick<SessionApi, "get"> & { hook(name: "context" | "compaction" | "generate", run: (event: Request) => Effect.Effect<void>): Effect.Effect<unknown> };
   tool: {
     list(): Effect.Effect<readonly Registration[]>;
-    transform(run: (editor: FileToolEditor & {
+    transform(run: (editor: {
       list(): readonly Registration[];
       update(id: string, change: (tool: Types.Mutable<Pick<Tool.Info, "options" | "execute" | "description" | "input">>) => void): void;
     }) => void): Effect.Effect<unknown>;
@@ -124,24 +100,9 @@ export default {
   effect: (ctx: PluginContext) => Effect.gen(function* () {
     const activity = createCallActivity();
     yield* ctx.tool.transform(editor => {
-      adaptFileTools(editor);
       for (const tool of editor.list()) {
         if (directTools.has(tool.id)) continue;
         editor.update(tool.id, value => {
-          if (tool.id === "patch") {
-            // SAFETY: OpenCode 2.2.7 registers patch with Struct({ patchText: Schema.String }).
-            const input = value.input as Schema.Struct<{ readonly patchText: Schema.String }>;
-            value.input = input.mapFields(fields => ({
-              ...fields, patchText: fields.patchText.annotate({ description: patchTextDescription }),
-            }), { unsafePreserveChecks: true });
-            value.description = patchDescription;
-            const execute = value.execute;
-            value.execute = (input, context) => {
-              // SAFETY: The native patch schema validates this input before execution.
-              const patch = input as { patchText: string };
-              return execute({ ...patch, patchText: framePatch(patch.patchText) }, context);
-            };
-          }
           value.options = { ...value.options, codemode: true, pinned: true };
           value.execute = activity.wrap(tool.id, value.execute);
         });

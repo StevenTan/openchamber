@@ -24,6 +24,7 @@ async function fixture(execute = () => Effect.succeed({ content: 'FILE_CONTENT',
     ['openchamber_commands_load', { id: 'openchamber_commands_load', name: 'load', input: {}, options: { namespace: 'openchamber_commands', codemode: false } }],
     ['browser_panel', { id: 'browser_panel', name: 'panel', input: {}, options: { namespace: 'browser', codemode: false } }],
     ['browser_click', { id: 'browser_click', name: 'click', input: {}, options: { namespace: 'browser', codemode: false } }],
+    ...['write', 'edit', 'patch', 'view_image'].map(name => [`file_${name}`, { id: `file_${name}`, name, input: {}, options: { namespace: 'file', codemode: false } }]),
     ['request_user_input_async', { id: 'request_user_input_async', name: 'user_input_async', input: {}, options: { namespace: 'request', codemode: false } }],
   ]);
   const sessionHooks = new Map();
@@ -120,6 +121,10 @@ it('supplies complete descriptions and parameter signatures while preserving dir
   expect(f.tools.get('openchamber_commands_write_stdin').options.codemode).toBe(false);
   expect(text).not.toContain('tools.openchamber_commands.exec_command(');
   expect(text).not.toContain('tools.openchamber_commands.write_stdin(');
+  for (const name of ['write', 'edit', 'patch', 'view_image']) {
+    expect(f.tools.get(`file_${name}`).options.codemode).toBe(false);
+    expect(text).not.toContain(`tools.file.${name}(`);
+  }
   for (const name of ['panel', 'click']) {
     expect(f.tools.get(`browser_${name}`).options.codemode).toBe(false);
     expect(text).not.toContain(`tools.browser.${name}(`);
@@ -128,28 +133,6 @@ it('supplies complete descriptions and parameter signatures while preserving dir
     expect(f.tools.get(`openchamber_commands_${name}`).options.codemode).toBe(false);
     expect(text).not.toContain(`tools.openchamber_commands.${name}(`);
   }
-});
-
-it('supplies native patch boundaries for file operation sections', async () => {
-  const received = [];
-  const f = await fixture(input => { received.push(input); return Effect.succeed({ content: 'PATCH_APPLIED' }); });
-  const patch = f.tools.get('patch');
-  const document = (await f.request()).system.map(part => part.text).join('\n');
-  const requirement = "The tool supplies the outer '*** Begin Patch' and '*** End Patch' lines.";
-  expect(patch.description).toContain(requirement);
-  expect(patch.description).toContain('Example patchText:');
-  expect(patch.description).not.toContain('\n*** Begin Patch\n');
-  expect(patch.input.fields.patchText.ast.annotations.description).toContain(requirement);
-  expect(document).toContain('tools.patch(');
-  expect(document).toContain(requirement);
-  const body = '*** Update File: a.txt\n@@\n-before\n+after';
-  const framed = `*** Begin Patch\n${body}\n*** End Patch`;
-  for (const patchText of [body, body.replaceAll('\n', '\r\n'), `\n${body}\n`]) {
-    const input = { patchText };
-    expect(Schema.decodeUnknownSync(patch.input)(input)).toEqual(input);
-    expect(await Effect.runPromise(patch.execute(input, { sessionID: 's', messageID: 'm', id: 'c' }))).toEqual({ content: 'PATCH_APPLIED' });
-  }
-  expect(received.map(input => input.patchText.replaceAll('\r\n', '\n'))).toEqual([framed, framed, framed]);
 });
 
 it('keeps simultaneous calls with identical arguments associated with their own results', async () => {

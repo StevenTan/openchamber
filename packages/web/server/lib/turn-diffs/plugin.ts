@@ -49,11 +49,11 @@ const displayPath = (file: string, directory: string) => {
   return relative.startsWith(`..${path.sep}`) || relative === '..' ? file : relative.split(path.sep).join('/');
 };
 const toolPaths = (tool: string, input: HookEvent['input'], directory: string) => {
-  if (tool === 'write' || tool === 'edit') {
+  if (['write', 'edit', 'file_write', 'file_edit'].includes(tool)) {
     // SAFETY: File-tool execution supplies path for write and edit.
     return [expandPath(input.path as string, directory)];
   }
-  if (tool !== 'patch') return [];
+  if (tool !== 'patch' && tool !== 'file_patch') return [];
   // SAFETY: The patch tool supplies patchText after the tool-name check.
   return [...new Set([...(input.patchText as string).matchAll(/^\*\*\* (?:Add File:|Update File:|Delete File:|Move to:) (.+)\r?$/gm)]
     .map((match) => expandPath(String(match[1]).replace(/\r$/, ''), directory)))];
@@ -227,7 +227,7 @@ export default {
         scripts.set(callKey(event), { sessionID: event.sessionID });
         return;
       }
-      if (!['write', 'edit', 'patch'].includes(event.tool)) return;
+      if (!['write', 'edit', 'patch', 'file_write', 'file_edit', 'file_patch'].includes(event.tool)) return;
       await serial(event.sessionID, async () => {
         const key = callKey(event);
         const capture = calls.get(key) ?? { sessionID: event.sessionID, pending: 0 };
@@ -270,7 +270,7 @@ export default {
         });
         return;
       }
-      if (!['write', 'edit', 'patch'].includes(event.tool)) return;
+      if (!['write', 'edit', 'patch', 'file_write', 'file_edit', 'file_patch'].includes(event.tool)) return;
       await serial(event.sessionID, async () => {
         const capture = calls.get(callKey(event));
         if (!capture) return;

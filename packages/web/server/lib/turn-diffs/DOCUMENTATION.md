@@ -8,7 +8,7 @@ and rendering. OpenCode owns plugin storage and transcript persistence.
 
 ## Invariants
 
-- `write`, `edit`, and `patch` copy each path's first original bytes into a
+- Native and shared MCP `write`, `edit`, and `patch` tools copy each path's first original bytes into a
   private temporary directory before execution. Repeated calls reuse that
   baseline. Paths outside the project and paths without Git tracking work
   identically. A move records the source and destination as separate paths.

@@ -12,7 +12,7 @@ The pinned official `@opencode/codemode` dependency generates descriptors only.
 - Operation tools enter native Code Mode. Page, secret, image, workflow and native
   subagent cards keep direct entries because their UI reads the top-level call.
   Asynchronous question forms and child-agent controls support script calls.
-  Command execution, continuation, sleep and session memory keep their native MCP direct entries.
+  Command execution, continuation, sleep, session memory, file mutations and image viewing keep their native MCP direct entries.
 - Code Mode tools are pinned, so their native catalog listings include complete
   parameter signatures.
 - The request catalog uses the registered schemas and descriptions, filtered by
@@ -54,17 +54,11 @@ capture state. The plugin does not write or replay model-facing messages.
 
 ### File operation catalog
 
-Text and directory reads use command tools. `view_image` accepts local PNG, JPEG,
-GIF and WebP files through the native reader, preserving file permissions and
-image attachments. Its structured result contains only the path and MIME type.
-The reader's general file entry is private to these adapters.
-
-Native mutation executors validate each call; callers select the operation matching their edit.
-`patchText` accepts file operation sections starting with an action header.
-The adapter supplies one native boundary pair before invoking the original patch
-executor. Registered descriptions and field annotations state this input contract.
-The native schema fields and checks, hunk parser, permissions and mutation logic
-retain their ownership.
+Text and directory reads use command tools. The shared file MCP service owns
+`file_write`, `file_edit`, `file_patch` and `file_view_image`, with direct entries.
+Their descriptions and schemas come from MCP discovery. File permissions and
+activity metadata are supplied by the file policy plugin; recorded turn patches
+remain owned by the turn-diffs plugin.
 
 ### Skill availability
 

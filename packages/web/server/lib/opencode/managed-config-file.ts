@@ -9,6 +9,7 @@ import { materializeQuotaUsagePlugin } from '../quota/response-usage.js';
 import { materializeCodeModePlugin } from '../agent-code-mode/runtime.js';
 import { materializeCodexAgentPlugin } from './codex-agent-plugin.js';
 import { materializeWorkspaceDependencies } from '../workspace-dependencies/runtime.js';
+import { materializeFilePlugin } from '../agent-file/materialize.js';
 import type { createAgentToolRuntime } from '../agent-tool/runtime.js';
 import type { LimitFailoverConfigurationInput } from '../limit-failover/policy.js';
 
@@ -120,6 +121,7 @@ export const createManagedConfigRuntime = ({
     if (agentToolRuntime) directories.push(await agentToolRuntime.materializeCommandPlugin());
     if (agentToolRuntime) directories.push(await agentToolRuntime.materializeSearchPlugin());
     if (agentToolRuntime) directories.push(await agentToolRuntime.materializeQuestionPlugin());
+    if (agentToolRuntime) directories.push(await materializeFilePlugin(instanceDir));
     directories.push(await materializeTurnDiffPlugin({ fsPromises, path, instanceDir }));
     directories.push(await materializeQuotaUsagePlugin({ fsPromises, instanceDir }));
     if (agentToolRuntime) directories.push(await materializeCodeModePlugin(instanceDir));
