@@ -24,6 +24,7 @@ async function fixture(execute = () => Effect.succeed({ content: 'FILE_CONTENT',
     ['openchamber_commands_load', { id: 'openchamber_commands_load', name: 'load', input: {}, options: { namespace: 'openchamber_commands', codemode: false } }],
     ['browser_panel', { id: 'browser_panel', name: 'panel', input: {}, options: { namespace: 'browser', codemode: false } }],
     ['browser_click', { id: 'browser_click', name: 'click', input: {}, options: { namespace: 'browser', codemode: false } }],
+    ['request_user_input_async', { id: 'request_user_input_async', name: 'user_input_async', input: {}, options: { namespace: 'request', codemode: false } }],
   ]);
   const sessionHooks = new Map();
   const toolHooks = new Map();
@@ -113,6 +114,8 @@ it('supplies complete descriptions and parameter signatures while preserving dir
   expect(f.tools.get('example_file').options.codemode).toBe(true);
   expect(f.tools.get('example_file').options.pinned).toBe(true);
   expect(f.tools.get('subagent').options.codemode).toBe(false);
+  expect(f.tools.get('request_user_input_async').options.codemode).toBe(false);
+  expect(text).not.toContain('tools.request.user_input_async(');
   expect(f.tools.get('openchamber_commands_exec_command').options.codemode).toBe(false);
   expect(f.tools.get('openchamber_commands_write_stdin').options.codemode).toBe(false);
   expect(text).not.toContain('tools.openchamber_commands.exec_command(');

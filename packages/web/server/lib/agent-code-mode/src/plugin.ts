@@ -19,6 +19,7 @@ const directTools = new Set([
   "openchamber_commands_exec_command", "openchamber_commands_write_stdin",
   "openchamber_commands_clock_sleep", "openchamber_commands_store", "openchamber_commands_load",
   ...BROWSER_MCP_TOOLS,
+  "request_user_input_async",
 ]);
 const patchTextDescription = "File operation sections beginning with '*** Add File:', '*** Update File:' or '*** Delete File:'. The tool supplies the outer '*** Begin Patch' and '*** End Patch' lines.";
 const skillInput = Schema.Struct({ id: Schema.String });

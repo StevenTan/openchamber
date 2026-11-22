@@ -2,8 +2,13 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import crypto from 'node:crypto';
+import express from 'express';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createQuestionRuntime, questionStoreDirectory } from './dist/runtime.js';
+import { createAgentToolRuntime } from '../agent-tool/runtime.js';
 
 const cleanup = [];
 afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); });
@@ -46,42 +51,85 @@ async function fixture() {
 }
 
 describe('asynchronous questions', () => {
-  it('keeps repeated questions from one script as separate requests', async () => {
+  it('creates independently identified native MCP questions with session ownership and immediate receipts', async () => {
     const f = await fixture();
     const runtime = f.runtime();
     const directory = await runtime.materializePlugin(f.dataDir);
     const { default: plugin } = await import(pathToFileURL(path.join(directory, 'index.js')).href);
-    let tool;
+    let config;
+    const hooks = new Map();
+    const approve = vi.fn(async () => {});
+    const asyncTool = { options: { codemode: false } };
     const nativeQuestion = { description: 'Native question usage notes', input: {}, execute: vi.fn() };
     const originalQuestion = { ...nativeQuestion };
-    vi.stubEnv('OPENCHAMBER_AGENT_TOOL_URL', 'http://127.0.0.1:3000');
-    vi.stubGlobal('fetch', async (_url, request) => new Response(JSON.stringify(await runtime.ask(JSON.parse(request.body)))));
-    cleanup.push(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+    let listener;
+    const agentRuntime = createAgentToolRuntime({
+      crypto, fsPromises: fs, path, instanceDir: f.dataDir, questionRuntime: runtime,
+      getActivePort: () => listener.address().port,
+    });
+    const app = express();
+    agentRuntime.registerRoutes(app, express);
+    listener = await new Promise(resolve => { const server = app.listen(0, '127.0.0.1', () => resolve(server)); });
+    cleanup.push(async () => { await agentRuntime.closeCommands(); await new Promise(resolve => listener.close(resolve)); });
+    for (const [key, value] of Object.entries(agentRuntime.createChildEnv())) vi.stubEnv(key, value);
+    cleanup.push(() => vi.unstubAllEnvs());
     await plugin.setup({
-      permission: { assert: async () => {} },
-      tool: { transform: async run => run({
-        update: (name, change) => { expect(name).toBe('question'); change(nativeQuestion); },
-        add: value => { tool = value; },
-      }) },
+      permission: { assert: approve },
+      mcp: { transform: async run => run({ set: (name, value) => { config = { name, ...value }; } }) },
+      tool: {
+        transform: async run => run({ update: (name, change) => change(name === 'question' ? nativeQuestion : asyncTool) }),
+        hook: async (name, run) => hooks.set(name, run),
+      },
     });
     expect(nativeQuestion.description).toContain('Waits for the user to answer before returning.');
     expect(nativeQuestion.description).toContain('answer is required before further work can proceed.');
     expect(nativeQuestion.description).toContain(originalQuestion.description);
     expect(nativeQuestion.input).toBe(originalQuestion.input);
     expect(nativeQuestion.execute).toBe(originalQuestion.execute);
+    expect(config).toMatchObject({ name: 'request', codemode: false, oauth: false });
+    expect(asyncTool.options.permission).toBe('question');
+    const client = new Client({ name: 'question-test', version: '1' });
+    const transport = new StreamableHTTPClientTransport(new URL(config.url), { requestInit: { headers: config.headers } });
+    cleanup.push(async () => { await transport.terminateSession(); await client.close(); });
+    await client.connect(transport);
+    const catalog = await client.listTools();
+    expect(catalog.tools).toHaveLength(1);
+    const tool = catalog.tools[0];
+    expect(tool.name).toBe('user_input_async');
     expect(tool.description).toContain('immediately returns a receipt object');
     expect(tool.description).toContain('Awaiting this call waits for question creation; execution then continues in the same turn');
+    expect(tool.inputSchema.properties.questions.items.properties.options).not.toHaveProperty('prefixItems');
+    expect(tool.outputSchema.required).toEqual(['question_id', 'status', 'message']);
     const context = { sessionID: 'ses_1', agent: 'build', messageID: 'message', id: 'outer_script', signal: new AbortController().signal };
-    const firstResult = await tool.execute({ questions: [{ title: 'First question' }] }, context);
-    const secondResult = await tool.execute({ questions: [{ title: 'Second question' }] }, context);
-    const first = firstResult.output;
-    const second = secondResult.output;
-    expect(JSON.parse(firstResult.content)).toEqual(first);
-    expect(JSON.parse(secondResult.content)).toEqual(second);
+    await hooks.get('execute.before')({ ...context, tool: 'request_user_input_async' });
+    expect(approve).toHaveBeenCalledWith({
+      sessionID: 'ses_1', agent: 'build', action: 'question', resources: ['*'], save: ['*'],
+      source: { type: 'tool', messageID: context.messageID, id: context.id },
+    });
+    const call = (title, sessionID = 'ses_1') => client.callTool({ name: tool.name, arguments: { questions: [{ title }] }, _meta: { 'ai.opencode/sessionID': sessionID } });
+    const firstResult = await call('First question');
+    const secondResult = await call('Second question');
+    const first = firstResult.structuredContent;
+    const second = secondResult.structuredContent;
+    expect(JSON.parse(firstResult.content[0].text)).toEqual(first);
+    expect(JSON.parse(secondResult.content[0].text)).toEqual(second);
     expect(first).toMatchObject({ status: 'pending', message: expect.any(String) });
     expect(second).toMatchObject({ status: 'pending', message: expect.any(String) });
     expect(first.question_id).not.toBe(second.question_id);
     expect([...f.forms.values()].map(form => form.fields[0].title)).toEqual(['First question', 'Second question']);
+    expect(f.delivered.size).toBe(0);
+    const result = { output: first };
+    await hooks.get('execute.after')({ ...context, tool: 'request_user_input_async', status: 'completed', result });
+    expect(result.metadata.questionID).toBe(first.question_id);
+    const other = await call('Other session', 'ses_2');
+    expect(f.forms.get(other.structuredContent.question_id).sessionID).toBe('ses_2');
+    await runtime.resolveBatch({ sessionID: 'ses_1', replies: [
+      { questionID: first.question_id, status: 'answered', answer: { q0: 'Blue' } },
+      { questionID: second.question_id, status: 'answered', answer: { q0: 'Green' } },
+    ] });
+    await vi.waitFor(() => expect(f.delivered.size).toBe(1));
+    expect(JSON.parse([...f.delivered.values()][0].text).responses).toHaveLength(2);
+    expect(f.forms.get(other.structuredContent.question_id).state.status).toBe('pending');
   });
 
   it('delivers a submitted question group in one message and preserves request order', async () => {

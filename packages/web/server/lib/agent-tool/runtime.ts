@@ -62,6 +62,7 @@ import type { ControlOptions, createOpenChamberControlService } from '../opencha
 import type { Application, ExpressFactory, Request, RequestHandler } from '../shared/http-contracts.js';
 import { z } from 'zod';
 import type { createQuestionRuntime } from '../agent-question/src/runtime.js';
+import { createQuestionMcpRuntime } from '../agent-question/src/mcp.js';
 
 interface ParameterSchema {
   type: string | string[];
@@ -1078,12 +1079,9 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
       if (!authorize(req)) return res.status(401).json({ error: 'Unauthorized' });
       await browserMcp.handleRequest(req, res);
     });
-    app.post<Parameters<typeof questionRuntime.ask>[0]>('/api/openchamber/async-question', express.json({ limit: '1mb' }), (req, res) => {
+    app.all('/api/openchamber/async-question/mcp', express.json({ limit: '1mb' }), async (req, res) => {
       if (!authorize(req)) return res.status(401).json({ error: 'Unauthorized' });
-      return questionRuntime.ask(req.body).then(
-        (result) => res.json(result),
-        (error: Error & { status?: number }) => res.status(error.status ?? (error.name === 'ZodError' ? 400 : 500)).json({ error: error.message }),
-      );
+      await questionMcp.handleRequest(req, res);
     });
     app.post<AgentToolPayload>('/api/openchamber/agent-tool', express.json({ limit: '1mb' }), async (req, res) => {
       if (!authorize(req)) return res.status(401).json({ error: 'Unauthorized' });
@@ -1124,6 +1122,7 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
     },
     outputSchema: { ...TOOL_OUTPUT_SCHEMA, type: 'object' },
   }, execute, trackInflight);
+  const questionMcp = createQuestionMcpRuntime(questionRuntime);
 
   const registerQuestionFormRoutes = (app: Application, express: Pick<ExpressFactory, 'json'>) => {
     app.post<Parameters<typeof questionRuntime.resolveBatch>[0]>('/api/openchamber/async-question/resolve', express.json({ limit: '1mb' }), (req, res) => {
@@ -1154,7 +1153,7 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
     materializeCommandPlugin: commandToolRuntime.materializePlugin,
     materializeSearchPlugin: () => materializeSearchPlugin(instanceDir),
     materializeQuestionPlugin: () => questionRuntime.materializePlugin(instanceDir),
-    closeCommands: () => Promise.all([commandToolRuntime.close(), browserMcp.close()]),
+    closeCommands: () => Promise.all([commandToolRuntime.close(), browserMcp.close(), questionMcp.close()]),
     observeCommandEvent: commandToolRuntime.observeEvent,
   };
 };

@@ -505,8 +505,8 @@ that declares output without a schema.
 
 ## Runtime parity
 
-The managed `openchamber-question-tool` exposes `request_user_input_async` through
-the same authenticated callback channel. Its durable form and answer lifecycle is
+The managed `openchamber-question-tool` configures native MCP discovery of
+`request_user_input_async` through the same authenticated callback channel. Its durable form and answer lifecycle is
 owned by `../agent-question/`; ordinary form replies use the existing form routes.
 
 The separate `openchamber-command-tool` plugin configures native MCP discovery of
@@ -515,7 +515,7 @@ OpenCode. Their service shares this runtime's authenticated callback channel.
 Its command ownership, waiting, session memory and PTY contracts are in
 `../agent-command/DOCUMENTATION.md`.
 
-`mcp.ts` owns Streamable HTTP connection handling shared by the command and browser
+`mcp.ts` owns Streamable HTTP connection handling shared by the command, browser and question
 services. They use the same listener and callback authentication.
 
 - Web and Desktop managed OpenCode: injected automatically.

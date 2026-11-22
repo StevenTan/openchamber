@@ -45,16 +45,14 @@ describe('asynchronous question routes', () => {
       resolveBatch: vi.fn(async () => ({ sessionID: 'ses_1', questionIDs: ['frm_ocq1'] })),
     };
     const { runtime } = await createRuntime({ questionRuntime });
-    const env = runtime.createChildEnv();
+    runtime.createChildEnv();
     const app = express();
     runtime.registerRoutes(app, express);
     app.use('/api', (req, res, next) => req.headers['x-fixture-auth'] === 'yes' ? next() : res.status(401).end());
     runtime.registerQuestionFormRoutes(app, express);
     app.post('/api/session/:sessionID/form/:formID/reply', (_req, res) => res.status(202).end());
 
-    await request(app).post('/api/openchamber/async-question').send({}).expect(401);
-    await request(app).post('/api/openchamber/async-question').set('Authorization', `Bearer ${env.OPENCHAMBER_AGENT_TOOL_TOKEN}`).send({ sessionID: 'ses_1', callID: 'call_1', input: {} }).expect(200);
-    expect(questionRuntime.ask).toHaveBeenCalledTimes(1);
+    await request(app).post('/api/openchamber/async-question/mcp').send({}).expect(401);
     await request(app).post('/api/session/ses_1/form/frm_ocq1/reply').send({ answer: { q0: 'Blue' } }).expect(401);
     await request(app).delete('/api/session/ses_1/form/frm_ocq1').expect(401);
     await request(app).post('/api/openchamber/async-question/resolve').send({}).expect(401);
