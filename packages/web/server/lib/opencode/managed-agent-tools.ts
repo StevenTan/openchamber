@@ -4,6 +4,7 @@ import path from 'node:path';
 import type { Server } from 'node:http';
 import { createAgentToolRuntime, type AgentToolDependencies } from '../agent-tool/runtime.js';
 import { createOpenCodeToolPermissions } from './tool-permissions.js';
+import { createCodeModeFileActivity } from './code-mode.js';
 import { isString } from '../event-stream/guards.js';
 import type { createOpenChamberControlService } from '../openchamber-control/service.js';
 import type { SessionClient } from '../openchamber-sessions/opencode-client-contract.js';
@@ -19,6 +20,7 @@ export function createManagedAgentTools({ control, client, server, permissionOpt
   const permissions = createOpenCodeToolPermissions(permissionOptions);
   const runtime = createAgentToolRuntime({
     ...dependencies, crypto, fsPromises, path, permissions,
+    codeModeFileActivity: createCodeModeFileActivity(permissionOptions),
     executeAction: (...args) => control.execute(...args),
     resolveSessionDirectory: sessionID => control.resolveSessionDirectory(sessionID),
     hasPendingInput: async (sessionID, signal) => (await client().session.inbox.list({ sessionID }, { signal })).length > 0,

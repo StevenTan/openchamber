@@ -75,7 +75,7 @@ export function scriptRuntime(tools: readonly ScriptTool[], progress: (calls: Sc
   const bindings = `{${namespaces.map(name => `[${JSON.stringify(name)}]: tools[${JSON.stringify(name)}]`).join(",")}}`;
   return { catalog: runtime.catalog, execute: (code: string) => runtime.execute(`return await (async (tools, search) => {\n${code}\n})(${bindings}, undefined);`).pipe(Effect.map(result => ({
     result: !result.ok && result.error.kind === "UnknownTool" ? {
-      ...result, error: { ...result.error, suggestions: ["Use the exact JavaScript tools path shown in the complete Code Mode catalog in this request's system instructions."] },
+      ...result, error: { ...result.error, suggestions: ["Use the exact JavaScript tools path shown in the complete Code Mode catalog in the execute tool description."] },
     } : result,
     calls, files,
   }))) };

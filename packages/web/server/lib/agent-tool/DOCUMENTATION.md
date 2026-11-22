@@ -175,7 +175,7 @@ Session control and browser operations are independently enabled:
   (512 KiB retained, at most 256 KiB of text per read); nothing is typed,
   started or stopped. Only this callback reaches the actions: the ordinary
   control route refuses `terminal.*`. VS Code has no such tool, since the
-  plugin is not injected there. It sits behind Code Mode, and its catalog line says to
+  plugin is not injected there. Its direct entry says to
   read it when the answer is in a terminal the user is looking at.
 - `openchamber_workflow` — `workflow.*`, scripts that fan a large task out to
   many agents, run by OpenChamber (`../workflows/DOCUMENTATION.md`). Off by
@@ -204,30 +204,15 @@ from the schema rather than leaving them visible. The plugin is injected only
 when OpenChamber launches and owns the OpenCode process, and not at all when
 both settings are `false`.
 
-- `openchamber`, `openchamber_schedule`,
-  `openchamber_memory`, `openchamber_knowledge` and `openchamber_notify` are
-  registered with `codemode: true`, behind OpenCode's Code Mode `execute`
-  tool; there is no setting for it. On `scripts/tool-use-bench` with three
-  models this cut the first request of a session by about 30% with the same or
-  better use of the tools, and one provider's tool-call streaming stalled on
-  their direct schemas. `openchamber_render`, `openchamber_secret`,
-  `openchamber_image`, `openchamber_workflow` and
-  `openchamber_workflow_answer` stay direct (`codemode: false`): the chat
-  draws a page, a secret card, images or a run card from the tool's own call,
-  and inside an `execute` script that call is only an entry in `execute`'s
-  list.
-- Behind Code Mode each tool also registers a namespace of its own name with
-  a one-line description (`CODE_MODE_CATALOG_LINES`). The catalog always
-  lists namespaces with their descriptions but tools only within a small
-  budget, and with large MCP servers connected ours showed as bare rows such
-  as `openchamber_web (1 tool, none shown)`; agents asked to open a page in the
-  browser panel fetched it instead and said they had no browser
-  (`scripts/tool-use-bench`). The line also carries a use the session guidance
-  does not state, where it is always seen, rather than only in the tool
-  description the agent reads after choosing the tool. Names and paths stay as
-  they are: agents call `tools.openchamber(...)` straight from the session
-  guidance, and both a control tool renamed into a shared namespace and one
-  with the other tools nested under it made them stop calling it.
+- The managed Code Mode adapter gives every tool a direct entry. Memory,
+  knowledge, usage and notifications also appear in the shared script catalog.
+  Backend-specific control, scheduling and terminal tools keep direct entries.
+  `openchamber_render`, `openchamber_secret`, `openchamber_image`,
+  `openchamber_workflow` and `openchamber_workflow_answer` have direct entries
+  because the chat renders their dedicated cards from the original calls.
+- Shared Code Mode supplies complete tool descriptions and signatures in its
+  MCP definition, including direct entry names. Its catalog contract is owned
+  by `../agent-code-mode/DOCUMENTATION.md`.
 - The plugin accepts the action's inputs either inside `parameters` or beside
   `action`, because models produce both shapes; an explicit `parameters` object
   wins on a conflict. Rejecting the flattened shape turned a call that plainly
@@ -306,7 +291,7 @@ and the few rules that hold for every call, an action description its required
 inputs and one non-obvious behavior, a parameter description its format,
 default and when to set it. Field names and JSON types carry the rest.
 
-- Every tool description stays within 2048 characters, which a test enforces.
+- Each control tool description stays within 2048 characters, which a test enforces.
   Claude Code before 2.1.296 passes an MCP tool description on only up to
   2048 characters (4096 after), and the plugin that runs it uses whichever CLI
   the user installed; the input schema reaches the model whole. A rule that
@@ -518,13 +503,17 @@ Its command ownership, waiting, session memory and PTY contracts are in
 `../agent-command/DOCUMENTATION.md`.
 
 `control-mcp.ts` exposes memory, project knowledge, usage and notifications through
-the `openchamber` MCP server at `/api/openchamber/control-tool/mcp`. Its four direct
+the standalone `/api/openchamber/control-tool/mcp` endpoint. Managed agents discover
+them through the `openchamber` server at `/api/openchamber/code-mode/mcp`, alongside
+the script execution tool. Its four direct
 tools retain their `openchamber_*` names, settings and action result envelopes.
 The shared permission runtime checks access before invocation. Managed OpenCode
 hooks attach activity metadata after completion. Execution uses the existing control service.
 
 `mcp.ts` owns Streamable HTTP connection handling shared by the command, browser,
-question, file and control services. They use the same listener and callback authentication.
+question, file, control and Code Mode services. They use the same listener and callback authentication.
+Code Mode connects to the shared server factories through SDK in-memory transports.
+`mcp-services.ts` owns their script registration, authenticated routes and shutdown.
 `mcp-context.ts` defines the injected session, call and cancellation context.
 Backend adapters resolve that identity outside model arguments; OpenCode's adapter
 in `../opencode/mcp-context.ts` reads its session metadata. The host resolves the

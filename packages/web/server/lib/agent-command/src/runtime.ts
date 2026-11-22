@@ -228,6 +228,7 @@ export function createCommandToolRuntime({
 
   return {
     materializePlugin,
+    mcp,
     registerRoutes,
     reset,
     close: () => {

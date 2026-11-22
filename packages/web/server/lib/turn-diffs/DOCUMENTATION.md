@@ -27,7 +27,9 @@ and rendering. OpenCode owns plugin storage and transcript persistence.
   capture cannot be read as an absent record.
 - Per-session serialization orders baseline manifests and record writes.
   Capturing does not lock files or resolve concurrent external attribution.
-- File executor wrappers capture direct and scripted operations. Operations
+- File executor wrappers capture direct operations. Code Mode calls the same
+  capture functions through `openchamber-turn-diffs.capture` RPC with the original
+  session, message and outer call identity. Operations
   sharing a Code Mode call ID settle as a group before
   saving the final patch. The outer script result carries its diff reference
   and statistics so shared UI reads the same recorded version. Script completion

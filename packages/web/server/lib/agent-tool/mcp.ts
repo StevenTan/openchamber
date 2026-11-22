@@ -6,9 +6,10 @@ import { z } from 'zod';
 
 const sessionHeader = z.string().optional();
 
-export function createMcpRuntime(createServer: () => Promise<Pick<Server, 'connect' | 'close'>> | Pick<Server, 'connect' | 'close'>) {
+export function createMcpRuntime(createServer: () => Promise<Pick<Server, 'connect' | 'close'>> | Pick<Server, 'connect' | 'close'>, { enableJsonResponse = true } = {}) {
   const connections = new Map<string, { server: Pick<Server, 'close'>; transport: StreamableHTTPServerTransport }>();
   return {
+    createServer,
     async handleRequest(req: IncomingMessage & { body: unknown }, res: ServerResponse & { status(code: number): { json(body: { error: string }): void } }) {
       const sessionID = sessionHeader.parse(req.headers['mcp-session-id']);
       if (sessionID !== undefined) {
@@ -23,7 +24,7 @@ export function createMcpRuntime(createServer: () => Promise<Pick<Server, 'conne
       const server = await createServer();
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: randomUUID,
-        enableJsonResponse: true,
+        enableJsonResponse,
         onsessioninitialized: id => { connections.set(id, { server, transport }); },
         onsessionclosed: id => { connections.delete(id); },
       });

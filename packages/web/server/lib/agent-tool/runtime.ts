@@ -67,6 +67,8 @@ import { createControlMcpRuntime, controlMcpSetup, type ControlMcpTool } from '.
 import { resolveOpenCodeMcpContext } from '../opencode/mcp-context.js';
 import type { ResolveMcpContext } from './mcp-context.js';
 import type { ToolPermissions } from './permissions.js';
+import type { CodeModeFileActivity } from '../agent-code-mode/mcp.js';
+import { createAgentMcpServices } from './mcp-services.js';
 
 export interface ParameterSchema {
   type: string | string[];
@@ -139,6 +141,7 @@ export interface AgentToolDependencies {
   questionRuntime: ReturnType<typeof createQuestionRuntime>;
   resolveMcpContext?: ResolveMcpContext;
   permissions: ToolPermissions;
+  codeModeFileActivity?: CodeModeFileActivity;
 }
 
 interface ToolEntryOptions {
@@ -936,6 +939,7 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
   const pluginManifestPath = path.join(pluginDirectory, 'package.json');
   let activeToken: string | null = null;
   let controlTools: ControlMcpTool[] = [];
+  let webEnabled = true;
 
   const { callbackHost, isSameMachineAddress } = createCallbackAddress(getActiveHost);
 
@@ -943,6 +947,7 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
     if (!includeControl && !includeSchedule && !includeWeb && !includeMemory && !includeKnowledge && !includeNotify && !includeRender && !includeImage && !includeSecret && !includeUsage && !includeTerminal && !includeWorkflow) {
       throw new Error('At least one OpenChamber managed tool must be enabled to inject the plugin');
     }
+    webEnabled = includeWeb;
     controlTools = [
       ...includeMemory ? [{ name: 'memory', description: CODE_MODE_CATALOG_LINES.openchamber_memory + '\n\n' + MEMORY_TOOL_DESCRIPTION, definitions: OPENCHAMBER_MEMORY_ACTION_DEFINITIONS, parameters: MEMORY_PARAMETER_PROPERTIES }] : [],
       ...includeKnowledge ? [{ name: 'knowledge', description: CODE_MODE_CATALOG_LINES.openchamber_knowledge + '\n\n' + KNOWLEDGE_TOOL_DESCRIPTION, definitions: OPENCHAMBER_KNOWLEDGE_ACTION_DEFINITIONS, parameters: KNOWLEDGE_PARAMETER_PROPERTIES }] : [],
@@ -1053,12 +1058,7 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
 
   const registerRoutes = (app: Application, express: Pick<ExpressFactory, 'json'>) => {
     commandToolRuntime.registerRoutes(app, express);
-    for (const [route, mcp, limit] of [['browser-tool', browserMcp, '1mb'], ['async-question', questionMcp, '1mb'], ['file-tool', fileMcp, '50mb'], ['control-tool', controlMcp, '1mb']] as const) {
-      app.all(`/api/openchamber/${route}/mcp`, express.json({ limit }), async (req, res) => {
-        if (!authorize(req)) return res.status(401).json({ error: 'Unauthorized' });
-        await mcp.handleRequest(req, res);
-      });
-    }
+    mcpServices.registerRoutes(app, express);
     app.post<AgentToolPayload>('/api/openchamber/agent-tool', express.json({ limit: '1mb' }), async (req, res) => {
       if (!authorize(req)) return res.status(401).json({ error: 'Unauthorized' });
       const controller = new AbortController();
@@ -1101,7 +1101,7 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
   const questionMcp = createQuestionMcpRuntime(questionRuntime, resolveMcpContext, permissions);
   const fileMcp = createFileMcpRuntime(permissions, resolveMcpContext);
   const controlMcp = createControlMcpRuntime(() => controlTools, execute, resolveMcpContext, trackInflight, { ...TOOL_OUTPUT_SCHEMA, type: 'object' }, permissions);
-
+  const mcpServices = createAgentMcpServices({ openchamber_commands: commandToolRuntime.mcp, file: fileMcp, browser: browserMcp, request: questionMcp, openchamber: controlMcp }, { resolveContext: resolveMcpContext, permissions, fileActivity: dependencies.codeModeFileActivity, browserEnabled: () => webEnabled, authorize });
 
   return {
     pluginDirectory,
@@ -1115,7 +1115,7 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
     materializeCommandPlugin: commandToolRuntime.materializePlugin,
     materializeSearchPlugin: () => materializeSearchPlugin(instanceDir),
     materializeQuestionPlugin: () => questionRuntime.materializePlugin(instanceDir),
-    closeCommands: () => Promise.all([commandToolRuntime.close(), browserMcp.close(), questionMcp.close(), fileMcp.close(), controlMcp.close()]),
+    closeCommands: () => Promise.all([mcpServices.close(), commandToolRuntime.close()]),
     observeCommandEvent: commandToolRuntime.observeEvent,
   };
 };

@@ -33,7 +33,10 @@ interface Context {
       update(id: string, change: (tool: { execute(input: HookEvent['input'], context: Call): Promise<{ metadata?: Tool.Metadata }> }) => void): void;
     }) => void): Promise<void>;
   };
-  rpc: { register(description: typeof definition, handlers: { read(input: { sessionID: string; turnID: string }): Promise<TurnRecord | { version: number; sessionID: string; turnID: string; unavailable: boolean }> }): Promise<void> };
+  rpc: { register(description: typeof definition, handlers: {
+    read(input: { sessionID: string; turnID: string }): Promise<TurnRecord | { version: number; sessionID: string; turnID: string; unavailable: boolean }>;
+    capture(input: Call & Pick<HookEvent, 'tool' | 'input'> & { phase: 'before' | 'after' }): Promise<{ openchamberTurnDiff?: DiffMetadata }>;
+  }): Promise<void> };
   event: { subscribe(input: { types: string[]; signal: AbortSignal }): AsyncIterable<{ type: string; data: { sessionID: string; reason?: string; assistantMessageID: string } }> };
 }
 
@@ -43,6 +46,10 @@ const definition = {
   methods: {
     read: {
       input: { type: 'object', properties: { sessionID: { type: 'string' }, turnID: { type: 'string' } }, required: ['sessionID', 'turnID'], additionalProperties: false },
+      output: { type: 'object' },
+    },
+    capture: {
+      input: { type: 'object', properties: { sessionID: { type: 'string' }, messageID: { type: 'string' }, id: { type: 'string' }, tool: { type: 'string' }, input: { type: 'object' }, phase: { enum: ['before', 'after'] } }, required: ['sessionID', 'messageID', 'id', 'tool', 'input', 'phase'] },
       output: { type: 'object' },
     },
   },
@@ -304,6 +311,15 @@ export default {
       }
     });
     await ctx.rpc.register(definition, {
+      capture: async event => {
+        if (event.phase === 'before') {
+          await beforeFile(event);
+          return {};
+        }
+        const result: Pick<Tool.Result, 'metadata'> = {};
+        await afterFile(event, result);
+        return result.metadata ?? {};
+      },
       read: async ({ sessionID, turnID }) => serial(sessionID, async () => {
         await ctx.session.get({ sessionID });
         const active = turns.get(activeKey(sessionID, turnID)) ?? await ctx.storage.get(activeKey(sessionID, turnID));

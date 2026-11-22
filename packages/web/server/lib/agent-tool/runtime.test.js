@@ -541,7 +541,7 @@ describe('managed agent tool runtime', () => {
     await prepareManagedEnv(runtime);
     const tool = await loadTools(dataDir, 'validator');
 
-    for (const entry of Object.values(tool).filter(tool => tool.options.namespace !== 'browser')) {
+    for (const entry of Object.values(tool).filter(tool => tool.input.properties.action)) {
       expect(entry.input.properties.action.enum).toBeInstanceOf(Array);
       expect(entry.input.properties.action).not.toHaveProperty('oneOf');
     }
@@ -552,7 +552,7 @@ describe('managed agent tool runtime', () => {
     await prepareManagedEnv(runtime, { includeControl: true, includeWeb: true, includeMemory: true, includeKnowledge: true, includeNotify: true, includeRender: true });
     const tools = await loadTools(dataDir, 'root-shape');
 
-    for (const tool of Object.values(tools).filter(tool => tool.options.namespace !== 'browser')) {
+    for (const tool of Object.values(tools).filter(tool => tool.input.properties.action)) {
       expect(Object.keys(tool.input.properties).sort()).toEqual(['action', 'parameters']);
       expect(tool.input.additionalProperties).toBe(true);
     }
@@ -719,7 +719,7 @@ describe('managed agent tool runtime', () => {
     await prepareManagedEnv(runtime, { includeControl: true, includeWeb: false, includeMemory: true });
     const tool = await loadTools(dataDir, 'memory');
 
-    expect(Object.keys(tool)).toEqual(['openchamber', 'openchamber_memory']);
+    expect(Object.keys(tool)).toEqual(['openchamber', 'openchamber_execute', 'openchamber_memory']);
     expect(Object.keys(tool.openchamber_memory.input.properties.parameters.properties).sort())
       .toEqual(['body', 'memoryId', 'scope', 'title', 'type']);
     // Memory inputs must not leak into the control tool's schema, which the
@@ -740,7 +740,7 @@ describe('managed agent tool runtime', () => {
     await prepareManagedEnv(runtime, { includeControl: false, includeWeb: false, includeMemory: true });
     const tool = await loadTools(dataDir, 'onlymemory');
 
-    expect(Object.keys(tool)).toEqual(['openchamber_memory']);
+    expect(Object.keys(tool)).toEqual(['openchamber_execute', 'openchamber_memory']);
   });
 
   it('exposes notify as its own tool only when switched on', async () => {
@@ -748,7 +748,7 @@ describe('managed agent tool runtime', () => {
     await prepareManagedEnv(runtime, { includeControl: true, includeWeb: false, includeMemory: false, includeNotify: true });
     const tool = await loadTools(dataDir, 'notify');
 
-    expect(Object.keys(tool)).toEqual(['openchamber', 'openchamber_notify']);
+    expect(Object.keys(tool)).toEqual(['openchamber', 'openchamber_execute', 'openchamber_notify']);
     expect(Object.keys(tool.openchamber_notify.input.properties.parameters.properties).sort())
       .toEqual(['body', 'title']);
     expect(Object.keys(tool.openchamber.input.properties.parameters.properties)).not.toContain('showWhenFocused');
@@ -776,7 +776,7 @@ describe('managed agent tool runtime', () => {
     const namespaces = [];
     const tool = await loadTools(dataDir, 'usage', {}, [], namespaces);
 
-    expect(Object.keys(tool)).toEqual(['openchamber_usage']);
+    expect(Object.keys(tool)).toEqual(['openchamber_execute', 'openchamber_usage']);
     expect(Object.keys(tool.openchamber_usage.input.properties.parameters.properties)).toEqual(['providerId']);
     expect(tool.openchamber_usage.options).toEqual({ codemode: false, namespace: 'openchamber' });
     // Its catalog line names when to read it, so agents do not check limits before every task.
@@ -1128,7 +1128,9 @@ describe('managed agent tool runtime', () => {
       includeImage: true,
       includeUsage: true,
     });
-    const tools = await loadTools(dataDir, 'description-length');
+    const { openchamber_execute: execute, ...tools } = await loadTools(dataDir, 'description-length');
+
+    expect(execute.description).toContain('tools.openchamber_commands.exec_command(');
 
     expect(Object.keys(tools).filter(name => tools[name].options.namespace !== 'browser').sort()).toEqual([
       'openchamber',
@@ -1275,7 +1277,8 @@ describe('managed agent tool runtime', () => {
     const { runtime, dataDir } = await createRuntime();
     await prepareManagedEnv(runtime, { includeControl: true, includeSchedule: true, includeWeb: true, includeMemory: true, includeKnowledge: true, includeNotify: true, includeRender: true });
     const namespaces = [];
-    const { openchamber_render: render, ...behindExecute } = await loadTools(dataDir, 'codemode', {}, [], namespaces);
+    const { openchamber_render: render, openchamber_execute: execute, ...behindExecute } = await loadTools(dataDir, 'codemode', {}, [], namespaces);
+    expect(execute.options).toEqual({ codemode: false, namespace: 'openchamber' });
     const names = ['openchamber', 'openchamber_knowledge', 'openchamber_memory', 'openchamber_notify', 'openchamber_schedule'];
     expect(Object.keys(behindExecute).filter(name => behindExecute[name].options.namespace !== 'browser').sort()).toEqual(names);
     for (const tool of Object.values(behindExecute).filter(tool => tool.options.namespace !== 'openchamber')) {

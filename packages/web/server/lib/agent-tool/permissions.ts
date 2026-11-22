@@ -19,6 +19,7 @@ export interface ToolPermissionPolicy {
 }
 export interface ToolPermissionSession extends Pick<ToolPermissionPolicy, 'directory' | 'projectDirectory'> {
   assert(input: ToolPermissionInput, signal: AbortSignal): Promise<void>;
+  denied(action: string, resource: string): boolean;
 }
 export interface ToolPermissions {
   session(sessionID: string): Promise<ToolPermissionSession>;
@@ -56,7 +57,9 @@ export function createToolPermissions({ file, readPolicy, publish }: Options) {
   };
   const session = async (sessionID: string): Promise<ToolPermissionSession> => {
     const policy = await readPolicy(sessionID);
-    return { directory: policy.directory, projectDirectory: policy.projectDirectory, assert: async (input, signal) => {
+    return { directory: policy.directory, projectDirectory: policy.projectDirectory,
+      denied: (action, resource) => evaluate(action, resource, policy.rules) === 'deny',
+      assert: async (input, signal) => {
       signal.throwIfAborted();
       const decision = effect(input, policy);
       if (decision === 'deny') throw new Error(`Permission denied: ${input.action}`);

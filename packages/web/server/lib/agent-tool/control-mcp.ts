@@ -86,7 +86,7 @@ export function controlMcpSetup(titles: Record<string, string>) {
   return String.raw`
     await ctx.mcp.transform(servers => {
       servers.set('openchamber', {
-        type: 'remote', url: new URL('/api/openchamber/control-tool/mcp', process.env.OPENCHAMBER_AGENT_TOOL_URL).href,
+        type: 'remote', url: new URL('/api/openchamber/code-mode/mcp', process.env.OPENCHAMBER_AGENT_TOOL_URL).href,
         oauth: false, codemode: false,
         headers: { authorization: 'Bearer ' + process.env.OPENCHAMBER_AGENT_TOOL_TOKEN },
       })
