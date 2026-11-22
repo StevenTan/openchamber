@@ -30,6 +30,8 @@ module's MIT license. Skill filtering uses the
 - Shared command, file, browser, asynchronous question and control tools support
   direct and script calls with identical arguments and permission checks.
   Managed requests expose `openchamber_execute` as their script entry.
+  Session control, schedules and terminal reads use `tools.openchamber.control`,
+  `tools.openchamber.schedule` and `tools.openchamber.terminal`.
 - Whole-tool permission denies filter the script inventory on every invocation.
   Individual MCP services own resource-specific approvals and validation.
   OpenCode-specific native tools remain direct, including dedicated card tools.

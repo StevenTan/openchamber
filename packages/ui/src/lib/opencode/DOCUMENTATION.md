@@ -48,6 +48,8 @@ generic rendering.
   preserving each call's own input, output, metadata, timing and error. Derived
   IDs identify rows; the owning message/session IDs retain the shared completion
   path. Malformed records do not hide other calls.
+- `tool-name.ts` maps `openchamber_control` to the control presentation identity
+  `openchamber` for direct and scripted calls.
 - `toolContentShells.ts` recognizes both top-level and recorded result shells.
   Navigation output is compacted through the same rules on streamed results;
   completing either form fetches its owning message.

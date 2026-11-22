@@ -3,6 +3,7 @@ import { createCodeModeMcpRuntime, type CodeModeFileActivity } from '../agent-co
 import type { createMcpRuntime } from './mcp.js';
 import type { ResolveMcpContext } from './mcp-context.js';
 import type { ToolPermissions } from './permissions.js';
+import { controlMcpPermission } from './control-mcp.js';
 
 type Services = Record<'openchamber_commands' | 'file' | 'browser' | 'request' | 'openchamber', ReturnType<typeof createMcpRuntime>>;
 interface Options {
@@ -19,7 +20,7 @@ export function createAgentMcpServices(services: Services, options: Options) {
     { namespace: 'file', runtime: services.file, permission: name => name === 'view_image' ? 'read' : 'edit' },
     { namespace: 'browser', runtime: services.browser, permission: () => 'openchamber_web', enabled: options.browserEnabled },
     { namespace: 'request', runtime: services.request, permission: () => 'question' },
-    { namespace: 'openchamber', runtime: services.openchamber, permission: name => `openchamber_${name}` },
+    { namespace: 'openchamber', runtime: services.openchamber, permission: controlMcpPermission },
   ], options.resolveContext, options.permissions, options.fileActivity);
   const routes = [
     ['browser-tool', services.browser, '1mb'], ['async-question', services.request, '1mb'],

@@ -57,7 +57,7 @@ export const sleepSummaryText = ({ digest, children }: { digest: LeadDigest | un
   const sections = [
     'This lead slept past its prompt cache, so OpenChamber replaced the conversation before this point with this note instead of a model-written summary.'
       + ' The brief and the lead rules are still in your context. The full earlier conversation is one call away: session.messages for this session'
-      + ' (tools.openchamber inside execute) with all: true. Read it when something below is not enough to go on.',
+      + ' (tools.openchamber.control inside execute) with all: true. Read it when something below is not enough to go on.',
   ];
   if (digest) {
     if (digest.needsYou.length > 0) {

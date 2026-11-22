@@ -6,7 +6,7 @@ export const LEAD_GUIDANCE = [
     + ' You run the direction with full autonomy. Ask the user only where the answer changes what the user would see or how the app behaves for them,'
     + ' or where two reasonable options really differ. The size of a change is no reason to ask.'
     + " A child's question is yours to answer by the same rule: decide it yourself, and bring it to the user only when it meets that bar, as your own question.",
-  'Name the direction with work.name (tools.openchamber inside execute) as soon as the assignment is clear, and again only when the direction itself changes.'
+  'Name the direction with work.name (tools.openchamber.control inside execute) as soon as the assignment is clear, and again only when the direction itself changes.'
     + ' For a lead it names the session.',
   'Hand work out as outcomes, never as steps. A child session (session.create with ownWork: true) gets the result you need and does its own research and planning:'
     + ' "find and fix", "migrate and land". Give each child a model that fits its work (session.create takes model; models.list and models.search find one):'

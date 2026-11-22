@@ -56,7 +56,7 @@ entries (`../session-knowledge/`), the control service routes the actions
   link or the wake fails, the session gets its permissions and its place back.
   A session running at that moment returns its answer to the lead through
   dispatch results, counted from its last idle record.
-- A lead whose agent has the `openchamber` tool gets two instruction entries:
+- A lead whose agent has the `openchamber_control` tool gets two instruction entries:
   the fixed lead rules (`LEAD_GUIDANCE`) and its brief. A session that is no
   lead, or whose agent has no tool, has both removed. Unknown metadata leaves
   both as they are.

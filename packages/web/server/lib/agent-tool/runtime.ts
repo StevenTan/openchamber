@@ -149,7 +149,6 @@ interface ToolEntryOptions {
   description: string;
   definitions: readonly ActionDefinition[];
   parameters: Record<string, ParameterSchema>;
-  codeMode: boolean;
   answers?: { waitsWhen: string; closedInChatNote: string } | null;
   secretRun?: boolean;
 }
@@ -653,7 +652,7 @@ const SECRET_RUN_PERMISSION = String.raw`        if (args.action === "secret.run
         }
 `;
 
-const createToolEntry = ({ name, description, definitions, parameters, codeMode, answers = null, secretRun = false }: ToolEntryOptions) => {
+const createToolEntry = ({ name, description, definitions, parameters, answers = null, secretRun = false }: ToolEntryOptions) => {
   const normalizeBooleans = booleanNormalizationBlock(parameters);
   const reviveDependsOn = dependsOnRevivalBlock(parameters);
   const [definition] = definitions;
@@ -662,7 +661,7 @@ const createToolEntry = ({ name, description, definitions, parameters, codeMode,
   return String.raw`    tools.add({
       name: ${JSON.stringify(name)},
       description: ${JSON.stringify(description)},
-      options: { codemode: ${codeMode ? 'true' : 'false'} },
+      options: { codemode: false },
       output: ${JSON.stringify(TOOL_OUTPUT_SCHEMA)},
       input: {
         type: "object",
@@ -682,17 +681,6 @@ const createToolEntry = ({ name, description, definitions, parameters, codeMode,
         // shapes are accepted; an explicit parameters object wins on a conflict.
         const { action: requestedAction, parameters, ...flattened } = input ?? {}
         const args = { ...flattened, ...(parameters ?? {}), action: requestedAction }
-        // Nested object values can arrive JSON-stringified (issue #4591). Only
-        // 'link' is revived, once, and only into a plain object: free-form
-        // strings such as prompts and titles must stay text. The field belongs
-        // to session.link alone (its bare 'link' alias included), so this is
-        // field-scoped rather than a general coercion.
-        if (typeof args.link === 'string') {
-          try {
-            const revived = JSON.parse(args.link)
-            if (revived !== null && typeof revived === 'object' && !Array.isArray(revived)) args.link = revived
-          } catch {}
-        }
 ${reviveDependsOn}${actionSchema.normalize}${secretRunNormalize}${normalizeBooleans}        const actionTitles = ${JSON.stringify(AGENT_TOOL_ACTION_TITLES)}
         const title = Object.hasOwn(actionTitles, args.action) ? actionTitles[args.action] : args.action
         const progress = (extra) => context.progress({
@@ -764,33 +752,9 @@ const OPENCODE_TOOLS_REPLACED_BY_CONTROL = ['opencode_worktree_create', 'opencod
 
 const createPluginSource = ({ includeControl, includeSchedule, includeWeb, includeMemory, includeKnowledge, includeNotify, includeRender, includeShare, includeImage, includeSecret, includeUsage, includeTerminal, includeWorkflow }: Required<PluginOptions>) => {
   const entries = [];
-  const included = { openchamber: includeControl, openchamber_schedule: includeSchedule, openchamber_terminal: includeTerminal };
-  for (const [name, description] of Object.entries(CODE_MODE_CATALOG_LINES)
-    .filter((entry): entry is [keyof typeof included, string] => Object.hasOwn(included, entry[0]))) {
-    if (included[name]) entries.push(`    tools.namespace(${JSON.stringify({ name, description })})
-`);
-  }
   if (includeControl) {
     entries.push(`    for (const id of ${JSON.stringify(OPENCODE_TOOLS_REPLACED_BY_CONTROL)}) tools.remove(id)
 `);
-  }
-  if (includeControl) {
-    entries.push(createToolEntry({
-      name: 'openchamber',
-      description: CONTROL_TOOL_DESCRIPTION,
-      definitions: OPENCHAMBER_AGENT_TOOL_ACTION_DEFINITIONS,
-      parameters: CONTROL_PARAMETER_PROPERTIES,
-      codeMode: true,
-    }));
-  }
-  if (includeSchedule) {
-    entries.push(createToolEntry({
-      name: 'openchamber_schedule',
-      description: SCHEDULE_TOOL_DESCRIPTION,
-      definitions: OPENCHAMBER_SCHEDULE_ACTION_DEFINITIONS,
-      parameters: SCHEDULE_PARAMETER_PROPERTIES,
-      codeMode: true,
-    }));
   }
   if (includeRender) {
     entries.push(createToolEntry({
@@ -798,7 +762,6 @@ const createPluginSource = ({ includeControl, includeSchedule, includeWeb, inclu
       description: includeShare ? `${RENDER_TOOL_DESCRIPTION}${RENDER_TOOL_SHARE_SENTENCE}` : RENDER_TOOL_DESCRIPTION,
       definitions: OPENCHAMBER_RENDER_ACTION_DEFINITIONS,
       parameters: includeShare ? { ...RENDER_PARAMETER_PROPERTIES, share: RENDER_SHARE_PARAMETER } : RENDER_PARAMETER_PROPERTIES,
-      codeMode: false,
       answers: { waitsWhen: 'args.awaitAnswer === true', closedInChatNote: RENDER_PAGE_CLOSED_IN_CHAT_NOTE },
     }));
   }
@@ -808,7 +771,6 @@ const createPluginSource = ({ includeControl, includeSchedule, includeWeb, inclu
       description: SECRET_TOOL_DESCRIPTION,
       definitions: OPENCHAMBER_SECRET_ACTION_DEFINITIONS,
       parameters: SECRET_PARAMETER_PROPERTIES,
-      codeMode: false,
       answers: { waitsWhen: '(args.action !== "secret.forget" && args.action !== "forget") || args.saved === true', closedInChatNote: SECRET_REQUEST_CLOSED_IN_CHAT_NOTE },
       secretRun: true,
     }));
@@ -819,16 +781,6 @@ const createPluginSource = ({ includeControl, includeSchedule, includeWeb, inclu
       description: IMAGE_TOOL_DESCRIPTION,
       definitions: OPENCHAMBER_IMAGE_ACTION_DEFINITIONS,
       parameters: IMAGE_PARAMETER_PROPERTIES,
-      codeMode: false,
-    }));
-  }
-  if (includeTerminal) {
-    entries.push(createToolEntry({
-      name: 'openchamber_terminal',
-      description: TERMINAL_TOOL_DESCRIPTION,
-      definitions: OPENCHAMBER_TERMINAL_ACTION_DEFINITIONS,
-      parameters: TERMINAL_PARAMETER_PROPERTIES,
-      codeMode: true,
     }));
   }
   if (includeWorkflow) {
@@ -837,14 +789,12 @@ const createPluginSource = ({ includeControl, includeSchedule, includeWeb, inclu
       description: WORKFLOW_TOOL_DESCRIPTION,
       definitions: OPENCHAMBER_WORKFLOW_ACTION_DEFINITIONS,
       parameters: WORKFLOW_PARAMETER_PROPERTIES,
-      codeMode: false,
     }));
     entries.push(createToolEntry({
       name: WORKFLOW_ANSWER_TOOL,
       description: WORKFLOW_ANSWER_TOOL_DESCRIPTION,
       definitions: OPENCHAMBER_WORKFLOW_ANSWER_ACTION_DEFINITIONS,
       parameters: WORKFLOW_ANSWER_PARAMETER_PROPERTIES,
-      codeMode: false,
     }));
   }
 
@@ -892,7 +842,7 @@ export default {
   setup: async (ctx) => {
     exemptCallbackFromProxy()
     await ctx.tool.transform((tools) => {
-${entries.join('')}    })${includeWeb ? browserMcpSetup(AGENT_TOOL_ACTION_TITLES) : ''}${includeMemory || includeKnowledge || includeUsage || includeNotify ? controlMcpSetup(AGENT_TOOL_ACTION_TITLES) : ''}${includeRender || includeSecret ? `
+${entries.join('')}    })${includeWeb ? browserMcpSetup(AGENT_TOOL_ACTION_TITLES) : ''}${includeMemory || includeKnowledge || includeUsage || includeNotify || includeControl || includeSchedule || includeTerminal ? controlMcpSetup(AGENT_TOOL_ACTION_TITLES) : ''}${includeRender || includeSecret ? `
     await ctx.session.hook("prompt", (event) => {
       // An agent's prompt is not the user writing, and a queued one arrives
       // only after the turn: the page keeps waiting for the user.
@@ -953,6 +903,9 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
       ...includeKnowledge ? [{ name: 'knowledge', description: CODE_MODE_CATALOG_LINES.openchamber_knowledge + '\n\n' + KNOWLEDGE_TOOL_DESCRIPTION, definitions: OPENCHAMBER_KNOWLEDGE_ACTION_DEFINITIONS, parameters: KNOWLEDGE_PARAMETER_PROPERTIES }] : [],
       ...includeUsage ? [{ name: 'usage', description: CODE_MODE_CATALOG_LINES.openchamber_usage + '\n\n' + USAGE_TOOL_DESCRIPTION, definitions: OPENCHAMBER_USAGE_ACTION_DEFINITIONS, parameters: USAGE_PARAMETER_PROPERTIES }] : [],
       ...includeNotify ? [{ name: 'notify', description: CODE_MODE_CATALOG_LINES.openchamber_notify + '\n\n' + NOTIFY_TOOL_DESCRIPTION, definitions: OPENCHAMBER_NOTIFY_ACTION_DEFINITIONS, parameters: NOTIFY_PARAMETER_PROPERTIES }] : [],
+      ...includeControl ? [{ name: 'control', description: CODE_MODE_CATALOG_LINES.openchamber + '\n\n' + CONTROL_TOOL_DESCRIPTION, definitions: OPENCHAMBER_AGENT_TOOL_ACTION_DEFINITIONS, parameters: CONTROL_PARAMETER_PROPERTIES }] : [],
+      ...includeSchedule ? [{ name: 'schedule', description: CODE_MODE_CATALOG_LINES.openchamber_schedule + '\n\n' + SCHEDULE_TOOL_DESCRIPTION, definitions: OPENCHAMBER_SCHEDULE_ACTION_DEFINITIONS, parameters: SCHEDULE_PARAMETER_PROPERTIES }] : [],
+      ...includeTerminal ? [{ name: 'terminal', description: CODE_MODE_CATALOG_LINES.openchamber_terminal + '\n\n' + TERMINAL_TOOL_DESCRIPTION, definitions: OPENCHAMBER_TERMINAL_ACTION_DEFINITIONS, parameters: TERMINAL_PARAMETER_PROPERTIES }] : [],
     ];
     await fsPromises.mkdir(pluginDirectory, { recursive: true });
     await fsPromises.writeFile(pluginManifestPath, PLUGIN_PACKAGE_JSON, { mode: 0o600 });

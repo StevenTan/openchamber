@@ -15,7 +15,7 @@ import { createToolPermissions } from '../agent-tool/permissions.js';
 const cleanup = [];
 afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); vi.unstubAllEnvs(); });
 
-async function fixture() {
+async function fixture(dependencies = {}) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'code-mode-mcp-'));
   cleanup.push(() => fs.rm(directory, { recursive: true, force: true }));
   await fs.symlink(new URL('../../../node_modules', import.meta.url), path.join(directory, 'node_modules'), 'dir');
@@ -28,6 +28,7 @@ async function fixture() {
   const runtime = createAgentToolRuntime({ crypto, fsPromises: fs, path, instanceDir: directory,
     resolveSessionDirectory: async () => directory, getActivePort: () => listener.address().port, permissions: policy,
     codeModeFileActivity: async (phase, request, tool, input) => { captured.push({ phase, source: request._meta?.['openchamber/source'], tool, input }); return {}; },
+    ...dependencies,
   });
   const app = express();
   app.get('/page', (_req, res) => res.send('FETCH_BODY'));
@@ -105,6 +106,31 @@ it('runs shared MCP files and commands concurrently with structured output, prog
   await fs.writeFile(path.join(f.directory, 'image.png'), Buffer.from(image, 'base64'));
   const viewed = await f.run('return await tools.file.view_image({path:"image.png"});');
   expect(viewed.content).toContainEqual({ type: 'file', mime: 'image/png', uri: `data:image/png;base64,${image}` });
+});
+
+it('shares control, schedule and terminal calls between direct MCP and scripts with session identity and permissions', async () => {
+  const executeAction = vi.fn(async action => ({ action }));
+  const f = await fixture({ executeAction });
+  await f.runtime.materializePlugin({ includeControl: true, includeSchedule: true, includeTerminal: true });
+  const tools = (await f.client.listTools()).tools;
+  for (const name of ['control', 'schedule', 'terminal']) {
+    expect(tools.map(tool => tool.name)).toContain(name);
+    expect(tools.find(tool => tool.name === 'execute').description).toContain(`tools.openchamber.${name}(`);
+  }
+  const direct = await f.client.callTool({ name: 'control', arguments: { action: 'session.list' }, _meta: { 'ai.opencode/sessionID': 'session' } });
+  expect(direct.structuredContent).toMatchObject({ ok: true, action: 'session.list' });
+  const result = await f.run('return await Promise.allSettled([tools.openchamber.control({action:"session.list"}), tools.openchamber.schedule({action:"list"}), tools.openchamber.terminal({action:"list"})]);');
+  expect(result.output.value.map(value => value.value.action)).toEqual(['session.list', 'schedule.list', 'terminal.list']);
+  for (const [, , directory, options] of executeAction.mock.calls) {
+    expect(directory).toBe(f.directory);
+    expect(options).toMatchObject({ contextSessionId: 'session', contextCallId: expect.any(String), signal: expect.any(AbortSignal) });
+  }
+  expect(result.metadata.openchamberToolCalls.map(call => call.metadata.openchamber.action)).toEqual(['session.list', 'schedule.list', 'terminal.list']);
+  f.permissions.push({ action: 'openchamber', resource: '*', effect: 'deny' });
+  const count = executeAction.mock.calls.length;
+  expect((await f.run('return await tools.openchamber.control({action:"session.list"});')).output.ok).toBe(false);
+  await expect(f.client.callTool({ name: 'control', arguments: { action: 'session.list' }, _meta: { 'ai.opencode/sessionID': 'session' } })).rejects.toThrow('Permission denied: openchamber');
+  expect(executeAction).toHaveBeenCalledTimes(count);
 });
 
 it('keeps memory scoped to the calling session and exposes no tool discovery', async () => {

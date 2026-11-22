@@ -5,7 +5,7 @@
 This module exposes typed OpenCode custom tools and shared native MCP services.
 Session control and browser operations are independently enabled:
 
-- `openchamber` — projects, sessions, worktrees, and showing a file to the
+- `openchamber_control` — projects, sessions, worktrees, and showing a file to the
   user (`file.open`). Enabled while the persisted `agentControlToolEnabled`
   setting is not `false`.
 - `openchamber_schedule` — the `schedule.*` actions of the same control
@@ -425,10 +425,8 @@ makes the trade visible and reversible, the same shape `openchamber_image`,
 `openchamber_notify` and `openchamber_usage` use, and the setting is read again
 on each call so a materialized plugin cannot outlive the decision.
 
-It sits behind Code Mode: two actions with a short result are worth
-one namespace line in the catalog, and the catalog line says when to read it —
-the answer is in a terminal the user is looking at — so an agent does not
-sample the panel on every task.
+It has a direct MCP entry and a Code Mode catalog entry. The description says
+when to read it: the answer is in a terminal the user is looking at.
 
 ## Security invariants
 
@@ -505,8 +503,13 @@ Its command ownership, waiting, session memory and PTY contracts are in
 `control-mcp.ts` exposes memory, project knowledge, usage and notifications through
 the standalone `/api/openchamber/control-tool/mcp` endpoint. Managed agents discover
 them through the `openchamber` server at `/api/openchamber/code-mode/mcp`, alongside
-the script execution tool. Its four direct
+the script execution tool. Its direct
 tools retain their `openchamber_*` names, settings and action result envelopes.
+The same MCP server exposes `control`, `schedule` and `terminal`, with direct
+names `openchamber_control`, `openchamber_schedule` and `openchamber_terminal`.
+Code Mode calls use `tools.openchamber.control`, `.schedule` and `.terminal`.
+Control keeps the `openchamber` permission action, including configured rules
+and saved approvals. Its execution uses the control action allowlist.
 The shared permission runtime checks access before invocation. Managed OpenCode
 hooks attach activity metadata after completion. Execution uses the existing control service.
 

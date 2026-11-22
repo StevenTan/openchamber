@@ -7,7 +7,8 @@ import type { ActionDefinition, AgentToolPayload, ParameterSchema, ResultFields 
 import type { ControlOptions } from '../openchamber-control/service.js';
 import type { ToolPermissions } from './permissions.js';
 
-export const CONTROL_MCP_TOOLS = ['openchamber_memory', 'openchamber_knowledge', 'openchamber_usage', 'openchamber_notify'];
+export const CONTROL_MCP_TOOLS = ['openchamber_memory', 'openchamber_knowledge', 'openchamber_usage', 'openchamber_notify', 'openchamber_control', 'openchamber_schedule', 'openchamber_terminal'];
+export const controlMcpPermission = (name: string) => name === 'control' ? 'openchamber' : `openchamber_${name}`;
 export interface ControlMcpTool {
   name: string;
   description: string;
@@ -62,6 +63,10 @@ export function createControlMcpRuntime(
         const revived = jsonString.pipe(z.array(z.json())).safeParse(args.dependsOn);
         if (revived.success) args.dependsOn = revived.data;
       }
+      if (Object.hasOwn(tool.parameters, 'link')) {
+        const revived = jsonString.pipe(z.record(z.string(), z.unknown())).safeParse(args.link);
+        if (revived.success) args.link = revived.data;
+      }
       for (const [field, schema] of Object.entries(tool.parameters)) {
         if (schema.type !== 'boolean') continue;
         if (args[field] === 'true') args[field] = true;
@@ -72,8 +77,9 @@ export function createControlMcpRuntime(
       const untrack = trackInflight(context.sessionID, controller);
       const signal = AbortSignal.any([context.signal, controller.signal]);
       try {
-        await (await permissions.session(context.sessionID)).assert({ action: `openchamber_${tool.name}`, resources: ['*'], save: ['*'] }, signal);
-        const result = await execute({ tool: `openchamber_${tool.name}`, input: args, sessionID: context.sessionID, callID: context.callID }, { signal });
+        const permission = controlMcpPermission(tool.name);
+        await (await permissions.session(context.sessionID)).assert({ action: permission, resources: ['*'], save: ['*'] }, signal);
+        const result = await execute({ tool: permission, input: args, sessionID: context.sessionID, callID: context.callID }, { signal });
         signal.throwIfAborted();
         return { structuredContent: result, content: [{ type: 'text', text: JSON.stringify(result) }] };
       } finally { untrack(); }
@@ -94,11 +100,14 @@ export function controlMcpSetup(titles: Record<string, string>) {
     const controlTools = new Set(${JSON.stringify(CONTROL_MCP_TOOLS)})
     await ctx.tool.transform(tools => {
       for (const name of controlTools) tools.update(name, tool => {
+        const permission = name === 'openchamber_control' ? 'openchamber' : name
+        tool.options = { ...tool.options, permission }
         const execute = tool.execute
         tool.execute = async (input, context) => {
+          const titles = ${JSON.stringify(titles)}
+          await context.progress({ [permission]: { schemaVersion: 1, action: input.action, description: titles[input.action] ?? input.action } })
           const result = await execute(input, context)
           const output = result.output
-          const titles = ${JSON.stringify(titles)}
           result.metadata = { ...result.metadata, openchamber: {
             schemaVersion: 1, action: output.action, description: titles[output.action] ?? output.action, ok: output.ok,
           } }

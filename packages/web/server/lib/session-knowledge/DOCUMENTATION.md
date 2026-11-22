@@ -140,7 +140,7 @@ hosted mobile and Capacitor use the server sync above.
 
 ## When to link
 
-A session whose agent has the managed `openchamber` tool (the setting is on and
+A session whose agent has the managed `openchamber_control` tool (the setting is on and
 OpenChamber launched OpenCode) is also told when to link an issue or change to
 it with `session.link` (`SESSION_LINK_GUIDANCE`), and only here: the tool's
 description does not repeat it. Stated only in the action's description it went unread: an
@@ -149,8 +149,8 @@ tool, so it never linked anything. It goes into `openchamber.guidance`.
 
 The same sessions are told how to hand work to another session
 (`DISPATCH_GUIDANCE`). Every guidance line that names an action of the
-`openchamber` tool names `tools.openchamber` inside `execute`, and the direct
-`openchamber` tool when `execute` is unavailable. Told only "the openchamber tool", an agent looked for a direct tool
+`openchamber_control` tool names `tools.openchamber.control` inside `openchamber_execute`, and the direct
+`openchamber_control` tool when `execute` is unavailable. Told only "the openchamber tool", an agent looked for a direct tool
 of that name, found `openchamber_secret` and `openchamber_render`, and called
 those again and again (#6608). The guidance also sends part of the
 agent's own task to its subagent tool, so a dispatch stays something the user
@@ -164,7 +164,7 @@ plain folders keep their session titles without an agent naming instruction.
 Eligibility is read for the current directory on every send; a failed read
 withholds the naming guidance.
 
-While the agent has the managed `openchamber` tool, `openchamber.checkout`
+While the agent has the managed `openchamber_control` tool, `openchamber.checkout`
 names the session's directory and the branch checked out there
 (`readCheckoutBranch`, read on every send). An agent once went on editing on a
 branch another session had switched the shared checkout to while it was
