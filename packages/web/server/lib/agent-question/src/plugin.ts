@@ -41,6 +41,12 @@ export const createQuestionPluginSource = () => `export default {
       })
       tools.update('request_user_input_async', tool => {
         tool.options = { ...tool.options, permission: 'question' }
+        const execute = tool.execute
+        tool.execute = async (input, context) => {
+          const result = await execute(input, context)
+          result.metadata = { ...result.metadata, questionID: result.output.question_id }
+          return result
+        }
       })
     })
     await ctx.mcp.transform(servers => {
@@ -48,10 +54,6 @@ export const createQuestionPluginSource = () => `export default {
         type: 'remote', url: endpoint, oauth: false, codemode: false,
         headers: { authorization: 'Bearer ' + process.env.OPENCHAMBER_AGENT_TOOL_TOKEN },
       })
-    })
-    await ctx.tool.hook('execute.after', async event => {
-      if (event.status !== 'completed' || event.tool !== 'request_user_input_async') return
-      event.result.metadata = { ...event.result.metadata, questionID: event.result.output.question_id }
     })
   },
 }

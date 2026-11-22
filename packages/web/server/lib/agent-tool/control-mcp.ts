@@ -92,12 +92,18 @@ export function controlMcpSetup(titles: Record<string, string>) {
       })
     })
     const controlTools = new Set(${JSON.stringify(CONTROL_MCP_TOOLS)})
-    await ctx.tool.hook('execute.after', async event => {
-      if (event.status !== 'completed' || !controlTools.has(event.tool)) return
-      const result = event.result.output
-      const titles = ${JSON.stringify(titles)}
-      event.result.metadata = { ...event.result.metadata, openchamber: {
-        schemaVersion: 1, action: result.action, description: titles[result.action] ?? result.action, ok: result.ok,
-      } }
+    await ctx.tool.transform(tools => {
+      for (const name of controlTools) tools.update(name, tool => {
+        const execute = tool.execute
+        tool.execute = async (input, context) => {
+          const result = await execute(input, context)
+          const output = result.output
+          const titles = ${JSON.stringify(titles)}
+          result.metadata = { ...result.metadata, openchamber: {
+            schemaVersion: 1, action: output.action, description: titles[output.action] ?? output.action, ok: output.ok,
+          } }
+          return result
+        }
+      })
     })`;
 }

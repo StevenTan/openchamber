@@ -30,35 +30,35 @@ async function fixture() {
   cleanup.push(async () => { await runtime.closeCommands(); await new Promise(resolve => listener.close(resolve)); });
   for (const [key, value] of Object.entries(runtime.createChildEnv())) vi.stubEnv(key, value);
   cleanup.push(() => vi.unstubAllEnvs());
-  const hooks = new Map(), removed = [], registered = new Map();
+  const transforms = [], removed = [], registered = new Map();
   let config;
   await plugin.setup({
     location: { directory, project: { directory } }, permission: { assert: approve },
     mcp: { transform: async run => run({ set: (name, value) => { config = { name, ...value }; } }) },
     tool: {
-      transform: async run => run({ remove: name => removed.push(name), update: (name, change) => { const tool = {}; change(tool); registered.set(name, tool); } }),
-      hook: async (name, run) => hooks.set(name, run),
+      transform: async run => transforms.push(run),
     },
   });
   const client = new Client({ name: 'file-test', version: '1' });
   const transport = new StreamableHTTPClientTransport(new URL(config.url), { requestInit: { headers: config.headers } });
   cleanup.push(async () => { await transport.terminateSession(); await client.close(); });
   await client.connect(transport);
-  const invoke = async (name, input) => {
-    const context = { sessionID: 'session', agent: 'build', messageID: 'message', id: crypto.randomUUID(), tool: `file_${name}`, input };
-    const result = await client.callTool({ name, arguments: input, _meta: { 'ai.opencode/sessionID': 'session' } });
-    if (result.isError) throw new Error(result.content.map(part => part.text).join('\n'));
-    const event = { ...context, status: 'completed', result: { output: result.structuredContent } };
-    await hooks.get('execute.after')(event);
-    return { ...result, metadata: event.result.metadata };
-  };
+  for (const tool of (await client.listTools()).tools) registered.set(`file_${tool.name}`, {
+    execute: async (input, context) => {
+      const result = await client.callTool({ name: tool.name, arguments: input, _meta: { 'ai.opencode/sessionID': context.sessionID } });
+      if (result.isError) throw new Error(result.content.map(part => part.text).join('\n'));
+      return { ...result, output: result.structuredContent };
+    },
+  });
+  for (const transform of transforms) transform({ remove: name => removed.push(name), update: (name, change) => change(registered.get(name)) });
+  const invoke = (name, input) => registered.get(`file_${name}`).execute(input, { sessionID: 'session', agent: 'build', messageID: 'message', id: crypto.randomUUID() });
   return { directory, client, invoke, approve, removed, registered, config };
 }
 
 it.each(['body', 'complete'])('discovers shared file tools, preserves edit previews and applies %s patches with recorded file diffs', async format => {
   const f = await fixture();
   expect(f.config).toMatchObject({ name: 'file', codemode: false, oauth: false });
-  expect(f.removed).toEqual(['read', 'write', 'edit', 'patch']);
+  expect(f.removed).toEqual(['read', 'write', 'edit', 'patch', 'glob', 'grep']);
   const tools = (await f.client.listTools()).tools;
   expect(tools.map(tool => tool.name)).toEqual(['write', 'edit', 'patch', 'view_image']);
   expect(tools.find(tool => tool.name === 'patch').inputSchema.properties.patchText.description).toContain('The tool supplies the outer');

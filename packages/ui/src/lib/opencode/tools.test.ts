@@ -33,6 +33,9 @@ import {
 import type { Metadata, ToolInput, ToolState } from "./model"
 
 describe("tool identity", () => {
+  test("recognizes the OpenChamber script tool", () => {
+    expect(normalizeToolName("openchamber_execute")).toBe("execute")
+  })
   test("recognizes the v2 names, not the v1 ones", () => {
     expect(isShellTool("shell")).toBe(true)
     expect(isShellTool("bash")).toBe(false)

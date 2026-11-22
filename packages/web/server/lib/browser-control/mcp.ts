@@ -5,7 +5,6 @@ import { createMcpRuntime } from '../agent-tool/mcp.js';
 import type { AgentToolInput, AgentToolPayload, ResultFields } from '../agent-tool/runtime.js';
 import type { ControlOptions } from '../openchamber-control/service.js';
 import { getPlaywrightToolDefinitions } from './playwright.js';
-import { BROWSER_MCP_TOOLS } from './tools.js';
 import type { ResolveMcpContext } from '../agent-tool/mcp-context.js';
 import type { ToolPermissions } from '../agent-tool/permissions.js';
 
@@ -68,13 +67,18 @@ export function browserMcpSetup(titles: Record<string, string>) {
         headers: { authorization: 'Bearer ' + process.env.OPENCHAMBER_AGENT_TOOL_TOKEN },
       })
     })
-    const browserTools = new Set(${JSON.stringify(BROWSER_MCP_TOOLS)})
-    await ctx.tool.hook('execute.after', async event => {
-      if (event.status !== 'completed' || event.tool !== 'browser_panel') return
-      const result = event.result.output
-      const titles = ${JSON.stringify(titles)}
-      event.result.metadata = { ...event.result.metadata, openchamber: {
-        schemaVersion: 1, action: result.action, description: titles[result.action] ?? result.action, ok: result.ok,
-      } }
+    await ctx.tool.transform(tools => {
+      tools.update('browser_panel', tool => {
+        const execute = tool.execute
+        tool.execute = async (input, context) => {
+          const result = await execute(input, context)
+          const output = result.output
+          const titles = ${JSON.stringify(titles)}
+          result.metadata = { ...result.metadata, openchamber: {
+            schemaVersion: 1, action: output.action, description: titles[output.action] ?? output.action, ok: output.ok,
+          } }
+          return result
+        }
+      })
     })`;
 }

@@ -14,12 +14,18 @@ const harness = async (storage = new Map(), directory) => {
   const pluginDirectory = await materializeTurnDiffPlugin({ fsPromises: fs, path, instanceDir: directory });
   const { default: plugin } = await import(pathToFileURL(path.join(pluginDirectory, 'index.js')).href);
   const hooks = {}, handlers = {};
+  const mutations = new Map();
+  const tools = new Map(['write', 'edit', 'patch', 'file_write', 'file_edit', 'file_patch'].map(id => [id, {
+    id, execute: (_input, context) => mutations.get(context.id)(),
+  }]));
   let turnID = 'user-1', failWrite = false, context;
   const events = [];
   let wake;
   const ctx = {
     location: { directory },
-    tool: { hook: async (name, run) => { hooks[name] = run; } },
+    tool: { hook: async (name, run) => { hooks[name] = run; }, transform: async run => run({
+      list: () => [...tools.values()], update: (id, change) => change(tools.get(id)),
+    }) },
     session: { context: async () => context ?? [{ type: 'user', id: turnID }, { type: 'assistant', id: 'assistant' }], get: async () => ({}) },
     storage: {
       get: async (key) => structuredClone(storage.get(key)),
@@ -47,6 +53,11 @@ const harness = async (storage = new Map(), directory) => {
   let callID = 0;
   const tool = async (name, input, mutate, status = 'completed', identity = {}) => {
     const event = { tool: name, input, id: `call-${++callID}`, messageID: 'assistant', sessionID: 'session', ...identity };
+    if (tools.has(name)) {
+      mutations.set(event.id, async () => { await mutate(); if (status !== 'completed') throw new Error('File operation failed'); return {}; });
+      const result = await tools.get(name).execute(input, event).catch(error => error);
+      return result.metadata?.openchamberTurnDiff;
+    }
     await hooks['execute.before'](event);
     await mutate();
     const result = {};
@@ -58,7 +69,14 @@ const harness = async (storage = new Map(), directory) => {
   };
   return {
     directory, storage, stop, tool,
-    begin: (name, input, identity) => hooks['execute.before']({ tool: name, input, messageID: 'assistant', sessionID: 'session', ...identity }),
+    begin: (name, input, identity) => {
+      const event = { tool: name, input, messageID: 'assistant', sessionID: 'session', ...identity };
+      if (!tools.has(name)) return hooks['execute.before'](event);
+      return new Promise(resolve => {
+        mutations.set(event.id, () => { resolve(); return new Promise(() => {}); });
+        void tools.get(name).execute(input, event);
+      });
+    },
     read: (id = turnID, sessionID = 'session') => handlers.read({ sessionID, turnID: id }),
     turn: (id) => { turnID = id; },
     context: (messages) => { context = messages; },
@@ -79,12 +97,12 @@ describe('recorded turn file diffs', () => {
     expect(record.files[0]).toMatchObject({ file: 'code.txt', additions: 1, deletions: 1 });
     expect(record.files[0].patch).toContain('-before\n+after');
   });
-  it('publishes script file changes on the outer execute result', async () => {
+  it.each(['execute', 'openchamber_execute'])('publishes script file changes on the outer %s result', async name => {
     const h = await harness();
     const file = path.join(h.directory, 'code.txt');
     await fs.writeFile(file, 'before\n');
     const identity = { id: 'script' };
-    const metadata = await h.tool('execute', { code: 'write file' }, async () => {
+    const metadata = await h.tool(name, { code: 'write file' }, async () => {
       await h.tool('write', { path: file }, () => fs.writeFile(file, 'after\n'), 'completed', identity);
     }, 'completed', identity);
     expect(metadata.files).toEqual([{ file: 'code.txt', status: 'modified', additions: 1, deletions: 1 }]);

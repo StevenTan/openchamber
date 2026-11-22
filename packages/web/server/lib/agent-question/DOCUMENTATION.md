@@ -19,8 +19,7 @@ independent work can continue while the question is pending.
 Each MCP invocation receives its session, request identity and cancellation signal
 through the injected shared context resolver. OpenCode's adapter reads its
 `ai.opencode/sessionID` metadata. The MCP service checks the shared
-`question` permission. The plugin supplies question ID activity metadata. The tool is called directly
-and is excluded from the Code Mode catalog.
+`question` permission. The plugin supplies question ID activity metadata. Direct and Code Mode calls share the registered executor and its question metadata.
 
 The UI groups pending asynchronous requests by their owning session. Fields retain
 their request IDs, answers stay in the client draft while the user switches

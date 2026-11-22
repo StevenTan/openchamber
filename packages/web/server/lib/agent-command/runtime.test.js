@@ -46,10 +46,10 @@ beforeEach(async () => {
   const plugin = await import(pathToFileURL(path.join(directory, 'index.js')).href);
   approvals = vi.fn(async () => {});
   registered = new Map([['shell', {}]]);
-  const hooks = new Map();
+  const transforms = [];
   await plugin.default.setup({
     location: { directory: root }, permission: { assert: approvals },
-    tool: { transform: async transform => transform({ remove: id => registered.delete(id), namespace: () => {}, add: tool => registered.set(tool.options.namespace ? `${tool.options.namespace}_${tool.name}` : tool.name, tool) }), hook: async (name, handler) => hooks.set(name, handler) },
+    tool: { transform: async transform => transforms.push(transform) },
     mcp: { transform: async transform => transform({ set: (name, config) => { mcpConfig = { name, ...config }; } }) },
   });
   nativeClient = new Client({ name: 'opencode', version: '2.3.2' });
@@ -65,11 +65,11 @@ beforeEach(async () => {
         const response = await mcpCall(nativeClient, tool.name, event.input, caller);
         if (response.isError) throw new Error(response.content.map(part => part.text).join('\n'));
         const result = { output: response.structuredContent, content: response.content };
-        await hooks.get('execute.after')({ ...event, status: 'completed', result });
         return result;
       },
     });
   }
+  for (const transform of transforms) transform({ remove: id => { registered.delete(id); tools.delete(id); }, update: (id, change) => change(tools.get(id.slice(mcpConfig.name.length + 1))) });
 });
 
 afterEach(async () => {

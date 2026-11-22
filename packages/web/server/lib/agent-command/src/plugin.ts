@@ -18,19 +18,19 @@ export default {
     }
     await ctx.tool.transform(tools => {
       tools.remove('shell')
-    })
-    await ctx.tool.hook('execute.after', async event => {
-      if (event.status === 'completed' && event.tool === commandServer + '_clock_sleep') {
-        event.result.metadata = { ...event.result.metadata, ...event.result.output }
-      }
-      if (event.status !== 'completed' || (event.tool !== executeTool && event.tool !== stdinTool)) return
-      const result = event.result.output
-      event.result.metadata = {
-        ...event.result.metadata,
-        status: result.status, session_id: result.session_id, truncated: result.truncated,
-        ...(result.status === 'completed' ? { exit_code: result.exit_code } : {}),
-        ...(event.tool === executeTool ? { command: event.input.cmd } : {}),
-      }
+      for (const name of [executeTool, stdinTool, commandServer + '_clock_sleep']) tools.update(name, tool => {
+        const execute = tool.execute
+        tool.execute = async (input, context) => {
+          const result = await execute(input, context)
+          const output = result.output
+          result.metadata = { ...result.metadata, ...(name === commandServer + '_clock_sleep' ? output : {
+            status: output.status, session_id: output.session_id, truncated: output.truncated,
+            ...(output.status === 'completed' ? { exit_code: output.exit_code } : {}),
+            ...(name === executeTool ? { command: input.cmd } : {}),
+          }) }
+          return result
+        }
+      })
     })
     await ctx.mcp.transform(servers => {
       servers.set(commandServer, {

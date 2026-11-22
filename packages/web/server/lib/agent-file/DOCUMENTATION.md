@@ -28,6 +28,8 @@ own plugins.
   completed paths; recorded turn diffs compare actual disk contents.
 - Writes apply the requested content. Project formatting commands run separately
   through command tools.
+- Text reading and file searches use command tools. Managed agents use shell
+  commands such as `cat`, `sed` and `rg` for those operations.
 - Mutation results contain a message and file diffs. The OpenCode after-hook
   supplies their activity metadata. Image results contain the resolved path and
   MIME type, with PNG, JPEG, GIF or WebP bytes carried as MCP image content.

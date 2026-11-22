@@ -109,15 +109,16 @@ const loadTools = async (dataDir, tag, hooks = {}, removed = [], namespaces = []
   const pluginModule = await import(`${pathToFileURL(entrypoint).href}?${tag}=${Date.now()}`);
   const registered = {};
   const mcpServers = new Map();
-  const toolHooks = new Map();
+  const transforms = [];
   await pluginModule.default.setup({
     mcp: { transform: async run => run({ set: (name, config) => mcpServers.set(name, config) }) },
     permission: { assert: vi.fn(async () => {}) },
     ...context,
     tool: {
-      hook: async (name, callback) => toolHooks.set(name, callback),
       transform: (edit) => {
+        transforms.push(edit);
         edit({
+          update: () => {},
           add: (tool) => { registered[tool.name] = tool; },
           remove: (id) => { removed.push(id); },
           namespace: (namespace) => { namespaces.push(namespace); },
@@ -147,15 +148,13 @@ const loadTools = async (dataDir, tag, hooks = {}, removed = [], namespaces = []
       registered[name] = { description: tool.description, input: tool.inputSchema, output: tool.outputSchema,
         options: { codemode: false, namespace: 'openchamber' },
         execute: async (input, context) => {
-          const event = { ...context, agent: 'build', messageID: 'message', id: crypto.randomUUID(), tool: name, input };
           const result = await client.callTool({ name: tool.name, arguments: input, _meta: { 'ai.opencode/sessionID': context.sessionID } });
           if (result.isError) throw new Error(result.content.map(part => part.text).join('\n'));
-          const after = { ...event, status: 'completed', result: { output: result.structuredContent } };
-          await toolHooks.get('execute.after')(after);
-          return { content: JSON.stringify(result.structuredContent), metadata: after.result.metadata };
+          return { output: result.structuredContent, content: JSON.stringify(result.structuredContent) };
         } };
     }
   }
+  for (const edit of transforms) edit({ add: () => {}, remove: () => {}, namespace: () => {}, update: (id, change) => { if (registered[id]) change(registered[id]); } });
   return registered;
 };
 

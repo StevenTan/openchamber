@@ -26,7 +26,13 @@ interface Context {
     scan(input: { prefix: string; after?: string }): Promise<{ entries: { key: `active:${string}`; value: Turn }[]; next?: string }>;
   };
   session: { context(input: { sessionID: string }): Promise<Message[]>; get(input: { sessionID: string }): Promise<void> };
-  tool: { hook(name: string, run: (event: HookEvent) => Promise<void>): Promise<void> };
+  tool: {
+    hook(name: string, run: (event: HookEvent) => Promise<void>): Promise<void>;
+    transform(run: (tools: {
+      list(): readonly { id: string }[];
+      update(id: string, change: (tool: { execute(input: HookEvent['input'], context: Call): Promise<{ metadata?: Tool.Metadata }> }) => void): void;
+    }) => void): Promise<void>;
+  };
   rpc: { register(description: typeof definition, handlers: { read(input: { sessionID: string; turnID: string }): Promise<TurnRecord | { version: number; sessionID: string; turnID: string; unavailable: boolean }> }): Promise<void> };
   event: { subscribe(input: { types: string[]; signal: AbortSignal }): AsyncIterable<{ type: string; data: { sessionID: string; reason?: string; assistantMessageID: string } }> };
 }
@@ -222,12 +228,7 @@ export default {
         await fs.rm(value.temporaryDirectory, { recursive: true, force: true });
       }
     };
-    await ctx.tool.hook('execute.before', async (event) => {
-      if (event.tool === 'execute') {
-        scripts.set(callKey(event), { sessionID: event.sessionID });
-        return;
-      }
-      if (!['write', 'edit', 'patch', 'file_write', 'file_edit', 'file_patch'].includes(event.tool)) return;
+    const beforeFile = async (event: Call & Pick<HookEvent, 'tool' | 'input'>) => {
       await serial(event.sessionID, async () => {
         const key = callKey(event);
         const capture = calls.get(key) ?? { sessionID: event.sessionID, pending: 0 };
@@ -254,9 +255,40 @@ export default {
           await ctx.storage.set(activeKey(event.sessionID, turn.turnID), turn);
         } catch (error) { capture.error = controlErrorFields(error)?.message; }
       });
+    };
+    const afterFile = async (event: Call, result: { metadata?: Tool.Metadata }) => {
+      await serial(event.sessionID, async () => {
+        const capture = calls.get(callKey(event));
+        if (!capture) return;
+        if (--capture.pending > 0) return;
+        const metadata = await settleCapture(callKey(event), capture);
+        result.metadata = { ...result.metadata, openchamberTurnDiff: metadata };
+      });
+    };
+    await ctx.tool.transform(tools => {
+      for (const tool of tools.list()) {
+        if (!['write', 'edit', 'patch', 'file_write', 'file_edit', 'file_patch'].includes(tool.id)) continue;
+        tools.update(tool.id, value => {
+          const execute = value.execute;
+          value.execute = async (input, context) => {
+            await beforeFile({ ...context, tool: tool.id, input });
+            const result = await execute(input, context).catch(async error => {
+              const failure: Pick<Tool.Result, 'metadata'> = {};
+              await afterFile(context, failure);
+              if (error instanceof Error) Object.assign(error, { metadata: failure.metadata });
+              throw error;
+            });
+            await afterFile(context, result);
+            return result;
+          };
+        });
+      }
+    });
+    await ctx.tool.hook('execute.before', async event => {
+      if (event.tool === 'execute' || event.tool === 'openchamber_execute') scripts.set(callKey(event), { sessionID: event.sessionID });
     });
     await ctx.tool.hook('execute.after', async (event) => {
-      if (event.tool === 'execute') {
+      if (event.tool === 'execute' || event.tool === 'openchamber_execute') {
         await serial(event.sessionID, async () => {
           const key = callKey(event);
           const capture = calls.get(key);
@@ -270,15 +302,6 @@ export default {
         });
         return;
       }
-      if (!['write', 'edit', 'patch', 'file_write', 'file_edit', 'file_patch'].includes(event.tool)) return;
-      await serial(event.sessionID, async () => {
-        const capture = calls.get(callKey(event));
-        if (!capture) return;
-        if (--capture.pending > 0) return;
-        const metadata = await settleCapture(callKey(event), capture);
-        const result = event.status === 'completed' ? event.result : event.error;
-        result.metadata = { ...result.metadata, openchamberTurnDiff: metadata };
-      });
     });
     await ctx.rpc.register(definition, {
       read: async ({ sessionID, turnID }) => serial(sessionID, async () => {

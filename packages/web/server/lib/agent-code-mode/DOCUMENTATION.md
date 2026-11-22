@@ -1,87 +1,73 @@
-# Native Code Mode catalog
+# OpenChamber Code Mode
 
 ## Ownership
 
-Managed OpenCode uses its native `execute` interpreter, validation, permissions,
-tool hooks and result processing. This plugin selects operation tools and supplies
-their complete descriptions and generated signatures before each model request.
-The pinned official `@opencode/codemode` dependency generates descriptors only.
+`execution.ts` owns script execution and call activity using the official
+`@opencode/codemode` confined interpreter. It consumes tool descriptions, schemas
+and executors without importing backend session types or transports. The fetch
+extension adapts the upstream OpenCode implementation under the module MIT license.
+
+The vendored tool runtime and wildcard matcher come from OpenCode v2.3.2:
+[tool runtime](https://github.com/anomalyco/opencode/blob/v2.3.2/packages/core/src/tool/runtime.ts),
+[empty input schema](https://github.com/anomalyco/opencode/blob/v2.3.2/packages/ai/src/tool.ts),
+[record predicate](https://github.com/anomalyco/opencode/blob/v2.3.2/packages/util/src/record.ts),
+[wildcard matcher](https://github.com/anomalyco/opencode/blob/v2.3.2/packages/core/src/util/wildcard.ts).
+They retain upstream runtime behavior with local type imports and the required
+helpers included. The adapter owns catalog placement, skill policy, activity and
+attachment forwarding.
+
+`plugin.ts` is the managed OpenCode adapter. It registers `openchamber_execute`,
+reads the live tool registry and applies the current agent and session permissions.
+MCP registrations include built-in services and user-installed servers. Their
+existing executors retain MCP connections, authentication and permission checks.
 
 ## Invariants
 
-- Operation tools enter native Code Mode. Page, secret, image, workflow and native
-  subagent cards keep direct entries because their UI reads the top-level call.
-  Asynchronous question forms and child-agent controls support script calls.
-  Command execution, continuation, sleep, session memory, file mutations and image viewing keep their native MCP direct entries.
-  Long-term memory, project knowledge, usage and notifications also keep native MCP direct entries.
-- Code Mode tools are pinned, so their native catalog listings include complete
-  parameter signatures.
-- The request catalog uses the registered schemas and descriptions, filtered by
-  the invoking agent and session's whole-tool permission rules. Resource-specific
-  permissions remain the original tool executor's responsibility.
-- The complete catalog replaces the `core/codemode` baseline source in outgoing
-  context. Other instruction sources retain their text. Each request names its
-  available direct tools separately. Disabling native `execute` retains OpenCode's
-  direct-call behavior.
-- A final request message identifies the complete system catalog as authoritative
-  for tool availability and parameter signatures. Persisted instruction notices
-  retain their other contents, including notices combining several sources.
-- The plugin runs on managed Web and Electron servers. Hosted and Capacitor clients
-  use their connected server; external OpenCode and VS Code own their plugins.
+- Each request supplies the complete tool descriptions and parameter signatures
+  in its system prefix. Script calls use the listed `tools` paths directly.
+  Tools with direct entries show that entry beside their JavaScript signature.
+  Namespace diagnostics retain path suggestions and refer to this complete catalog.
+  Scripts receive a local `tools` object containing registered roots and namespaces;
+  the local `search` binding is undefined. Tool discovery has no callable entry.
+- Commands, continuation, sleep, store/load, file operations, browser tools,
+  asynchronous questions and control MCP tools have direct and script entries.
+  Render, secrets, image generation, workflows and native subagent cards have
+  direct entries only.
+- Managed requests expose `openchamber_execute` as their script entry. Native
+  `execute` and its discovery instructions are excluded from those requests.
+- Whole-tool permission denies filter the script inventory on every invocation.
+  Individual tool executors own resource-specific approvals. Input decoding uses
+  the registered Effect, Standard Schema or JSON Schema contract.
+  The plugin imports Effect from the OpenCode host and decodes registered Effect
+  schemas directly, preserving their checks, defaults and transformations.
+  Tool definitions, argument decoding, output encoding and content normalization
+  use the copied OpenCode v2.3.2 tool runtime in `src/vendor/tool-runtime.ts`.
+  Permission and skill filters share the upstream wildcard matcher.
+- The interpreter uses tools for filesystem and process access. `fetch` retains
+  the native HTTP response methods, webfetch approval and redirect deny rules. Calls whose completion matters must be awaited; pending
+  calls stop when the script ends. Independent calls support `Promise.allSettled`.
+- Results preserve structured tool values. Script text is formatted once; this
+  module adds no output truncation. File content returned by tools is attached to
+  the outer result, so image viewing remains available inside scripts.
+- `toolCalls` carries live progress and `openchamberToolCalls` carries completed
+  inputs, outputs, metadata, errors and timing for shared UI projection. Each run
+  owns these records, including simultaneous calls with identical arguments.
+- File executors own their per-call metadata and turn diff capture for direct and
+  scripted calls. The turn-diffs plugin publishes the net change on the outer call.
+- Managed Web and Electron servers install the adapter. Hosted and Capacitor
+  clients use their connected server. External OpenCode and VS Code own their
+  plugin configuration.
 
-## Decisions
+## Skill policy
 
-### Native execution ownership
+Managed agents use file-backed skills. Request guidance excludes virtual
+`skill://` registrations while preserving permissions and automatic-invocation
+settings. Both direct and script skill loads reject virtual entries using the
+current registry. Context, compaction and transient generation share this policy.
+Explicit user skill attachments remain user-provided context.
 
-Catalog generation uses the official library while tool execution stays inside
-OpenCode, preserving its execution hooks and cancellation boundaries. Tool IDs,
-permissions and output contracts remain owned by their existing modules.
+## Catalog placement
 
-### Recorded call activity
-
-`call-activity.ts` records each ordinary inner call's input, timing, encoded text
-result, metadata and failure. Invocation-local markers keep simultaneous calls
-with identical arguments separate and are cleared before results are published.
-The native `execute.after` hook supplies encoded output; the wrapper preserves
-the executor's returned values and failure causes.
-
-The outer result carries these records in `openchamberToolCalls` for UI
-projection. Native `toolCalls` remains authoritative for script progress and
-calls rejected before execution. Dedicated direct cards retain their own path.
-Rich records settle with the outer after-hook. Native permission declines and
-interrupts bypass that hook; those scripts retain native activity and recorded
-turn diffs, without rich per-call results. Session terminal events clear pending
-capture state. The plugin does not write or replay model-facing messages.
-
-### File operation catalog
-
-Text and directory reads use command tools. The shared file MCP service owns
-`file_write`, `file_edit`, `file_patch` and `file_view_image`, with direct entries.
-Their descriptions and schemas come from MCP discovery. File permissions and
-activity metadata are supplied by the file policy plugin; recorded turn patches
-remain owned by the turn-diffs plugin.
-
-### Skill availability
-
-Managed agents use file-backed skills. The request hook supplies native-format
-skill guidance with virtual `skill://` entries excluded, preserving skill
-permissions and automatic-invocation settings. The `skill` before-hook rejects
-virtual entries using the current registry, including entries from plugins
-activated later. File-backed skills retain the native loader and its permissions.
-Registration remains owned by OpenCode; this policy governs model discovery and
-tool loading and does not rewrite plugin data or materialize virtual resources.
-The same directory policy covers compaction and transient generation. Current
-guidance takes precedence over persisted catalog notices. Explicit user skill
-attachments and existing transcript contents remain user-provided context.
-
-### Catalog placement
-
-Complete descriptions stay in the system prefix for prompt caching. A short
-reference after conversation history resolves the precedence of historical
-Code Mode notices without duplicating definitions or editing stored messages.
-
-### Session memory ownership
-
-The command MCP service owns session-local JSON snapshots and their lifecycle
-(`../agent-command/DOCUMENTATION.md`). The catalog keeps those tools on the
-native direct list alongside command execution and sleep.
+Complete definitions stay in the system prefix for prompt caching. A short
+reference after history identifies the current catalog as authoritative without
+duplicating definitions or editing stored messages.

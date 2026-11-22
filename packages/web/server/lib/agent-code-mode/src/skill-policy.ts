@@ -2,6 +2,7 @@ import { Effect } from "effect";
 import type { Skill } from "@opencode/schema/skill";
 import type { Permission } from "@opencode/schema/permission";
 import { Tool } from "@opencode/schema/tool";
+import { Wildcard } from "./vendor/wildcard.js";
 
 export interface SkillRegistry {
   list(): Effect.Effect<{ data: readonly Skill.Info[] }>;
@@ -15,17 +16,10 @@ interface SystemPart {
 
 const virtual = (skill: Skill.Info) => skill.path.startsWith("skill://");
 
-function match(input: string, pattern: string) {
-  let escaped = pattern.replaceAll("\\", "/").replace(/[.+^${}()|[\]\\]/g, "\\$&")
-    .replace(/\*/g, ".*").replace(/\?/g, ".");
-  if (escaped.endsWith(" .*")) escaped = escaped.slice(0, -3) + "( .*)?";
-  return new RegExp(`^${escaped}$`, process.platform === "win32" ? "si" : "s").test(input.replaceAll("\\", "/"));
-}
-
 export function filterVirtualSkillGuidance(system: SystemPart[], skills: readonly Skill.Info[], rules: Permission.Ruleset) {
   if (!skills.some(virtual)) return;
   const available = skills.filter(skill => !virtual(skill) && skill.description !== undefined && skill.autoinvoke !== false
-    && [...rules].reverse().find(rule => match("skill", rule.action) && match(skill.id, rule.resource))?.effect !== "deny")
+    && rules.findLast(rule => Wildcard.match("skill", rule.action) && Wildcard.match(skill.id, rule.resource))?.effect !== "deny")
     .sort((a, b) => a.id.localeCompare(b.id));
   const text = [
     "Skills provide specialized instructions and workflows for specific tasks.",

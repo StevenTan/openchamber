@@ -1,17 +1,17 @@
-import { CodeMode, Tool as CatalogTool } from "@opencode/codemode";
-import { Effect, Option, Predicate, Schema, Stream, type Types } from "effect";
-import { z } from "zod";
-import { $ZodType, toJSONSchema } from "zod/v4/core";
+import { Effect, Option, Schema, type Types } from "effect";
 import type { AgentApi, SessionApi } from "@opencode/client/effect/api";
 import type { Agent } from "@opencode/schema/agent";
 import type { Session } from "@opencode/schema/session";
-import type { Tool } from "@opencode/schema/tool";
+import { Tool } from "@opencode/schema/tool";
 import type { Permission } from "@opencode/schema/permission";
-import { createCallActivity } from "./call-activity.js";
+import { scriptRuntime, scriptOutput, type ScriptTool } from "./execution.js";
 import { FILE_MCP_TOOLS } from "../../agent-file/contracts.js";
 import { assertFileSkill, filterVirtualSkillGuidance, type SkillRegistry } from "./skill-policy.js";
 import { BROWSER_MCP_TOOLS } from "../../browser-control/tools.js";
 import { CONTROL_MCP_TOOLS } from "../../agent-tool/control-mcp.js";
+import { fetchExtension } from "./fetch.js";
+import { definition, execute, normalizedName } from "./vendor/tool-runtime.js";
+import { Wildcard } from "./vendor/wildcard.js";
 
 const directTools = new Set([
   "openchamber_render", "openchamber_secret", "openchamber_image",
@@ -24,9 +24,11 @@ const directTools = new Set([
   ...FILE_MCP_TOOLS,
   ...CONTROL_MCP_TOOLS,
 ]);
+const cardTools = new Set(["openchamber_render", "openchamber_secret", "openchamber_image", "openchamber_workflow", "openchamber_workflow_answer", "subagent"]);
+const executeName = "openchamber_execute";
 const skillInput = Schema.Struct({ id: Schema.String });
 
-type Registration = Pick<Tool.Info, "name" | "description" | "input" | "output" | "options"> & { id: string };
+type Registration = Tool.Info & { id: string };
 interface InstructionSource { key: string; text: string }
 interface SystemPart {
   type: "text";
@@ -43,93 +45,111 @@ interface Request {
 }
 interface PluginContext {
   agent: Pick<AgentApi, "get">;
+  permission: { assert(input: { sessionID: Session.ID; agent: Agent.ID; action: string; resources: string[]; save: string[]; metadata: { method: string; url: string }; source: { type: "tool"; messageID: Tool.Context["messageID"]; id: string } }): Effect.Effect<void, Tool.Error> };
   skill: SkillRegistry;
   session: Pick<SessionApi, "get"> & { hook(name: "context" | "compaction" | "generate", run: (event: Request) => Effect.Effect<void>): Effect.Effect<unknown> };
   tool: {
     list(): Effect.Effect<readonly Registration[]>;
     transform(run: (editor: {
       list(): readonly Registration[];
+      add(tool: Tool.Info): void;
       update(id: string, change: (tool: Types.Mutable<Pick<Tool.Info, "options" | "execute" | "description" | "input">>) => void): void;
     }) => void): Effect.Effect<unknown>;
     hook(name: "execute.before", run: (event: ToolEvent & { input: unknown }) => Effect.Effect<void, Tool.Error>): Effect.Effect<unknown>;
-    hook(name: "execute.after", run: (event: ToolEvent & (
-      { status: "completed"; input: unknown; result: { content?: Tool.Result["content"]; metadata?: Tool.Metadata } } | { status: "error"; error: { metadata?: Tool.Metadata } }
-    )) => Effect.Effect<void>): Effect.Effect<unknown>;
   };
-  event: { subscribe(input: { types: string[] }): Stream.Stream<{ data: { sessionID: string } }, unknown> };
 }
 
 function disabled(action: string, rules: Permission.Ruleset) {
-  const rule = [...rules].reverse().find(rule => {
-    const pattern = rule.action.replaceAll("\\", "/").replace(/[.+^${}()|[\]\\]/g, "\\$&")
-      .replace(/\*/g, ".*").replace(/\?/g, ".");
-    return new RegExp(`^${pattern}$`, process.platform === "win32" ? "si" : "s").test(action.replaceAll("\\", "/"));
-  });
+  const rule = rules.findLast(rule => Wildcard.match(action, rule.action));
   return rule?.resource === "*" && rule.effect === "deny";
 }
 
-function catalogSchema(value: Tool.Info["input"], io: "input" | "output"): CatalogTool.SchemaType {
-  if (Schema.isSchema(value)) return Schema.toJsonSchemaDocument(value).schema;
-  const convert = z.custom<(options: { target: string }) => z.core.JSONSchema.JSONSchema>(Predicate.isFunction);
-  const standard = z.object({ "~standard": z.object({ jsonSchema: z.object({ input: convert, output: convert }) }) });
-  const document = value instanceof $ZodType ? toJSONSchema(value, { target: "draft-2020-12", io })
-    : "~standard" in value ? standard.parse(value)["~standard"].jsonSchema[io]({ target: "draft-2020-12" }) : value;
-  return z.record(z.string(), z.unknown()).parse(document);
+function scriptTools(tools: readonly Registration[], invoke: (tool: Registration, input: Schema.Json) => ReturnType<ScriptTool["execute"]>): ScriptTool[] {
+  return tools.map(tool => {
+    const name = normalizedName(tool);
+    const path = tool.options?.namespace === undefined ? name : `${tool.options.namespace}.${name}`;
+    const child = definition(tool);
+    return { id: tool.id, path,
+      description: tool.description,
+      input: child.inputSchema,
+      output: child.outputSchema ?? Schema.NullOr(Schema.String),
+      execute: (input: Schema.Json) => invoke(tool, input),
+    };
+  });
 }
 
-function completeCatalog(tools: readonly Registration[]) {
-  const definitions = Object.fromEntries(tools.map(tool => {
-    const name = tool.name.replace(/[^a-zA-Z0-9_-]/g, "_");
-    const path = tool.options?.namespace === undefined ? name : `${tool.options.namespace}.${name}`;
-    return [path, CatalogTool.make({
-      description: tool.description,
-      input: catalogSchema(tool.input, "input"),
-      output: tool.output === undefined ? Schema.NullOr(Schema.String) : catalogSchema(tool.output, "output"),
-      execute: () => Effect.void,
-    })];
-  }));
-  const catalog = CodeMode.make({ tools: definitions }).catalog;
+function completeCatalog(tools: readonly ScriptTool[], direct: ReadonlySet<string>) {
+  const { catalog } = scriptRuntime(tools, () => Effect.void);
+  const directNames = new Map(tools.filter(tool => direct.has(tool.id)).map(tool => [tool.path, tool.id]));
   return [
     "# Code Mode",
-    "Call the tools below as JavaScript inside `execute`. This complete catalog defines tool availability for the current request.",
+    "Call the tools below as JavaScript inside `openchamber_execute` with { code }. This complete catalog supplies every available path, description and parameter signature; call these paths directly without a tool-discovery step.",
+    "A direct tool entry accepts JSON arguments as its own tool call. Inside JavaScript, use the exact tools path in the signature below. Each supported direct entry is named beside its script signature; both forms accept the same arguments.",
     "Await calls whose results matter. Run independent calls concurrently with Promise.allSettled; run dependent operations in order. Return the results the model needs.",
-    ...catalog.map(tool => `## ${tool.path}\n\n${tool.description}\n\n\`\`\`typescript\n${tool.signature}\n\`\`\``),
+    ...catalog.map(tool => {
+      const directName = directNames.get(tool.path);
+      return `## ${tool.path}\n\n${tool.description}${directName ? `\n\nDirect tool entry: \`${directName}\`. JavaScript call:` : ""}\n\n\`\`\`typescript\n${tool.signature}\n\`\`\``;
+    }),
   ].join("\n\n");
 }
 
 export default {
   id: "openchamber-code-mode",
   effect: (ctx: PluginContext) => Effect.gen(function* () {
-    const activity = createCallActivity();
+    const available = (registered: readonly Registration[], rules: Permission.Ruleset) => registered.filter(tool =>
+      tool.id !== executeName && !cardTools.has(tool.id) && !disabled(tool.options?.permission ?? tool.id, rules));
     yield* ctx.tool.transform(editor => {
       for (const tool of editor.list()) {
-        if (directTools.has(tool.id)) continue;
         editor.update(tool.id, value => {
-          value.options = { ...value.options, codemode: true, pinned: true };
-          value.execute = activity.wrap(tool.id, value.execute);
+          const { pinned: _pinned, ...options } = value.options ?? {};
+          value.options = { ...options, codemode: false };
         });
       }
+      editor.add({ name: executeName, options: { codemode: false, permission: "execute" },
+        description: "Run JavaScript to call tools from the complete Code Mode catalog. Pass { code }. Await calls whose results matter; use Promise.allSettled for independent calls. Return the results needed for reasoning. Pending calls stop when the script ends. Command and file tools also have direct entries. fetch(url, init?) returns a response with text(), json(), bytes(), status, ok, url and headers; it uses webfetch permissions.",
+        input: Schema.Struct({ code: Schema.String }), output: Schema.Json,
+        execute: (input, context) => Effect.gen(function* () {
+          const { code } = yield* Schema.decodeUnknownEffect(Schema.Struct({ code: Schema.String }))(input);
+          const [registered, session, agent] = yield* Effect.all([
+            ctx.tool.list(), ctx.session.get({ sessionID: context.sessionID }), ctx.agent.get({ agentID: context.agent }),
+          ], { concurrency: "unbounded" });
+          const rules = [...agent.data.permissions, ...session.permissions ?? []];
+          const tools = scriptTools(available(registered, rules), (tool, input) => Effect.gen(function* () {
+            if (tool.id === "skill") {
+              const { id } = yield* Schema.decodeUnknownEffect(skillInput)(input);
+              yield* assertFileSkill(ctx.skill, id);
+            }
+            let metadata: Tool.Metadata = {};
+            const result = yield* execute(tool, input, { ...context, progress: value => Effect.sync(() => { metadata = { ...metadata, ...value }; }) });
+            const content = result.content;
+            const text = content.filter(part => part.type === "text").map(part => part.text).join("\n");
+            return { value: yield* Schema.decodeUnknownEffect(Schema.Json)(result.output === undefined ? text || null : result.output),
+              text, metadata: yield* Schema.decodeUnknownEffect(Schema.JsonObject)(JSON.parse(JSON.stringify({ ...metadata, ...result.metadata }))),
+              files: content.filter(part => part.type === "file"),
+            };
+          }));
+          const network = fetchExtension((url, metadata) => ctx.permission.assert({
+            sessionID: context.sessionID, agent: context.agent, action: "webfetch", resources: [url], save: ["*"], metadata,
+            source: { type: "tool", messageID: context.messageID, id: context.id },
+          }), url => {
+            const rule = rules.findLast(rule => Wildcard.match("webfetch", rule.action) && Wildcard.match(url, rule.resource));
+            return rule?.effect === "deny" ? Effect.fail(new Error(`Permission denied: webfetch ${url}`)) : Effect.void;
+          });
+          const { result, calls, files } = yield* scriptRuntime(tools, calls => context.progress({ toolCalls: calls }), [network]).execute(code);
+          const output = scriptOutput(result);
+          return { output: yield* Schema.decodeUnknownEffect(Schema.Json)(result),
+            content: [{ type: "text" as const, text: output }, ...files],
+            metadata: { toolCalls: calls, openchamberToolCalls: calls },
+          };
+        }).pipe(Effect.mapError(error => new Tool.Error({ message: String(error) }))),
+      });
     });
     yield* ctx.tool.hook("execute.before", event => Effect.gen(function* () {
       if (event.tool === "skill") {
         const decoded = Schema.decodeUnknownOption(skillInput)(event.input);
         if (Option.isSome(decoded)) yield* assertFileSkill(ctx.skill, decoded.value.id);
       }
-      if (event.tool === "execute") activity.start(event);
     }));
-    yield* ctx.tool.hook("execute.after", event => Effect.sync(() => {
-      if (event.tool !== "execute") {
-        if (event.status === "completed") activity.complete(event, event.input, event.result);
-        return;
-      }
-      const calls = activity.finish(event);
-      const result = event.status === "completed" ? event.result : event.error;
-      if (calls?.length) result.metadata = { ...result.metadata, openchamberToolCalls: calls };
-    }));
-    yield* ctx.event.subscribe({ types: ["session.execution.succeeded", "session.execution.failed", "session.execution.interrupted", "session.deleted"] }).pipe(
-      Stream.runForEach(event => Effect.sync(() => activity.clear(event.data.sessionID))),
-      Effect.forkScoped({ startImmediately: true }),
-    );
     for (const name of ["context", "compaction", "generate"] as const) yield* ctx.session.hook(name, event => Effect.gen(function* () {
       const [registered, session, agent, skills] = yield* Effect.all([
         ctx.tool.list(), ctx.session.get({ sessionID: event.sessionID }), ctx.agent.get({ agentID: event.agent }), ctx.skill.list(),
@@ -141,10 +161,9 @@ export default {
           "Use the current system skill directory for available skills; it supersedes historical skill catalog notices. Only file-backed skills are available through the skill tool.",
         }] });
       }
-      if (!event.tools.execute) return;
-      const tools = registered.filter(tool => tool.options?.codemode !== false
-        && !disabled(tool.options?.permission ?? tool.id, rules));
-      const text = completeCatalog(tools);
+      delete event.tools.execute;
+      if (!event.tools[executeName]) return;
+      const tools = available(registered, rules);
       for (const part of event.system) {
         const sources = part.metadata?.experimental?.instructions;
         if (!sources?.some(source => source.key === "core/codemode")) continue;
@@ -153,7 +172,9 @@ export default {
         } };
         part.text = sources.filter(source => source.key !== "core/codemode").map(source => source.text).join("\n\n");
       }
-      const direct = Object.keys(event.tools).filter(name => name !== "execute");
+      for (const tool of registered) if (tool.id !== executeName && !directTools.has(tool.id)) delete event.tools[tool.id];
+      const direct = Object.keys(event.tools).filter(name => name !== executeName);
+      const text = completeCatalog(scriptTools(tools, () => Effect.die("Catalog only")), new Set(direct));
       event.system.push({ type: "text", text: text + (direct.length ? `\n\nDirect tools: ${direct.join(", ")}. Call these through their own tool entries.` : "") });
       event.messages.push({ role: "system", content: [{ type: "text", text:
         "Use the complete Code Mode catalog in this request's system instructions for current tool availability and parameter signatures; it supersedes historical Code Mode catalog notices.",

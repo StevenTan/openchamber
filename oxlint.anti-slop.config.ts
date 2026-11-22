@@ -31,6 +31,7 @@ export default defineConfig({
     "packages/web/server/lib/agent-command/src/vendor/**",
     "packages/web/server/lib/agent-command/src/process-detection.ts",
     "packages/web/server/lib/agent-search/src/vendor/**",
+    "packages/web/server/lib/agent-code-mode/src/vendor/**",
   ],
   jsPlugins: [
     { name: "anti-slop", specifier: "./tools/oxlint/anti-slop/index.ts" },

@@ -80,7 +80,7 @@ External OpenCode and VS Code lifecycles receive no plugin injection.
   events end it early. Tool cancellation, session deletion and server shutdown reject pending sleeps,
   clear timers and cancel outstanding inbox queries. Inbox-query and event-stream
   failures surface as tool errors. Results contain `duration_ms`,
-  `wall_time_seconds` and `interrupted`; the native after-hook also records these
+  `wall_time_seconds` and `interrupted`; the registered executor also records these
   fields as activity metadata.
 - `store({ key, value })` saves a JSON snapshot and returns `{ key }`.
   `load({ key })` returns `{ value: savedValue }` containing a copy of the snapshot,
@@ -90,7 +90,8 @@ External OpenCode and VS Code lifecycles receive no plugin injection.
 
 Command tools expose their result object in MCP `structuredContent` alongside
 display text. OpenCode's native MCP tool executor preserves that object in tool
-output. The after-execution hook records command status and handles for activity.
+output. The registered executor records command status and handles for direct and scripted
+activity.
 
 ## Decisions
 

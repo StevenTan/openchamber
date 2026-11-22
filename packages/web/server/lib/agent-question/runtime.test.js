@@ -57,9 +57,8 @@ describe('asynchronous questions', () => {
     const directory = await runtime.materializePlugin(f.dataDir);
     const { default: plugin } = await import(pathToFileURL(path.join(directory, 'index.js')).href);
     let config;
-    const hooks = new Map();
     const approve = vi.fn(async () => {});
-    const asyncTool = { options: { codemode: false } };
+    const asyncTool = { options: { codemode: false }, execute: async input => ({ output: input }) };
     const nativeQuestion = { description: 'Native question usage notes', input: {}, execute: vi.fn() };
     const originalQuestion = { ...nativeQuestion };
     let listener;
@@ -79,7 +78,6 @@ describe('asynchronous questions', () => {
       mcp: { transform: async run => run({ set: (name, value) => { config = { name, ...value }; } }) },
       tool: {
         transform: async run => run({ update: (name, change) => change(name === 'question' ? nativeQuestion : asyncTool) }),
-        hook: async (name, run) => hooks.set(name, run),
       },
     });
     expect(nativeQuestion.description).toContain('Waits for the user to answer before returning.');
@@ -115,8 +113,7 @@ describe('asynchronous questions', () => {
     expect(first.question_id).not.toBe(second.question_id);
     expect([...f.forms.values()].map(form => form.fields[0].title)).toEqual(['First question', 'Second question']);
     expect(f.delivered.size).toBe(0);
-    const result = { output: first };
-    await hooks.get('execute.after')({ ...context, tool: 'request_user_input_async', status: 'completed', result });
+    const result = await asyncTool.execute(first, context);
     expect(result.metadata.questionID).toBe(first.question_id);
     const other = await call('Other session', 'ses_2');
     expect(f.forms.get(other.structuredContent.question_id).sessionID).toBe('ses_2');

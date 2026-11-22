@@ -73,8 +73,9 @@ search, page opening, text lookup and link traversal. It requires a proxy that
 supports this protocol and uses the invoking model's provider API key. The
 `web.run` tool returns backend text and preserves structured results in metadata.
 
-Managed operation tools use native Code Mode with complete descriptions and
-parameter signatures. Tools that render dedicated cards keep direct entries.
+Managed operation tools use OpenChamber Code Mode with complete descriptions and
+parameter signatures. Command and file MCP tools support direct and script calls.
+Tools that render dedicated cards keep direct entries.
 
 The bundled OpenCode server provides `collaboration` tools for listing agents,
 sending tasks and messages, waiting for idle, and interrupting agents in the

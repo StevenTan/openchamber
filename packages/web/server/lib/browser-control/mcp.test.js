@@ -10,7 +10,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createAgentToolRuntime } from '../agent-tool/runtime.js';
 
-let root, runtime, listener, client, transport, env, config, executeAction, hooks, approve;
+let root, runtime, listener, client, transport, env, config, executeAction, panelTool, approve;
 const caller = { sessionID: 'session-a', agent: 'build', messageID: 'message-a', id: 'call-a' };
 
 beforeEach(async () => {
@@ -30,12 +30,11 @@ beforeEach(async () => {
   for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
   const directory = await runtime.materializePlugin({ includeControl: false, includeMemory: false, includeWeb: true });
   const plugin = await import(pathToFileURL(path.join(directory, 'index.js')).href);
-  hooks = new Map();
+  panelTool = { execute: async (input, context) => ({ output: (await call('panel', input, context.sessionID)).structuredContent }) };
   approve = vi.fn(async () => {});
   await plugin.default.setup({
     tool: {
-      transform: async edit => edit({ add: () => { throw Error('Browser must use native MCP'); }, namespace: () => {} }),
-      hook: async (name, run) => hooks.set(name, run),
+      transform: async edit => edit({ update: (id, change) => change(panelTool) }),
     },
     permission: { assert: approve },
     mcp: { transform: async edit => edit({ set: (name, value) => { config = { name, ...value }; } }) },
@@ -90,8 +89,7 @@ it('preserves panel inputs, result envelopes and activity metadata', async () =>
   expect(executeAction.mock.lastCall[1].url).toBe('http://127.0.0.1:8900/nested');
   await call('panel', { action: 'browser.type', parameters: { selector: '#q', value: 'x', submit: 'true' } });
   expect(executeAction.mock.lastCall[1].submit).toBe(true);
-  const result = { output: opened.structuredContent };
-  await hooks.get('execute.after')({ ...caller, tool: 'browser_panel', status: 'completed', result });
+  const result = await panelTool.execute({ action: 'browser.open', url: 'http://127.0.0.1:8900/' }, caller);
   expect(result.metadata.openchamber).toMatchObject({ action: 'browser.open', ok: true, description: 'Open a page in the browser panel' });
 });
 
