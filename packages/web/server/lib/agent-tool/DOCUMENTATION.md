@@ -68,17 +68,16 @@ Session control and browser operations are independently enabled:
   It also names the temporary directory to save a screenshot in
   (`os.tmpdir()/opencode`) so it stays out of the project. How
   to ask on a page is the `awaitAnswer` input's description; `answerLater`,
-  a boolean the plugin normalizes like `awaitAnswer`, returns at once and is
-  not a wait here (no call registration, no `timeout: false`), see
+  a boolean the MCP service normalizes like `awaitAnswer`, returns at once
+  without registering a wait, see
   `../openchamber-control/DOCUMENTATION.md`.
   With `awaitAnswer` the call waits for the user's answer on the page. The
-  plugin sends the call id (`context.id`) with the callback so the server can
+  managed OpenCode adapter sends the call id (`context.id`) in MCP metadata so the server can
   find the waiting call when the chat answers it, and copies the answer into
   the call's metadata (`metadata.openchamber.answer`), so every client shows
-  the page as answered. The waiting callback sends Bun's `timeout: false`,
-  since Bun's fetch otherwise ends a request with no response after about six
-  minutes. While the call waits, OpenCode holds any chat message
-  for that session until the call returns, so the plugin registers a
+  the page as answered. The MCP client uses a 12-hour request timeout and
+  forwards cancellation. While the call waits, OpenCode holds any chat message
+  for that session until the call returns, so the adapter registers a
   `session.prompt` hook: the user's prompt for the session aborts the
   waiting call, which returns `{ answered: false, reason: "chat" }`, and the
   agent reads the message next. Two kinds of prompt leave the wait running.
@@ -86,8 +85,8 @@ Session control and browser operations are independently enabled:
   `openchamber.promptedBy` record `session.send` writes (a non-empty
   `sessionID`), or it is a run of OpenCode's own scheduler
   (`experimental.schedules`), an ordinary steer prompt marked
-  `schedule: { id }` with a non-empty `id` (`isAgentPrompt` in `render-page.js`, embedded with
-  `toString()`). The second has `delivery: "queue"`, which OpenCode delivers
+  `schedule: { id }` with a non-empty `id` (`isAgentPrompt` in `render-page.js`).
+  The second has `delivery: "queue"`, which OpenCode delivers
   only after the turn. The user can still move an undelivered prompt between
   queue and steer, also one sent as a steer before the page appeared, and
   OpenCode does that without running the prompt hook again. So the plugin
@@ -142,12 +141,12 @@ Session control and browser operations are independently enabled:
   `secret.request` is a
   card where the user types one secret the agent asked for (`label`, `reason`,
   optional `placeholder`). Both wait, and so does a `secret.forget` with
-  `saved: true`, which the user confirms on a card, with the same plugin machinery as a page
-  with `awaitAnswer` (call id, `timeout: false`, the `session.prompt` hook
+  `saved: true`, which the user confirms on a card. Its native plugin sends the
+  call id with `timeout: false` and registers the `session.prompt` hook
   that ends the wait when the user writes in the chat and leaves it running
   for an agent's or a queued prompt, the inbox events for the user's prompt
   moved to steer, and the inbox check
-  for a message sent before the card appeared). The value never
+  for a message sent before the card appeared. The value never
   travels through the call: the chat posts it to the server, which writes it
   to a private file, and the call returns only `{ status, file }`
   (`../openchamber-control/secret-request.js`). Direct, never behind Code
@@ -508,6 +507,10 @@ tools retain their `openchamber_*` names, settings and action result envelopes.
 The same MCP server exposes `control`, `schedule` and `terminal`, with direct
 names `openchamber_control`, `openchamber_schedule` and `openchamber_terminal`.
 Code Mode calls use `tools.openchamber.control`, `.schedule` and `.terminal`.
+It also exposes `render` and `image` as direct tools `openchamber_render` and
+`openchamber_image`. These card tools are excluded from the script catalog.
+The managed OpenCode adapter supplies their original call ids, cancellation,
+page-answer metadata and chat-reply handling through its scoped MCP client.
 Control keeps the `openchamber` permission action, including configured rules
 and saved approvals. Its execution uses the control action allowlist.
 The shared permission runtime checks access before invocation. Managed OpenCode

@@ -1529,6 +1529,9 @@ tool and forwards original call identity, progress and attachments. The
 `code-mode.ts` adapter invokes the turn-diffs capture RPC for scripted file
 operations. Backend-specific tools retain direct entries;
 `../agent-code-mode/DOCUMENTATION.md` owns the catalog contract.
+For direct render and image calls, the adapter supplies `openchamber/callID`
+metadata. `mcp-context.ts` resolves this original call id so page answers from
+the chat address the active wait. Calls without that metadata use the MCP request id.
 
 OpenChamber injects its own OpenCode plugins through a file it owns rather than
 through the process environment, because an environment variable cannot change

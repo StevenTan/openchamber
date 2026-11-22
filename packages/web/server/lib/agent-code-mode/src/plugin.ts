@@ -1,21 +1,29 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
-import { Effect, Option, Schema, type Types } from 'effect';
-import type { AgentApi, SessionApi } from '@opencode/client/effect/api';
+import { Effect, Option, Schema, Stream, type Types } from 'effect';
+import type { AgentApi, EventApi, SessionApi } from '@opencode/client/effect/api';
 import type { Agent } from '@opencode/schema/agent';
 import type { Session } from '@opencode/schema/session';
 import { Tool } from '@opencode/schema/tool';
 import { assertFileSkill, filterVirtualSkillGuidance, type SkillRegistry } from './skill-policy.js';
+import { controlMcpInput } from '../../agent-tool/control-mcp.js';
+import { isAgentPrompt, RENDER_PAGE_CLOSED_IN_CHAT_NOTE } from '../../openchamber-control/render-page.js';
+import { OPENCHAMBER_RENDER_ACTION_DEFINITIONS, OPENCHAMBER_IMAGE_ACTION_DEFINITIONS } from '../../openchamber-control/actions.js';
 
 interface InstructionSource { key: string; text: string }
 interface SystemPart { type: 'text'; text: string; metadata?: { experimental?: { instructions?: InstructionSource[] } } }
 interface Request { sessionID: Session.ID; agent: Agent.ID; system: SystemPart[]; tools: Record<string, { description: string }>; messages: Array<{ role: string; content: unknown[] }> }
+interface Prompt { sessionID: string; messageID: string; delivery?: string; metadata?: Parameters<typeof isAgentPrompt>[0] }
 interface PluginContext {
   location: { directory: string };
   agent: Pick<AgentApi, 'get'>;
   skill: SkillRegistry;
-  session: Pick<SessionApi, 'get'> & { hook(name: 'context' | 'compaction' | 'generate', run: (event: Request) => Effect.Effect<void>): Effect.Effect<unknown> };
+  session: Pick<SessionApi, 'get'> & {
+    hook(name: 'context' | 'compaction' | 'generate', run: (event: Request) => Effect.Effect<void>): Effect.Effect<unknown>;
+    hook(name: 'prompt', run: (event: Prompt) => Effect.Effect<void>): Effect.Effect<unknown>;
+  };
+  event: Pick<EventApi, 'subscribe'>;
   mcp: { transform(run: (servers: { set(name: string, config: { type: 'remote'; url: string; oauth: false; codemode: false; headers: { authorization: string } }): void }) => void): Effect.Effect<unknown> };
   tool: {
     transform(run: (editor: {
@@ -29,6 +37,10 @@ interface PluginContext {
 const executeName = 'openchamber_execute';
 const skillInput = Schema.Struct({ id: Schema.String });
 const object = Schema.decodeUnknownSync(Schema.JsonObject);
+const cardActions = new Map([
+  ['openchamber_render', OPENCHAMBER_RENDER_ACTION_DEFINITIONS[0]],
+  ['openchamber_image', OPENCHAMBER_IMAGE_ACTION_DEFINITIONS[0]],
+]);
 
 export default {
   id: 'openchamber-code-mode',
@@ -41,11 +53,61 @@ export default {
       await client.connect(new StreamableHTTPClientTransport(endpoint, { requestInit: { headers } }));
       return client;
     }), client => Effect.promise(() => client.close()));
+    const pagesWaitingForChat = new Map<string, Set<AbortController>>();
+    const pendingByUser = new Map<string, string>();
+    const endWaits = (sessionID: string) => {
+      for (const controller of pagesWaitingForChat.get(sessionID) ?? []) controller.abort();
+    };
+    yield* ctx.session.hook('prompt', event => Effect.sync(() => {
+      if (isAgentPrompt(event.metadata)) return;
+      pendingByUser.set(event.messageID, event.sessionID);
+      if (event.delivery !== 'queue') endWaits(event.sessionID);
+    }));
+    yield* Stream.runForEach(ctx.event.subscribe({ types: ['session.inbox.delivery.changed', 'session.inbox.delivered', 'session.inbox.cancelled', 'session.deleted'] }), event => Effect.sync(() => {
+      if (event.type === 'session.deleted') {
+        for (const [inboxID, sessionID] of pendingByUser) if (sessionID === event.data.sessionID) pendingByUser.delete(inboxID);
+        return;
+      }
+      if (event.type === 'session.inbox.delivery.changed') {
+        const sessionID = pendingByUser.get(event.data.inboxID);
+        if (sessionID && event.data.delivery === 'steer') endWaits(sessionID);
+      }
+      if (event.type === 'session.inbox.delivered' || event.type === 'session.inbox.cancelled') pendingByUser.delete(event.data.inboxID);
+    })).pipe(Effect.forkIn(yield* Effect.scope));
     yield* ctx.tool.transform(editor => {
       for (const tool of editor.list()) {
         editor.update(tool.id, value => {
           const { pinned: _pinned, ...options } = value.options ?? {};
           value.options = { ...options, codemode: false };
+          const card = cardActions.get(tool.id);
+          if (card) {
+            value.execute = (input, context) => Effect.tryPromise({ try: async signal => {
+              const args = controlMcpInput(object(input), card.action);
+              const chat = new AbortController();
+              const waiting = card.action === 'render.page' && (args.awaitAnswer === true || args.awaitAnswer === 'true');
+              const active = pagesWaitingForChat.get(context.sessionID) ?? new Set();
+              if (waiting) { active.add(chat); pagesWaitingForChat.set(context.sessionID, active); }
+              const metadata = { schemaVersion: 1, action: card.action, description: card.title };
+              await Effect.runPromise(context.progress(object({ [tool.id]: metadata })));
+              let output;
+              try {
+                const result = CallToolResultSchema.parse(await client.callTool({ name: tool.id.slice('openchamber_'.length), arguments: object(args), _meta: {
+                  'ai.opencode/sessionID': context.sessionID, 'openchamber/callID': context.id,
+                } }, CallToolResultSchema, { signal: AbortSignal.any([signal, chat.signal]), timeout: 43_200_000 }));
+                if (result.isError) throw new Error(result.content.filter(part => part.type === 'text').map(part => part.text).join('\n'));
+                output = object(result.structuredContent);
+              } catch (error) {
+                if (signal.aborted || !chat.signal.aborted) throw error;
+                output = { schemaVersion: 1, ok: true, action: card.action, data: { answer: { answered: false, reason: 'chat' }, note: RENDER_PAGE_CLOSED_IN_CHAT_NOTE } };
+              } finally {
+                active.delete(chat);
+                if (active.size === 0) pagesWaitingForChat.delete(context.sessionID);
+              }
+              const answer = object(output.data ?? {}).answer;
+              return { output, content: JSON.stringify(output), metadata: { openchamber: { ...metadata, ok: output.ok, ...answer !== undefined && { answer } } } };
+            }, catch: error => new Tool.Error({ message: String(error) }) });
+            return;
+          }
           if (tool.id !== executeName) return;
           value.options = { ...value.options, permission: 'execute' };
           value.execute = (input, context) => Effect.tryPromise({ try: async signal => {

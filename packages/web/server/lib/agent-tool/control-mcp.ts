@@ -7,7 +7,8 @@ import type { ActionDefinition, AgentToolPayload, ParameterSchema, ResultFields 
 import type { ControlOptions } from '../openchamber-control/service.js';
 import type { ToolPermissions } from './permissions.js';
 
-export const CONTROL_MCP_TOOLS = ['openchamber_memory', 'openchamber_knowledge', 'openchamber_usage', 'openchamber_notify', 'openchamber_control', 'openchamber_schedule', 'openchamber_terminal'];
+export const CONTROL_MCP_TOOLS = ['openchamber_memory', 'openchamber_knowledge', 'openchamber_usage', 'openchamber_notify', 'openchamber_control', 'openchamber_schedule', 'openchamber_terminal', 'openchamber_render', 'openchamber_image'];
+export const DIRECT_CONTROL_MCP_TOOLS = ['render', 'image'];
 export const controlMcpPermission = (name: string) => name === 'control' ? 'openchamber' : `openchamber_${name}`;
 export interface ControlMcpTool {
   name: string;
@@ -20,6 +21,22 @@ const jsonString = z.string().transform((value, context) => {
   try { return JSON.parse(value); }
   catch { context.addIssue({ code: 'custom', message: 'Invalid JSON' }); return z.NEVER; }
 });
+
+export function controlMcpInput(input: z.input<typeof inputSchema> | undefined, singleAction?: string) {
+  const { action, parameters, ...flattened } = inputSchema.parse(input);
+  const args = inputSchema.parse({ ...flattened, ...parameters, action });
+  if (singleAction) {
+    const revived = jsonString.pipe(inputSchema).safeParse(args.action);
+    if (revived.success) {
+      const { action: _action, parameters: nested, ...fields } = revived.data;
+      for (const [field, value] of Object.entries({ ...fields, ...nested })) {
+        if (!Object.hasOwn(args, field)) args[field] = value;
+      }
+    }
+    args.action = singleAction;
+  }
+  return args;
+}
 
 export function createControlMcpRuntime(
   getTools: () => ControlMcpTool[],
@@ -47,18 +64,7 @@ export function createControlMcpRuntime(
     server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
       const tool = getTools().find(tool => tool.name === request.params.name);
       if (!tool) throw new Error(`Unknown OpenChamber tool: ${request.params.name}`);
-      const { action, parameters, ...flattened } = inputSchema.parse(request.params.arguments);
-      const args = inputSchema.parse({ ...flattened, ...parameters, action });
-      if (tool.definitions.length === 1) {
-        const revived = jsonString.pipe(inputSchema).safeParse(args.action);
-        if (revived.success) {
-          const { action: _action, parameters: nested, ...fields } = revived.data;
-          for (const [field, value] of Object.entries({ ...fields, ...nested })) {
-            if (!Object.hasOwn(args, field)) args[field] = value;
-          }
-        }
-        args.action = tool.definitions[0]?.action;
-      }
+      const args = controlMcpInput(request.params.arguments, tool.definitions.length === 1 ? tool.definitions[0]?.action : undefined);
       if (Object.hasOwn(tool.parameters, 'dependsOn')) {
         const revived = jsonString.pipe(z.array(z.json())).safeParse(args.dependsOn);
         if (revived.success) args.dependsOn = revived.data;

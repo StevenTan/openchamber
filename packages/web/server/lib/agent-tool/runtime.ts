@@ -36,7 +36,6 @@ import {
 import { MAX_AGENTS_PER_RUN, MAX_CONCURRENT_AGENTS } from '../workflows/runtime.js';
 import {
   isAgentPrompt,
-  RENDER_PAGE_CLOSED_IN_CHAT_NOTE,
   RENDER_PAGE_IMAGE_BUDGET_BYTES,
   RENDER_PAGE_MAX_HTML_LENGTH,
   RENDER_PAGE_MAX_TITLE_LENGTH,
@@ -750,20 +749,11 @@ const CODE_MODE_CATALOG_LINES = {
 
 const OPENCODE_TOOLS_REPLACED_BY_CONTROL = ['opencode_worktree_create', 'opencode_models'];
 
-const createPluginSource = ({ includeControl, includeSchedule, includeWeb, includeMemory, includeKnowledge, includeNotify, includeRender, includeShare, includeImage, includeSecret, includeUsage, includeTerminal, includeWorkflow }: Required<PluginOptions>) => {
+const createPluginSource = ({ includeControl, includeSchedule, includeWeb, includeMemory, includeKnowledge, includeNotify, includeRender, includeImage, includeSecret, includeUsage, includeTerminal, includeWorkflow }: Required<PluginOptions>) => {
   const entries = [];
   if (includeControl) {
     entries.push(`    for (const id of ${JSON.stringify(OPENCODE_TOOLS_REPLACED_BY_CONTROL)}) tools.remove(id)
 `);
-  }
-  if (includeRender) {
-    entries.push(createToolEntry({
-      name: 'openchamber_render',
-      description: includeShare ? `${RENDER_TOOL_DESCRIPTION}${RENDER_TOOL_SHARE_SENTENCE}` : RENDER_TOOL_DESCRIPTION,
-      definitions: OPENCHAMBER_RENDER_ACTION_DEFINITIONS,
-      parameters: includeShare ? { ...RENDER_PARAMETER_PROPERTIES, share: RENDER_SHARE_PARAMETER } : RENDER_PARAMETER_PROPERTIES,
-      answers: { waitsWhen: 'args.awaitAnswer === true', closedInChatNote: RENDER_PAGE_CLOSED_IN_CHAT_NOTE },
-    }));
   }
   if (includeSecret) {
     entries.push(createToolEntry({
@@ -773,14 +763,6 @@ const createPluginSource = ({ includeControl, includeSchedule, includeWeb, inclu
       parameters: SECRET_PARAMETER_PROPERTIES,
       answers: { waitsWhen: '(args.action !== "secret.forget" && args.action !== "forget") || args.saved === true', closedInChatNote: SECRET_REQUEST_CLOSED_IN_CHAT_NOTE },
       secretRun: true,
-    }));
-  }
-  if (includeImage) {
-    entries.push(createToolEntry({
-      name: 'openchamber_image',
-      description: IMAGE_TOOL_DESCRIPTION,
-      definitions: OPENCHAMBER_IMAGE_ACTION_DEFINITIONS,
-      parameters: IMAGE_PARAMETER_PROPERTIES,
     }));
   }
   if (includeWorkflow) {
@@ -815,7 +797,7 @@ const secretRunCommandLine = ${secretRunCommandLine.toString()}
 // Session id -> abort controllers of the calls that wait for the user's answer
 // (a page, or a secret card).
 const pagesWaitingForChat = new Map()
-${includeRender || includeSecret ? `const isAgentPrompt = ${isAgentPrompt.toString()}
+${includeSecret ? `const isAgentPrompt = ${isAgentPrompt.toString()}
 const endWaits = (sessionID) => {
   for (const controller of pagesWaitingForChat.get(sessionID) ?? []) controller.abort()
 }
@@ -842,7 +824,7 @@ export default {
   setup: async (ctx) => {
     exemptCallbackFromProxy()
     await ctx.tool.transform((tools) => {
-${entries.join('')}    })${includeWeb ? browserMcpSetup(AGENT_TOOL_ACTION_TITLES) : ''}${includeMemory || includeKnowledge || includeUsage || includeNotify || includeControl || includeSchedule || includeTerminal ? controlMcpSetup(AGENT_TOOL_ACTION_TITLES) : ''}${includeRender || includeSecret ? `
+${entries.join('')}    })${includeWeb ? browserMcpSetup(AGENT_TOOL_ACTION_TITLES) : ''}${includeMemory || includeKnowledge || includeUsage || includeNotify || includeControl || includeSchedule || includeTerminal || includeRender || includeImage ? controlMcpSetup(AGENT_TOOL_ACTION_TITLES) : ''}${includeSecret ? `
     await ctx.session.hook("prompt", (event) => {
       // An agent's prompt is not the user writing, and a queued one arrives
       // only after the turn: the page keeps waiting for the user.
@@ -906,6 +888,8 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
       ...includeControl ? [{ name: 'control', description: CODE_MODE_CATALOG_LINES.openchamber + '\n\n' + CONTROL_TOOL_DESCRIPTION, definitions: OPENCHAMBER_AGENT_TOOL_ACTION_DEFINITIONS, parameters: CONTROL_PARAMETER_PROPERTIES }] : [],
       ...includeSchedule ? [{ name: 'schedule', description: CODE_MODE_CATALOG_LINES.openchamber_schedule + '\n\n' + SCHEDULE_TOOL_DESCRIPTION, definitions: OPENCHAMBER_SCHEDULE_ACTION_DEFINITIONS, parameters: SCHEDULE_PARAMETER_PROPERTIES }] : [],
       ...includeTerminal ? [{ name: 'terminal', description: CODE_MODE_CATALOG_LINES.openchamber_terminal + '\n\n' + TERMINAL_TOOL_DESCRIPTION, definitions: OPENCHAMBER_TERMINAL_ACTION_DEFINITIONS, parameters: TERMINAL_PARAMETER_PROPERTIES }] : [],
+      ...includeRender ? [{ name: 'render', description: includeShare ? `${RENDER_TOOL_DESCRIPTION}${RENDER_TOOL_SHARE_SENTENCE}` : RENDER_TOOL_DESCRIPTION, definitions: OPENCHAMBER_RENDER_ACTION_DEFINITIONS, parameters: includeShare ? { ...RENDER_PARAMETER_PROPERTIES, share: RENDER_SHARE_PARAMETER } : RENDER_PARAMETER_PROPERTIES }] : [],
+      ...includeImage ? [{ name: 'image', description: IMAGE_TOOL_DESCRIPTION, definitions: OPENCHAMBER_IMAGE_ACTION_DEFINITIONS, parameters: IMAGE_PARAMETER_PROPERTIES }] : [],
     ];
     await fsPromises.mkdir(pluginDirectory, { recursive: true });
     await fsPromises.writeFile(pluginManifestPath, PLUGIN_PACKAGE_JSON, { mode: 0o600 });

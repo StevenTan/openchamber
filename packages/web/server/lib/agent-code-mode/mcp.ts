@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { createMcpRuntime } from '../agent-tool/mcp.js';
 import type { McpInvocation, ResolveMcpContext } from '../agent-tool/mcp-context.js';
 import type { ToolPermissions } from '../agent-tool/permissions.js';
+import { DIRECT_CONTROL_MCP_TOOLS } from '../agent-tool/control-mcp.js';
 import { scriptRuntime, scriptOutput, type ScriptTool, type ScriptCall } from './src/execution.js';
 import { fetchExtension } from './src/fetch.js';
 import {
@@ -86,7 +87,8 @@ export function createCodeModeMcpRuntime(
     });
     server.setRequestHandler(ListToolsRequestSchema, async () => {
       const entries = await inventory();
-      const { catalog } = scriptRuntime(entries.map(entry => descriptor(entry, () => Effect.die('Catalog only'))), () => Effect.void);
+      const scriptEntries = entries.filter(entry => entry.namespace !== 'openchamber' || !DIRECT_CONTROL_MCP_TOOLS.includes(entry.tool.name));
+      const { catalog } = scriptRuntime(scriptEntries.map(entry => descriptor(entry, () => Effect.die('Catalog only'))), () => Effect.void);
       const tool: Tool = { name: 'execute', inputSchema: { type: 'object', properties: { code: { type: 'string' } }, required: ['code'], additionalProperties: false }, outputSchema: { type: 'object' },
         description: [
           'Run JavaScript with { code }. The complete catalog below supplies every available tools path, description and parameter signature. Call these paths directly. Await calls whose results matter; run independent calls with Promise.allSettled. Return the results needed for reasoning. Pending calls stop when the script ends.',
@@ -105,7 +107,7 @@ export function createCodeModeMcpRuntime(
       const context = resolveContext(extra);
       const policy = await permissions.session(context.sessionID);
       await policy.assert({ action: 'execute', resources: ['*'], save: ['*'] }, context.signal);
-      const entries = (await inventory()).filter(entry => !policy.denied(entry.permission(entry.tool.name), '*'));
+      const entries = (await inventory()).filter(entry => (entry.namespace !== 'openchamber' || !DIRECT_CONTROL_MCP_TOOLS.includes(entry.tool.name)) && !policy.denied(entry.permission(entry.tool.name), '*'));
       const tools = entries.map(entry => descriptor(entry, args => Effect.tryPromise({ try: async signal => {
         const editing = entry.namespace === 'file' && entry.tool.name !== 'view_image';
         const name = `${entry.namespace}_${entry.tool.name}`;

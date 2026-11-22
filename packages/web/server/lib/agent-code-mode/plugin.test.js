@@ -7,15 +7,16 @@ import express from 'express';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { afterEach, expect, it, vi } from 'vitest';
-import { Effect, Exit, Schema, Scope } from 'effect';
+import { Effect, Exit, Schema, Scope, Stream } from 'effect';
 import { materializeCodeModePlugin } from './runtime.js';
 import { createAgentToolRuntime } from '../agent-tool/runtime.js';
 import { createToolPermissions } from '../agent-tool/permissions.js';
+import { createOpenChamberControlService } from '../openchamber-control/service.js';
 
 const cleanup = [];
 afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); vi.unstubAllEnvs(); });
 
-async function fixture(dependencies = {}) {
+async function fixture({ pluginOptions, ...dependencies } = {}) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'code-mode-mcp-'));
   cleanup.push(() => fs.rm(directory, { recursive: true, force: true }));
   await fs.symlink(new URL('../../../node_modules', import.meta.url), path.join(directory, 'node_modules'), 'dir');
@@ -31,6 +32,7 @@ async function fixture(dependencies = {}) {
     ...dependencies,
   });
   const app = express();
+  if (pluginOptions) await runtime.materializePlugin(pluginOptions);
   app.get('/page', (_req, res) => res.send('FETCH_BODY'));
   runtime.registerRoutes(app, express);
   listener = await new Promise(resolve => { const server = app.listen(0, '127.0.0.1', () => resolve(server)); });
@@ -49,6 +51,7 @@ async function fixture(dependencies = {}) {
     location: { directory },
     mcp: { transform: run => Effect.sync(() => run({ set: (name, config) => { expect(name).toBe('openchamber'); expect(config.url).toContain('/code-mode/mcp'); } })) },
     skill: { list: () => Effect.succeed({ data: skills }) },
+    event: { subscribe: () => Stream.never },
     tool: {
       transform: run => Effect.sync(() => run({ list: () => [...tools.values()], update: (id, change) => change(tools.get(id)) })),
       hook: (name, run) => Effect.sync(() => toolHooks.set(name, event => Effect.runPromise(run(event)))),
@@ -62,9 +65,10 @@ async function fixture(dependencies = {}) {
   cleanup.push(() => Effect.runPromise(Scope.close(scope, Exit.void)));
   await Effect.runPromise(plugin.effect(ctx).pipe(Effect.provideService(Scope.Scope, scope)));
   const progress = [];
-  const run = (code, sessionID = 'session') => Effect.runPromise(tools.get('openchamber_execute').execute({ code }, {
-    sessionID, agent: 'build', messageID: 'message', id: crypto.randomUUID(), progress: update => Effect.sync(() => progress.push(structuredClone(update))),
-  }));
+  const invoke = (name, input, { sessionID = 'session', id = crypto.randomUUID(), signal } = {}) => Effect.runPromise(tools.get(name).execute(input, {
+    sessionID, agent: 'build', messageID: 'message', id, progress: update => Effect.sync(() => progress.push(structuredClone(update))),
+  }), { signal });
+  const run = (code, sessionID = 'session') => invoke('openchamber_execute', { code }, { sessionID });
   const request = async (hook = 'context') => {
     const event = { sessionID: 'session', agent: 'build', tools: { execute: {}, openchamber_execute: {}, native_probe: {} }, messages: [],
       system: [{ type: 'text', text: 'OLD_CATALOG\nENVIRONMENT\nVIRTUAL_BODY', metadata: { experimental: { instructions: [{ key: 'core/codemode', text: 'OLD_CATALOG' }, { key: 'core/environment', text: 'ENVIRONMENT' }, { key: 'core/skill-guidance', text: 'VIRTUAL_BODY' }] } } }],
@@ -72,7 +76,7 @@ async function fixture(dependencies = {}) {
     await sessionHooks.get(hook)(event);
     return event;
   };
-  return { directory, client, tools, permissions, policy, skills, request, toolHooks, run, captured, progress, runtime, url: `http://127.0.0.1:${listener.address().port}/page` };
+  return { directory, client, tools, permissions, policy, skills, request, toolHooks, run, invoke, sessionHooks, captured, progress, runtime, url: `http://127.0.0.1:${listener.address().port}/page` };
 }
 
 it('discovers execute through MCP with the complete shared catalog and keeps backend tools direct', async () => {
@@ -166,4 +170,92 @@ it('keeps virtual skill filtering and file skill loads on backend context hooks'
   }
   await expect(f.toolHooks.get('execute.before')({ tool: 'skill', input: { id: 'virtual' } })).rejects.toThrow("Virtual skill 'virtual' is disabled");
   await expect(f.toolHooks.get('execute.before')({ tool: 'skill', input: { id: 'local' } })).resolves.toBeUndefined();
+});
+
+const createPageWaitSignals = () => {
+  const calls = new Map();
+  const forCall = (id) => {
+    if (!calls.has(id)) calls.set(id, Promise.withResolvers());
+    return calls.get(id);
+  };
+  return {
+    onPageWaitChange: (change) => { if (change.type === 'waiting') forCall(change.callId).resolve(); },
+    ready: (id) => forCall(id).promise,
+  };
+};
+
+it('returns the answer a page waited for, or ends the wait when the user writes in the chat', async () => {
+  const pageWaits = createPageWaitSignals();
+  const service = createOpenChamberControlService({ sessionService: { resolveDirectory: async () => '/repo' }, onPageWaitChange: pageWaits.onPageWaitChange });
+  const f = await fixture({ pluginOptions: { includeControl: false, includeWeb: false, includeMemory: false, includeRender: true },
+    resolveSessionDirectory: async () => '/repo', executeAction: (...args) => service.execute(...args) });
+  const ask = (id, awaitAnswer = true, signal) => f.invoke('openchamber_render',
+    { action: 'render.page', parameters: { html: '<p>Pick</p>', title: 'Pick a layout', awaitAnswer } },
+    { sessionID: 'ses_caller', id, signal });
+  const hooks = { prompt: event => f.sessionHooks.get('prompt')(event) };
+
+  const answered = ask('call_1');
+  await vi.waitFor(() => service.answerPage({ sessionId: 'ses_caller', callId: 'call_1', summary: 'Layout B', data: { layout: 'b' } }));
+  const result = await answered;
+  expect(JSON.parse(result.content)).toMatchObject({ ok: true, data: { answer: { answered: true, summary: 'Layout B', data: { layout: 'b' } } } });
+  expect(result.metadata.openchamber).toMatchObject({ ok: true, answer: { answered: true, summary: 'Layout B', data: { layout: 'b' } } });
+  await ask('call_shown', false);
+
+  const closed = ask('call_2');
+  await pageWaits.ready('call_2');
+  await hooks.prompt({ sessionID: 'ses_other' });
+  await hooks.prompt({ sessionID: 'ses_caller' });
+  const closedResult = await closed;
+  expect(JSON.parse(closedResult.content)).toMatchObject({ ok: true, data: { answer: { answered: false, reason: 'chat' } } });
+  expect(closedResult.output).toEqual(JSON.parse(closedResult.content));
+  expect(closedResult.metadata.openchamber).toMatchObject({ ok: true, answer: { answered: false, reason: 'chat' } });
+  // The server let go of the page too, so a late answer finds nothing.
+  await vi.waitFor(() => expect(() => service.answerPage({ sessionId: 'ses_caller', callId: 'call_2', summary: 'B' }))
+    .toThrow(expect.objectContaining({ statusCode: 404 })));
+
+  // The user's Stop (OpenCode 2.3.0 aborts the signal the tool read) ends
+  // the call as stopped; an ok:false envelope would read as a finished
+  // call, and the chat would drop the page.
+  const stop = new AbortController();
+  const stopped = ask('call_3', true, stop.signal);
+  await pageWaits.ready('call_3');
+  stop.abort();
+  await expect(stopped).rejects.toThrow();
+
+});
+
+it('keeps a page waiting through a prompt an agent sent or one queued for after the turn', async () => {
+  const pageWaits = createPageWaitSignals();
+  const service = createOpenChamberControlService({ sessionService: { resolveDirectory: async () => '/repo' }, onPageWaitChange: pageWaits.onPageWaitChange });
+  const f = await fixture({ pluginOptions: { includeControl: false, includeWeb: false, includeMemory: false, includeRender: true },
+    resolveSessionDirectory: async () => '/repo', executeAction: (...args) => service.execute(...args) });
+  const ask = (id, awaitAnswer = true, signal) => f.invoke('openchamber_render',
+    { action: 'render.page', parameters: { html: '<p>Pick</p>', title: 'Pick a layout', awaitAnswer } },
+    { sessionID: 'ses_caller', id, signal });
+  const hooks = { prompt: event => f.sessionHooks.get('prompt')(event) };
+
+  const waiting = ask('call_1');
+  await pageWaits.ready('call_1');
+  // session.send records the sending session; its id may be any non-empty handle.
+  await hooks.prompt({ sessionID: 'ses_caller', delivery: 'steer', metadata: { openchamber: { promptedBy: { sessionID: 'ses_helper', title: 'Build helper' } } } });
+  await hooks.prompt({ sessionID: 'ses_caller', delivery: 'steer', metadata: { openchamber: { promptedBy: { sessionID: 'remote-host/opencode/session:ses_x' } } } });
+  // OpenCode's own scheduler (experimental.schedules) steers its runs in with this marker.
+  await hooks.prompt({ sessionID: 'ses_caller', delivery: 'steer', metadata: { schedule: { id: 'sch_1', run: 1, dueAt: 1, late: false } } });
+  // The user's queued prompt is delivered after the turn, so it cannot follow the result.
+  await hooks.prompt({ sessionID: 'ses_caller', messageID: 'msg_queued', delivery: 'queue' });
+  service.answerPage({ sessionId: 'ses_caller', callId: 'call_1', summary: 'Layout B' });
+  expect(JSON.parse((await waiting).content)).toMatchObject({ data: { answer: { answered: true, summary: 'Layout B' } } });
+
+  // An empty sender names nobody, so the prompt counts as the user's.
+  const closed = ask('call_2');
+  await pageWaits.ready('call_2');
+  await hooks.prompt({ sessionID: 'ses_caller', delivery: 'steer', metadata: { openchamber: { promptedBy: { sessionID: ' ' } } } });
+  expect(JSON.parse((await closed).content)).toMatchObject({ data: { answer: { answered: false, reason: 'chat' } } });
+
+  // A plain string is not the record session.send writes, so it counts as the user's too.
+  const plain = ask('call_3');
+  await pageWaits.ready('call_3');
+  await hooks.prompt({ sessionID: 'ses_caller', delivery: 'steer', metadata: { openchamber: { promptedBy: 'remote-host/opencode/session:ses_x' } } });
+  expect(JSON.parse((await plain).content)).toMatchObject({ data: { answer: { answered: false, reason: 'chat' } } });
+
 });
