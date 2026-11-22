@@ -127,25 +127,21 @@ Session control and browser operations are independently enabled:
 - `openchamber_secret` — `secret.run`, `secret.request` and `secret.forget`.
   Its description and parameters live in `secret-tool.ts`, under names of
   their own, since `label` means something else in the web tool. `secret.run`
-  asks OpenCode's shell permission for its command line in the
-  plugin, before the call reaches the server: `ctx.permission.assert` with
+  asks the shared permission runtime to approve its command line before execution:
   action `shell`, the line `secretRunCommandLine` draws as the resource and
-  `<program> *` as the pattern to save, so the session's shell rules apply as
-  to any command and a deny never shows a card. The plugin embeds the server's
-  `secretRunCommand` and `secretRunCommandLine` with `toString()`, so the line
-  the user approves is the one the card shows; a malformed call fails before
-  anything is asked. The refusal `assert` throws is rethrown, since a plain
-  rejection ends the agent's step. Only a call from this tool reaches the
-  server as `secretRunAuthorized`, and secret actions use the session OpenCode
-  reported, so no payload field can reach another session's remembered values.
+  `<program> *` as the pattern to save. Command parsing uses `secretRunCommand`;
+  malformed commands return usage errors before shell approval. Only the shared
+  MCP handler sets `secretRunAuthorized` after approval. Secret actions use the
+  backend session identity, so payload fields cannot select remembered values
+  from another session.
   `secret.request` is a
   card where the user types one secret the agent asked for (`label`, `reason`,
   optional `placeholder`). Both wait, and so does a `secret.forget` with
-  `saved: true`, which the user confirms on a card. Its native plugin sends the
-  call id with `timeout: false` and registers the `session.prompt` hook
-  that ends the wait when the user writes in the chat and leaves it running
-  for an agent's or a queued prompt, the inbox events for the user's prompt
-  moved to steer, and the inbox check
+  `saved: true`, which the user confirms on a card. The managed adapter sends
+  the original call id through its scoped MCP client and follows prompt and
+  inbox events. User chat replies end the wait; agent and queued prompts leave
+  it waiting. Moving a user's queued prompt to steer ends the wait. The service
+  checks the inbox
   for a message sent before the card appeared. The value never
   travels through the call: the chat posts it to the server, which writes it
   to a private file, and the call returns only `{ status, file }`
@@ -507,8 +503,8 @@ tools retain their `openchamber_*` names, settings and action result envelopes.
 The same MCP server exposes `control`, `schedule` and `terminal`, with direct
 names `openchamber_control`, `openchamber_schedule` and `openchamber_terminal`.
 Code Mode calls use `tools.openchamber.control`, `.schedule` and `.terminal`.
-It also exposes `render` and `image` as direct tools `openchamber_render` and
-`openchamber_image`. These card tools are excluded from the script catalog.
+It also exposes `render`, `image` and `secret` as direct tools
+`openchamber_render`, `openchamber_image` and `openchamber_secret`. These card tools are excluded from the script catalog.
 The managed OpenCode adapter supplies their original call ids, cancellation,
 page-answer metadata and chat-reply handling through its scoped MCP client.
 Control keeps the `openchamber` permission action, including configured rules
@@ -565,17 +561,17 @@ Express uses `../shared/http-contracts.js`.
 The injected execution and directory-resolution callbacks are optional typed
 functions, so their presence checks no longer repeat `typeof`. Every `typeof`
 in generated JavaScript remains: tool inputs, parsed JSON, callback responses
-and the OpenCode permission capability cross an untyped process boundary.
+cross an untyped process boundary.
 Array and own-property checks remain for revived inputs, parameter selection
 and action-title dictionaries, including names inherited from Object.
 
-The runtime imports action definitions, workflow limits, render and secret
-helpers, sharing limits, shared guards and the callback-address helper. Its
+The runtime imports action definitions, workflow limits, render
+limits, sharing limits, shared guards and the callback-address helper. Its
 external inputs are HTTP JSON, socket addresses and authorization headers,
 listener host and port, the injected session-directory resolver, and the control
 service's returned values and thrown failures. The generated plugin additionally
 reads callback URL/token and proxy environment variables, tool inputs, session
-hooks, inbox events, permission capabilities and HTTP response JSON. Their
+compaction hooks and HTTP response JSON. Their
 validation and failure handling stay unchanged.
 
 ### Why plugin source stays standalone JavaScript

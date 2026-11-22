@@ -12,11 +12,12 @@ import { materializeCodeModePlugin } from './runtime.js';
 import { createAgentToolRuntime } from '../agent-tool/runtime.js';
 import { createToolPermissions } from '../agent-tool/permissions.js';
 import { createOpenChamberControlService } from '../openchamber-control/service.js';
+import { createSecretFiles } from '../openchamber-control/secret-request.js';
 
 const cleanup = [];
 afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); vi.unstubAllEnvs(); });
 
-async function fixture({ pluginOptions, ...dependencies } = {}) {
+async function fixture({ pluginOptions, events = Stream.never, ...dependencies } = {}) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'code-mode-mcp-'));
   cleanup.push(() => fs.rm(directory, { recursive: true, force: true }));
   await fs.symlink(new URL('../../../node_modules', import.meta.url), path.join(directory, 'node_modules'), 'dir');
@@ -51,7 +52,7 @@ async function fixture({ pluginOptions, ...dependencies } = {}) {
     location: { directory },
     mcp: { transform: run => Effect.sync(() => run({ set: (name, config) => { expect(name).toBe('openchamber'); expect(config.url).toContain('/code-mode/mcp'); } })) },
     skill: { list: () => Effect.succeed({ data: skills }) },
-    event: { subscribe: () => Stream.never },
+    event: { subscribe: () => events },
     tool: {
       transform: run => Effect.sync(() => run({ list: () => [...tools.values()], update: (id, change) => change(tools.get(id)) })),
       hook: (name, run) => Effect.sync(() => toolHooks.set(name, event => Effect.runPromise(run(event)))),
@@ -184,6 +185,47 @@ const createPageWaitSignals = () => {
   };
 };
 
+it('keeps secret values out of MCP results and preserves card answers and cancellation', async () => {
+  const waits = createPageWaitSignals();
+  let service;
+  const f = await fixture({ pluginOptions: { includeControl: false, includeWeb: false, includeMemory: false, includeSecret: true },
+    executeAction: (...args) => service.execute(...args),
+  });
+  service = createOpenChamberControlService({ sessionService: { resolveDirectory: async () => f.directory },
+    secretFiles: createSecretFiles({ directory: path.join(f.directory, 'secrets') }), onPageWaitChange: waits.onPageWaitChange,
+  });
+  const request = id => f.invoke('openchamber_secret', { action: 'request', parameters: { label: 'Test token', reason: 'Local fixture' } }, { id });
+  const pending = request('file');
+  await waits.ready('file');
+  await service.answerSecret({ sessionId: 'session', callId: 'file', value: 'fixture-private-value' });
+  const result = await pending;
+  expect(result.metadata.openchamber).toMatchObject({ action: 'secret.request', ok: true, answer: { status: 'saved' } });
+  expect(result.content).not.toContain('fixture-private-value');
+  expect(await fs.readFile(result.output.data.answer.file, 'utf8')).toBe('fixture-private-value');
+
+  const command = f.invoke('openchamber_secret', { action: 'secret.run', parameters: {
+    program: process.execPath, args: ['-e', 'console.log(process.env.TOKEN)'], reason: 'Local fixture', inputs: [{ env: 'TOKEN', label: 'Test token' }],
+  } }, { id: 'command' });
+  await waits.ready('command');
+  await service.answerSecret({ sessionId: 'session', callId: 'command', values: { TOKEN: 'fixture-private-value' } });
+  const ran = await command;
+  expect(ran.metadata.openchamber.answer).toMatchObject({ status: 'ran', exitCode: 0 });
+  expect(ran.output.data.stdout).toBe('[secret:TOKEN]\n');
+  expect(ran.content).not.toContain('fixture-private-value');
+
+  const chat = request('chat');
+  await waits.ready('chat');
+  await f.sessionHooks.get('prompt')({ sessionID: 'session', messageID: 'chat', delivery: 'steer' });
+  expect((await chat).metadata.openchamber.answer).toEqual({ answered: false, reason: 'chat' });
+  await vi.waitFor(() => expect(service.answerSecret({ sessionId: 'session', callId: 'chat', value: 'late' })).rejects.toMatchObject({ statusCode: 404 }));
+
+  const stop = new AbortController();
+  const stopped = f.invoke('openchamber_secret', { action: 'request', label: 'Test token', reason: 'Local fixture' }, { id: 'stop', signal: stop.signal });
+  await waits.ready('stop');
+  stop.abort();
+  await expect(stopped).rejects.toThrow();
+});
+
 it('returns the answer a page waited for, or ends the wait when the user writes in the chat', async () => {
   const pageWaits = createPageWaitSignals();
   const service = createOpenChamberControlService({ sessionService: { resolveDirectory: async () => '/repo' }, onPageWaitChange: pageWaits.onPageWaitChange });
@@ -259,3 +301,118 @@ it('keeps a page waiting through a prompt an agent sent or one queued for after 
   expect(JSON.parse((await plain).content)).toMatchObject({ data: { answer: { answered: false, reason: 'chat' } } });
 
 });
+
+  it.each([
+    ['secret.request', { action: 'request', label: 'Token', reason: 'Deploy' }],
+    ['secret.run', { action: 'run', program: 'wrangler', args: ['deploy'], reason: 'Deploy', inputs: [{ env: 'TOKEN', label: 'Token' }] }],
+    ['secret.forget', { action: 'forget', saved: 'true' }],
+  ])('keeps a %s card waiting through an agent or queued prompt, and ends it for the user', async (action, input) => {
+    // OpenCode's event stream, fed by the test.
+    const pushed = [];
+    let wake = () => {};
+    const emit = (type, data) => new Promise((resolve) => {
+      pushed.push({ event: { type, data: { sessionID: 'ses_1', ...data } }, resolve });
+      wake();
+    });
+    async function* events() {
+      for (;;) {
+        while (pushed.length > 0) {
+          const next = pushed.shift();
+          if (next.end) return;
+          yield next.event;
+          next.resolve();
+        }
+        await new Promise(resolve => { wake = resolve; });
+      }
+    }
+    const releases = [];
+    const requests = new Map();
+    const f = await fixture({ pluginOptions: { includeControl: false, includeWeb: false, includeMemory: false, includeSecret: true },
+      events: Stream.fromAsyncIterable(events(), error => error),
+      executeAction: async (_action, _input, _directory, options) => new Promise((resolve, reject) => {
+        releases.push(() => resolve({ answer: { answered: true } }));
+        options.signal.addEventListener('abort', () => reject(options.signal.reason), { once: true });
+        const request = requests.get(options.contextCallId);
+        request.signal = options.signal;
+        request.resolve();
+      }),
+    });
+    cleanup.push(() => { pushed.push({ end: true }); wake(); });
+    const hooks = { prompt: event => f.sessionHooks.get('prompt')(event) };
+    // A call's answer once it returns; `pending` while it waits.
+    const pending = Symbol('pending');
+    const call = (id, sessionID = 'ses_1') => {
+      const box = { answer: pending };
+      const request = Promise.withResolvers();
+      requests.set(id, request);
+      box.ready = request.promise;
+      box.request = request;
+      box.result = f.invoke('openchamber_secret', input, { sessionID, id })
+        .then((result) => { box.answer = JSON.parse(result.content).data.answer; return box.answer; });
+      return box;
+    };
+    const agent = { openchamber: { promptedBy: { sessionID: 'ses_helper' } } };
+
+    try {
+      const answered = call('call_1');
+      await answered.ready;
+      await hooks.prompt({ sessionID: 'ses_1', messageID: 'msg_a', delivery: 'steer', metadata: agent });
+      await hooks.prompt({ sessionID: 'ses_1', messageID: 'msg_s', delivery: 'steer', metadata: { schedule: { id: 'sch_1' } } });
+      await hooks.prompt({ sessionID: 'ses_1', messageID: 'msg_q', delivery: 'queue' });
+      expect(answered.request.signal.aborted).toBe(false);
+      expect(answered.answer).toBe(pending);
+      releases[0]();
+      expect(await answered.result).toEqual({ answered: true });
+
+      // Moving a queued prompt to steer runs no prompt hook: the inbox event ends the wait, for the user's prompt only.
+      const promoted = call('call_2');
+      await promoted.ready;
+      await hooks.prompt({ sessionID: 'ses_1', messageID: 'msg_user', delivery: 'queue' });
+      await hooks.prompt({ sessionID: 'ses_1', messageID: 'msg_agent', delivery: 'queue', metadata: agent });
+      await emit('session.inbox.delivery.changed', { inboxID: 'msg_agent', delivery: 'steer' });
+      await emit('session.inbox.delivery.changed', { inboxID: 'msg_user', delivery: 'queue' });
+      expect(promoted.request.signal.aborted).toBe(false);
+      expect(promoted.answer).toBe(pending);
+      await emit('session.inbox.delivery.changed', { inboxID: 'msg_user', delivery: 'steer' });
+      expect(await promoted.result).toEqual({ answered: false, reason: 'chat' });
+
+      const closed = call('call_3');
+      await closed.ready;
+      await hooks.prompt({ sessionID: 'ses_1', messageID: 'msg_now', delivery: 'steer' });
+      expect(await closed.result).toEqual({ answered: false, reason: 'chat' });
+
+      // A steer the user sent before the card, moved to the queue and back once it waits, ends it too.
+      await hooks.prompt({ sessionID: 'ses_1', messageID: 'msg_early', delivery: 'steer' });
+      await emit('session.inbox.delivery.changed', { inboxID: 'msg_early', delivery: 'queue' });
+      const late = call('call_4');
+      await late.ready;
+      await emit('session.inbox.delivery.changed', { inboxID: 'msg_early', delivery: 'steer' });
+      expect(await late.result).toEqual({ answered: false, reason: 'chat' });
+
+      // A delivered prompt is forgotten, so a later event for its id ends nothing.
+      await hooks.prompt({ sessionID: 'ses_1', messageID: 'msg_done', delivery: 'queue' });
+      await emit('session.inbox.delivered', { inboxID: 'msg_done' });
+      const delivered = call('call_5');
+      await delivered.ready;
+      await emit('session.inbox.delivery.changed', { inboxID: 'msg_done', delivery: 'steer' });
+      expect(delivered.request.signal.aborted).toBe(false);
+      expect(delivered.answer).toBe(pending);
+      releases.at(-1)();
+      expect(await delivered.result).toEqual({ answered: true });
+
+      // A deleted session's prompts are forgotten, another session's are kept.
+      await hooks.prompt({ sessionID: 'ses_1', messageID: 'msg_gone', delivery: 'queue' });
+      await hooks.prompt({ sessionID: 'ses_2', messageID: 'msg_kept', delivery: 'queue' });
+      await emit('session.deleted', { sessionID: 'ses_1' });
+      const forgotten = call('call_6');
+      const kept = call('call_7', 'ses_2');
+      await Promise.all([forgotten.ready, kept.ready]);
+      await emit('session.inbox.delivery.changed', { inboxID: 'msg_gone', delivery: 'steer' });
+      await emit('session.inbox.delivery.changed', { sessionID: 'ses_2', inboxID: 'msg_kept', delivery: 'steer' });
+      expect(await kept.result).toEqual({ answered: false, reason: 'chat' });
+      expect(forgotten.request.signal.aborted).toBe(false);
+      expect(forgotten.answer).toBe(pending);
+      releases.at(-2)();
+      expect(await forgotten.result).toEqual({ answered: true });
+    } finally { for (const release of releases) release(); }
+  });

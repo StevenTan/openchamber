@@ -244,7 +244,7 @@ constructor retains its existing `Object.assign` behavior.
   serve both kinds of card. The call names a `program`, its `args`, a `reason`
   and 1 to 8 `inputs` (`env`, `label`, optional `placeholder`); a malformed
   call is a `400` before any card. Only a call the agent tool marks
-  `secretRunAuthorized` runs (the secret tool's plugin, after OpenCode's shell
+  `secretRunAuthorized` runs (the shared MCP handler, after shared shell
   permission for the command line, see `../agent-tool/DOCUMENTATION.md`);
   anything else is a `403`. Before it waits, the call reads the values the
   chat remembers; with none missing it runs at once and no card waits. While
@@ -798,13 +798,13 @@ Models omit namespaces already implied by a tool's name, while verbs such as
 allowlist, accepts a globally unique bare name when the tool is unknown, and
 lists the applicable actions on failure so another call needs no guessing.
 
-### Why embedded helpers stay self-contained
+### Command approval
 
-The agent plugin embeds `secretRunCommand`, `secretRunCommandLine` and
-`isAgentPrompt` with `toString()`, so imports or closed-over helpers cannot
-resolve there. Command validation precedes permission requests and bounds the
-whole line because a shell script can occupy one argument. The displayed line
-escapes invisible and directional characters so approval describes what runs.
+The shared MCP handler and secret service use `secretRunCommand` and
+`secretRunCommandLine`. Command validation precedes shell permission requests
+and bounds the whole line because a shell script can occupy one argument.
+The displayed line escapes invisible and directional characters so approval
+shows what runs.
 
 ### Why service form answers are completed like the chat's answers
 

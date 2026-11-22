@@ -9,7 +9,8 @@ import { Tool } from '@opencode/schema/tool';
 import { assertFileSkill, filterVirtualSkillGuidance, type SkillRegistry } from './skill-policy.js';
 import { controlMcpInput } from '../../agent-tool/control-mcp.js';
 import { isAgentPrompt, RENDER_PAGE_CLOSED_IN_CHAT_NOTE } from '../../openchamber-control/render-page.js';
-import { OPENCHAMBER_RENDER_ACTION_DEFINITIONS, OPENCHAMBER_IMAGE_ACTION_DEFINITIONS } from '../../openchamber-control/actions.js';
+import { OPENCHAMBER_RENDER_ACTION_DEFINITIONS, OPENCHAMBER_IMAGE_ACTION_DEFINITIONS, OPENCHAMBER_SECRET_ACTION_DEFINITIONS, resolveAgentToolAction } from '../../openchamber-control/actions.js';
+import { SECRET_REQUEST_CLOSED_IN_CHAT_NOTE } from '../../openchamber-control/secret-request.js';
 
 interface InstructionSource { key: string; text: string }
 interface SystemPart { type: 'text'; text: string; metadata?: { experimental?: { instructions?: InstructionSource[] } } }
@@ -38,8 +39,9 @@ const executeName = 'openchamber_execute';
 const skillInput = Schema.Struct({ id: Schema.String });
 const object = Schema.decodeUnknownSync(Schema.JsonObject);
 const cardActions = new Map([
-  ['openchamber_render', OPENCHAMBER_RENDER_ACTION_DEFINITIONS[0]],
-  ['openchamber_image', OPENCHAMBER_IMAGE_ACTION_DEFINITIONS[0]],
+  ['openchamber_render', OPENCHAMBER_RENDER_ACTION_DEFINITIONS],
+  ['openchamber_image', OPENCHAMBER_IMAGE_ACTION_DEFINITIONS],
+  ['openchamber_secret', OPENCHAMBER_SECRET_ACTION_DEFINITIONS],
 ]);
 
 export default {
@@ -82,12 +84,15 @@ export default {
           const card = cardActions.get(tool.id);
           if (card) {
             value.execute = (input, context) => Effect.tryPromise({ try: async signal => {
-              const args = controlMcpInput(object(input), card.action);
+              const args = controlMcpInput(object(input), card.length === 1 ? card[0]?.action : undefined);
+              const action = resolveAgentToolAction(args.action ?? null, tool.id).action ?? args.action;
               const chat = new AbortController();
-              const waiting = card.action === 'render.page' && (args.awaitAnswer === true || args.awaitAnswer === 'true');
+              const waiting = tool.id === 'openchamber_secret'
+                ? action !== 'secret.forget' || args.saved === true || args.saved === 'true'
+                : action === 'render.page' && (args.awaitAnswer === true || args.awaitAnswer === 'true');
               const active = pagesWaitingForChat.get(context.sessionID) ?? new Set();
               if (waiting) { active.add(chat); pagesWaitingForChat.set(context.sessionID, active); }
-              const metadata = { schemaVersion: 1, action: card.action, description: card.title };
+              const metadata = { schemaVersion: 1, action, description: card.find(entry => entry.action === action)?.title ?? action };
               await Effect.runPromise(context.progress(object({ [tool.id]: metadata })));
               let output;
               try {
@@ -98,7 +103,7 @@ export default {
                 output = object(result.structuredContent);
               } catch (error) {
                 if (signal.aborted || !chat.signal.aborted) throw error;
-                output = { schemaVersion: 1, ok: true, action: card.action, data: { answer: { answered: false, reason: 'chat' }, note: RENDER_PAGE_CLOSED_IN_CHAT_NOTE } };
+                output = { schemaVersion: 1, ok: true, action, data: { answer: { answered: false, reason: 'chat' }, note: tool.id === 'openchamber_secret' ? SECRET_REQUEST_CLOSED_IN_CHAT_NOTE : RENDER_PAGE_CLOSED_IN_CHAT_NOTE } };
               } finally {
                 active.delete(chat);
                 if (active.size === 0) pagesWaitingForChat.delete(context.sessionID);

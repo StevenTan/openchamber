@@ -5,8 +5,10 @@
 The authenticated `/api/openchamber/code-mode/mcp` service owns the `execute`
 tool. Its `openchamber` MCP registration also exposes the shared memory,
 knowledge, usage and notification tools with their existing names.
-Page rendering and image generation have direct MCP entries with their existing
-`openchamber_render` and `openchamber_image` names and dedicated chat cards.
+Page rendering, image generation and secrets have direct MCP entries named
+`openchamber_render`, `openchamber_image` and `openchamber_secret`, with dedicated
+chat cards. The managed adapter supplies original call ids, answer metadata and
+chat-reply cancellation.
 
 `execution.ts` runs JavaScript with the official `@opencode/codemode` confined
 interpreter. Command, file, browser, asynchronous question and control tools
@@ -36,7 +38,7 @@ module's MIT license. Skill filtering uses the
   `tools.openchamber.schedule` and `tools.openchamber.terminal`.
 - Whole-tool permission denies filter the script inventory on every invocation.
   Individual MCP services own resource-specific approvals and validation.
-  OpenCode-specific native tools remain direct. Rendering and image generation
+  OpenCode-specific native tools remain direct. Rendering, image generation and secrets
   are excluded from the script catalog and execution inventory.
 - The interpreter accesses processes and files through tools. `fetch` retains
   response methods, webfetch approval and redirect deny rules. Await calls whose

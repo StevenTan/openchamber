@@ -35,7 +35,6 @@ import {
 } from '../openchamber-control/actions.js';
 import { MAX_AGENTS_PER_RUN, MAX_CONCURRENT_AGENTS } from '../workflows/runtime.js';
 import {
-  isAgentPrompt,
   RENDER_PAGE_IMAGE_BUDGET_BYTES,
   RENDER_PAGE_MAX_HTML_LENGTH,
   RENDER_PAGE_MAX_TITLE_LENGTH,
@@ -46,8 +45,6 @@ import {
   SHARE_MAX_SUMMARY_LENGTH,
   SHARE_MIN_HOURS,
 } from '../share-pages/runtime.js';
-import { SECRET_REQUEST_CLOSED_IN_CHAT_NOTE } from '../openchamber-control/secret-request.js';
-import { secretRunCommand, secretRunCommandLine } from '../openchamber-control/secret-run.js';
 import { RENDER_PAGE_UI_DESCRIPTION } from './render-tool.js';
 import { SECRET_PARAMETER_PROPERTIES, SECRET_TOOL_DESCRIPTION } from './secret-tool.js';
 import { createCallbackAddress } from './callback-address.js';
@@ -148,8 +145,6 @@ interface ToolEntryOptions {
   description: string;
   definitions: readonly ActionDefinition[];
   parameters: Record<string, ParameterSchema>;
-  answers?: { waitsWhen: string; closedInChatNote: string } | null;
-  secretRun?: boolean;
 }
 
 export interface ResultFields {
@@ -544,39 +539,6 @@ const createResult = ({ ok, action, data, error, exitCode }: ResultFields) => {
   return result;
 };
 
-const answerWaitSetup = (waitsWhen: string) => String.raw`        const chatController = new AbortController()
-        const waiting = ${waitsWhen}
-        if (waiting) {
-          const set = pagesWaitingForChat.get(context.sessionID) ?? new Set()
-          set.add(chatController)
-          pagesWaitingForChat.set(context.sessionID, set)
-        }
-        const releaseWait = () => {
-          const set = pagesWaitingForChat.get(context.sessionID)
-          if (!set) return
-          set.delete(chatController)
-          if (set.size === 0) pagesWaitingForChat.delete(context.sessionID)
-        }
-        const waitSignal = AbortSignal.any([context.signal, chatController.signal].filter(Boolean))
-`;
-
-const ANSWER_FETCH_TIMEOUT = String.raw`
-            ...(waiting ? { timeout: false } : {}),`;
-
-const ANSWER_METADATA = String.raw`, ...(result.ok === true && result.data && typeof result.data.answer === "object" && result.data.answer !== null ? { answer: result.data.answer } : {})`;
-
-const ANSWER_WAIT_RELEASE = String.raw` finally {
-          releaseWait()
-        }`;
-
-const answerClosedInChat = (note: string) => String.raw`
-          if (chatController.signal.aborted && !context.signal?.aborted) {
-            const answer = { answered: false, reason: "chat" }
-            const payload = { schemaVersion: ${TOOL_SCHEMA_VERSION}, ok: true, action: args.action, data: { answer, note: ${JSON.stringify(note)} } }
-            await progress({ ok: true })
-            return { output: payload, content: JSON.stringify(payload), metadata: { openchamber: { schemaVersion: ${TOOL_SCHEMA_VERSION}, action: args.action, description: title, ok: true, answer } } }
-          }`;
-
 const booleanNormalizationBlock = (parameters: Record<string, ParameterSchema>) => {
   const booleanParameters = Object.entries(parameters)
     .filter(([, schema]) => schema.type === 'boolean')
@@ -633,30 +595,11 @@ const singleActionSchema = (definition: ActionDefinition) => ({
 `,
 });
 
-const SECRET_RUN_PERMISSION = String.raw`        if (args.action === "secret.run") {
-          const command = secretRunCommand(args)
-          if (command.error) return failure({ schemaVersion: ${TOOL_SCHEMA_VERSION}, ok: false, action: args.action, error: { message: command.error, kind: "usage" } })
-          if (typeof ctx.permission?.assert !== "function") {
-            return failure({ schemaVersion: ${TOOL_SCHEMA_VERSION}, ok: false, action: args.action, error: { message: "This OpenCode cannot ask the user to approve a command, so secret.run is unavailable; use secret.request", kind: "runtime" } })
-          }
-          const line = secretRunCommandLine(command.program, command.args)
-          await ctx.permission.assert({
-            sessionID: context.sessionID,
-            agent: context.agent,
-            action: "shell",
-            resources: [line],
-            save: [command.program + " *"],
-            source: { type: "tool", messageID: context.messageID, id: context.id },
-          })
-        }
-`;
-
-const createToolEntry = ({ name, description, definitions, parameters, answers = null, secretRun = false }: ToolEntryOptions) => {
+const createToolEntry = ({ name, description, definitions, parameters }: ToolEntryOptions) => {
   const normalizeBooleans = booleanNormalizationBlock(parameters);
   const reviveDependsOn = dependsOnRevivalBlock(parameters);
   const [definition] = definitions;
   const actionSchema = definitions.length === 1 && definition ? singleActionSchema(definition) : multiActionSchema(definitions);
-  const secretRunNormalize = secretRun ? '        if (args.action === "run") args.action = "secret.run"\n' : '';
   return String.raw`    tools.add({
       name: ${JSON.stringify(name)},
       description: ${JSON.stringify(description)},
@@ -680,7 +623,7 @@ const createToolEntry = ({ name, description, definitions, parameters, answers =
         // shapes are accepted; an explicit parameters object wins on a conflict.
         const { action: requestedAction, parameters, ...flattened } = input ?? {}
         const args = { ...flattened, ...(parameters ?? {}), action: requestedAction }
-${reviveDependsOn}${actionSchema.normalize}${secretRunNormalize}${normalizeBooleans}        const actionTitles = ${JSON.stringify(AGENT_TOOL_ACTION_TITLES)}
+${reviveDependsOn}${actionSchema.normalize}${normalizeBooleans}        const actionTitles = ${JSON.stringify(AGENT_TOOL_ACTION_TITLES)}
         const title = Object.hasOwn(actionTitles, args.action) ? actionTitles[args.action] : args.action
         const progress = (extra) => context.progress({
           ${name}: {
@@ -701,7 +644,7 @@ ${reviveDependsOn}${actionSchema.normalize}${secretRunNormalize}${normalizeBoole
         if (!endpoint || !token) {
           return failure({ schemaVersion: ${TOOL_SCHEMA_VERSION}, ok: false, action: args.action, error: { message: "OpenChamber managed tool connection is unavailable" } })
         }
-${secretRun ? SECRET_RUN_PERMISSION : ''}${answers ? answerWaitSetup(answers.waitsWhen) : ''}
+
         try {
           const response = await fetch(endpoint, {
             method: "POST",
@@ -714,14 +657,14 @@ ${secretRun ? SECRET_RUN_PERMISSION : ''}${answers ? answerWaitSetup(answers.wai
             // directory on its own side. The signal fires when the session is
             // aborted, so the OpenChamber side stops the action too.
             body: JSON.stringify({ input: args, sessionID: context.sessionID, callID: context.id, tool: ${JSON.stringify(name)} }),
-            signal: ${answers ? 'waitSignal' : 'context.signal'},${answers ? ANSWER_FETCH_TIMEOUT : ''}
+            signal: context.signal,
           })
           const content = await response.text()
           let result = null
           try { result = JSON.parse(content) } catch {}
           const valid = result?.schemaVersion === ${TOOL_SCHEMA_VERSION} && typeof result?.ok === "boolean" && typeof result?.action === "string"
           await progress({ ok: valid && result.ok === true })
-          if (valid) return { output: result, content, metadata: { openchamber: { schemaVersion: ${TOOL_SCHEMA_VERSION}, action: args.action, description: title, ok: result.ok === true${answers ? ANSWER_METADATA : ''} } } }
+          if (valid) return { output: result, content, metadata: { openchamber: { schemaVersion: ${TOOL_SCHEMA_VERSION}, action: args.action, description: title, ok: result.ok === true } } }
           return failure({ schemaVersion: ${TOOL_SCHEMA_VERSION}, ok: false, action: args.action, error: { message: "OpenChamber returned an invalid response", kind: "runtime", status: response.status } })
         } catch (error) {
           // A stopped call stays a stopped call. Since OpenCode 2.3.0 a tool
@@ -729,9 +672,9 @@ ${secretRun ? SECRET_RUN_PERMISSION : ''}${answers ? answerWaitSetup(answers.wai
           // is recorded as the call's result: an ok:false envelope here would
           // read as an ordinary completed call, and the chat would drop the
           // page or secret card the user stopped.
-          if (context.signal?.aborted) throw error${answers ? answerClosedInChat(answers.closedInChatNote) : ''}
+          if (context.signal?.aborted) throw error
           return failure({ schemaVersion: ${TOOL_SCHEMA_VERSION}, ok: false, action: args.action, error: { message: error instanceof Error ? error.message : String(error), kind: "runtime" } })
-        }${answers ? ANSWER_WAIT_RELEASE : ''}
+        }
       },
     })
 `;
@@ -755,16 +698,6 @@ const createPluginSource = ({ includeControl, includeSchedule, includeWeb, inclu
     entries.push(`    for (const id of ${JSON.stringify(OPENCODE_TOOLS_REPLACED_BY_CONTROL)}) tools.remove(id)
 `);
   }
-  if (includeSecret) {
-    entries.push(createToolEntry({
-      name: 'openchamber_secret',
-      description: SECRET_TOOL_DESCRIPTION,
-      definitions: OPENCHAMBER_SECRET_ACTION_DEFINITIONS,
-      parameters: SECRET_PARAMETER_PROPERTIES,
-      answers: { waitsWhen: '(args.action !== "secret.forget" && args.action !== "forget") || args.saved === true', closedInChatNote: SECRET_REQUEST_CLOSED_IN_CHAT_NOTE },
-      secretRun: true,
-    }));
-  }
   if (includeWorkflow) {
     entries.push(createToolEntry({
       name: 'openchamber_workflow',
@@ -780,11 +713,7 @@ const createPluginSource = ({ includeControl, includeSchedule, includeWeb, inclu
     }));
   }
 
-  const secretRunHelpers = includeSecret ? `const secretRunCommand = ${secretRunCommand.toString()}
-const secretRunCommandLine = ${secretRunCommandLine.toString()}
-
-` : '';
-  return `${secretRunHelpers}const exemptCallbackFromProxy = () => {
+  return `const exemptCallbackFromProxy = () => {
   const endpoint = process.env.OPENCHAMBER_AGENT_TOOL_URL
   if (!endpoint || !URL.canParse(endpoint)) return
   const host = new URL(endpoint).hostname.replace(/^\\[|\\]$/g, "")
@@ -794,48 +723,12 @@ const secretRunCommandLine = ${secretRunCommandLine.toString()}
   }
 }
 
-// Session id -> abort controllers of the calls that wait for the user's answer
-// (a page, or a secret card).
-const pagesWaitingForChat = new Map()
-${includeSecret ? `const isAgentPrompt = ${isAgentPrompt.toString()}
-const endWaits = (sessionID) => {
-  for (const controller of pagesWaitingForChat.get(sessionID) ?? []) controller.abort()
-}
-
-// Inbox id -> session id of the user's prompts not yet delivered. The user can
-// move one between queue and steer, and OpenCode does that without running the
-// prompt hook again, so the plugin follows the inbox events for these ids.
-const pendingByUser = new Map()
-const followUserPrompts = async (events) => {
-  for await (const event of events) {
-    if (event.type === "session.deleted") {
-      for (const [inboxID, sessionID] of pendingByUser) if (sessionID === event.data?.sessionID) pendingByUser.delete(inboxID)
-      continue
-    }
-    const sessionID = pendingByUser.get(event.data?.inboxID)
-    if (!sessionID) continue
-    if (event.type !== "session.inbox.delivery.changed") pendingByUser.delete(event.data.inboxID)
-    else if (event.data.delivery === "steer") endWaits(sessionID)
-  }
-}
-` : ''}
 export default {
   id: ${JSON.stringify(PLUGIN_ID)},
   setup: async (ctx) => {
     exemptCallbackFromProxy()
     await ctx.tool.transform((tools) => {
-${entries.join('')}    })${includeWeb ? browserMcpSetup(AGENT_TOOL_ACTION_TITLES) : ''}${includeMemory || includeKnowledge || includeUsage || includeNotify || includeControl || includeSchedule || includeTerminal || includeRender || includeImage ? controlMcpSetup(AGENT_TOOL_ACTION_TITLES) : ''}${includeSecret ? `
-    await ctx.session.hook("prompt", (event) => {
-      // An agent's prompt is not the user writing, and a queued one arrives
-      // only after the turn: the page keeps waiting for the user.
-      if (isAgentPrompt(event.metadata)) return
-      pendingByUser.set(event.messageID, event.sessionID)
-      if (event.delivery !== "queue") endWaits(event.sessionID)
-    })
-    if (ctx.event?.subscribe) {
-      followUserPrompts(ctx.event.subscribe({ types: ["session.inbox.delivery.changed", "session.inbox.delivered", "session.inbox.cancelled", "session.deleted"] }))
-        .catch((error) => console.warn("[openchamber-agent-tool] stopped following the user's prompts:", error?.message ?? error))
-    }` : ''}${includeControl ? LEAD_COMPACTION_HOOK : ''}
+${entries.join('')}    })${includeWeb ? browserMcpSetup(AGENT_TOOL_ACTION_TITLES) : ''}${includeMemory || includeKnowledge || includeUsage || includeNotify || includeControl || includeSchedule || includeTerminal || includeRender || includeImage || includeSecret ? controlMcpSetup(AGENT_TOOL_ACTION_TITLES) : ''}${includeControl ? LEAD_COMPACTION_HOOK : ''}
   },
 }
 `;
@@ -890,6 +783,7 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
       ...includeTerminal ? [{ name: 'terminal', description: CODE_MODE_CATALOG_LINES.openchamber_terminal + '\n\n' + TERMINAL_TOOL_DESCRIPTION, definitions: OPENCHAMBER_TERMINAL_ACTION_DEFINITIONS, parameters: TERMINAL_PARAMETER_PROPERTIES }] : [],
       ...includeRender ? [{ name: 'render', description: includeShare ? `${RENDER_TOOL_DESCRIPTION}${RENDER_TOOL_SHARE_SENTENCE}` : RENDER_TOOL_DESCRIPTION, definitions: OPENCHAMBER_RENDER_ACTION_DEFINITIONS, parameters: includeShare ? { ...RENDER_PARAMETER_PROPERTIES, share: RENDER_SHARE_PARAMETER } : RENDER_PARAMETER_PROPERTIES }] : [],
       ...includeImage ? [{ name: 'image', description: IMAGE_TOOL_DESCRIPTION, definitions: OPENCHAMBER_IMAGE_ACTION_DEFINITIONS, parameters: IMAGE_PARAMETER_PROPERTIES }] : [],
+      ...includeSecret ? [{ name: 'secret', description: SECRET_TOOL_DESCRIPTION, definitions: OPENCHAMBER_SECRET_ACTION_DEFINITIONS, parameters: SECRET_PARAMETER_PROPERTIES }] : [],
     ];
     await fsPromises.mkdir(pluginDirectory, { recursive: true });
     await fsPromises.writeFile(pluginManifestPath, PLUGIN_PACKAGE_JSON, { mode: 0o600 });
@@ -949,7 +843,6 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
       const contextSessionId = knowledgeAction || secretAction ? sessionID : asNonEmptyString(payload.contextSessionId) ?? sessionID;
       const contextCallId = asNonEmptyString(payload.callID);
       const actionOptions: ControlOptions = { ...options };
-      if (action === 'secret.run' && payload.tool === 'openchamber_secret') actionOptions.secretRunAuthorized = true;
       if (contextSessionId) actionOptions.contextSessionId = contextSessionId;
       if (contextCallId) actionOptions.contextCallId = contextCallId;
       const input = { ...payload.input, action };

@@ -6,9 +6,11 @@ import type { ResolveMcpContext } from './mcp-context.js';
 import type { ActionDefinition, AgentToolPayload, ParameterSchema, ResultFields } from './runtime.js';
 import type { ControlOptions } from '../openchamber-control/service.js';
 import type { ToolPermissions } from './permissions.js';
+import { resolveAgentToolAction } from '../openchamber-control/actions.js';
+import { secretRunCommand, secretRunCommandLine } from '../openchamber-control/secret-run.js';
 
-export const CONTROL_MCP_TOOLS = ['openchamber_memory', 'openchamber_knowledge', 'openchamber_usage', 'openchamber_notify', 'openchamber_control', 'openchamber_schedule', 'openchamber_terminal', 'openchamber_render', 'openchamber_image'];
-export const DIRECT_CONTROL_MCP_TOOLS = ['render', 'image'];
+export const CONTROL_MCP_TOOLS = ['openchamber_memory', 'openchamber_knowledge', 'openchamber_usage', 'openchamber_notify', 'openchamber_control', 'openchamber_schedule', 'openchamber_terminal', 'openchamber_render', 'openchamber_image', 'openchamber_secret'];
+export const DIRECT_CONTROL_MCP_TOOLS = ['render', 'image', 'secret'];
 export const controlMcpPermission = (name: string) => name === 'control' ? 'openchamber' : `openchamber_${name}`;
 export interface ControlMcpTool {
   name: string;
@@ -84,8 +86,19 @@ export function createControlMcpRuntime(
       const signal = AbortSignal.any([context.signal, controller.signal]);
       try {
         const permission = controlMcpPermission(tool.name);
-        await (await permissions.session(context.sessionID)).assert({ action: permission, resources: ['*'], save: ['*'] }, signal);
-        const result = await execute({ tool: permission, input: args, sessionID: context.sessionID, callID: context.callID }, { signal });
+        const policy = await permissions.session(context.sessionID);
+        await policy.assert({ action: permission, resources: ['*'], save: ['*'] }, signal);
+        const options: ControlOptions = { signal };
+        if (tool.name === 'secret' && resolveAgentToolAction(args.action ?? null, permission).action === 'secret.run') {
+          const command = secretRunCommand({ program: args.program, args: args.args });
+          if (command.program === undefined) {
+            const result = { schemaVersion: 1, ok: false, action: 'secret.run', error: { kind: 'usage', message: command.error } };
+            return { structuredContent: result, content: [{ type: 'text', text: JSON.stringify(result) }] };
+          }
+          await policy.assert({ action: 'shell', resources: [secretRunCommandLine(command.program, command.args)], save: [command.program + ' *'] }, signal);
+          options.secretRunAuthorized = true;
+        }
+        const result = await execute({ tool: permission, input: args, sessionID: context.sessionID, callID: context.callID }, options);
         signal.throwIfAborted();
         return { structuredContent: result, content: [{ type: 'text', text: JSON.stringify(result) }] };
       } finally { untrack(); }
