@@ -102,3 +102,8 @@ and directory boundaries. Only the event hub's already-typed directory no
 longer needs a string check. OpenCode session records can put their directory
 on `location`; requests scope that directory through `x-opencode-directory`,
 and permission replies use the `decision` body field.
+
+Shared MCP permission requests use the same policy modes and event subscription.
+The host supplies shared pending requests during reconciliation and replies to
+those requests through the shared runtime. Backend-owned requests use OpenCode's
+permission API.

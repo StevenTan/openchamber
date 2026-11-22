@@ -65,6 +65,8 @@ export function createPermissionAutoAcceptRuntime({
   fetchImpl = fetch,
   retryDelaysMs = RETRY_DELAYS_MS,
   requestTimeoutMs = REQUEST_TIMEOUT_MS,
+  replyToolPermission = async () => false,
+  listToolPermissions = () => [],
 }: PermissionAutoAcceptOptions) {
   let policy = normalizePolicy().policy;
   let loaded = false;
@@ -229,6 +231,7 @@ export function createPermissionAutoAcceptRuntime({
       const verdict = evaluatePermission ? await evaluatePermission(permission, directory) : null;
       if (verdict?.action !== 'accept') return 'held';
     }
+    if (await replyToolPermission(`${permission.sessionID}`, `${permission.id}`)) return 'replied';
     await request(`/api/session/${encodeURIComponent(`${permission.sessionID}`)}/permission/${encodeURIComponent(`${permission.id}`)}/reply`, {
       directory,
       method: 'POST',
@@ -312,6 +315,9 @@ export function createPermissionAutoAcceptRuntime({
         ? normalizedDirectories
         : Array.from(new Set(await runningSessionDirectories().catch(() => [])));
       const pendingById = new Map<JsonValue, { permission: JsonObject; directory: PermissionDirectory }>();
+      for (const entry of listToolPermissions()) {
+        if (isJsonObject(entry.permission) && entry.permission.id) pendingById.set(entry.permission.id, { permission: entry.permission, directory: entry.directory });
+      }
       for (const directory of scopes) {
         let payload;
         try {

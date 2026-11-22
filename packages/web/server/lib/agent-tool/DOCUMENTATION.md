@@ -21,7 +21,7 @@ Session control and browser operations are independently enabled:
   Their session, page execution and cancellation contract is owned by
   `../browser-control/DOCUMENTATION.md`.
 - `file_write`, `file_edit`, `file_patch` and `file_view_image` use the shared
-  file MCP service. Its policy plugin owns file permissions and activity metadata;
+  file MCP service. The service owns file permission checks; its plugin supplies activity metadata.
   execution and image attachments are described in `../agent-file/DOCUMENTATION.md`.
 - `openchamber_notify` — `notify.send`, a notification to the user through
   `lib/notifications/emit-route.js` (same limits and rate window as
@@ -520,8 +520,8 @@ Its command ownership, waiting, session memory and PTY contracts are in
 `control-mcp.ts` exposes memory, project knowledge, usage and notifications through
 the `openchamber` MCP server at `/api/openchamber/control-tool/mcp`. Its four direct
 tools retain their `openchamber_*` names, settings and action result envelopes.
-The managed OpenCode policy hooks check permissions before invocation and attach
-activity metadata after completion. Execution uses the existing control service.
+The shared permission runtime checks access before invocation. Managed OpenCode
+hooks attach activity metadata after completion. Execution uses the existing control service.
 
 `mcp.ts` owns Streamable HTTP connection handling shared by the command, browser,
 question, file and control services. They use the same listener and callback authentication.
@@ -595,3 +595,23 @@ remain unchanged by the server's TypeScript conversion.
 OpenCode applies configuration rules to every agent before reading the session's
 own rules. The managed rule denies the workflow answer tool globally, while a
 workflow agent's session can allow it.
+
+## Shared MCP permissions
+
+`permissions.ts` evaluates configured action and resource rules for command, file,
+browser, asynchronous question and control MCP calls. The last matching configured
+rule wins. Configured denies take precedence over saved approvals. Requests that
+need approval publish `permission.asked` through the global event hub and wait
+before executing the operation. Cancellation closes the request.
+
+`permission-routes.ts` serves these requests through the existing permission HTTP
+API. Pending lists include both backend and shared requests. The existing clients
+and automatic approval modes use the same events and replies. A rejection closes
+pending requests in that session. An always reply saves the proposed patterns in
+`tool-permissions.json`, scoped to the project, and resolves matching pending calls.
+
+The OpenCode adapter in `../opencode/tool-permissions.ts` reads the session's agent,
+configured permissions, project and backend saved approvals. It supplies this data
+to the shared evaluator. The managed plugins configure MCP and activity metadata.
+Web and Electron run the shared service; hosted and Capacitor clients use their
+connected server. VS Code and external OpenCode retain their own tool lifecycle.

@@ -16,7 +16,7 @@ itself; it can only ask and wait.
   upstream parameters and add `tabId`. The calling session comes from authoritative
   MCP metadata, and the server resolves its directory before dispatch. Backend
   integration supplies this session identity through `ResolveMcpContext`, outside model arguments.
-  The plugin checks the existing `openchamber_web` permission and records panel
+  The MCP service checks the shared `openchamber_web` permission. The plugin records panel
   activity metadata. Panel results retain the control envelope; page tools return
   upstream MCP content, including errors and media. MCP cancellation and session
   Stop abort the existing broker request. The browser setting controls discovery.

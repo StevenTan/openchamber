@@ -54,4 +54,6 @@ export interface PermissionAutoAcceptOptions {
   fetchImpl?: typeof fetch;
   retryDelaysMs?: number[];
   requestTimeoutMs?: number;
+  replyToolPermission?: (sessionID: string, requestID: string) => Promise<boolean>;
+  listToolPermissions?: () => Array<{ permission: JsonValue; directory: string }>;
 }

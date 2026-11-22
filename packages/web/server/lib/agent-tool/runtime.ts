@@ -59,13 +59,14 @@ import { LEAD_COMPACTION_HOOK } from '../session-lead/agent-tool-plugin.js';
 import { controlErrorFields } from '../openchamber-control/error.js';
 import type { ControlInput } from '../openchamber-control/contracts.js';
 import type { ControlOptions, createOpenChamberControlService } from '../openchamber-control/service.js';
-import type { Application, ExpressFactory, Request, RequestHandler } from '../shared/http-contracts.js';
+import type { Application, ExpressFactory, Request } from '../shared/http-contracts.js';
 import type { createQuestionRuntime } from '../agent-question/src/runtime.js';
-import { createQuestionMcpRuntime } from '../agent-question/src/mcp.js';
+import { createQuestionMcpRuntime, registerQuestionFormRoutes } from '../agent-question/src/mcp.js';
 import { createFileMcpRuntime } from '../agent-file/mcp.js';
 import { createControlMcpRuntime, controlMcpSetup, type ControlMcpTool } from './control-mcp.js';
 import { resolveOpenCodeMcpContext } from '../opencode/mcp-context.js';
 import type { ResolveMcpContext } from './mcp-context.js';
+import type { ToolPermissions } from './permissions.js';
 
 export interface ParameterSchema {
   type: string | string[];
@@ -137,6 +138,7 @@ export interface AgentToolDependencies {
   hasPendingInput: Parameters<typeof createCommandToolRuntime>[0]['hasPendingInput'];
   questionRuntime: ReturnType<typeof createQuestionRuntime>;
   resolveMcpContext?: ResolveMcpContext;
+  permissions: ToolPermissions;
 }
 
 interface ToolEntryOptions {
@@ -926,6 +928,7 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
     hasPendingInput,
     questionRuntime,
     resolveMcpContext = resolveOpenCodeMcpContext,
+    permissions,
   } = dependencies;
   const pluginRoot = path.join(instanceDir, 'agent-tool');
   const pluginDirectory = path.join(pluginRoot, PLUGIN_ID);
@@ -1081,7 +1084,7 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
     });
   };
 
-  const commandToolRuntime = createCommandToolRuntime({ instanceDir, resolveSessionDirectory, getEnvironment: getCommandEnvironment, hasPendingInput, authorize, trackInflight, abortSession, resolveMcpContext });
+  const commandToolRuntime = createCommandToolRuntime({ instanceDir, resolveSessionDirectory, getEnvironment: getCommandEnvironment, hasPendingInput, authorize, trackInflight, abortSession, resolveMcpContext, permissions });
   const browserMcp = createBrowserMcpRuntime({
     name: 'panel',
     description: WEB_TOOL_DESCRIPTION,
@@ -1094,27 +1097,11 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
       required: ['action'], additionalProperties: true,
     },
     outputSchema: { ...TOOL_OUTPUT_SCHEMA, type: 'object' },
-  }, execute, trackInflight, resolveMcpContext);
-  const questionMcp = createQuestionMcpRuntime(questionRuntime, resolveMcpContext);
-  const fileMcp = createFileMcpRuntime(resolveSessionDirectory, resolveMcpContext);
-  const controlMcp = createControlMcpRuntime(() => controlTools, execute, resolveMcpContext, trackInflight, { ...TOOL_OUTPUT_SCHEMA, type: 'object' });
+  }, execute, trackInflight, resolveMcpContext, permissions);
+  const questionMcp = createQuestionMcpRuntime(questionRuntime, resolveMcpContext, permissions);
+  const fileMcp = createFileMcpRuntime(permissions, resolveMcpContext);
+  const controlMcp = createControlMcpRuntime(() => controlTools, execute, resolveMcpContext, trackInflight, { ...TOOL_OUTPUT_SCHEMA, type: 'object' }, permissions);
 
-  const registerQuestionFormRoutes = (app: Application, express: Pick<ExpressFactory, 'json'>) => {
-    app.post<Parameters<typeof questionRuntime.resolveBatch>[0]>('/api/openchamber/async-question/resolve', express.json({ limit: '1mb' }), (req, res) => {
-      return questionRuntime.resolveBatch(req.body).then(
-        () => res.status(204).end(),
-        (error: Error & { status?: number }) => res.status(error.status ?? (error.name === 'ZodError' ? 400 : 500)).json({ error: error.message }),
-      );
-    });
-    const resolveQuestion = (cancel: boolean): RequestHandler<{ answer?: unknown }, { sessionID: string; formID: string }> => (req, res, next) => {
-      return questionRuntime.resolve(req.params.sessionID, req.params.formID, cancel ? { status: 'cancelled' } : { status: 'answered', answer: req.body?.answer }).then((handled) => {
-        if (!handled) return next();
-        return res.status(204).end();
-      }, (error: Error & { status?: number }) => res.status(error.status ?? (error.name === 'ZodError' ? 400 : 500)).json({ error: error.message }));
-    };
-    app.post('/api/session/:sessionID/form/:formID/reply', express.json({ limit: '1mb' }), resolveQuestion(false));
-    app.delete('/api/session/:sessionID/form/:formID', resolveQuestion(true));
-  };
 
   return {
     pluginDirectory,
@@ -1122,7 +1109,7 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
     createChildEnv,
     authorizeRequest: authorize,
     registerRoutes,
-    registerQuestionFormRoutes,
+    registerQuestionFormRoutes: (app: Application, express: Pick<ExpressFactory, 'json'>) => registerQuestionFormRoutes(questionRuntime, app, express),
     execute,
     abortSession,
     materializeCommandPlugin: commandToolRuntime.materializePlugin,

@@ -49,14 +49,6 @@ export const createQuestionPluginSource = () => `export default {
         headers: { authorization: 'Bearer ' + process.env.OPENCHAMBER_AGENT_TOOL_TOKEN },
       })
     })
-    await ctx.tool.hook('execute.before', async context => {
-      if (context.tool !== 'request_user_input_async') return
-      await ctx.permission.assert({
-        sessionID: context.sessionID, agent: context.agent, action: 'question',
-        resources: ['*'], save: ['*'],
-        source: { type: 'tool', messageID: context.messageID, id: context.id },
-      })
-    })
     await ctx.tool.hook('execute.after', async event => {
       if (event.status !== 'completed' || event.tool !== 'request_user_input_async') return
       event.result.metadata = { ...event.result.metadata, questionID: event.result.output.question_id }

@@ -5,6 +5,7 @@ import { createMcpRuntime } from './mcp.js';
 import type { ResolveMcpContext } from './mcp-context.js';
 import type { ActionDefinition, AgentToolPayload, ParameterSchema, ResultFields } from './runtime.js';
 import type { ControlOptions } from '../openchamber-control/service.js';
+import type { ToolPermissions } from './permissions.js';
 
 export const CONTROL_MCP_TOOLS = ['openchamber_memory', 'openchamber_knowledge', 'openchamber_usage', 'openchamber_notify'];
 export interface ControlMcpTool {
@@ -25,6 +26,7 @@ export function createControlMcpRuntime(
   resolveContext: ResolveMcpContext,
   trackInflight: (sessionID: string, controller: AbortController) => () => void,
   outputSchema: NonNullable<Tool['outputSchema']>,
+  permissions: ToolPermissions,
 ) {
   return createMcpRuntime(() => {
     const server = new Server({ name: 'openchamber', version: '1.0.0' }, { capabilities: { tools: {} } });
@@ -70,6 +72,7 @@ export function createControlMcpRuntime(
       const untrack = trackInflight(context.sessionID, controller);
       const signal = AbortSignal.any([context.signal, controller.signal]);
       try {
+        await (await permissions.session(context.sessionID)).assert({ action: `openchamber_${tool.name}`, resources: ['*'], save: ['*'] }, signal);
         const result = await execute({ tool: `openchamber_${tool.name}`, input: args, sessionID: context.sessionID, callID: context.callID }, { signal });
         signal.throwIfAborted();
         return { structuredContent: result, content: [{ type: 'text', text: JSON.stringify(result) }] };
@@ -89,14 +92,6 @@ export function controlMcpSetup(titles: Record<string, string>) {
       })
     })
     const controlTools = new Set(${JSON.stringify(CONTROL_MCP_TOOLS)})
-    await ctx.tool.hook('execute.before', async context => {
-      if (!controlTools.has(context.tool)) return
-      await ctx.permission.assert({
-        sessionID: context.sessionID, agent: context.agent, action: context.tool,
-        resources: ['*'], save: ['*'],
-        source: { type: 'tool', messageID: context.messageID, id: context.id },
-      })
-    })
     await ctx.tool.hook('execute.after', async event => {
       if (event.status !== 'completed' || !controlTools.has(event.tool)) return
       const result = event.result.output

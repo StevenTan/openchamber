@@ -21,6 +21,7 @@ beforeEach(async () => {
     getActivePort: () => listener.address().port,
     resolveSessionDirectory: async session => path.join(root, session),
     executeAction,
+    permissions: { session: async () => ({ directory: root, projectDirectory: root, assert: approve }) },
   });
   const app = express();
   runtime.registerRoutes(app, express);
@@ -95,13 +96,12 @@ it('preserves panel inputs, result envelopes and activity metadata', async () =>
 });
 
 it('applies browser permissions to panel and page tools before invocation', async () => {
-  for (const tool of ['browser_panel', 'browser_click']) {
-    await hooks.get('execute.before')({ ...caller, tool });
-    expect(approve).toHaveBeenLastCalledWith({
-      sessionID: caller.sessionID, agent: caller.agent, action: 'openchamber_web', resources: ['*'], save: ['*'],
-      source: { type: 'tool', messageID: caller.messageID, id: caller.id },
-    });
+  for (const [tool, args] of [['panel', { action: 'browser.snapshot' }], ['click', { element: 'Save', ref: 'e1' }]]) {
+    approve.mockRejectedValueOnce(new Error('Browser denied'));
+    await expect(call(tool, args)).rejects.toThrow('Browser denied');
+    expect(approve).toHaveBeenLastCalledWith({ action: 'openchamber_web', resources: ['*'], save: ['*'] }, expect.any(AbortSignal));
   }
+  expect(executeAction).not.toHaveBeenCalled();
 });
 
 it('delivers MCP cancellation and session stop to browser actions', async () => {

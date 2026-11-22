@@ -204,7 +204,7 @@ import { attachRealtimeProxy } from './lib/realtime-proxy.js';
 import { createRelayService, relayBlockedByEnterprise } from './lib/relay/service.js';
 import { createRelayHostLock } from './lib/relay/host-lock.js';
 import { createRelayKeyStore } from './lib/relay/key-store.js';
-import { createAgentToolRuntime } from './lib/agent-tool/runtime.js';
+import { createManagedAgentTools } from './lib/opencode/managed-agent-tools.js';
 import { createQuestionRuntime, questionStoreDirectory } from './lib/agent-question/src/runtime.js';
 import { createBrowserControlBroker } from './lib/browser-control/broker.js';
 import { createBrowserClientEvents } from './lib/browser-control/client-events.js';
@@ -462,7 +462,7 @@ const saveImportedTheme: typeof themeRuntime.saveImportedTheme = (...args) => th
 const deleteImportedTheme: typeof themeRuntime.deleteImportedTheme = (...args) => themeRuntime.deleteImportedTheme(...args);
 
 let questionRuntime: ReturnType<typeof createQuestionRuntime> | null = null;
-let agentToolRuntime: ReturnType<typeof createAgentToolRuntime> | null = null;
+let agentToolRuntime: ReturnType<typeof createManagedAgentTools> | null = null;
 let limitFailoverRuntime: ReturnType<typeof createLimitFailoverRuntime> | null = null;
 let managedConfigRuntime: ReturnType<typeof createManagedConfigRuntime> | null = null;
 let stopEnterprisePolicyWatch = () => {};
@@ -1301,6 +1301,8 @@ const permissionAutoAcceptRuntime = createPermissionAutoAcceptRuntime({
   broadcastGlobalUiEvent: broadcastPermissionUiEvent,
   evaluatePermission: (permission, directory) => routingRuntime.evaluatePermission(permission, directory),
   onPermissionReplied: (permissionId) => routingRuntime.forgetPermission(permissionId),
+  replyToolPermission: async (sessionID, requestID) => agentToolRuntime?.permissions.reply(sessionID, requestID, 'once') ?? false,
+  listToolPermissions: () => agentToolRuntime?.permissions.list().map(entry => ({ permission: { ...entry.request }, directory: entry.directory })) ?? [],
   resolveLegacyEnabledMode: async () => ((await routingRuntime.legacySafetyNetEnabled()) ? 'safety' : 'auto'),
   readDefaultMode: spacePermissionDefaultFile
     ? () => readSpacePermissionDefault(spacePermissionDefaultFile)
@@ -2415,25 +2417,15 @@ async function main(options: WebUiServerOptions = {}) {
     isSessionArchived: (sessionID) => openChamberSessionService.sessionArchive.isArchived(sessionID),
     isEnabled: () => !isExternalOpenCode && !ENV_SKIP_OPENCODE_START,
   });
-  agentToolRuntime = createAgentToolRuntime({
-    crypto,
-    fsPromises,
-    path,
+  agentToolRuntime = createManagedAgentTools({
     instanceDir,
     env: process.env,
-    executeAction: (...args) => openChamberControlService.execute(...args),
-    resolveSessionDirectory: (sessionID) => openChamberControlService.resolveSessionDirectory(sessionID),
+    control: openChamberControlService,
+    client: () => openCodeSessionClient(),
+    server: () => server,
     getCommandEnvironment: () => overlayEnvironment({ ...process.env, PATH: buildAugmentedPath() }, environmentRuntime.forOpenCode()),
-    hasPendingInput: async (sessionID, signal) => (await openCodeSessionClient().session.inbox.list({ sessionID }, { signal })).length > 0,
     questionRuntime,
-    getActivePort: () => {
-      const address = server?.address?.();
-      return address && !isString(address) ? address.port : null;
-    },
-    getActiveHost: () => {
-      const address = server?.address?.();
-      return address && !isString(address) ? address.address : null;
-    },
+    permissionOptions: { dataDir: OPENCHAMBER_DATA_DIR, buildOpenCodeUrl, getOpenCodeAuthHeaders, globalEventHub: globalMessageStreamHub },
   });
   limitFailoverRuntime = createLimitFailoverRuntime({
     fsPromises,

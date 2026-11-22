@@ -7,6 +7,7 @@ import type { ControlOptions } from '../openchamber-control/service.js';
 import { getPlaywrightToolDefinitions } from './playwright.js';
 import { BROWSER_MCP_TOOLS } from './tools.js';
 import type { ResolveMcpContext } from '../agent-tool/mcp-context.js';
+import type { ToolPermissions } from '../agent-tool/permissions.js';
 
 const panelInput = z.object({ action: z.string(), parameters: z.record(z.string(), z.unknown()).optional() }).catchall(z.unknown());
 
@@ -15,6 +16,7 @@ export function createBrowserMcpRuntime(
   execute: (payload: AgentToolPayload, options: ControlOptions) => Promise<ResultFields & { schemaVersion: number }>,
   trackInflight: (sessionID: string, controller: AbortController) => () => void,
   resolveContext: ResolveMcpContext,
+  permissions: ToolPermissions,
 ) {
   return createMcpRuntime(async () => {
     const pageTools = await getPlaywrightToolDefinitions();
@@ -42,6 +44,7 @@ export function createBrowserMcpRuntime(
       const signal = AbortSignal.any([extra.signal, controller.signal]);
       const untrack = trackInflight(sessionID, controller);
       try {
+        await (await permissions.session(sessionID)).assert({ action: 'openchamber_web', resources: ['*'], save: ['*'] }, signal);
         const payload: AgentToolPayload = { tool: 'openchamber_web', input, sessionID, callID };
         const result = await execute(payload, { signal });
         signal.throwIfAborted();
@@ -66,14 +69,6 @@ export function browserMcpSetup(titles: Record<string, string>) {
       })
     })
     const browserTools = new Set(${JSON.stringify(BROWSER_MCP_TOOLS)})
-    await ctx.tool.hook('execute.before', async context => {
-      if (!browserTools.has(context.tool)) return
-      await ctx.permission.assert({
-        sessionID: context.sessionID, agent: context.agent, action: 'openchamber_web',
-        resources: ['*'], save: ['*'],
-        source: { type: 'tool', messageID: context.messageID, id: context.id },
-      })
-    })
     await ctx.tool.hook('execute.after', async event => {
       if (event.status !== 'completed' || event.tool !== 'browser_panel') return
       const result = event.result.output

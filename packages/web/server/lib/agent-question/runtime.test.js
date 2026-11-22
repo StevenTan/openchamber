@@ -66,6 +66,7 @@ describe('asynchronous questions', () => {
     const agentRuntime = createAgentToolRuntime({
       crypto, fsPromises: fs, path, instanceDir: f.dataDir, questionRuntime: runtime,
       getActivePort: () => listener.address().port,
+      permissions: { session: async () => ({ directory: f.dataDir, projectDirectory: f.dataDir, assert: approve }) },
     });
     const app = express();
     agentRuntime.registerRoutes(app, express);
@@ -101,13 +102,9 @@ describe('asynchronous questions', () => {
     expect(tool.inputSchema.properties.questions.items.properties.options).not.toHaveProperty('prefixItems');
     expect(tool.outputSchema.required).toEqual(['question_id', 'status', 'message']);
     const context = { sessionID: 'ses_1', agent: 'build', messageID: 'message', id: 'outer_script', signal: new AbortController().signal };
-    await hooks.get('execute.before')({ ...context, tool: 'request_user_input_async' });
-    expect(approve).toHaveBeenCalledWith({
-      sessionID: 'ses_1', agent: 'build', action: 'question', resources: ['*'], save: ['*'],
-      source: { type: 'tool', messageID: context.messageID, id: context.id },
-    });
     const call = (title, sessionID = 'ses_1') => client.callTool({ name: tool.name, arguments: { questions: [{ title }] }, _meta: { 'ai.opencode/sessionID': sessionID } });
     const firstResult = await call('First question');
+    expect(approve).toHaveBeenCalledWith({ action: 'question', resources: ['*'], save: ['*'] }, expect.any(AbortSignal));
     const secondResult = await call('Second question');
     const first = firstResult.structuredContent;
     const second = secondResult.structuredContent;

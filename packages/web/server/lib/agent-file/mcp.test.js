@@ -14,10 +14,16 @@ afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await c
 async function fixture() {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'file-mcp-'));
   cleanup.push(() => fs.rm(directory, { recursive: true, force: true }));
+  const approve = vi.fn(async () => {});
   let listener;
   const runtime = createAgentToolRuntime({ crypto, fsPromises: fs, path, instanceDir: directory,
     resolveSessionDirectory: async sessionID => sessionID === 'session' ? directory : null,
-    getActivePort: () => listener.address().port });
+    getActivePort: () => listener.address().port,
+    permissions: { session: async sessionID => {
+      if (sessionID !== 'session') throw new Error('Session directory is unavailable');
+      return { directory, projectDirectory: directory, assert: approve };
+    } },
+  });
   const app = express();
   runtime.registerRoutes(app, express);
   listener = await new Promise(resolve => { const server = app.listen(0, '127.0.0.1', () => resolve(server)); });
@@ -26,7 +32,6 @@ async function fixture() {
   cleanup.push(() => vi.unstubAllEnvs());
   const hooks = new Map(), removed = [], registered = new Map();
   let config;
-  const approve = vi.fn(async () => {});
   await plugin.setup({
     location: { directory, project: { directory } }, permission: { assert: approve },
     mcp: { transform: async run => run({ set: (name, value) => { config = { name, ...value }; } }) },
@@ -41,7 +46,6 @@ async function fixture() {
   await client.connect(transport);
   const invoke = async (name, input) => {
     const context = { sessionID: 'session', agent: 'build', messageID: 'message', id: crypto.randomUUID(), tool: `file_${name}`, input };
-    await hooks.get('execute.before')(context);
     const result = await client.callTool({ name, arguments: input, _meta: { 'ai.opencode/sessionID': 'session' } });
     if (result.isError) throw new Error(result.content.map(part => part.text).join('\n'));
     const event = { ...context, status: 'completed', result: { output: result.structuredContent } };
@@ -91,7 +95,7 @@ it('attaches local image bytes through MCP and rejects non-images and missing se
   const result = await f.invoke('view_image', { path: 'page.png' });
   expect(result.structuredContent).toEqual({ path: path.join(f.directory, 'page.png'), mime: 'image/png' });
   expect(result.content).toEqual([{ type: 'image', mimeType: 'image/png', data: image.toString('base64') }]);
-  expect(f.approve).toHaveBeenLastCalledWith(expect.objectContaining({ action: 'read', resources: ['page.png'] }));
+  expect(f.approve).toHaveBeenLastCalledWith(expect.objectContaining({ action: 'read', resources: ['page.png'] }), expect.any(AbortSignal));
   await fs.writeFile(path.join(f.directory, 'text.txt'), 'text');
   await expect(f.invoke('view_image', { path: 'text.txt' })).rejects.toThrow('Expected a PNG');
   await expect(f.client.callTool({ name: 'write', arguments: { path: 'no.txt', content: '' }, _meta: { 'ai.opencode/sessionID': 'missing' } })).rejects.toThrow('Session directory is unavailable');

@@ -36,6 +36,7 @@ beforeEach(async () => {
     resolveSessionDirectory: async (id) => id.startsWith('session-') ? root : null,
     getCommandEnvironment: () => ({ ...process.env, COMMAND_TOOL_CONFIGURED_ENV: 'configured' }),
     hasPendingInput,
+    permissions: { session: async sessionID => ({ directory: root, projectDirectory: root, assert: async input => approvals({ ...input, sessionID }) }) },
   });
   runtime.registerRoutes(app, express);
   server = await new Promise(resolve => { const listener = app.listen(0, '127.0.0.1', () => resolve(listener)); });
@@ -61,7 +62,6 @@ beforeEach(async () => {
       ...tool, input: tool.inputSchema,
       async execute(input, caller) {
         const event = { ...caller, tool: mcpConfig.name + '_' + tool.name, input };
-        await hooks.get('execute.before')(event);
         const response = await mcpCall(nativeClient, tool.name, event.input, caller);
         if (response.isError) throw new Error(response.content.map(part => part.text).join('\n'));
         const result = { output: response.structuredContent, content: response.content };

@@ -4,8 +4,8 @@
 
 The file MCP service owns local writes, text replacement, multi-file patches and
 image attachments. Managed OpenCode discovers `file_write`, `file_edit`,
-`file_patch` and `file_view_image` as direct MCP tools. Its policy plugin checks
-OpenCode permissions and supplies activity metadata. The turn-diffs plugin owns
+`file_patch` and `file_view_image` as direct MCP tools. The shared permission service checks
+file access before execution; its OpenCode plugin supplies activity metadata. The turn-diffs plugin owns
 persisted turn patches; shared UI renders those records.
 
 Web and Electron managed servers register the service. Hosted and Capacitor
@@ -37,8 +37,9 @@ own plugins.
 ### Shared execution and backend permissions
 
 The service executes filesystem operations independently of an agent backend.
-The OpenCode plugin uses its permission APIs before invoking MCP, retaining the
-session, agent and source call identity. Transport authentication stays in the
+The service checks the calling session's shared permission policy before reading
+images or applying mutations. OpenCode supplies its configured rules and saved
+approvals through the backend adapter. Transport authentication stays in the
 agent-tool runtime.
 
 ### Upstream algorithms

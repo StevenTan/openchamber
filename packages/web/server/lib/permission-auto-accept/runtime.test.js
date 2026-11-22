@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createPermissionAutoAcceptRuntime } from './runtime.js';
 import { translateWireEvent, wireEventDirectory } from '../event-stream/translate-v2.js';
 
-const createRuntime = ({ stored, fetchImpl, retryDelaysMs = [0], evaluatePermission, onPermissionReplied, resolveLegacyEnabledMode, broadcastGlobalUiEvent, beforePersist } = {}) => {
+const createRuntime = ({ stored, fetchImpl, retryDelaysMs = [0], evaluatePermission, onPermissionReplied, resolveLegacyEnabledMode, broadcastGlobalUiEvent, beforePersist, replyToolPermission, listToolPermissions } = {}) => {
   let settings = stored ?? { permissionAutoAccept: { sessions: {} } };
   let eventHandler;
   let statusHandler;
@@ -24,6 +24,8 @@ const createRuntime = ({ stored, fetchImpl, retryDelaysMs = [0], evaluatePermiss
     onPermissionReplied,
     resolveLegacyEnabledMode,
     broadcastGlobalUiEvent,
+    replyToolPermission,
+    listToolPermissions,
   });
   runtime.start();
   return {
@@ -561,4 +563,17 @@ describe('permission auto-accept runtime', () => {
     await flush();
     expect(evaluatePermission).not.toHaveBeenCalled();
   });
+});
+
+it('reconciles shared MCP approvals through the shared reply handler', async () => {
+  const permission = { id: 'per_oc_test', sessionID: 'session', action: 'edit', resources: ['file.txt'] };
+  const replyToolPermission = vi.fn(async () => true);
+  const fetchImpl = vi.fn(async () => Response.json([]));
+  const { runtime } = createRuntime({ fetchImpl, replyToolPermission,
+    listToolPermissions: () => [{ permission, directory: '/project' }],
+  });
+  await runtime.setSessionPolicy('session', 'auto', '/project');
+  await runtime.reconcilePending(['/project']);
+  expect(replyToolPermission).toHaveBeenCalledWith('session', 'per_oc_test');
+  expect(fetchImpl.mock.calls.some(([url]) => new URL(url).pathname.endsWith('/reply'))).toBe(false);
 });

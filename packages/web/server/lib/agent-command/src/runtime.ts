@@ -12,6 +12,8 @@ import type { ResolveMcpContext } from "../../agent-tool/mcp-context.js";
 import { createSleepClock } from "./sleep.js";
 import { createSessionMemory } from "./session-memory.js";
 import type { JsonValue } from "../../event-stream/contracts.js";
+import { authorizeCommand } from './permissions.js';
+import type { ToolPermissions } from '../../agent-tool/permissions.js';
 
 const streamEvent = z.discriminatedUnion("type", [
   z.object({ type: z.enum(["session.inbox.enqueued", "session.deleted"]), data: z.object({ sessionID: z.string() }) }),
@@ -24,6 +26,7 @@ interface CommandRuntimeOptions extends CallbackAuthorization {
   getEnvironment?: (() => NodeJS.ProcessEnv) | undefined;
   hasPendingInput: (sessionID: string, signal: AbortSignal) => Promise<boolean>;
   resolveMcpContext: ResolveMcpContext;
+  permissions: ToolPermissions;
 }
 
 interface CallbackRequest extends IncomingMessage {
@@ -59,6 +62,7 @@ export function createCommandToolRuntime({
   trackInflight,
   resolveMcpContext,
   abortSession,
+  permissions,
 }: CommandRuntimeOptions) {
   const pluginDirectory = path.join(
     instanceDir,
@@ -191,7 +195,9 @@ export function createCommandToolRuntime({
     const controller = new AbortController();
     const untrack = trackInflight(context.sessionID, controller);
     try {
-      return await execute(tool, input, { sessionID: context.sessionID, signal: AbortSignal.any([context.signal, controller.signal]) });
+      const invocation = { sessionID: context.sessionID, signal: AbortSignal.any([context.signal, controller.signal]) };
+      const approved = await authorizeCommand(permissions, tool, input, invocation);
+      return await execute(tool, approved, invocation);
     } finally {
       untrack();
     }

@@ -38,6 +38,7 @@ const createRuntime = async (overrides = {}) => {
     instanceDir: dataDir,
     getActivePort: () => 3901,
     executeAction,
+    permissions: { session: async () => ({ directory: dataDir, projectDirectory: dataDir, assert: async () => {} }) },
     ...overrides,
   });
   return { runtime, dataDir, executeAction };
@@ -147,8 +148,8 @@ const loadTools = async (dataDir, tag, hooks = {}, removed = [], namespaces = []
         options: { codemode: false, namespace: 'openchamber' },
         execute: async (input, context) => {
           const event = { ...context, agent: 'build', messageID: 'message', id: crypto.randomUUID(), tool: name, input };
-          await toolHooks.get('execute.before')(event);
           const result = await client.callTool({ name: tool.name, arguments: input, _meta: { 'ai.opencode/sessionID': context.sessionID } });
+          if (result.isError) throw new Error(result.content.map(part => part.text).join('\n'));
           const after = { ...event, status: 'completed', result: { output: result.structuredContent } };
           await toolHooks.get('execute.after')(after);
           return { content: JSON.stringify(result.structuredContent), metadata: after.result.metadata };
@@ -159,12 +160,13 @@ const loadTools = async (dataDir, tag, hooks = {}, removed = [], namespaces = []
 };
 
 it('uses the backend context for direct MCP calls and retains permissions and activity metadata', async () => {
+  const permission = { assert: vi.fn(async () => {}) };
   const { runtime, dataDir, executeAction } = await createRuntime({
+    permissions: { session: async () => ({ directory: '/project', projectDirectory: '/project', assert: permission.assert }) },
     resolveMcpContext: request => ({ sessionID: 'app-session', callID: String(request.requestId), signal: request.signal }),
     resolveSessionDirectory: async sessionID => sessionID === 'app-session' ? '/project' : undefined,
   });
   await prepareManagedEnv(runtime, { includeControl: false, includeWeb: false, includeKnowledge: true, includeUsage: true, includeNotify: true });
-  const permission = { assert: vi.fn(async () => {}) };
   const tools = await loadTools(dataDir, 'shared-context', {}, [], [], { permission });
   const context = { sessionID: 'backend-session', agent: 'build' };
   for (const [name, action, parameters] of [
@@ -176,7 +178,7 @@ it('uses the backend context for direct MCP calls and retains permissions and ac
     const result = await tools[`openchamber_${name}`].execute({ action, parameters }, context);
     expect(JSON.parse(result.content)).toMatchObject({ action, ok: true });
     expect(result.metadata.openchamber).toMatchObject({ action, ok: true });
-    expect(permission.assert).toHaveBeenLastCalledWith(expect.objectContaining({ action: `openchamber_${name}`, sessionID: 'backend-session' }));
+    expect(permission.assert).toHaveBeenLastCalledWith(expect.objectContaining({ action: `openchamber_${name}` }), expect.any(AbortSignal));
   }
   expect(executeAction.mock.calls.find(([action]) => action === 'knowledge.list')).toEqual([
     'knowledge.list', { action: 'knowledge.list', kind: 'note' }, '/project', { contextSessionId: 'app-session', contextCallId: expect.any(String), signal: expect.any(AbortSignal) },

@@ -13,7 +13,8 @@ shared PTY provider and process-tree shutdown implementation.
 The agent-tool runtime supplies same-machine callback authentication and the
 managed-child environment. OpenCode's native MCP client discovers and invokes
 the command tools. The plugin configures the `openchamber_commands` MCP server
-and installs command permission and activity hooks. The managed config registers
+and supplies command activity metadata. The service checks command and terminal
+input permissions through the shared permission runtime. The managed config registers
 this plugin for Web and Electron. Hosted and Capacitor mobile clients use those server-side processes.
 External OpenCode and VS Code lifecycles receive no plugin injection.
 
@@ -60,7 +61,7 @@ External OpenCode and VS Code lifecycles receive no plugin injection.
 - A pipe command owns its POSIX process group. On command exit, remaining jobs
   in that group terminate before the session completes. Tasks that explicitly
   detach from the group have their own lifecycle.
-- The plugin's before-execution hook checks OpenCode's shell permission before launching commands and
+- The MCP service checks shared shell permissions before launching commands and
   sending terminal input. Launch permissions use OpenCode's portable shell
   scanner and directory analysis, vendored with its MIT notice in `vendor`.
   `shell` selects the binary for both permission analysis and process creation;
