@@ -3,7 +3,6 @@ import {
   createPermissionParser,
 } from "./vendor/shell-permissions.js";
 import { commandShell } from "./process.js";
-import { createSleepClock } from "./sleep.js";
 import { COMMAND_MCP_SERVER } from "./contracts.js";
 
 export const COMMAND_PLUGIN_ID = "openchamber-command-tool";
@@ -30,33 +29,6 @@ export default {
       const entries = (process.env[key] || '').split(',').map(value => value.trim()).filter(Boolean)
       if (!entries.includes(host)) process.env[key] = [...entries, host].join(',')
     }
-    const request = async (tool, sessionID, input, signal) => {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' },
-        body: JSON.stringify({ tool, sessionID, input }),
-        signal, timeout: false,
-      })
-      const result = await response.json()
-      if (!response.ok) throw new Error(result.error)
-      return result
-    }
-    const clock = (${createSleepClock.toString()})({
-      hasPendingInput: async (sessionID, signal) => (await request('pending_input', sessionID, {}, signal)).pending,
-    })
-    const watchingInput = (async () => {
-      try {
-        for await (const event of ctx.event.subscribe({ types: ['session.inbox.enqueued'], signal: clock.signal })) {
-          clock.interrupt(event.data.sessionID)
-        }
-        if (!clock.signal.aborted) throw new Error('Input event stream ended')
-      } catch (error) {
-        if (!clock.signal.aborted) {
-          console.error('[agent-command] input event stream failed:', error)
-          clock.close(new Error('Input event stream failed', { cause: error }))
-        }
-      }
-    })()
     const approve = (context, action, resource, save = resource) => ctx.permission.assert({
       sessionID: context.sessionID, agent: context.agent, action,
       resources: [resource], save: [save],
@@ -76,8 +48,6 @@ export default {
     }
     await ctx.tool.transform(tools => {
       tools.remove('shell')
-      tools.namespace({ name: 'clock', description: 'Tools for waiting on time.' })
-      tools.add(clock.tool)
     })
     await ctx.tool.hook('execute.before', async context => {
       const input = context.input
@@ -107,6 +77,9 @@ export default {
       }
     })
     await ctx.tool.hook('execute.after', async event => {
+      if (event.status === 'completed' && event.tool === commandServer + '_clock_sleep') {
+        event.result.metadata = { ...event.result.metadata, ...event.result.output }
+      }
       if (event.status !== 'completed' || (event.tool !== executeTool && event.tool !== stdinTool)) return
       const result = event.result.output
       event.result.metadata = {
@@ -122,10 +95,6 @@ export default {
         headers: { authorization: 'Bearer ' + token },
       })
     })
-    return async () => {
-      clock.close()
-      await watchingInput
-    }
   },
 }
 `;

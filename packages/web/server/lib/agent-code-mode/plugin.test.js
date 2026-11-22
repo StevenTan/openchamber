@@ -19,6 +19,9 @@ async function fixture(execute = () => Effect.succeed({ content: 'FILE_CONTENT',
     ['subagent', { id: 'subagent', name: 'subagent', input: {}, options: { codemode: false } }],
     ['openchamber_commands_exec_command', { id: 'openchamber_commands_exec_command', name: 'exec_command', input: {}, options: { namespace: 'openchamber_commands', codemode: false } }],
     ['openchamber_commands_write_stdin', { id: 'openchamber_commands_write_stdin', name: 'write_stdin', input: {}, options: { namespace: 'openchamber_commands', codemode: false } }],
+    ['openchamber_commands_clock_sleep', { id: 'openchamber_commands_clock_sleep', name: 'clock_sleep', input: {}, options: { namespace: 'openchamber_commands', codemode: false } }],
+    ['openchamber_commands_store', { id: 'openchamber_commands_store', name: 'store', input: {}, options: { namespace: 'openchamber_commands', codemode: false } }],
+    ['openchamber_commands_load', { id: 'openchamber_commands_load', name: 'load', input: {}, options: { namespace: 'openchamber_commands', codemode: false } }],
   ]);
   const sessionHooks = new Map();
   const toolHooks = new Map();
@@ -49,21 +52,6 @@ async function fixture(execute = () => Effect.succeed({ content: 'FILE_CONTENT',
   };
   return { tools, permissions, skills, request, toolHooks };
 }
-
-it('returns stored values through the native output encoder', async () => {
-  const { tools } = await fixture();
-  const context = { sessionID: 'ses_memory', agent: 'build', messageID: 'msg_memory', id: 'call_memory' };
-  const value = { marker: 'expected', n: 17 };
-  const store = tools.get('store');
-  const load = tools.get('load');
-  const input = await Effect.runPromise(Schema.decodeUnknownEffect(store.input)({ key: 'probe', value }));
-  await Effect.runPromise(store.execute(input, context));
-  const result = await Effect.runPromise(load.execute({ key: 'probe' }, context));
-  const output = Schema.isSchema(load.output)
-    ? await Effect.runPromise(Schema.encodeEffect(load.output)(result.output))
-    : (await load.output['~standard'].validate(result.output)).value;
-  expect(output).toEqual(value);
-});
 
 it('hides virtual skills registered after activation and rejects their loading', async () => {
   const f = await fixture();
@@ -113,8 +101,8 @@ it('supplies complete descriptions and parameter signatures while preserving dir
   expect(text).toContain('FULL_READ_INSTRUCTIONS');
   expect(text).toContain('PATH_FIELD_INSTRUCTIONS');
   expect(text).toContain('tools.example_file(');
-  expect(text).toContain('tools.store(');
-  expect(text).toContain('tools.load(');
+  expect(f.tools.has('store')).toBe(false);
+  expect(f.tools.has('load')).toBe(false);
   expect(text).toContain('ENVIRONMENT');
   expect(text).toContain('NATIVE_SKILL_GUIDANCE');
   expect(text).not.toContain('OLD_PARTIAL_CATALOG');
@@ -127,6 +115,10 @@ it('supplies complete descriptions and parameter signatures while preserving dir
   expect(f.tools.get('openchamber_commands_write_stdin').options.codemode).toBe(false);
   expect(text).not.toContain('tools.openchamber_commands.exec_command(');
   expect(text).not.toContain('tools.openchamber_commands.write_stdin(');
+  for (const name of ['clock_sleep', 'store', 'load']) {
+    expect(f.tools.get(`openchamber_commands_${name}`).options.codemode).toBe(false);
+    expect(text).not.toContain(`tools.openchamber_commands.${name}(`);
+  }
 });
 
 it('supplies native patch boundaries for file operation sections', async () => {

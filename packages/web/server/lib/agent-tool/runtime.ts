@@ -1140,7 +1140,7 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
     });
   };
 
-  const commandToolRuntime = createCommandToolRuntime({ instanceDir, resolveSessionDirectory, getEnvironment: getCommandEnvironment, hasPendingInput, authorize, trackInflight, resolveMcpSessionID: request => z.string().min(1).parse(request._meta?.['ai.opencode/sessionID']) });
+  const commandToolRuntime = createCommandToolRuntime({ instanceDir, resolveSessionDirectory, getEnvironment: getCommandEnvironment, hasPendingInput, authorize, trackInflight, abortSession, resolveMcpSessionID: request => z.string().min(1).parse(request._meta?.['ai.opencode/sessionID']) });
 
   const registerQuestionFormRoutes = (app: Application, express: Pick<ExpressFactory, 'json'>) => {
     app.post<Parameters<typeof questionRuntime.resolveBatch>[0]>('/api/openchamber/async-question/resolve', express.json({ limit: '1mb' }), (req, res) => {
@@ -1172,6 +1172,6 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
     materializeSearchPlugin: () => materializeSearchPlugin(instanceDir),
     materializeQuestionPlugin: () => questionRuntime.materializePlugin(instanceDir),
     closeCommands: commandToolRuntime.close,
-    releaseCommandSession: commandToolRuntime.releaseSession,
+    observeCommandEvent: commandToolRuntime.observeEvent,
   };
 };

@@ -139,7 +139,7 @@ Call tools listed in the Code Mode catalog as JavaScript inside `execute`, using
 
 When available, call the MCP tools `openchamber_commands_exec_command` and `openchamber_commands_write_stdin` directly to start and continue commands, using the returned `session_id`. Follow their current definitions for input delivery, terminal mode, EOF and wait parameters. Use the returned `status` to distinguish running and completed commands. A completed session can retain its identifier for output inspection.
 
-Use `tools.clock.sleep` inside `execute` for a deliberate time delay and follow its interruption result when new user input arrives.
+Use the direct MCP tool `openchamber_commands_clock_sleep` for a deliberate time delay and follow its interruption result when new user input arrives. Use `openchamber_commands_store` and `openchamber_commands_load` for session-local JSON snapshots; load returns `{ value: savedValue }`.
 
 Use `tools.request_user_input_async` inside `execute` to collect necessary user decisions. Continue independent work while answers are pending; use the answer before proceeding with work that depends on it.
 

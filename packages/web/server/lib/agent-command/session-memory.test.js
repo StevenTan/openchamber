@@ -1,13 +1,11 @@
-import { Effect } from 'effect';
 import { expect, it } from 'vitest';
 import { createSessionMemory } from './src/session-memory.ts';
 
 function fixture() {
   const memory = createSessionMemory();
-  const tools = Object.fromEntries(memory.tools.map(tool => [tool.name, tool]));
   const call = async (name, input, sessionID = 'session-a') => {
-    const result = await Effect.runPromise(tools[name].execute(input, { sessionID }));
-    return result.output;
+    const result = memory[name](input, sessionID);
+    return name === 'load' ? result.value : result;
   };
   return { memory, call };
 }

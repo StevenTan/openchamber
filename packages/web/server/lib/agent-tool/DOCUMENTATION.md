@@ -514,9 +514,10 @@ The managed `openchamber-question-tool` exposes `request_user_input_async` throu
 the same authenticated callback channel. Its durable form and answer lifecycle is
 owned by `../agent-question/`; ordinary form replies use the existing form routes.
 
-The separate `openchamber-command-tool` plugin exposes `exec_command` and
-`write_stdin` for managed OpenCode and shares this runtime's authenticated
-callback channel. Its command ownership, waiting and PTY contracts are in
+The separate `openchamber-command-tool` plugin configures native MCP discovery of
+`exec_command`, `write_stdin`, `clock_sleep`, `store` and `load` for managed
+OpenCode. Their service shares this runtime's authenticated callback channel.
+Its command ownership, waiting, session memory and PTY contracts are in
 `../agent-command/DOCUMENTATION.md`.
 
 - Web and Desktop managed OpenCode: injected automatically.

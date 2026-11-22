@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import type { CallToolResult, ServerNotification, ServerRequest } from "@modelcontextprotocol/sdk/types.js";
-import { commandOutput, commandTools, type CommandArguments, type CommandResult, type CommandToolContext, type CommandToolName } from "./contracts.js";
+import { commandTools, type CommandArguments, type RuntimeResult, type CommandToolContext, type CommandToolName } from "./contracts.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -11,7 +11,7 @@ const sessionHeader = z.string().optional();
 export type McpInvocation = Pick<RequestHandlerExtra<ServerRequest, ServerNotification>, "_meta">;
 
 export function createCommandMcpRuntime(
-  execute: (tool: CommandToolName, input: CommandArguments, context: CommandToolContext) => Promise<CommandResult>,
+  execute: (tool: CommandToolName, input: CommandArguments, context: CommandToolContext) => Promise<RuntimeResult>,
   resolveSessionID: (request: McpInvocation) => string,
 ) {
   const connections = new Map<string, { server: McpServer; transport: StreamableHTTPServerTransport }>();
@@ -47,16 +47,16 @@ export function createCommandMcpRuntime(
 }
 
 function createCommandMcpServer(
-  execute: (tool: CommandToolName, input: CommandArguments, context: CommandToolContext) => Promise<CommandResult>,
+  execute: (tool: CommandToolName, input: CommandArguments, context: CommandToolContext) => Promise<RuntimeResult>,
   resolveSessionID: (request: McpInvocation) => string,
 ) {
   const server = new McpServer({ name: "openchamber-commands", version: "1.0.0" });
-  for (const name of ["exec_command", "write_stdin"] as const) {
+  for (const name of ["exec_command", "write_stdin", "clock_sleep", "store", "load"] as const) {
     const definition = commandTools[name];
     server.registerTool(name, {
       description: definition.description,
       inputSchema: definition.input,
-      outputSchema: commandOutput,
+      outputSchema: definition.output,
     }, async (input: CommandArguments, extra: RequestHandlerExtra<ServerRequest, ServerNotification>): Promise<CallToolResult> => {
       const result = await execute(name, input, { sessionID: resolveSessionID(extra), signal: extra.signal });
       return { structuredContent: result, content: [{ type: "text", text: JSON.stringify(result) }] };

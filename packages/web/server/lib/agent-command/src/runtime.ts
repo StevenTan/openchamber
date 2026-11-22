@@ -6,16 +6,16 @@ import { COMMAND_PLUGIN_ID, createCommandPluginSource } from "./plugin.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { truncateOutput } from "./output.js";
 import { commandWait, continuationWait } from "./wait.js";
-import { commandInput, stdinInput, type CommandArguments, type CommandResult, type CommandToolName, type CommandToolContext } from "./contracts.js";
+import { commandInput, stdinInput, commandTools, type CommandArguments, type CommandResult, type RuntimeResult, type CommandToolName, type CommandToolContext } from "./contracts.js";
 import { createCommandMcpRuntime, type McpInvocation } from "./mcp.js";
+import { createSleepClock } from "./sleep.js";
+import { createSessionMemory } from "./session-memory.js";
+import type { JsonValue } from "../../event-stream/contracts.js";
 
-const requestInput = z
-  .object({
-    sessionID: z.string().min(1),
-    tool: z.literal("pending_input"),
-    input: z.unknown(),
-  })
-  .strict();
+const streamEvent = z.discriminatedUnion("type", [
+  z.object({ type: z.enum(["session.inbox.enqueued", "session.deleted"]), data: z.object({ sessionID: z.string() }) }),
+  z.object({ type: z.enum(["connect", "disconnect", "error", "initial-error"]) }),
+]);
 
 interface CommandRuntimeOptions extends CallbackAuthorization {
   instanceDir: string;
@@ -30,7 +30,7 @@ interface CallbackRequest extends IncomingMessage {
 }
 interface CallbackResponse extends ServerResponse {
   status(code: number): CallbackResponse;
-  json(body: CommandResult | { pending: boolean } | { error: string }): CallbackResponse;
+  json(body: { error: string }): CallbackResponse;
 }
 type CallbackHandler = (
   req: CallbackRequest,
@@ -38,7 +38,6 @@ type CallbackHandler = (
   next: (error?: Error) => void,
 ) => void | CallbackResponse | Promise<void | CallbackResponse>;
 interface CallbackApp {
-  post(path: string, ...handlers: CallbackHandler[]): void;
   all(path: string, ...handlers: CallbackHandler[]): void;
 }
 interface CallbackParser {
@@ -47,6 +46,7 @@ interface CallbackParser {
 interface CallbackAuthorization {
   authorize(req: IncomingMessage): boolean;
   trackInflight(sessionID: string, controller: AbortController): () => void;
+  abortSession(sessionID: string): number;
 }
 
 export function createCommandToolRuntime({
@@ -57,6 +57,7 @@ export function createCommandToolRuntime({
   authorize,
   trackInflight,
   resolveMcpSessionID,
+  abortSession,
 }: CommandRuntimeOptions) {
   const pluginDirectory = path.join(
     instanceDir,
@@ -65,6 +66,8 @@ export function createCommandToolRuntime({
   );
   let managers = new Map<string, TerminalManager>();
   let closed = false;
+  let clock = createSleepClock({ hasPendingInput });
+  const memory = createSessionMemory();
   const closeResources = async () => {
     const previous = managers;
     managers = new Map();
@@ -132,6 +135,8 @@ export function createCommandToolRuntime({
 
   const reset = () => {
     closed = false;
+    clock.close();
+    clock = createSleepClock({ hasPendingInput });
     void closeResources().catch((error) =>
       console.error("[agent-command] process cleanup failed:", error.message),
     );
@@ -141,8 +146,11 @@ export function createCommandToolRuntime({
     tool: CommandToolName,
     input: CommandArguments,
     { sessionID, signal }: CommandToolContext,
-  ): Promise<CommandResult> => {
+  ): Promise<RuntimeResult> => {
     if (closed) throw new Error("Command runtime is closed");
+    if (tool === "clock_sleep") return clock.sleep(commandTools.clock_sleep.input.parse(input), { sessionID, signal });
+    if (tool === "store") return memory.store(commandTools.store.input.parse(input), sessionID);
+    if (tool === "load") return memory.load(commandTools.load.input.parse(input), sessionID);
     if (tool === "exec_command") {
       const args = commandInput.parse(input);
       let manager = managers.get(sessionID);
@@ -200,35 +208,15 @@ export function createCommandToolRuntime({
         await mcp.handleRequest(req, res);
       },
     );
-    app.post(
-      "/api/openchamber/command-tool",
-      express.json({ limit: "1mb" }),
-      async (req: CallbackRequest, res: CallbackResponse) => {
-        if (!authorize(req))
-          return res.status(401).json({ error: "Unauthorized" });
-        const controller = new AbortController();
-        const abort = () => {
-          if (!res.writableEnded) controller.abort();
-        };
-        res.once("close", abort);
-        try {
-          const payload = requestInput.parse(req.body);
-          const untrack = trackInflight(payload.sessionID, controller);
-          try {
-            return res.json({ pending: await hasPendingInput(payload.sessionID, controller.signal) });
-          } finally {
-            untrack();
-          }
-        } catch (error) {
-          if (!res.destroyed)
-            return res.status(400).json({
-              error: error instanceof Error ? error.message : String(error),
-            });
-        } finally {
-          res.off("close", abort);
-        }
-      },
-    );
+  };
+
+  const releaseSession = async (id: string) => {
+    abortSession(id);
+    memory.clear(id);
+    const manager = managers.get(id);
+    if (!manager) return;
+    await manager.close();
+    managers.delete(id);
   };
 
   return {
@@ -237,13 +225,19 @@ export function createCommandToolRuntime({
     reset,
     close: () => {
       closed = true;
+      clock.close();
+      memory.clearAll();
       return closeResources();
     },
-    releaseSession: async (id: string) => {
-      const manager = managers.get(id);
-      if (!manager) return;
-      await manager.close();
-      managers.delete(id);
+    observeEvent: (payload: JsonValue) => {
+      const parsed = streamEvent.safeParse(payload);
+      if (!parsed.success) return;
+      const event = parsed.data;
+      if (event.type === "session.inbox.enqueued") clock.interrupt(event.data.sessionID);
+      if (event.type === "session.deleted") return releaseSession(event.data.sessionID)
+        .catch(error => console.error("[agent-command] session cleanup failed:", error.message));
+      if (event.type === "connect" && clock.signal.aborted) clock = createSleepClock({ hasPendingInput });
+      if (event.type === "disconnect" || event.type === "error") clock.close(new Error("Input event stream failed"));
     },
   };
 }

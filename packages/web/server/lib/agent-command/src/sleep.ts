@@ -54,37 +54,15 @@ export function createSleepClock({ hasPendingInput }: ClockOptions) {
         error => { if (cleanup()) reject(error); },
       );
     });
-    const wallTime = (performance.now() - started) / 1000;
-    return {
-      content: `Wall time: ${wallTime.toFixed(4)} seconds\n${interrupted ? "Sleep interrupted by new input." : "Sleep completed."}`,
-      metadata: { duration_ms, wall_time_seconds: wallTime, interrupted },
-    };
+    return { duration_ms, wall_time_seconds: Math.round(performance.now() - started) / 1000, interrupted };
   };
 
   return {
     signal: lifetime.signal,
-    tool: {
-      name: "sleep",
-      description: "Pause execution for a specified duration. Pending input or new input in this session ends the sleep early. Returns elapsed wall-clock time.",
-      options: { namespace: "clock", codemode: false },
-      input: {
-        type: "object",
-        properties: {
-          duration_ms: {
-            type: "integer",
-            minimum: 1,
-            maximum: maximumDuration,
-            description: "How long to sleep in milliseconds.",
-          },
-        },
-        required: ["duration_ms"],
-        additionalProperties: false,
-      },
-      execute: sleep,
-    },
+    sleep,
     interrupt: (sessionID: string) => {
       for (const wake of pending.get(sessionID) ?? []) wake();
     },
-    close: (reason: Error = new Error("Clock plugin unloaded")) => lifetime.abort(reason),
+    close: (reason: Error = new Error("Clock runtime closed")) => lifetime.abort(reason),
   };
 }

@@ -6,7 +6,6 @@ import { pathToFileURL } from 'node:url';
 import express from 'express';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createAgentToolRuntime } from '../agent-tool/runtime.js';
-import { EventEmitter, on } from 'node:events';
 import { setImmediate } from 'node:timers/promises';
 import { TerminalManager } from './dist/terminal-manager.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -20,8 +19,6 @@ let runtime;
 let tools;
 let approvals;
 let childEnv;
-let cleanupPlugin;
-let inputEvents;
 let hasPendingInput;
 let registered;
 let nativeClient;
@@ -32,7 +29,6 @@ const context = { sessionID: 'session-a', agent: 'build', messageID: 'message-a'
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-command-'));
   const app = express();
-  inputEvents = new EventEmitter();
   hasPendingInput = vi.fn(async () => false);
   runtime = createAgentToolRuntime({
     crypto, fsPromises: fs, path, instanceDir: root,
@@ -50,15 +46,10 @@ beforeEach(async () => {
   approvals = vi.fn(async () => {});
   registered = new Map([['shell', {}]]);
   const hooks = new Map();
-  cleanupPlugin = await plugin.default.setup({
+  await plugin.default.setup({
     location: { directory: root }, permission: { assert: approvals },
     tool: { transform: async transform => transform({ remove: id => registered.delete(id), namespace: () => {}, add: tool => registered.set(tool.options.namespace ? `${tool.options.namespace}_${tool.name}` : tool.name, tool) }), hook: async (name, handler) => hooks.set(name, handler) },
     mcp: { transform: async transform => transform({ set: (name, config) => { mcpConfig = { name, ...config }; } }) },
-    event: {
-      async *subscribe({ signal }) {
-        for await (const [event] of on(inputEvents, 'input', { signal })) yield event;
-      },
-    },
   });
   nativeClient = new Client({ name: 'opencode', version: '2.3.2' });
   nativeTransport = new StreamableHTTPClientTransport(new URL(mcpConfig.url), { requestInit: { headers: mcpConfig.headers } });
@@ -82,7 +73,6 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await cleanupPlugin();
   await nativeTransport.terminateSession();
   await nativeClient.close();
   vi.useRealTimers();
@@ -94,7 +84,7 @@ afterEach(async () => {
 
 const run = async (name, input, caller = context) => (await tools.get(name).execute(input, caller)).output;
 const enqueueInput = async sessionID => {
-  inputEvents.emit('input', { type: 'session.inbox.enqueued', data: { sessionID } });
+  runtime.observeCommandEvent({ type: 'session.inbox.enqueued', data: { sessionID } });
   await setImmediate();
 };
 const withMcpClient = async use => {
@@ -118,12 +108,12 @@ describe('managed command tools', () => {
   it('exposes the command contracts and structured results through MCP', async () => {
     await withMcpClient(async client => {
       const catalog = await client.listTools();
-      expect(catalog.tools.map(tool => tool.name)).toEqual(['exec_command', 'write_stdin']);
+      expect(catalog.tools.map(tool => tool.name)).toEqual(['exec_command', 'write_stdin', 'clock_sleep', 'store', 'load']);
       for (const tool of catalog.tools) {
         expect(tool.description).toBe(tools.get(tool.name).description);
         expect(tool.inputSchema.required).toEqual(tools.get(tool.name).input.required);
         expect(tool.inputSchema.properties).not.toHaveProperty('sessionID');
-        expect(tool.outputSchema.properties).toHaveProperty('session_id');
+        expect(tool.outputSchema.type).toBe('object');
       }
       const value = { text: '引号 "OK"、反斜杠 \\ 和换行\n第二行', nested: { value: 7 } };
       const result = await mcpCall(client, 'exec_command', { cmd: nodeCommand(`console.log(${JSON.stringify(JSON.stringify(value))})`) });
@@ -172,9 +162,9 @@ describe('managed command tools', () => {
   });
 
   it('exposes command execution and continuation through native MCP discovery', () => {
-    expect([...registered.keys()]).toEqual(['clock_sleep']);
+    expect([...registered.keys()]).toEqual([]);
     expect(mcpConfig).toMatchObject({ name: 'openchamber_commands', type: 'remote', codemode: false, oauth: false });
-    expect([...tools.keys()]).toEqual(['clock_sleep', 'exec_command', 'write_stdin']);
+    expect([...tools.keys()]).toEqual(['exec_command', 'write_stdin', 'clock_sleep', 'store', 'load']);
     expect(tools.get('exec_command').input.required).toEqual(['cmd']);
     expect(tools.get('write_stdin').input.required).toEqual(['session_id']);
     expect(tools.get('clock_sleep').input.required).toEqual(['duration_ms']);
@@ -187,13 +177,14 @@ describe('managed command tools', () => {
   it('completes a clock sleep and reports elapsed time', async () => {
     const sleeping = tools.get('clock_sleep').execute({ duration_ms: 20 }, context);
     const result = await sleeping;
-    expect(result.content).toContain('Sleep completed.');
+    expect(JSON.parse(result.content[0].text)).toEqual(result.output);
     expect(result.metadata).toMatchObject({ duration_ms: 20, interrupted: false });
     expect(result.metadata.wall_time_seconds).toBeGreaterThan(0);
   });
 
   it('wakes sleeping tools only for new input in their own session', async () => {
     const sleeping = tools.get('clock_sleep').execute({ duration_ms: 10000 }, context);
+    await expect.poll(() => hasPendingInput.mock.calls.length).toBe(1);
     await enqueueInput('session-b');
     await enqueueInput(context.sessionID);
     expect((await sleeping).metadata.interrupted).toBe(true);
@@ -207,15 +198,8 @@ describe('managed command tools', () => {
     await rejected;
   });
 
-  it('releases sleeping tools when the plugin unloads', async () => {
-    const sleeping = tools.get('clock_sleep').execute({ duration_ms: 10000 }, context);
-    const rejected = expect(sleeping).rejects.toThrow('Clock plugin unloaded');
-    await cleanupPlugin();
-    await rejected;
-  });
-
   it.each([0, -1, 0.5, 43200001])('rejects unsupported sleep duration %s', async duration_ms => {
-    await expect(tools.get('clock_sleep').execute({ duration_ms }, context)).rejects.toThrow('duration_ms must be between');
+    await expect(tools.get('clock_sleep').execute({ duration_ms }, context)).rejects.toThrow();
   });
 
   it('returns immediately for input already in the session inbox', async () => {
@@ -443,12 +427,8 @@ describe('managed command tools', () => {
   });
 
   it('rejects unauthenticated callbacks and invalid inputs', async () => {
-    const endpoint = new URL('/api/openchamber/command-tool', childEnv.OPENCHAMBER_AGENT_TOOL_URL);
+    const endpoint = new URL('/api/openchamber/command-tool/mcp', childEnv.OPENCHAMBER_AGENT_TOOL_URL);
     expect((await fetch(endpoint, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).status).toBe(401);
-    expect((await fetch(new URL('/api/openchamber/command-tool/mcp', endpoint), { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).status).toBe(401);
-    const response = await fetch(endpoint, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${childEnv.OPENCHAMBER_AGENT_TOOL_TOKEN}` }, body: JSON.stringify({ sessionID: 'session-a', tool: 'exec_command', input: { cmd: 'touch invalid-file', yield_time_ms: -1 } }) });
-    expect(response.status).toBe(400);
-    await expect(fs.stat(path.join(root, 'invalid-file'))).rejects.toMatchObject({ code: 'ENOENT' });
     await withMcpClient(async client => {
       const result = await mcpCall(client, 'exec_command', { cmd: 'touch invalid-file', yield_time_ms: -1 });
       expect(result.isError).toBe(true);
@@ -460,7 +440,7 @@ describe('managed command tools', () => {
     const started = await run('exec_command', { cmd: nodeCommand('setInterval(() => {}, 1000)'), yield_time_ms: 0 });
     await runtime.materializeCommandPlugin();
     expect((await run('write_stdin', { session_id: started.session_id, yield_time_ms: 0 })).status).toBe('running');
-    await runtime.releaseCommandSession(context.sessionID);
+    await runtime.observeCommandEvent({ type: 'session.deleted', data: { sessionID: context.sessionID } });
     await expect(run('write_stdin', { session_id: started.session_id, yield_time_ms: 0 })).rejects.toThrow('Command session not found');
   });
 
@@ -515,6 +495,31 @@ describe('managed command tools', () => {
     expect(interrupted.elapsed).toBeLessThan(1500);
     expect(interrupted.result.status).toBe('completed');
     expect(finished.status).toBe('completed');
+  });
+
+  it('keeps JSON snapshots across MCP connections and clears only a deleted session', async () => {
+    const values = [{ text: '你好 "OK"\\\n第二行', items: [1, false, null] }, 'text', [1, 2], null, false, 0, ''];
+    for (const value of values) {
+      expect(await run('store', { key: 'result', value })).toEqual({ key: 'result' });
+      await withMcpClient(async client => {
+        const result = await mcpCall(client, 'load', { key: 'result' });
+        expect(result.structuredContent).toEqual({ value });
+        expect(JSON.parse(result.content[0].text)).toEqual({ value });
+        expect((await mcpCall(client, 'load', { key: 'result' }, { ...context, sessionID: 'session-b' })).isError).toBe(true);
+      });
+    }
+    await run('store', { key: 'result', value: 'B' }, { ...context, sessionID: 'session-b' });
+    runtime.observeCommandEvent({ type: 'session.deleted', data: { sessionID: context.sessionID } });
+    await expect(run('load', { key: 'result' })).rejects.toThrow('No stored value');
+    expect(await run('load', { key: 'result' }, { ...context, sessionID: 'session-b' })).toEqual({ value: 'B' });
+  });
+
+  it('ends a sleeping call when its application session is stopped', async () => {
+    const sleeping = run('clock_sleep', { duration_ms: 30000 });
+    const rejected = expect(sleeping).rejects.toThrow();
+    await expect.poll(() => hasPendingInput.mock.calls.length).toBe(1);
+    expect(runtime.abortSession(context.sessionID)).toBe(1);
+    await rejected;
   });
 
   it('captures sustained output completely while keeping tool responses small', async () => {

@@ -1434,6 +1434,7 @@ const receivedPagesRuntime = createReceivedPagesRuntime({
   broadcast: (event) => broadcastOpenChamberUiEvent(event),
 });
 globalMessageStreamHub.subscribeStatus((status) => {
+  agentToolRuntime?.observeCommandEvent({ type: status.type });
   if (status?.type !== 'connect') return;
   void workflowRuntime.deliverPending();
   void sharePagesRuntime.poll();
@@ -1517,15 +1518,11 @@ globalMessageStreamHub.subscribeEvent((event) => {
   const directory = isString(event?.directory) && event.directory && event.directory !== 'global'
     ? event.directory
     : '';
+  agentToolRuntime?.observeCommandEvent(event?.payload);
   for (const payload of event?.translated?.() ?? []) {
     // external: https://github.com/anomalyco/opencode OpenCode 2 supplies no plugin abort signal; turn cancellation stops pending OpenChamber actions here.
     if (payload.type === 'session.idle' && 'aborted' in payload.properties && payload.properties.aborted === true) {
       agentToolRuntime?.abortSession?.(payload.properties.sessionID);
-    }
-    if (payload.type === 'session.deleted') {
-      // SAFETY: session.deleted carries the deleted session in info.
-      void agentToolRuntime?.releaseCommandSession((payload.properties.info as { id: string }).id)
-        .catch(error => console.error('[agent-command] session cleanup failed:', error.message));
     }
     if ((payload.type === 'session.idle' || payload.type === 'session.error') && payload.properties.sessionID !== undefined) {
       openChamberControlService.releaseAnswerWaits(payload.properties.sessionID);

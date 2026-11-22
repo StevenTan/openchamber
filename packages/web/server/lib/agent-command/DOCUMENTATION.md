@@ -3,10 +3,10 @@
 ## Ownership
 
 This module owns session-scoped command processes, their output buffers, the
-command MCP service, and the `openchamber-command-tool` policy and clock plugin. `exec_command` starts a process;
+command MCP service, session memory, sleep timers, and the `openchamber-command-tool` policy plugin. `exec_command` starts a process;
 `write_stdin` waits on it, reads new output, and sends pipe or raw PTY input.
-The same plugin provides `clock.sleep`, exposed as `clock_sleep` on OpenCode's
-direct tool list. Its timer runs in the plugin process.
+The service also provides `clock_sleep`, `store` and `load`. Their state lives
+in the OpenChamber server, scoped to the calling application session.
 The neighbouring `terminal` module owns the user's visible terminals and the
 shared PTY provider and process-tree shutdown implementation.
 
@@ -22,7 +22,7 @@ External OpenCode and VS Code lifecycles receive no plugin injection.
 - Each command belongs to the application session that started it. Other sessions
   cannot read its output or send input through its handle.
 - `contracts.ts` supplies the MCP tool descriptions and input/output schemas.
-  Command tools are exposed directly to the model through native MCP discovery.
+  All five tools are exposed directly to the model through native MCP discovery.
   Backend integration resolves the authoritative calling session from MCP metadata,
   outside model arguments. OpenCode supplies `ai.opencode/sessionID`.
 - `/api/openchamber/command-tool/mcp` uses Streamable HTTP and the existing
@@ -72,12 +72,19 @@ External OpenCode and VS Code lifecycles receive no plugin injection.
   stops its wait. Session deletion and server shutdown terminate owned processes;
   shutdown also waits for pending launches to finish cleanup. Plugin refresh
   preserves command handles.
-- `clock.sleep` accepts integer durations from 1 millisecond to 12 hours and
+- `clock_sleep` accepts integer durations from 1 millisecond to 12 hours and
   reports elapsed time. A sleep registers for wake-up before querying the
   session's durable inbox. Existing queued input and subsequent inbox-enqueued
-  events end it early. Tool cancellation and plugin unload reject pending sleeps,
+  events end it early. Tool cancellation, session deletion and server shutdown reject pending sleeps,
   clear timers and cancel outstanding inbox queries. Inbox-query and event-stream
-  failures surface as tool errors.
+  failures surface as tool errors. Results contain `duration_ms`,
+  `wall_time_seconds` and `interrupted`; the native after-hook also records these
+  fields as activity metadata.
+- `store({ key, value })` saves a JSON snapshot and returns `{ key }`.
+  `load({ key })` returns `{ value: savedValue }` containing a copy of the snapshot,
+  or a tool error for a missing key. Memory survives calls, turns, MCP reconnections,
+  location eviction and plugin refresh. Session deletion and server shutdown clear
+  it. Forked sessions start with separate empty memory.
 
 Command tools expose their result object in MCP `structuredContent` alongside
 display text. OpenCode's native MCP tool executor preserves that object in tool
@@ -105,9 +112,11 @@ scanner and permission parser with its license in `vendor/LICENSE`.
 
 ### Authoritative pending input
 
-The server queries OpenCode's session inbox for each sleep. The plugin subscribes
-to durable inbox-enqueued events for active waits. Reading current queue state
-handles delivery, cancellation and plugin reload without a second queue projection.
+The server queries OpenCode's session inbox for each sleep and consumes durable
+inbox-enqueued events from its shared upstream event hub for active waits.
+Reading current queue state handles delivery and cancellation without a second
+queue projection. An event-stream disconnect rejects pending sleeps; a connection
+event prepares the clock for subsequent calls.
 
 ### Pipe completion
 

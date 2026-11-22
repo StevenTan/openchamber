@@ -85,16 +85,34 @@ export const commandTools = {
   exec_command: {
     description: "Runs a command with stdin, stdout and stderr pipes by default. Use write_stdin to send input; send EOF with close_stdin when the program needs the end of its input. Set tty: true at launch for programs that require a terminal. The session mode is fixed at launch. Collects output until the wait ends or the process exits, returning a session ID for continuation. When status is running, continue with write_stdin using the returned session_id. Completed commands retain their session_id for output inspection; status and exit_code report completion.",
     input: commandInput,
+    output: commandOutput,
   },
   write_stdin: {
     description: "Writes characters to an existing command session and returns recent output. Pipe sessions accept ordinary input and close_stdin: true sends EOF after the supplied chars, so final input and EOF need one call. Empty chars without close_stdin waits without writing. Ctrl+C interrupts either mode. The session mode is fixed at launch. Use status to check completion; completed sessions remain readable through offset and length.",
     input: stdinInput,
+    output: commandOutput,
+  },
+  clock_sleep: {
+    description: "Pause execution for a specified duration. Pending input or new input in this session ends the sleep early. Returns elapsed wall-clock time and whether input interrupted the sleep.",
+    input: z.object({ duration_ms: z.number().int().min(1).max(43200000).describe("How long to sleep in milliseconds.") }).strict(),
+    output: z.object({ duration_ms: z.number(), wall_time_seconds: z.number(), interrupted: z.boolean() }),
+  },
+  store: {
+    description: "Save a JSON value under a key in the current session's memory. Overwrites the same key. Values remain available across tool calls and conversation turns until the session is deleted or the server restarts. Returns the saved key. Await store before loading a dependent value.",
+    input: z.object({ key: z.string().describe("Cache key within the current session."), value: z.json().describe("JSON value to save as a snapshot.") }).strict(),
+    output: z.object({ key: z.string() }),
+  },
+  load: {
+    description: "Read a JSON value saved by store in the current session. Returns { value: savedValue } with a copy of the saved value; call store to save edits. Throws a catchable tool error when the key does not exist. Other sessions' values are private. Memory is cleared when the session is deleted or the server restarts.",
+    input: z.object({ key: z.string().describe("Cache key within the current session.") }).strict(),
+    output: z.object({ value: z.json() }),
   },
 };
 
 export type CommandToolName = keyof typeof commandTools;
-export type CommandArguments = z.input<typeof commandInput> | z.input<typeof stdinInput>;
+export type CommandArguments = z.input<typeof commandTools[CommandToolName]["input"]>;
 export type CommandResult = z.infer<typeof commandOutput>;
+export type RuntimeResult = z.infer<typeof commandTools[CommandToolName]["output"]>;
 export interface CommandToolContext {
   sessionID: string;
   signal: AbortSignal;
