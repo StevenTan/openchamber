@@ -102,6 +102,8 @@ describe("tool row description", () => {
       .toEqual({ kind: "text", value: "memory.save · Drafts rule" })
     expect(toolDescription("openchamber_web", { action: "browser.snapshot", parameters: {} }, undefined))
       .toEqual({ kind: "text", value: "browser.snapshot" })
+    expect(toolDescription("browser_panel", { action: "browser.snapshot", parameters: {} }, undefined))
+      .toEqual({ kind: "text", value: "browser.snapshot" })
     expect(toolDescription("openchamber_notify", { title: "Review ready" }, undefined))
       .toEqual({ kind: "text", value: "Review ready" })
     expect(toolDescription("openchamber_usage", { action: "usage.read", parameters: { providerId: "claude" } }, undefined))

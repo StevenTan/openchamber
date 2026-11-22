@@ -9,6 +9,17 @@ itself; it can only ask and wait.
 
 ## Boundaries
 
+- `mcp.ts` exposes panel operations and the official Playwright page tools through
+  `/api/openchamber/browser-tool/mcp`, using the agent-tool runtime's same-machine
+  bearer authentication and shared Streamable HTTP transport. Managed OpenCode
+  discovers them directly as `browser_panel` and `browser_*`. Page schemas retain
+  upstream parameters and add `tabId`. The calling session comes from authoritative
+  MCP metadata, and the server resolves its directory before dispatch. Backend
+  integration supplies this session identity outside model arguments.
+  The plugin checks the existing `openchamber_web` permission and records panel
+  activity metadata. Panel results retain the control envelope; page tools return
+  upstream MCP content, including errors and media. MCP cancellation and session
+  Stop abort the existing broker request. The browser setting controls discovery.
 - `broker.js` owns request lifetime: it publishes one action through the
   injected `emitRequest`, holds the pending request, and settles it on a client
   result, a timeout, or an abort signal. It knows nothing about transports.
@@ -67,7 +78,7 @@ itself; it can only ask and wait.
   reloaded window starts unpreferred: the page keeps no record of its old
   connection, so its next click or key press takes the preference back.
 - `../openchamber-control/service.js` is the only caller. It maps the
-  `browser.*` actions of the `openchamber_web` tool onto the router's
+  `browser.*` actions from MCP or the control API onto the router's
   `request()` (same signature as the broker) and owns their parameter
   validation.
 - The client half is `packages/ui/src/lib/browser/controlClient.ts`. Every

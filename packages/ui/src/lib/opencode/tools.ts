@@ -561,7 +561,7 @@ const OPENCHAMBER_SECRET_TOOL = "openchamber_secret"
 const OPENCHAMBER_WORKFLOW_TOOL = "openchamber_workflow"
 const OPENCHAMBER_IMAGE_TOOL = "openchamber_image"
 
-const OPENCHAMBER_TOOLS = new Set(["openchamber", "openchamber_schedule", "openchamber_web", "openchamber_memory", "openchamber_knowledge", "openchamber_notify", "openchamber_usage", OPENCHAMBER_RENDER_TOOL, OPENCHAMBER_IMAGE_TOOL, OPENCHAMBER_SECRET_TOOL, OPENCHAMBER_WORKFLOW_TOOL])
+const OPENCHAMBER_TOOLS = new Set(["openchamber", "openchamber_schedule", "openchamber_web", "browser_panel", "openchamber_memory", "openchamber_knowledge", "openchamber_notify", "openchamber_usage", OPENCHAMBER_RENDER_TOOL, OPENCHAMBER_IMAGE_TOOL, OPENCHAMBER_SECRET_TOOL, OPENCHAMBER_WORKFLOW_TOOL])
 
 export const isOpenChamberTool = (toolName: ToolName): boolean => OPENCHAMBER_TOOLS.has(normalizeToolName(toolName))
 
@@ -685,7 +685,7 @@ const ACTION_PREFIX_BY_TOOL = new Map<string, string>(Object.entries({
   openchamber_schedule: "schedule",
   openchamber_notify: "notify",
   openchamber_usage: "usage",
-  openchamber_web: "browser",
+  openchamber_web: "browser", browser_panel: "browser",
   openchamber_render: "render",
   openchamber_image: "image",
   openchamber_secret: "secret",

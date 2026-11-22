@@ -10,6 +10,7 @@ import type { Permission } from "@opencode/schema/permission";
 import { createCallActivity } from "./call-activity.js";
 import { adaptFileTools, type FileToolEditor } from "./file-tools.js";
 import { assertFileSkill, filterVirtualSkillGuidance, type SkillRegistry } from "./skill-policy.js";
+import { BROWSER_MCP_TOOLS } from "../../browser-control/tools.js";
 
 const directTools = new Set([
   "openchamber_render", "openchamber_secret", "openchamber_image",
@@ -17,6 +18,7 @@ const directTools = new Set([
   "subagent",
   "openchamber_commands_exec_command", "openchamber_commands_write_stdin",
   "openchamber_commands_clock_sleep", "openchamber_commands_store", "openchamber_commands_load",
+  ...BROWSER_MCP_TOOLS,
 ]);
 const patchTextDescription = "File operation sections beginning with '*** Add File:', '*** Update File:' or '*** Delete File:'. The tool supplies the outer '*** Begin Patch' and '*** End Patch' lines.";
 const skillInput = Schema.Struct({ id: Schema.String });

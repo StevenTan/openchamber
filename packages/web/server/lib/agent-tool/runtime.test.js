@@ -99,8 +99,10 @@ const loadTools = async (dataDir, tag, hooks = {}, removed = [], namespaces = []
   const pluginModule = await import(`${pathToFileURL(entrypoint).href}?${tag}=${Date.now()}`);
   const registered = {};
   await pluginModule.default.setup({
+    mcp: { transform: async () => {} },
     ...context,
     tool: {
+      hook: async () => {},
       transform: (edit) => {
         edit({
           add: (tool) => { registered[tool.name] = tool; },
@@ -359,7 +361,7 @@ describe('managed agent tool runtime', () => {
     expect(tools.openchamber.input.properties.action.enum).not.toContain('knowledge.list');
     // The control tool keeps its own session id, a plain string.
     expect(tools.openchamber.input.properties.parameters.properties.sessionId).toEqual({ type: 'string' });
-    for (const tool of ['openchamber', 'openchamber_web', 'openchamber_memory']) {
+    for (const tool of ['openchamber', 'openchamber_memory']) {
       for (const field of ['kind', 'expected', 'completed', 'planId', 'dependsOn', 'ready']) {
         expect(tools[tool].input.properties.parameters.properties).not.toHaveProperty(field);
       }
@@ -440,23 +442,15 @@ describe('managed agent tool runtime', () => {
     expect(tool.openchamber.input.properties.parameters.properties.sessionId).toEqual({ type: 'string' });
   });
 
-  it('emits both tools, each carrying only its own actions and inputs', async () => {
+  it('keeps session control actions and inputs separate from browser operations', async () => {
     const { runtime, dataDir } = await createRuntime();
     await prepareManagedEnv(runtime);
     const tool = await loadTools(dataDir, 'both');
 
     const controlActions = tool.openchamber.input.properties.action.enum;
-    const webActions = tool.openchamber_web.input.properties.action.enum;
-    expect(webActions).toContain('browser.open');
-    expect(webActions).toContain('browser.close');
-    expect(webActions).toContain('browser.select');
     expect(controlActions).not.toContain('browser.open');
-    expect(webActions).not.toContain('session.create');
 
     // Turning one tool off has to remove its inputs too, not just its actions.
-    expect(Object.keys(tool.openchamber_web.input.properties.parameters.properties)).toContain('url');
-    expect(Object.keys(tool.openchamber_web.input.properties.parameters.properties)).toContain('label');
-    expect(Object.keys(tool.openchamber_web.input.properties.parameters.properties)).toContain('value');
     expect(Object.keys(tool.openchamber.input.properties.parameters.properties)).not.toContain('selector');
     // The control tool's own `url` names the link session.unlink removes, not a page.
     expect(tool.openchamber.input.properties.parameters.properties.url.description).toContain('session.unlink');
@@ -465,7 +459,7 @@ describe('managed agent tool runtime', () => {
     expect(controlActions).not.toContain('pr.watch');
     expect(Object.keys(tool.openchamber.input.properties.parameters.properties)).toContain('sessionId');
     expect(Object.keys(tool.openchamber.input.properties.parameters.properties)).toContain('path');
-    expect(Object.keys(tool.openchamber_web.input.properties.parameters.properties)).not.toContain('path');
+    expect(tool).not.toHaveProperty('openchamber_web');
   });
 
   it('keeps the action schema to one validator keyword', async () => {
@@ -480,34 +474,6 @@ describe('managed agent tool runtime', () => {
     for (const entry of Object.values(tool).filter(tool => tool.options.namespace !== 'browser')) {
       expect(entry.input.properties.action.enum).toBeInstanceOf(Array);
       expect(entry.input.properties.action).not.toHaveProperty('oneOf');
-    }
-  });
-
-  it('exposes upstream Playwright schemas and forwards the caller and panel tab', async () => {
-    const { runtime, dataDir } = await createRuntime();
-    const env = await prepareManagedEnv(runtime, { includeControl: false, includeWeb: true, includeMemory: false });
-    const tools = await loadTools(dataDir, 'playwright');
-    expect(tools.click.options).toEqual({ namespace: 'browser', codemode: true, permission: 'openchamber_web' });
-    expect(tools.click.input.properties.target.type).toBe('string');
-    expect(tools.click.input.properties.tabId.type).toBe('string');
-    const result = { content: [{ type: 'text', text: 'Clicked Save' }] };
-    const previousUrl = process.env.OPENCHAMBER_AGENT_TOOL_URL;
-    const previousToken = process.env.OPENCHAMBER_AGENT_TOOL_TOKEN;
-    process.env.OPENCHAMBER_AGENT_TOOL_URL = env.OPENCHAMBER_AGENT_TOOL_URL;
-    process.env.OPENCHAMBER_AGENT_TOOL_TOKEN = env.OPENCHAMBER_AGENT_TOOL_TOKEN;
-    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: true, data: result })));
-    try {
-      expect((await tools.click.execute({ tabId: 'panel-a', target: 'e5' }, { sessionID: 'ses_a', id: 'call_a' })).output).toEqual(result);
-      expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({
-        tool: 'openchamber_web', sessionID: 'ses_a', callID: 'call_a',
-        input: { action: 'browser.playwright', tool: 'browser_click', arguments: { target: 'e5' }, tabId: 'panel-a' },
-      });
-    } finally {
-      fetch.mockRestore();
-      if (previousUrl === undefined) delete process.env.OPENCHAMBER_AGENT_TOOL_URL;
-      else process.env.OPENCHAMBER_AGENT_TOOL_URL = previousUrl;
-      if (previousToken === undefined) delete process.env.OPENCHAMBER_AGENT_TOOL_TOKEN;
-      else process.env.OPENCHAMBER_AGENT_TOOL_TOKEN = previousToken;
     }
   });
 
@@ -540,17 +506,6 @@ describe('managed agent tool runtime', () => {
     const context = { sessionID: 'ses_1', agent: 'build', messageID: 'msg_1', id: 'call_1', progress: async () => {} };
 
     try {
-      // The shape a model actually produced: url and viewport next to action.
-      await tool.openchamber_web.execute(
-        { action: 'browser.open', url: 'https://example.test', viewport: 'mobile' },
-        context,
-      );
-      // The documented shape must keep working, and win when both are present.
-      await tool.openchamber_web.execute(
-        { action: 'browser.open', url: 'https://ignored.test', parameters: { url: 'https://example.test/nested' } },
-        context,
-      );
-      // Both tools come from one template, so session control accepts it too.
       await tool.openchamber.execute(
         { action: 'session.messages', sessionId: 'ses_1', limit: 3 },
         context,
@@ -561,12 +516,10 @@ describe('managed agent tool runtime', () => {
       process.env.OPENCHAMBER_AGENT_TOOL_TOKEN = originalToken;
     }
 
-    expect(sent[0].input).toEqual({ action: 'browser.open', url: 'https://example.test', viewport: 'mobile' });
-    expect(sent[1].input.url).toBe('https://example.test/nested');
-    expect(sent[2].input).toEqual({ action: 'session.messages', sessionId: 'ses_1', limit: 3 });
+    expect(sent[0].input).toEqual({ action: 'session.messages', sessionId: 'ses_1', limit: 3 });
     // v2 tools get no directory; the session id is what OpenChamber resolves from.
-    expect(sent[2].sessionID).toBe('ses_1');
-    expect(sent[2].contextDirectory).toBeUndefined();
+    expect(sent[0].sessionID).toBe('ses_1');
+    expect(sent[0].contextDirectory).toBeUndefined();
   });
 
   it('declares the workflow tool only when asked, with the scripting guide on script', async () => {
@@ -663,7 +616,6 @@ describe('managed agent tool runtime', () => {
       await call('openchamber', { action: 'session.list', withStatus: 'false' });
       // The field names come from the calling tool's own schema, so other
       // tools' booleans normalize there too, not only `completed`.
-      await call('openchamber_web', { action: 'browser.type', parameters: { selector: '#q', value: 'x', submit: 'true' } });
       await call('openchamber_knowledge', { action: 'knowledge.save', parameters: { kind: 'todo', id: 't1', completed: 'false' } });
       // Every other spelling or value keeps its identity for the strict check.
       for (const value of ['TRUE', 'False', 'yes', '1', 1, 0, null]) {
@@ -671,7 +623,6 @@ describe('managed agent tool runtime', () => {
       }
       // A boolean another tool declares is not a field of this tool, so it is
       // left alone here.
-      await call('openchamber_web', { action: 'browser.type', parameters: { selector: '#q', value: 'x', withStatus: 'true' } });
     } finally {
       globalThis.fetch = originalFetch;
       if (originalUrl === undefined) delete process.env.OPENCHAMBER_AGENT_TOOL_URL;
@@ -681,10 +632,8 @@ describe('managed agent tool runtime', () => {
     }
 
     expect(sent.slice(0, 8).map(({ input }) => input.withStatus)).toEqual([true, false, true, false, true, false, true, false]);
-    expect(sent[8].input.submit).toBe(true);
-    expect(sent[9].input.completed).toBe(false);
-    expect(sent.slice(10, 17).map(({ input }) => input.withStatus)).toEqual(['TRUE', 'False', 'yes', '1', 1, 0, null]);
-    expect(sent[17].input.withStatus).toBe('true');
+    expect(sent[8].input.completed).toBe(false);
+    expect(sent.slice(9, 16).map(({ input }) => input.withStatus)).toEqual(['TRUE', 'False', 'yes', '1', 1, 0, null]);
   });
 
   it('omits a tool the user turned off', async () => {
@@ -692,7 +641,7 @@ describe('managed agent tool runtime', () => {
     await prepareManagedEnv(runtime, { includeControl: false, includeWeb: true, includeMemory: false });
     const tool = await loadTools(dataDir, 'web');
 
-    expect(Object.keys(tool).filter(name => tool[name].options.namespace !== 'browser')).toEqual(['openchamber_web']);
+    expect(Object.keys(tool)).toEqual([]);
   });
 
   it('exposes memory as its own tool carrying only its own inputs', async () => {
@@ -1119,7 +1068,6 @@ describe('managed agent tool runtime', () => {
       'openchamber_render',
       'openchamber_schedule',
       'openchamber_usage',
-      'openchamber_web',
       'openchamber_workflow',
       'openchamber_workflow_answer',
     ]);
@@ -1252,12 +1200,12 @@ describe('managed agent tool runtime', () => {
     }
   });
 
-  it('puts the control, schedule, browser, memory, knowledge and notify tools behind Code Mode, and the render tool direct', async () => {
+  it('puts the control, schedule, memory, knowledge and notify tools behind Code Mode, and the render tool direct', async () => {
     const { runtime, dataDir } = await createRuntime();
     await prepareManagedEnv(runtime, { includeControl: true, includeSchedule: true, includeWeb: true, includeMemory: true, includeKnowledge: true, includeNotify: true, includeRender: true });
     const namespaces = [];
     const { openchamber_render: render, ...behindExecute } = await loadTools(dataDir, 'codemode', {}, [], namespaces);
-    const names = ['openchamber', 'openchamber_knowledge', 'openchamber_memory', 'openchamber_notify', 'openchamber_schedule', 'openchamber_web'];
+    const names = ['openchamber', 'openchamber_knowledge', 'openchamber_memory', 'openchamber_notify', 'openchamber_schedule'];
     expect(Object.keys(behindExecute).filter(name => behindExecute[name].options.namespace !== 'browser').sort()).toEqual(names);
     for (const tool of Object.values(behindExecute)) {
       expect(tool.options).toMatchObject({ codemode: true });
@@ -1265,8 +1213,7 @@ describe('managed agent tool runtime', () => {
     expect(render.options).toEqual({ codemode: false });
     // Names stay as they are; each tool gets a namespace of its own name, so
     // its catalog row says what it is even when the catalog lists none of it.
-    expect(namespaces.map((namespace) => namespace.name).sort()).toEqual(['browser', ...names]);
-    expect(namespaces.find((namespace) => namespace.name === 'openchamber_web').description).toContain('browser panel');
+    expect(namespaces.map((namespace) => namespace.name).sort()).toEqual(names);
 
     // A tool switched off takes its namespace along.
     await prepareManagedEnv(runtime, { includeControl: true, includeWeb: false, includeMemory: false, includeRender: true });

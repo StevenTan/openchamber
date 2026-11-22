@@ -295,7 +295,7 @@ describe('session image assets', () => {
     ]);
   });
 
-  it('authorizes the screenshot a browser.capture call saved, behind Code Mode too, and no others', async () => {
+  it.each(['openchamber_web', 'browser_panel'])('authorizes the screenshot %s saved, behind Code Mode too, and no others', async (browserTool) => {
     const fixture = await createFixture({ sources: [] });
     const shots = ['direct', 'script', 'quoted', 'failed', 'other'].map((name) => `.openchamber/screenshots/${name}.png`);
     await fs.mkdir(path.join(fixture.directory, '.openchamber', 'screenshots'), { recursive: true });
@@ -306,7 +306,7 @@ describe('session image assets', () => {
       id: 'msg_1',
       type: 'assistant',
       content: [
-        tool('openchamber_web', 'call_1', envelope(true, shots[0])),
+        tool(browserTool, 'call_1', envelope(true, shots[0])),
         tool('execute', 'call_2', envelope(true, shots[1])),
         tool('execute', 'call_3', JSON.stringify(envelope(true, shots[2]))),
         tool('execute', 'call_4', envelope(false, shots[3])),

@@ -85,7 +85,7 @@ export const getToolIcon = (toolName: string, presentation?: GuestToolRule | nul
     if (tool === 'cloudflare' || tool.startsWith('cloudflare_') || tool === 'claudflare' || tool.startsWith('claudflare_')) {
         return <Icon name="cloudflare" className={iconClass} />;
     }
-    if (tool === 'openchamber_web') {
+    if (tool === 'openchamber_web' || tool === 'browser_panel') {
         return <Icon name="global" className={iconClass} />;
     }
     if (tool === 'openchamber_schedule') {

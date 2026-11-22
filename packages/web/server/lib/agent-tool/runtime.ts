@@ -54,7 +54,7 @@ import { SECRET_PARAMETER_PROPERTIES, SECRET_TOOL_DESCRIPTION } from './secret-t
 import { createCallbackAddress } from './callback-address.js';
 import { createCommandToolRuntime } from '../agent-command/src/runtime.js';
 import { materializeSearchPlugin } from '../agent-search/runtime.js';
-import { getPlaywrightToolDefinitions } from '../browser-control/playwright.js';
+import { browserMcpSetup, createBrowserMcpRuntime } from '../browser-control/mcp.js';
 import { LEAD_COMPACTION_HOOK } from '../session-lead/agent-tool-plugin.js';
 import { controlErrorFields } from '../openchamber-control/error.js';
 import type { ControlInput } from '../openchamber-control/contracts.js';
@@ -744,7 +744,6 @@ ${secretRun ? SECRET_RUN_PERMISSION : ''}${answers ? answerWaitSetup(answers.wai
 const CODE_MODE_CATALOG_LINES = {
   openchamber: 'OpenChamber projects, sessions and worktrees: dispatch a session, link a PR, list models, move this session into a worktree (it can help when the checkout looks busy; ask unless the request already calls for separate work)',
   openchamber_schedule: 'Scheduled tasks: prompts OpenChamber runs on a schedule',
-  openchamber_web: "OpenChamber's browser panel, to check your work by looking at it: open a page, read it, click and type",
   openchamber_memory: 'Memory that persists across sessions',
   openchamber_knowledge: "The project's notes, todos and plans. Add a todo when asked or when you stop with work left",
   openchamber_notify: 'Notify the user outside the chat: when long work finishes and they have likely stepped away, when you are blocked on them, or when they asked to be told',
@@ -754,9 +753,9 @@ const CODE_MODE_CATALOG_LINES = {
 
 const OPENCODE_TOOLS_REPLACED_BY_CONTROL = ['opencode_worktree_create', 'opencode_models'];
 
-const createPluginSource = ({ includeControl, includeSchedule, includeWeb, includeMemory, includeKnowledge, includeNotify, includeRender, includeShare, includeImage, includeSecret, includeUsage, includeTerminal, includeWorkflow, playwrightTools }: Required<PluginOptions> & { playwrightTools: Awaited<ReturnType<typeof getPlaywrightToolDefinitions>> }) => {
+const createPluginSource = ({ includeControl, includeSchedule, includeWeb, includeMemory, includeKnowledge, includeNotify, includeRender, includeShare, includeImage, includeSecret, includeUsage, includeTerminal, includeWorkflow }: Required<PluginOptions>) => {
   const entries = [];
-  const included = { openchamber: includeControl, openchamber_schedule: includeSchedule, openchamber_web: includeWeb, openchamber_memory: includeMemory, openchamber_knowledge: includeKnowledge, openchamber_notify: includeNotify, openchamber_usage: includeUsage, openchamber_terminal: includeTerminal };
+  const included = { openchamber: includeControl, openchamber_schedule: includeSchedule, openchamber_memory: includeMemory, openchamber_knowledge: includeKnowledge, openchamber_notify: includeNotify, openchamber_usage: includeUsage, openchamber_terminal: includeTerminal };
   for (const [name, description] of Object.entries(CODE_MODE_CATALOG_LINES)
     .filter((entry): entry is [keyof typeof included, string] => Object.hasOwn(included, entry[0]))) {
     if (included[name]) entries.push(`    tools.namespace(${JSON.stringify({ name, description })})
@@ -783,38 +782,6 @@ const createPluginSource = ({ includeControl, includeSchedule, includeWeb, inclu
       parameters: SCHEDULE_PARAMETER_PROPERTIES,
       codeMode: true,
     }));
-  }
-  if (includeWeb) {
-    entries.push(createToolEntry({
-      name: 'openchamber_web',
-      description: WEB_TOOL_DESCRIPTION,
-      definitions: OPENCHAMBER_WEB_ACTION_DEFINITIONS.filter(entry => entry.action !== 'browser.playwright'),
-      parameters: WEB_PARAMETER_PROPERTIES,
-      codeMode: true,
-    }));
-    entries.push(`    tools.namespace({ name: "browser", description: "Playwright controls for the existing browser panel. Open a tab with openchamber_web action browser.open, then use these tools. tabId selects a panel tab listed by openchamber_web action browser.snapshot; otherwise use this session's page. Requires the built-in desktop provider or an extension implementing browser.playwright." })
-    for (const tool of ${JSON.stringify(playwrightTools)}) tools.add({
-      name: tool.name.replace(/^browser_/, ""),
-      description: tool.description,
-      input: { ...tool.inputSchema, properties: { ...tool.inputSchema.properties, tabId: { type: "string", description: "Browser panel tab id; defaults to this session's page." } } },
-      output: { type: "object", additionalProperties: true },
-      options: { namespace: "browser", codemode: true, permission: "openchamber_web" },
-      async execute({ tabId, ...args }, context) {
-        const response = await fetch(process.env.OPENCHAMBER_AGENT_TOOL_URL, {
-          method: "POST",
-          headers: { authorization: "Bearer " + process.env.OPENCHAMBER_AGENT_TOOL_TOKEN, "content-type": "application/json" },
-          body: JSON.stringify({
-            tool: "openchamber_web", sessionID: context.sessionID, callID: context.id,
-            input: { action: "browser.playwright", tool: tool.name, arguments: args, ...(tabId ? { tabId } : {}) },
-          }),
-          signal: context.signal,
-        })
-        const result = await response.json()
-        if (!response.ok || result.ok !== true) throw new Error(result.error?.message || "Browser action failed")
-        return { output: result.data, content: JSON.stringify(result.data) }
-      },
-    })
-`);
   }
   if (includeMemory) {
     entries.push(createToolEntry({
@@ -952,7 +919,7 @@ export default {
   setup: async (ctx) => {
     exemptCallbackFromProxy()
     await ctx.tool.transform((tools) => {
-${entries.join('')}    })${includeRender || includeSecret ? `
+${entries.join('')}    })${includeWeb ? browserMcpSetup(AGENT_TOOL_ACTION_TITLES) : ''}${includeRender || includeSecret ? `
     await ctx.session.hook("prompt", (event) => {
       // An agent's prompt is not the user writing, and a queued one arrives
       // only after the turn: the page keeps waiting for the user.
@@ -1005,8 +972,7 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
     }
     await fsPromises.mkdir(pluginDirectory, { recursive: true });
     await fsPromises.writeFile(pluginManifestPath, PLUGIN_PACKAGE_JSON, { mode: 0o600 });
-    const playwrightTools = includeWeb ? await getPlaywrightToolDefinitions() : [];
-    await fsPromises.writeFile(pluginPath, createPluginSource({ includeControl, includeSchedule, includeWeb, includeMemory, includeKnowledge, includeNotify, includeRender, includeShare: includeRender && includeShare, includeImage, includeSecret, includeUsage, includeTerminal, includeWorkflow, playwrightTools }), { mode: 0o600 });
+    await fsPromises.writeFile(pluginPath, createPluginSource({ includeControl, includeSchedule, includeWeb, includeMemory, includeKnowledge, includeNotify, includeRender, includeShare: includeRender && includeShare, includeImage, includeSecret, includeUsage, includeTerminal, includeWorkflow }), { mode: 0o600 });
     return pluginDirectory;
   };
 
@@ -1108,6 +1074,10 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
 
   const registerRoutes = (app: Application, express: Pick<ExpressFactory, 'json'>) => {
     commandToolRuntime.registerRoutes(app, express);
+    app.all('/api/openchamber/browser-tool/mcp', express.json({ limit: '1mb' }), async (req, res) => {
+      if (!authorize(req)) return res.status(401).json({ error: 'Unauthorized' });
+      await browserMcp.handleRequest(req, res);
+    });
     app.post<Parameters<typeof questionRuntime.ask>[0]>('/api/openchamber/async-question', express.json({ limit: '1mb' }), (req, res) => {
       if (!authorize(req)) return res.status(401).json({ error: 'Unauthorized' });
       return questionRuntime.ask(req.body).then(
@@ -1141,6 +1111,19 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
   };
 
   const commandToolRuntime = createCommandToolRuntime({ instanceDir, resolveSessionDirectory, getEnvironment: getCommandEnvironment, hasPendingInput, authorize, trackInflight, abortSession, resolveMcpSessionID: request => z.string().min(1).parse(request._meta?.['ai.opencode/sessionID']) });
+  const browserMcp = createBrowserMcpRuntime({
+    name: 'panel',
+    description: WEB_TOOL_DESCRIPTION,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: multiActionSchema(OPENCHAMBER_WEB_ACTION_DEFINITIONS.filter(entry => entry.action !== 'browser.playwright')).property,
+        parameters: { type: 'object', properties: WEB_PARAMETER_PROPERTIES, additionalProperties: false, description: 'Inputs for the action; use an empty object when none are needed' },
+      },
+      required: ['action'], additionalProperties: true,
+    },
+    outputSchema: { ...TOOL_OUTPUT_SCHEMA, type: 'object' },
+  }, execute, trackInflight);
 
   const registerQuestionFormRoutes = (app: Application, express: Pick<ExpressFactory, 'json'>) => {
     app.post<Parameters<typeof questionRuntime.resolveBatch>[0]>('/api/openchamber/async-question/resolve', express.json({ limit: '1mb' }), (req, res) => {
@@ -1171,7 +1154,7 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
     materializeCommandPlugin: commandToolRuntime.materializePlugin,
     materializeSearchPlugin: () => materializeSearchPlugin(instanceDir),
     materializeQuestionPlugin: () => questionRuntime.materializePlugin(instanceDir),
-    closeCommands: commandToolRuntime.close,
+    closeCommands: () => Promise.all([commandToolRuntime.close(), browserMcp.close()]),
     observeCommandEvent: commandToolRuntime.observeEvent,
   };
 };

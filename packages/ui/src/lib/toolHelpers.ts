@@ -297,7 +297,7 @@ const OPENCODE_NAMESPACE_METADATA: ToolMetadata = {
 
 export function getToolMetadata(toolName: string): ToolMetadata {
   if (toolName === 'opencode' || opencodeNamespaceTool(toolName)) return OPENCODE_NAMESPACE_METADATA;
-  return TOOL_METADATA[toolName] || TOOL_METADATA[normalizeToolName(toolName)] || {
+  return TOOL_METADATA[toolName === 'browser_panel' ? 'openchamber_web' : toolName] || TOOL_METADATA[normalizeToolName(toolName)] || {
     displayName: formatUnknownToolDisplayName(toolName),
     category: 'system',
     outputLanguage: 'text',

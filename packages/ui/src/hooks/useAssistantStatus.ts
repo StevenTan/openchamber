@@ -218,7 +218,7 @@ const OPENCHAMBER_STATUS = new Map(Object.entries<ToolActionStatus>({
 
 const getOpenChamberStatus = (call: OpenChamberToolCall, running: boolean): AgentStatus => {
     if (call.awaitsAnswer && running) return status('chat.agentStatus.waitingAnswer');
-    const known = OPENCHAMBER_STATUS.get(call.tool);
+    const known = OPENCHAMBER_STATUS.get(call.tool === 'browser_panel' ? 'openchamber_web' : call.tool);
     return status((call.action ? known?.actions?.[call.action] : undefined) ?? known?.fallback ?? 'chat.agentStatus.working');
 };
 

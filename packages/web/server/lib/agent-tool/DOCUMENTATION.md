@@ -2,9 +2,8 @@
 
 ## Purpose
 
-This module exposes OpenChamber to agents as typed OpenCode custom tools. There
-are two, because controlling sessions and driving a page are separate intents
-the user can want independently:
+This module exposes typed OpenCode custom tools and configures native MCP tools
+for managed OpenCode. Session control and browser operations are independently enabled:
 
 - `openchamber` — projects, sessions, worktrees, and showing a file to the
   user (`file.open`). Enabled while the persisted `agentControlToolEnabled`
@@ -16,15 +15,11 @@ the user can want independently:
   (`settings-runtime.js`), so the split hands nobody a tool they turned off.
   Like the control tool, a stale plugin is not refused: the CLI runs the same
   actions, so the service cannot tell an agent call from a CLI one.
-- `openchamber_web` — looking at and interacting with the page in OpenChamber's
-  browser panel. Enabled while `agentWebToolEnabled` is not `false`.
-  The same setting registers the `browser` Code Mode namespace from official
-  Playwright MCP descriptors, adding `tabId` for panel selection. These calls
-  use the existing authenticated callback and resolve the calling session's
-  directory before the browser broker selects a view. The generated plugin
-  carries complete upstream parameter schemas; MCP execution stays in the
-  Electron host, bound to that view. Panel tabs and navigation stay with
-  `openchamber_web`.
+- `browser_panel` and the `browser_*` page tools use native MCP discovery.
+  Enabled while `agentWebToolEnabled` is not `false`. The plugin configures
+  the `browser` MCP server and retains the `openchamber_web` permission.
+  Their session, page execution and cancellation contract is owned by
+  `../browser-control/DOCUMENTATION.md`.
 - `openchamber_notify` — `notify.send`, a notification to the user through
   `lib/notifications/emit-route.js` (same limits and rate window as
   `POST /api/notifications/emit`). Off by default: enabled only while
@@ -207,7 +202,7 @@ from the schema rather than leaving them visible. The plugin is injected only
 when OpenChamber launches and owns the OpenCode process, and not at all when
 both settings are `false`.
 
-- `openchamber`, `openchamber_schedule`, `openchamber_web`,
+- `openchamber`, `openchamber_schedule`,
   `openchamber_memory`, `openchamber_knowledge` and `openchamber_notify` are
   registered with `codemode: true`, behind OpenCode's Code Mode `execute`
   tool; there is no setting for it. On `scripts/tool-use-bench` with three
@@ -519,6 +514,9 @@ The separate `openchamber-command-tool` plugin configures native MCP discovery o
 OpenCode. Their service shares this runtime's authenticated callback channel.
 Its command ownership, waiting, session memory and PTY contracts are in
 `../agent-command/DOCUMENTATION.md`.
+
+`mcp.ts` owns Streamable HTTP connection handling shared by the command and browser
+services. They use the same listener and callback authentication.
 
 - Web and Desktop managed OpenCode: injected automatically.
 - External OpenCode selected with `OPENCODE_HOST` or skip-start: not injected,

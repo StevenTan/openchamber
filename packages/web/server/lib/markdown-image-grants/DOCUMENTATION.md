@@ -38,7 +38,7 @@ the UI is on a different machine.
   (`packages/ui/src/components/chat/message/parts/GeneratedImages.tsx`).
 - The screenshot a finished `browser.capture` call saved is referenced too
   (`capturedScreenshotPaths` in `../openchamber-control/screenshots.js`), from
-  an `openchamber_web` call or from the `execute` script that made it behind
+  a `browser_panel` or `openchamber_web` call, or from the `execute` script that made it behind
   Code Mode, whose stored result is the envelope as is or quoted once more.
   The chat draws it in the call's expanded row.
 - A request that names the page's tool call (`callId`) gets that page's images

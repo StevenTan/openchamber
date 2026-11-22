@@ -1,0 +1,83 @@
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { CallToolRequestSchema, CallToolResultSchema, ListToolsRequestSchema, type Tool } from '@modelcontextprotocol/sdk/types.js';
+import { z } from 'zod';
+import { createMcpRuntime } from '../agent-tool/mcp.js';
+import type { AgentToolInput, AgentToolPayload, ResultFields } from '../agent-tool/runtime.js';
+import type { ControlOptions } from '../openchamber-control/service.js';
+import { getPlaywrightToolDefinitions } from './playwright.js';
+import { BROWSER_MCP_TOOLS } from './tools.js';
+
+const panelInput = z.object({ action: z.string(), parameters: z.record(z.string(), z.unknown()).optional() }).catchall(z.unknown());
+
+export function createBrowserMcpRuntime(
+  panel: Tool,
+  execute: (payload: AgentToolPayload, options: ControlOptions) => Promise<ResultFields & { schemaVersion: number }>,
+  trackInflight: (sessionID: string, controller: AbortController) => () => void,
+) {
+  return createMcpRuntime(async () => {
+    const pageTools = await getPlaywrightToolDefinitions();
+    const tools = [panel, ...pageTools.map(tool => ({
+      ...tool,
+      name: tool.name.replace(/^browser_/, ''),
+      description: `${tool.description}\n\nOpen and manage panel tabs with browser_panel. tabId selects a tab listed by browser_panel action browser.snapshot; omission uses this session's page.`,
+      inputSchema: { ...tool.inputSchema, properties: { ...tool.inputSchema.properties, tabId: { type: 'string', description: "Browser panel tab id; defaults to this session's page." } } },
+    }))];
+    const server = new Server({ name: 'openchamber-browser', version: '1.0.0' }, { capabilities: { tools: {} } });
+    server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools }));
+    server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
+      const sessionID = z.string().min(1).parse(extra._meta?.['ai.opencode/sessionID']);
+      let input: AgentToolInput;
+      if (request.params.name === 'panel') {
+        const { action, parameters, ...flattened } = panelInput.parse(request.params.arguments);
+        input = { ...flattened, ...parameters, action };
+        if (input.submit === 'true') input.submit = true;
+        else if (input.submit === 'false') input.submit = false;
+      } else {
+        const { tabId, ...args } = request.params.arguments ?? {};
+        input = { action: 'browser.playwright', tool: `browser_${request.params.name}`, arguments: args, tabId };
+      }
+      const controller = new AbortController();
+      const signal = AbortSignal.any([extra.signal, controller.signal]);
+      const untrack = trackInflight(sessionID, controller);
+      try {
+        const payload: AgentToolPayload = { tool: 'openchamber_web', input, sessionID, callID: String(extra.requestId) };
+        const result = await execute(payload, { signal });
+        signal.throwIfAborted();
+        if (request.params.name === 'panel') return { structuredContent: result, content: [{ type: 'text', text: JSON.stringify(result) }] };
+        if (!result.ok) throw new Error(result.error?.message);
+        return CallToolResultSchema.parse(result.data);
+      } finally {
+        untrack();
+      }
+    });
+    return server;
+  });
+}
+
+export function browserMcpSetup(titles: Record<string, string>) {
+  return String.raw`
+    await ctx.mcp.transform(servers => {
+      servers.set('browser', {
+        type: 'remote', url: new URL('/api/openchamber/browser-tool/mcp', process.env.OPENCHAMBER_AGENT_TOOL_URL).href,
+        oauth: false, codemode: false,
+        headers: { authorization: 'Bearer ' + process.env.OPENCHAMBER_AGENT_TOOL_TOKEN },
+      })
+    })
+    const browserTools = new Set(${JSON.stringify(BROWSER_MCP_TOOLS)})
+    await ctx.tool.hook('execute.before', async context => {
+      if (!browserTools.has(context.tool)) return
+      await ctx.permission.assert({
+        sessionID: context.sessionID, agent: context.agent, action: 'openchamber_web',
+        resources: ['*'], save: ['*'],
+        source: { type: 'tool', messageID: context.messageID, id: context.id },
+      })
+    })
+    await ctx.tool.hook('execute.after', async event => {
+      if (event.status !== 'completed' || event.tool !== 'browser_panel') return
+      const result = event.result.output
+      const titles = ${JSON.stringify(titles)}
+      event.result.metadata = { ...event.result.metadata, openchamber: {
+        schemaVersion: 1, action: result.action, description: titles[result.action] ?? result.action, ok: result.ok,
+      } }
+    })`;
+}

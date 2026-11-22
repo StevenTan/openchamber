@@ -245,6 +245,7 @@ const comparablePath = (value: string) => {
 const TOOL_RESULT_IMAGE_PATHS = new Map([
   ['openchamber_image', generatedImagePaths],
   ['openchamber_web', capturedScreenshotPaths],
+  ['browser_panel', capturedScreenshotPaths],
   ['execute', capturedScreenshotPaths],
 ]);
 
