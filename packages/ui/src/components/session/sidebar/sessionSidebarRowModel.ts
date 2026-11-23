@@ -1,5 +1,4 @@
 import type { Session } from '@/lib/opencode/model';
-import { listedChildren } from './listedChildren';
 import type { SessionFolder, SessionFoldersMap } from '@/stores/useSessionFoldersStore';
 import { compareSessionsByLifecycleOrder, EMPTY_SESSION_ORDER_RANKS } from '@/sync/session-ordering';
 import { isSessionPinned } from '@/lib/sessionPins';
@@ -538,7 +537,7 @@ export const buildSessionSidebarRowModel = (args: SessionSidebarRowModelArgs): S
         ? null
         : getAuthoritativeSessionFolderOwnerKey(current.node.session, sessionOwner) ?? ownerKey);
       const expanded = args.expandedParents.has(expandedKey(rowContext, options.archived, current.node.session.id));
-      const children = listedChildren(current.node);
+      const children = current.node.children;
       push({
         kind: 'session',
         key: rowKey,

@@ -244,13 +244,6 @@ const TOOL_METADATA: Record<string, ToolMetadata> = {
       inputFields: []
     },
 
-    openchamber_workflow: {
-      displayName: 'OpenChamber Workflow',
-      category: 'system',
-      outputLanguage: 'json',
-      inputFields: []
-    },
-
     plan_enter: {
       displayName: 'Plan Mode',
       category: 'ai',
@@ -688,8 +681,6 @@ export function getLanguageFromExtension(filePath: string): string | null {
     'diff': 'diff',
     'patch': 'diff',
 
-
-
     'prisma': 'prisma',
 
     'proto': 'protobuf',
@@ -698,8 +689,6 @@ export function getLanguageFromExtension(filePath: string): string | null {
 
     'wat': 'wasm',
     'wast': 'wasm',
-
-
 
     'glsl': 'glsl',
     'vert': 'glsl',

@@ -168,19 +168,16 @@ const CONTROL_STREAM_SYNC_TYPES = new Set([
   'openchamber:page-settled',
   'openchamber:session-assist',
   'openchamber:session-archived',
-  'openchamber:workflow-run',
-  'openchamber:workflow-run-removed',
 ]);
 export type ControlStreamSyncEvent = Extract<SyncEvent, {
   type: 'openchamber.page-waiting' | 'openchamber.page-settled' | 'openchamber.session-assist' | 'session.patched'
-    | 'openchamber.workflow-run' | 'openchamber.workflow-run-removed';
 }>;
 type ControlStreamSyncEnvelope = { type: 'control-sync'; event: ControlStreamSyncEvent };
 
 const isControlStreamSyncEvent = (event: SyncEvent): event is ControlStreamSyncEvent => (
   event.type === 'openchamber.page-waiting' || event.type === 'openchamber.page-settled'
   || event.type === 'openchamber.session-assist' || event.type === 'session.patched'
-  || event.type === 'openchamber.workflow-run' || event.type === 'openchamber.workflow-run-removed'
+
 );
 
 const sharePageChangedSchema = z.object({ sessionId: z.string().min(1), callId: z.string().min(1) });

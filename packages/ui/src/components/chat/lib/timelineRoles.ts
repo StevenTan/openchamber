@@ -1,6 +1,5 @@
 import type { Message } from '@/lib/opencode/model';
 import { readDispatchedSessionResult } from '@/lib/opencode/dispatched-session';
-import { readWorkflowReport } from '@/lib/workflows/report';
 import { readShareAnswer } from '@/lib/share-pages/answer';
 import { readSubagentRun } from '@/lib/opencode/subagent-run';
 import { readAsyncQuestionAnswer } from '@/lib/opencode/async-question';
@@ -24,7 +23,6 @@ export const isSkippedTimelineRole = (role: Message['role']): boolean => SKIPPED
 export const isBackgroundReportEntry = (message: Message): boolean =>
     readSubagentRun(message) !== undefined
     || readDispatchedSessionResult(message) !== undefined
-    || readWorkflowReport(message) !== undefined
     || readAsyncQuestionAnswer(message) !== undefined
     || readShareAnswer(message) !== undefined;
 

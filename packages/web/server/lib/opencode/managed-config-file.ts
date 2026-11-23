@@ -1,5 +1,4 @@
-import { appendManagedCommand, appendManagedPermissions, appendManagedPolicies, appendManagedPlugin, appendManagedSkills } from './managed-plugin-config.js';
-import { managedPermissionRules } from '../agent-tool/runtime.js';
+import { appendManagedCommand, appendManagedPolicies, appendManagedPlugin, appendManagedSkills } from './managed-plugin-config.js';
 import { isLimitFailoverConfigured } from '../limit-failover/policy.js';
 import { isSharingAvailable } from '../share-pages/relay-client.js';
 import { materializeSessionTitlePlugin } from './session-title-plugin.js';
@@ -25,7 +24,6 @@ export interface ManagedConfigSettings extends LimitFailoverConfigurationInput {
   agentSecretToolEnabled?: unknown;
   agentUsageToolEnabled?: unknown;
   agentTerminalToolEnabled?: unknown;
-  agentWorkflowToolEnabled?: unknown;
 }
 
 export interface ManagedConfigDependencies {
@@ -46,7 +44,6 @@ interface ManagedConfigFile {
   plugins: string[];
   skills: string[];
   commands: Record<string, Awaited<ReturnType<typeof materializeAuthoringSkill>>['command']>;
-  permissions?: ReturnType<typeof managedPermissionRules>;
   policies?: Parameters<typeof appendManagedPolicies>[1];
 }
 
@@ -75,11 +72,10 @@ export const createManagedConfigRuntime = ({
 
   const ownsConfigFile = () => (env.OPENCODE_CONFIG ?? '').trim().length === 0;
 
-  const writeConfigFile = async ({ disabled, directories, extensionPlugins, permissions, policies, skills, commands }: Awaited<ReturnType<typeof materializeEnabledPlugins>>) => {
+  const writeConfigFile = async ({ disabled, directories, extensionPlugins, policies, skills, commands }: Awaited<ReturnType<typeof materializeEnabledPlugins>>) => {
     await fsPromises.mkdir(instanceDir, { recursive: true });
     const config: ManagedConfigFile = { plugins: [...disabled, ...directories, ...extensionPlugins], skills, commands };
     if (policies.length > 0) config.policies = policies;
-    if (permissions.length > 0) config.permissions = permissions;
     const text = `${JSON.stringify(config, null, 2)}\n`;
     const tmp = `${filePath}.tmp-${process.pid}-${Date.now()}`;
     try {
@@ -105,13 +101,10 @@ export const createManagedConfigRuntime = ({
     const includeSecret = settings?.agentSecretToolEnabled !== false;
     const includeUsage = settings?.agentUsageToolEnabled === true;
     const includeTerminal = settings?.agentTerminalToolEnabled === true;
-    const includeWorkflow = settings?.agentWorkflowToolEnabled === true;
 
     const directories = [];
-    let permissions: ReturnType<typeof managedPermissionRules> = [];
-    if (agentToolRuntime && (includeControl || includeSchedule || includeWeb || includeMemory || includeKnowledge || includeNotify || includeRender || includeImage || includeSecret || includeUsage || includeTerminal || includeWorkflow)) {
-      directories.push(await agentToolRuntime.materializePlugin({ includeControl, includeSchedule, includeWeb, includeMemory, includeKnowledge, includeNotify, includeRender, includeShare, includeImage, includeSecret, includeUsage, includeTerminal, includeWorkflow }));
-      permissions = managedPermissionRules({ includeWorkflow });
+    if (agentToolRuntime && (includeControl || includeSchedule || includeWeb || includeMemory || includeKnowledge || includeNotify || includeRender || includeImage || includeSecret || includeUsage || includeTerminal)) {
+      directories.push(await agentToolRuntime.materializePlugin({ includeControl, includeSchedule, includeWeb, includeMemory, includeKnowledge, includeNotify, includeRender, includeShare, includeImage, includeSecret, includeUsage, includeTerminal }));
     }
     if (agentToolRuntime && limitFailoverRuntime && isLimitFailoverConfigured(settings)) {
       directories.push(await limitFailoverRuntime.materializePlugin());
@@ -138,7 +131,7 @@ export const createManagedConfigRuntime = ({
     await fsPromises.copyFile(new URL('./opencode-skill.txt', import.meta.url), path.join(opencodeSkill, 'SKILL.md'));
     const skills = [authoring.skillsRoot, workspace.skillsRoot, ...await listExtensionSkillDirectories()];
     const extensionPlugins = await listExtensionPluginDirectories();
-    return { disabled, directories, extensionPlugins, permissions, policies: readPluginDenials(), skills, commands: { [EXTENSION_AUTHORING_COMMAND]: authoring.command } };
+    return { disabled, directories, extensionPlugins, policies: readPluginDenials(), skills, commands: { [EXTENSION_AUTHORING_COMMAND]: authoring.command } };
   };
 
   let writing: Promise<void> | null = null;
@@ -171,7 +164,6 @@ export const createManagedConfigRuntime = ({
       content = appendManagedPlugin(content, directory, 'managed plugin');
     }
     if (enabled.policies.length > 0) content = appendManagedPolicies(content, enabled.policies);
-    if (enabled.permissions.length > 0) content = appendManagedPermissions(content, enabled.permissions);
     content = appendManagedSkills(content, enabled.skills);
     for (const [name, command] of Object.entries(enabled.commands)) content = appendManagedCommand(content, name, command);
     return { ...childEnv, OPENCODE_CONFIG_CONTENT: content };

@@ -165,10 +165,6 @@ test('a Code Mode call shows its script, the tools it called, and the truncation
       ['openchamber', 'wait.list', { waiting: [{ waitId: 'https://github.com/a/b/pull/7', source: 'pr', extension: 'OpenChamber', title: '#7 Fix login', label: 'failed', args: { url: 'https://github.com/a/b/pull/7' }, status: 'waiting' }], sources: [{ source: 'timer', extension: 'OpenChamber', title: 'Timer' }, { source: 'pr', extension: 'OpenChamber', title: 'Pull request' }] }, ['Waiting on', '#7 Fix login', 'Can wait on', 'Timer', 'Pull request']],
       ['openchamber_web', 'browser.inspect', { ok: true, selector: '#save', tag: 'button', label: 'Save', styles: { color: 'red' } }, ['button · Save', '#save', 'color', 'red']],
       ['openchamber_web', 'browser.scroll', { ok: true, scrollY: 400, maxScrollY: 1200, atTop: false, atBottom: false }, ['Position', '400 of 1200 px']],
-      ['openchamber_workflow', 'workflow.check', { name: 'audit-routes', description: 'Audit every route', phases: ['Find', 'Audit'], limits: { concurrentAgents: 8, agentsPerRun: 200 } }, ['audit-routes', 'Audit every route', '1. Find', '2. Audit']],
-      ['openchamber_workflow', 'workflow.status', { id: 'run_1', parentSessionId: 'ses_exec', directory: '/repo', name: 'audit-routes', description: 'Audit every route', state: 'running', attempt: 1, createdAt: 1, currentPhase: 'Audit', phases: ['Find', 'Audit'], agents: [{ key: 'a', label: 'One', phase: 'Audit', state: 'completed' }, { key: 'b', label: 'Two', phase: 'Audit', state: 'running' }], logs: [] }, ['Running', 'Audit', '1 of 2 done']],
-      ['openchamber_workflow', 'workflow.result', { runId: 'run_1', state: 'completed', result: 'Two routes lack auth.' }, ['Done', 'Two routes lack auth.']],
-      ['openchamber_workflow', 'workflow.list', { workflows: [{ name: 'audit-routes', description: 'Audit every route' }], runs: [{ runId: 'run_1', name: 'audit-routes', state: 'failed', createdAt: 1 }] }, ['Saved', 'Runs', 'Failed']],
     ];
     for (const [tool, action, data, expected] of views) {
       const viewPart: ToolPartData = {

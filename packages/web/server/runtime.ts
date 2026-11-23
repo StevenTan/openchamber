@@ -137,9 +137,7 @@ import { createPrWatchRuntime } from './lib/pr-watch/runtime.js';
 import { createExtensionWaitsRuntime } from './lib/extension-waits/runtime.js';
 import { createLaterPages } from './lib/openchamber-control/later-pages.js';
 import { createMergeFollowRuntime } from './lib/github/merge-follow.js';
-import { createWorkflowAgentSessions } from './lib/workflows/agent-session.js';
-import { createWorkflowRuntime, lightenWorkflowRun } from './lib/workflows/runtime.js';
-import { createWorkflowRunStore } from './lib/workflows/store.js';
+import type { SyntheticMessage } from './lib/share-pages/contracts.js';
 import { createSharePagesRuntime } from './lib/share-pages/runtime.js';
 import { createSharePageStore } from './lib/share-pages/store.js';
 import {
@@ -448,7 +446,6 @@ const OPENCHAMBER_CHATS_DIR = process.env.OPENCHAMBER_CHATS_DIR && process.env.O
 
 const MAX_THEME_JSON_BYTES = 512 * 1024;
 
-
 const themeRuntime = createThemeRuntime({
   fsPromises,
   path,
@@ -661,7 +658,6 @@ const TERMINAL_INPUT_WS_REBIND_WINDOW_MS = 60 * 1000;
 const TERMINAL_INPUT_WS_HEARTBEAT_INTERVAL_MS = 15 * 1000;
 
 const rejectWebSocketUpgrade: typeof requestSecurityRuntime.rejectWebSocketUpgrade = (...args) => requestSecurityRuntime.rejectWebSocketUpgrade(...args);
-
 
 const isRequestOriginAllowed: typeof requestSecurityRuntime.isRequestOriginAllowed = (...args) => requestSecurityRuntime.isRequestOriginAllowed(...args);
 
@@ -1195,7 +1191,7 @@ const sessionLead = createSessionLeadServer({
   resolveSessionDirectory: (sessionID) => openChamberControlService.resolveSessionDirectory(sessionID),
   syncBriefEntry: (sessionID, directory, brief) => sessionKnowledgeRuntime.syncLeadBrief(sessionID, directory, brief),
   executeControl: (...args) => openChamberControlService.execute(...args),
-  readWorkflowSettings: () => readWorkflowSettings(),
+  
   createError: (message, status) => new OpenChamberControlError(message, status),
   buildOpenCodeUrl: (route, directory) => buildOpenCodeUrl(route, directory), getOpenCodeAuthHeaders: () => getOpenCodeAuthHeaders(),
   isSessionWarm: (sessionID, cacheLifetimeMs) => sessionWarmingRuntime.isSessionWarm(sessionID, cacheLifetimeMs),
@@ -1211,7 +1207,7 @@ const sessionKnowledgeRuntime = createManagedSessionKnowledgeRuntime({
   agentMemoryRuntime,
   resolveProjectId: (directory) => resolveMemoryProjectId(directory),
   isAgentMemoryEnabled,
-  isWorkflowToolEnabled: () => isWorkflowToolEnabled(),
+  
   readCheckoutBranch: getCheckedOutBranch,
   listWorktrees: getWorktrees,
   readPlaceholderBranch: readRenameableGeneratedBranch,
@@ -1355,7 +1351,6 @@ const dispatchResultsRuntime = createDispatchResultsRuntime({
 });
 dispatchResultsRuntime.start();
 
-
 const prWatchRuntime = createPrWatchRuntime({
   buildOpenCodeUrl,
   getOpenCodeAuthHeaders,
@@ -1391,32 +1386,23 @@ const mergeFollowRuntime = createMergeFollowRuntime({
   notify: (notification) => notificationTriggerRuntime.notifyPullRequest(notification),
 });
 
-const readWorkflowSettings = () => readSettingsFromDiskMigrated().catch(() => null);
-const isWorkflowToolEnabled = async () => (await readWorkflowSettings())?.agentWorkflowToolEnabled === true;
-const workflowAgentSessions = createWorkflowAgentSessions({
-  buildOpenCodeUrl,
-  getOpenCodeAuthHeaders,
-  waitForOpenCodeReady: (...args) => waitForOpenCodeReady(...args),
-  globalEventHub: globalMessageStreamHub,
-});
-const workflowRuntime = createWorkflowRuntime({
-  store: createWorkflowRunStore({ fsPromises, path, dataDir: OPENCHAMBER_DATA_DIR, lighten: lightenWorkflowRun }),
-  agentSessions: workflowAgentSessions,
-  postSynthetic: workflowAgentSessions.postSynthetic,
-  broadcast: (event) => broadcastOpenChamberUiEvent(event),
-  isEnabled: isWorkflowToolEnabled,
-  startsWithoutApproval: (sessionID) => sessionLead.startsWorkflowWithoutApproval(sessionID),
-  fsPromises,
-  path,
-});
-void workflowRuntime.start().catch((error) => {
-  console.warn('[workflows] failed to restore runs:', error?.message ?? error);
-});
+const postShareAnswer = async (sessionId: string, body: SyntheticMessage) => {
+  const response = await fetch(buildOpenCodeUrl(`/api/session/${encodeURIComponent(sessionId)}/synthetic`, ''), {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...getOpenCodeAuthHeaders() },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw Object.assign(new Error(`OpenCode refused the synthetic message with ${response.status}${detail ? `: ${detail.slice(0, 200)}` : ''}`), { status: response.status });
+  }
+};
 const sharePagesRuntime = createSharePagesRuntime({
   crypto,
   store: createSharePageStore({ fsPromises, path, dataDir: OPENCHAMBER_DATA_DIR }),
   relay: createShareRelayClient({ getSigner: createRelayShareSigner({ crypto, relayKeyStore }) }),
-  postSynthetic: workflowAgentSessions.postSynthetic,
+  postSynthetic: postShareAnswer,
   onAnswerDelivered: (answer) => notificationTriggerRuntime.notifyShareAnswer(answer),
   broadcast: (event) => broadcastOpenChamberUiEvent(event),
   isAvailable: isSharingAvailable,
@@ -1438,7 +1424,6 @@ const receivedPagesRuntime = createReceivedPagesRuntime({
 globalMessageStreamHub.subscribeStatus((status) => {
   agentToolRuntime?.observeCommandEvent({ type: status.type });
   if (status?.type !== 'connect') return;
-  void workflowRuntime.deliverPending();
   void sharePagesRuntime.poll();
 });
 
@@ -1592,7 +1577,6 @@ const processForwardedServerEvent = (payload: TranslatedEvent, emitSyntheticEven
     },
   });
 };
-
 
 const mcpOAuthSignIn = createMcpOAuthSignIn({
   storePath: path.join(OPENCHAMBER_DATA_DIR, 'mcp-oauth-assignments.json'),
@@ -2281,7 +2265,7 @@ const openChamberControlService = createOpenChamberControlService({
   prWatch: prWatchRuntime,
   extensionWaits: extensionWaitsRuntime,
   laterPages: process.env.OPENCHAMBER_SPACE_IDLE_STOP_FILE ? null : laterPagesRuntime,
-  workflowRuntime,
+  
   leadActions: sessionLead.actions,
   sharePages: sharePagesRuntime,
   archiveStore: openChamberSessionService.archiveStore,
@@ -2349,7 +2333,7 @@ const gracefulShutdownRuntime = createGracefulShutdownRuntime({
   mergeFollowRuntime,
   dispatchResultsRuntime,
   closeAsyncQuestions: () => questionRuntime?.stop(),
-  workflowRuntime,
+  
   messageSearchRuntime,
   sessionRuntime,
   getHealthCheckInterval: () => healthCheckInterval,
@@ -3030,7 +3014,7 @@ async function main(options: WebUiServerOptions = {}) {
     laterPagesRuntime,
     routingRuntime,
     mergeFollowRuntime,
-    workflowRuntime,
+    
   });
   void extensionServiceLifetime.reconcile();
 

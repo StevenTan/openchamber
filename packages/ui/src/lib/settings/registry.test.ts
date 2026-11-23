@@ -208,9 +208,9 @@ describe('settings registry', () => {
 
   test('section order: a saved default moves on apply, a dragged order stays', () => {
     const original = useUIStore.getState();
-    const savedDefault = ['session', 'repository', 'usage', 'telemetry', 'subagents', 'workflows', 'mcp', 'pinned', 'contextSources'];
+    const savedDefault = ['session', 'repository', 'usage', 'telemetry', 'subagents', 'mcp', 'pinned', 'contextSources'];
     // Sections added after an order was saved land in it: Tasks after Subagents.
-    const savedWithTasks = ['session', 'repository', 'usage', 'telemetry', 'subagents', 'tasks', 'workflows', 'mcp', 'pinned', 'contextSources'];
+    const savedWithTasks = ['session', 'repository', 'usage', 'telemetry', 'subagents', 'tasks', 'mcp', 'pinned', 'contextSources'];
     try {
       applySettingsToStores(parseSettingsDocument({ workStatusSectionOrder: savedDefault }) ?? {});
       expect(useUIStore.getState().workStatusSectionOrder.slice(0, 4)).toEqual(['session', 'repository', 'usage', 'contextSources']);
@@ -234,9 +234,9 @@ describe('settings registry', () => {
   test('section order: the local store migration moves a saved default', async () => {
     const migrate = useUIStore.persist.getOptions().migrate;
     if (!migrate) throw new Error('Expected a migration');
-    const savedDefault = ['session', 'repository', 'usage', 'telemetry', 'subagents', 'workflows', 'mcp', 'pinned', 'contextSources'];
+    const savedDefault = ['session', 'repository', 'usage', 'telemetry', 'subagents', 'mcp', 'pinned', 'contextSources'];
     expect(await migrate({ workStatusSectionOrder: savedDefault }, 26)).toMatchObject({
-      workStatusSectionOrder: ['session', 'repository', 'usage', 'contextSources', 'telemetry', 'subagents', 'tasks', 'workflows', 'mcp', 'pinned'],
+      workStatusSectionOrder: ['session', 'repository', 'usage', 'contextSources', 'telemetry', 'subagents', 'tasks', 'mcp', 'pinned'],
     });
   });
 

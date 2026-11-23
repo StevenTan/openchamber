@@ -4,8 +4,7 @@ import { createMessageId, escapeAttribute } from '../dispatch-results/runtime.js
 import { OpenChamberControlError, controlErrorFields } from '../openchamber-control/error.js';
 import type { ControlInput } from '../openchamber-control/contracts.js';
 import type { Request } from '../shared/http-contracts.js';
-import type { SyntheticMessage } from '../workflows/contracts.js';
-import type { JsonValue } from './contracts.js';
+import type { JsonValue, SyntheticMessage } from './contracts.js';
 import type { createSharePageStore, ShareGroup } from './store.js';
 import type { createShareRelayClient, ShareState } from './relay-client.js';
 import { isPlainObject, isString } from '../shared/guards.js';

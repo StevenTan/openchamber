@@ -2,9 +2,7 @@ import { z } from 'zod';
 
 import type { ToolInput } from '@/lib/opencode/model';
 import { openRouterSpendSelection } from '@/lib/quota/windowKeys';
-import { workflowRunSchema, workflowRunStateSchema } from '@/lib/workflows/model';
 import { waitArgsSchema } from '@/sync/extension-waits';
-
 
 const envelopeSchema = z.object({
   ok: z.boolean(),
@@ -322,25 +320,6 @@ export const browserResizedSchema = z.object({
 });
 const browserClosedSchema = z.object({ closed: z.literal(true) });
 
-export const workflowCheckedSchema = z.object({
-  name: z.string(),
-  description: text,
-  phases: z.array(z.string()).catch([]),
-});
-
-export const workflowListedSchema = z.object({
-  workflows: z.array(z.object({ name: z.string(), description: text, error: text })).catch([]),
-  runs: z.array(z.object({ runId: z.string(), name: z.string(), state: workflowRunStateSchema.optional().catch(undefined) })).catch([]),
-});
-
-export const workflowResultSchema = z.union([
-  z.object({ runId: z.string(), agent: z.object({ label: z.string(), state: z.string(), result: z.json().optional().catch(undefined), error: text }) }),
-  z.object({ runId: z.string(), state: workflowRunStateSchema, result: z.json().optional().catch(undefined), error: text }),
-]);
-
-export const workflowStoppedSchema = z.object({ runId: z.string(), state: z.string(), reused: z.number().optional().catch(undefined) });
-export const workflowSavedSchema = z.object({ name: z.string(), path: z.string() });
-
 const VIEW_SCHEMAS: ReadonlyMap<string, z.ZodType> = new Map<string, z.ZodType>([
   ['session.link', linkedSchema],
   ['session.unlink', unlinkedSchema],
@@ -391,13 +370,7 @@ const VIEW_SCHEMAS: ReadonlyMap<string, z.ZodType> = new Map<string, z.ZodType>(
   ['browser.inspect', browserInspectedSchema],
   ['browser.resize', browserResizedSchema],
   ['browser.close', browserClosedSchema],
-  ['workflow.check', workflowCheckedSchema],
-  ['workflow.status', workflowRunSchema],
-  ['workflow.result', workflowResultSchema],
-  ['workflow.list', workflowListedSchema],
-  ['workflow.stop', workflowStoppedSchema],
-  ['workflow.resume', workflowStoppedSchema],
-  ['workflow.save', workflowSavedSchema],
+
 ]);
 
 export const hasOpenChamberView = (envelope: OpenChamberEnvelope): boolean => {
@@ -522,14 +495,7 @@ export const OPENCHAMBER_ACTION_VERB_KEYS = {
   'render.page': 'chat.toolPart.openchamber.action.renderPage',
   'secret.request': 'chat.toolPart.openchamber.action.secretRequest',
   'secret.forget': 'chat.toolPart.openchamber.action.secretForget',
-  'workflow.check': 'chat.toolPart.openchamber.action.workflowCheck',
-  'workflow.run': 'chat.toolPart.openchamber.action.workflowRun',
-  'workflow.status': 'chat.toolPart.openchamber.action.workflowStatus',
-  'workflow.result': 'chat.toolPart.openchamber.action.workflowResult',
-  'workflow.stop': 'chat.toolPart.openchamber.action.workflowStop',
-  'workflow.resume': 'chat.toolPart.openchamber.action.workflowResume',
-  'workflow.save': 'chat.toolPart.openchamber.action.workflowSave',
-  'workflow.list': 'chat.toolPart.openchamber.action.workflowList',
+
 } as const;
 
 const VERB_KEYS = new Map(Object.entries(OPENCHAMBER_ACTION_VERB_KEYS));

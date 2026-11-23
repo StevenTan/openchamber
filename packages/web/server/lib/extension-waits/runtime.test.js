@@ -647,11 +647,11 @@ describe('createExtensionWaitsRuntime', () => {
       expect(service.calls).toHaveLength(0);
     });
 
-    it('wakes the idle session on time while its subagent and workflow agent still run', async () => {
+    it('wakes the idle session on time while its subagent and metadata-linked child still run', async () => {
       const { runtime, openCode, advance, removed } = await createRuntime({ catalog: [] });
       openCode.state.sessions = {
         sub: { id: 'sub', parentID: SESSION },
-        agent: { id: 'agent', metadata: { openchamber: { kind: 'workflow-agent', parentID: SESSION } } },
+        agent: { id: 'agent', metadata: { openchamber: { kind: 'operator-child', parentID: SESSION } } },
       };
       openCode.state.active = { sub: { type: 'running' }, agent: { type: 'running' } };
 

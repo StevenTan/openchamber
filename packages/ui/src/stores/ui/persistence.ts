@@ -425,7 +425,7 @@ export const uiStorePersistOptions = {
     agentMemoryDreamingVariant: state.agentMemoryDreamingVariant,
     agentRenderToolEnabled: state.agentRenderToolEnabled,
     agentSecretToolEnabled: state.agentSecretToolEnabled,
-    agentWorkflowToolEnabled: state.agentWorkflowToolEnabled,
+    
     isolatedSpacesEnabled: state.isolatedSpacesEnabled,
     permissionDefaultMode: state.permissionDefaultMode,
     agentMemoryViewedAt: state.agentMemoryViewedAt,

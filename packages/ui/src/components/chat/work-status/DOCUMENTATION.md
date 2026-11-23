@@ -371,7 +371,6 @@ which requests only providers enabled for this panel.
 | Subagent activity and context | the child's own messages and parts in the directory store (`subagentActivity.ts`, `SubagentLive.tsx`), one leaf subscription per row | see *What a subagent is doing* below |
 | Subagent report | the newest `<subagent>` report in the parent: a report message for a background run, the call's own result for a foreground one (`useSubagentReports`) | recomputed when the parent's message list changes (per message, never per streamed part), with each message's and each part array's reports cached; nothing is read while the session has no subagents |
 | Subagent blockers | directory `permission` / `question` maps | one subscription covers every child |
-| Workflows | `useSessionWorkflowRuns` (`lib/workflows/store.ts`): the session's runs read once from the server, then kept current by `openchamber:workflow-run` events | only while workflows are shown: not in VS Code, and only with the workflow tool on (`selectWorkflowsShown`) |
 | Usage | `components/usage/usageGroups.ts` over `useQuotaStore` | grouping shared with the mobile popover; presentation is not: a provider line in the text colour with its logo muted (`ProviderLogo tint`), groups set apart by 8px, limit rows under the name at the label x with a short reset time (`formatQuotaResetShort`) and compacted counts (`compactQuotaValueLabel`), full figures in the row tooltip; values muted unless a limit is in its warning or critical band (`usageValueTone`) |
 | Linked plans | `useProjectContextStore` plans of the session's project whose `session.sessionId` is this session | refreshed through `observeProjectContext` |
 | Linked threads | `lib/linkedIssues.ts` over session metadata; state from tracked items | written by the flows that attach an issue or PR, and removable from the row; a linked PR that is also the checked-out branch's PR shows the branch summary, as its sidebar row does |
@@ -427,7 +426,7 @@ adds the context fill while the subagent works or waits on the user, muted
 until the header's warning band. The tooltip holds the agent, the model and
 the report line whole. Tokens in the value column are what the subagent spent on its own work:
 input, output, reasoning and cache writes, from its session record. Cache
-reads are left out, as the Workflows panel leaves them out: each step
+reads are left out: each step
 re-reads the whole cached prompt, so a 25-step run read 2.2M from cache
 while its own work was 118K. The heading's button opens the Subagents panel
 (`components/chat/subagents`) where a context panel exists; on the phone and
@@ -699,31 +698,6 @@ changes on the branch, so the panel neither fetches status nor renders the
 changed-files row until the bootstrap settles, then forces one status fetch so
 the row reflects the reset tree rather than a mid-creation snapshot.
 
-### Workflow rows
-
-The Workflows section lists the runs the session proposed
-(`packages/web/server/lib/workflows`), newest first. Where the context panel
-exists (desktop and web), a run is one row that opens it in the Workflows
-panel (`components/chat/workflows/WorkflowsPanel.tsx`), which shows its agents,
-log, result and script. The row carries Run and Don't run while the run waits
-for approval and Resume after a failure or a stop; a running run shows its
-current phase and how many of its agents finished; a finished run's icon is
-its state, with no word beside it, as in Subagents. Stop lives in the panel
-and on the chat card. On the phone, which has no context panel, a run's row
-carries the same actions plus Stop, an open run lists its phases with how many
-agents finished and each phase its agents, and a finished run folds to its row
-until pressed. An agent row opens its session like a subagent row
-(`useOpenChildSession`, shared with the Subagents section).
-
-A workflow's agents are child sessions of the session too. The Subagents
-section leaves them out, so a run of fifty agents does not bury the session's
-own subagents and each session shows in one place.
-
-While workflows are not shown (VS Code, or the workflow tool off) the section
-exists in no list: the panel and the sections dialog both drop it (`useUnavailableWorkStatusSections`),
-so the dialog never offers a section that stays empty. Its id stays in the
-saved order, so it comes back where the user put it.
-
 ## Section order
 
 The default order is by durability:
@@ -734,7 +708,7 @@ The default order is by durability:
    long as the session is open. Usage sits here rather than lower down because a
    spent quota stops the work outright, and Context sources because it holds the
    linked issue and PR, which tell what the session is about;
-2. **Subagents**, **Tasks** and **Workflows** — what is happening right now;
+2. **Subagents** and **Tasks** — what is happening right now;
 3. **MCP** and **Pinned messages** — supporting material.
 
 The sections dialog has drag handles for changing this order, including hidden

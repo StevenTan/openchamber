@@ -302,13 +302,9 @@ export interface UIStore {
   agentMemoryDreamingVariant: string;
   agentRenderToolEnabled: boolean;
   agentSecretToolEnabled: boolean;
-  agentWorkflowToolEnabled: boolean;
-  agentWorkflowAutoApprove: boolean;
-  agentWorkflowAutoApproveLeads: boolean;
   isolatedSpacesEnabled: boolean;
   permissionDefaultMode: PermissionMode;
   agentMemoryFeatureAvailable: boolean;
-  agentWorkflowFeatureAvailable: boolean;
   routingFeatureAvailable: boolean;
   overviewFeatureAvailable: boolean;
   agentMemoryViewedAt: Record<string, number>;
@@ -572,11 +568,9 @@ export interface UIStore {
   setAgentMemoryDreamingVariant: (value: string) => void;
   setAgentRenderToolEnabled: (value: boolean) => void;
   setAgentSecretToolEnabled: (value: boolean) => void;
-  setAgentWorkflowToolEnabled: (value: boolean) => void;
   setIsolatedSpacesEnabled: (value: boolean) => void;
   setPermissionDefaultMode: (value: PermissionMode) => void;
   setAgentMemoryFeatureAvailable: (value: boolean) => void;
-  setAgentWorkflowFeatureAvailable: (value: boolean) => void;
   setRoutingFeatureAvailable: (value: boolean) => void;
   setOverviewFeatureAvailable: (value: boolean) => void;
   markAgentMemoryViewed: (key: string, viewedAt: number) => void;

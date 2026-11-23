@@ -40,7 +40,6 @@ import type { createBrowserControlRouter } from '../browser-control/provider.js'
 import type { ListedSessionRecord } from './listed-session.js';
 import type { BrowserControlParameters } from '../browser-control/broker.js';
 import type { createAgentMemoryActions } from '../agent-memory/actions.js';
-import type { createWorkflowRuntime } from '../workflows/runtime.js';
 import type { createLeadActions } from '../session-lead/actions.js';
 
 interface ControlSettings {
@@ -100,7 +99,6 @@ export interface ControlDependencies {
   prWatch?: WaitActionRequest['prWatch'];
   extensionWaits?: WaitActionRequest['extensionWaits'] | null;
   laterPages?: ReturnType<typeof createLaterPages> | null;
-  workflowRuntime?: Pick<ReturnType<typeof createWorkflowRuntime>, 'executeAction'> | null;
   leadActions?: Pick<ReturnType<typeof createLeadActions>, 'execute'> | null;
   sharePages?: Parameters<typeof createRenderPageAction>[0]['sharePages'];
   archiveStore?: { entry: (sessionID: string) => Promise<number | null | undefined> } | null;
@@ -197,7 +195,6 @@ interface SessionCreateOptions { startedByExtension?: string; operatorParentId?:
 interface MoveWorktree { name: string | undefined; branchName?: string; startRef?: string; existingBranch?: string }
 interface MovePayload { worktree: MoveWorktree; directory?: string; carry?: unknown }
 
-
 const DEFAULT_WAIT_TIMEOUT_SECONDS = 600;
 const MAX_WAIT_TIMEOUT_SECONDS = 86_400;
 const WAIT_POLL_INTERVAL_MS = 500;
@@ -209,7 +206,6 @@ const SCHEDULE_TASK_ID_ACTIONS = new Set([
   'schedule.delete',
   'schedule.toggle',
 ]);
-
 
 const normalizeWaitTimeoutMs = (value: ControlInput['timeout']) => {
   const seconds = value === undefined || value === null ? DEFAULT_WAIT_TIMEOUT_SECONDS : Number(value);
@@ -471,7 +467,7 @@ export const createOpenChamberControlService = (dependencies: ControlDependencie
     prWatch = null,
     extensionWaits = null,
     laterPages = null,
-    workflowRuntime = null,
+    
     leadActions = null,
     sharePages = null,
     archiveStore = null,
@@ -1212,13 +1208,6 @@ export const createOpenChamberControlService = (dependencies: ControlDependencie
           throw new OpenChamberControlError(result.body.error, result.status);
         }
         return result.body;
-      }
-      if (action.startsWith('workflow.')) {
-        if (!workflowRuntime) throw new OpenChamberControlError('Workflows are not available on this server', 503);
-        return await workflowRuntime.executeAction(action, input, {
-          sessionId: asNonEmptyString(options.contextSessionId),
-          directory: asNonEmptyString(contextDirectory),
-        });
       }
       if (action === 'render.page') {
         return await renderPage(input, {

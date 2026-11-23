@@ -26,14 +26,9 @@ import {
   resolveAgentToolAction,
   OPENCHAMBER_WEB_ACTION_DEFINITIONS,
   OPENCHAMBER_WEB_ACTIONS,
-  OPENCHAMBER_WORKFLOW_ACTION_DEFINITIONS,
-  OPENCHAMBER_WORKFLOW_ACTIONS,
-  OPENCHAMBER_WORKFLOW_ANSWER_ACTION_DEFINITIONS,
-  OPENCHAMBER_WORKFLOW_ANSWER_ACTIONS,
-  WORKFLOW_ANSWER_TOOL,
+
   CONTROL_ONLY_PARAMETER_PROPERTIES,
 } from '../openchamber-control/actions.js';
-import { MAX_AGENTS_PER_RUN, MAX_CONCURRENT_AGENTS } from '../workflows/runtime.js';
 import {
   RENDER_PAGE_IMAGE_BUDGET_BYTES,
   RENDER_PAGE_MAX_HTML_LENGTH,
@@ -88,10 +83,6 @@ export interface ActionDefinition {
 
 export interface AgentToolInput extends ControlInput {
   action?: unknown;
-  overwrite?: unknown;
-  script?: unknown;
-  runId?: unknown;
-  answer?: unknown;
   scope?: unknown;
   memoryId?: unknown;
   type?: unknown;
@@ -119,7 +110,6 @@ export interface PluginOptions {
   includeSecret?: boolean;
   includeUsage?: boolean;
   includeTerminal?: boolean;
-  includeWorkflow?: boolean;
 }
 
 export interface AgentToolDependencies {
@@ -138,13 +128,6 @@ export interface AgentToolDependencies {
   resolveMcpContext?: ResolveMcpContext;
   permissions: ToolPermissions;
   codeModeFileActivity?: CodeModeFileActivity;
-}
-
-interface ToolEntryOptions {
-  name: string;
-  description: string;
-  definitions: readonly ActionDefinition[];
-  parameters: Record<string, ParameterSchema>;
 }
 
 export interface ResultFields {
@@ -179,6 +162,7 @@ const TOOL_OUTPUT_SCHEMA = {
   required: ['schemaVersion', 'ok', 'action'],
   additionalProperties: true,
 };
+
 const PLUGIN_ID = 'openchamber-agent-tool';
 const ACTIONS = new Set([
   ...OPENCHAMBER_AGENT_TOOL_ACTIONS,
@@ -192,8 +176,7 @@ const ACTIONS = new Set([
   ...OPENCHAMBER_SECRET_ACTIONS,
   ...OPENCHAMBER_USAGE_ACTIONS,
   ...OPENCHAMBER_TERMINAL_ACTIONS,
-  ...OPENCHAMBER_WORKFLOW_ACTIONS,
-  ...OPENCHAMBER_WORKFLOW_ANSWER_ACTIONS,
+
 ]);
 const AGENT_TOOL_ACTION_TITLES = Object.fromEntries(
   [
@@ -208,8 +191,7 @@ const AGENT_TOOL_ACTION_TITLES = Object.fromEntries(
     ...OPENCHAMBER_SECRET_ACTION_DEFINITIONS,
     ...OPENCHAMBER_USAGE_ACTION_DEFINITIONS,
     ...OPENCHAMBER_TERMINAL_ACTION_DEFINITIONS,
-    ...OPENCHAMBER_WORKFLOW_ACTION_DEFINITIONS,
-    ...OPENCHAMBER_WORKFLOW_ANSWER_ACTION_DEFINITIONS,
+
   ].map(({ action, title }) => [action, title]),
 );
 
@@ -419,33 +401,6 @@ const TERMINAL_PARAMETER_PROPERTIES = {
   maxBytes: { type: 'integer', minimum: 1, maximum: 262144, description: 'terminal.read: how much of the end to return, 32768 by default, 262144 at most' },
 };
 
-const WORKFLOW_SCRIPT_DESCRIPTION = [
-  "JavaScript. It starts with export const meta = { name: 'audit-routes', description: 'One sentence', phases: ['Find', 'Audit'] }, then a body with top-level await and return.",
-  "The body sees: agent(prompt, { id, forkFrom, label, phase, agent, model, schema }) runs one agent in a fresh session and resolves to its final answer text, to the JSON value matching schema (JSON Schema: type, properties, required, items, enum; the agent hands it over through a checking tool), or to null when it failed. model is provider/model, optionally #variant; without it the agent runs on this session's model. The agent has none of this conversation, so the prompt carries everything it needs: paths, the question, what to answer. To branch, name a call with id and, once it has completed, pass forkFrom: that id to a later call: it runs in a fork of that agent's session, with its history and its agent and model unless given; ids are unique within a run, and a bad id or forkFrom fails the run.",
-  "parallel([() => agent(...), ...]) runs tasks together and waits for all of them: a barrier, resolving to their results, null for a failed one. pipeline(items, stage1, stage2, ...) runs each item through the stages on its own, each stage called as (previous, item, index) with previous the last stage's result (the item itself for the first), with no wait between stages; a stage that gives null ends that item as null; prefer it, and use parallel() between steps only when a step needs every earlier result at once, such as deduplicating across them. phase(title) groups the agents that follow under a title listed in meta.phases; inside parallel() or pipeline() pass phase to agent() instead. log(message) shows a line in the run. args is the JSON passed to workflow.run, {} when none was.",
-  `At most ${MAX_CONCURRENT_AGENTS} agents work at once and ${MAX_AGENTS_PER_RUN} per run. No imports, files, network, timers, Date.now(), new Date() or Math.random(): agents read and write files and run commands, the script only coordinates them, and a resumed run replays it.`,
-  "Return a short report value: each agent's full answer stays readable with workflow.result.",
-].join(' ');
-
-const WORKFLOW_PARAMETER_PROPERTIES = {
-  script: { type: 'string', description: WORKFLOW_SCRIPT_DESCRIPTION },
-  name: { type: 'string', description: 'A saved workflow, instead of script' },
-  args: { type: 'object', description: 'An object the script reads as args, such as { paths: [...] }' },
-  runId: { type: 'string', description: 'From workflow.run' },
-  agent: { type: 'string', description: "workflow.result: one agent's key or session id, from workflow.status" },
-  overwrite: { type: 'boolean', description: 'workflow.save: replace a saved workflow of the same name' },
-};
-
-const WORKFLOW_ANSWER_PARAMETER_PROPERTIES = {
-  answer: { type: 'object', description: 'Your answer, the JSON value matching the schema in your prompt. When that schema is not an object, pass { "value": <your value> }' },
-};
-
-const WORKFLOW_ANSWER_TOOL_DESCRIPTION = 'Hand over your answer when your prompt asks for one matching a JSON Schema. It is checked on the spot: a mismatch says what to fix, so call again until it is accepted, then end your turn.';
-
-export const managedPermissionRules = ({ includeWorkflow = false }: Pick<PluginOptions, 'includeWorkflow'> = {}) => (
-  includeWorkflow ? [{ action: WORKFLOW_ANSWER_TOOL, resource: '*', effect: 'deny' }] : []
-);
-
 const CONTROL_TOOL_DESCRIPTION = "OpenChamber projects, sessions and worktrees. One action per call; projectId or directory scope it, default this session's directory. "
   + "Create, send to or fork a separate session when the user explicitly asks; the user follows and talks to it. Use subagent for all delegation within your current task, regardless of task size; collaboration tools manage those agents, including their list, messages, follow-ups, waits and interruption. A dispatch returns at once; returnResult brings its final answer back here as a message. session.send always starts a new prompt. "
   + "session.moveToWorktree moves this session into a new worktree on a new branch from the default branch, taking the changed files you name in carry. It can help when the checkout looks busy: someone's pull request branch, uncommitted changes, another session here, a branch changed between your messages. Whether that fits depends on how the user works: ask, unless the request already calls for separate work, such as a pull request of its own. Unlike git worktree add, the session moves along and the branch starts from the default branch. "
@@ -486,10 +441,6 @@ const TERMINAL_TOOL_DESCRIPTION = "Read OpenChamber's terminal panel: the termin
   + "terminal.list names them, then terminal.read returns the end of one's scrollback as plain text; truncated says older output is no longer held, and maxBytes asks for less. "
   + "The tool exists only while the user turned it on, because a terminal holds whatever was typed into it, secrets included: read the terminal the question is about, not every one.";
 
-const WORKFLOW_TOOL_DESCRIPTION = 'Workflows: a script that fans a large task out to many agents, which OpenChamber runs in the background while you stay free. '
-  + 'For work with many similar independent pieces (a review per file, an audit across many routes, a migration of many files, research cross-checked across sources) or a check that must run on every piece. A single feature or a few steps is not one: do it yourself or with a subagent. '
-  + 'One action per call. Check a script with workflow.check, then workflow.run: the run waits for the user to approve it in the chat, or starts at once when they let runs start without approval in Settings, and the report arrives as a message when the run ends. Read script before writing one.';
-
 const BOOLEAN_PARAMETER_NAMES = [...new Set([
   ALL_PARAMETER_PROPERTIES,
   SCHEDULE_PARAMETER_PROPERTIES,
@@ -498,7 +449,6 @@ const BOOLEAN_PARAMETER_NAMES = [...new Set([
   NOTIFY_PARAMETER_PROPERTIES,
   RENDER_PARAMETER_PROPERTIES,
   IMAGE_PARAMETER_PROPERTIES,
-  WORKFLOW_PARAMETER_PROPERTIES,
   SECRET_PARAMETER_PROPERTIES,
 ].flatMap((properties) => Object.entries(properties)
   .filter((entry): entry is [keyof AgentToolInput, typeof entry[1]] => entry[1].type === 'boolean')
@@ -539,147 +489,6 @@ const createResult = ({ ok, action, data, error, exitCode }: ResultFields) => {
   return result;
 };
 
-const booleanNormalizationBlock = (parameters: Record<string, ParameterSchema>) => {
-  const booleanParameters = Object.entries(parameters)
-    .filter(([, schema]) => schema.type === 'boolean')
-    .map(([parameter]) => parameter);
-  if (booleanParameters.length === 0) return '';
-  return String.raw`        // A harness can stringify a boolean on the way here, and every
-        // downstream === true would read "true" as false. Exactly the two
-        // spellings are normalized, for the fields this tool declares boolean;
-        // every other value keeps its identity for the server's strict check.
-        for (const field of ${JSON.stringify(booleanParameters)}) {
-          if (args[field] === "true") args[field] = true
-          else if (args[field] === "false") args[field] = false
-        }
-`;
-};
-
-const dependsOnRevivalBlock = (parameters: Record<string, ParameterSchema>) => {
-  if (!Object.hasOwn(parameters, 'dependsOn')) return '';
-  return String.raw`        if (typeof args.dependsOn === "string") {
-          try {
-            const revived = JSON.parse(args.dependsOn)
-            if (Array.isArray(revived)) args.dependsOn = revived
-          } catch {}
-        }
-`;
-};
-
-const multiActionSchema = (definitions: readonly ActionDefinition[]) => ({
-  property: {
-    type: 'string',
-    enum: definitions.map((entry) => entry.action),
-    description: `OpenChamber action to perform (${definitions.map((entry) => `${entry.action}: ${entry.description}`).join('; ')})`,
-  },
-  required: ['action'],
-  normalize: '',
-});
-
-const singleActionSchema = (definition: ActionDefinition) => ({
-  property: { type: 'string', description: `${definition.action}: ${definition.description}` },
-  required: [],
-  normalize: String.raw`        if (typeof args.action === "string" && args.action.trim().startsWith("{")) {
-          try {
-            const revived = JSON.parse(args.action)
-            if (revived !== null && typeof revived === "object" && !Array.isArray(revived)) {
-              const { action: _revivedAction, parameters: revivedParameters, ...revivedFields } = revived
-              const nested = revivedParameters !== null && typeof revivedParameters === "object" && !Array.isArray(revivedParameters) ? revivedParameters : {}
-              for (const [field, value] of Object.entries({ ...revivedFields, ...nested })) {
-                if (!Object.hasOwn(args, field)) args[field] = value
-              }
-            }
-          } catch {}
-        }
-        args.action = ${JSON.stringify(definition.action)}
-`,
-});
-
-const createToolEntry = ({ name, description, definitions, parameters }: ToolEntryOptions) => {
-  const normalizeBooleans = booleanNormalizationBlock(parameters);
-  const reviveDependsOn = dependsOnRevivalBlock(parameters);
-  const [definition] = definitions;
-  const actionSchema = definitions.length === 1 && definition ? singleActionSchema(definition) : multiActionSchema(definitions);
-  return String.raw`    tools.add({
-      name: ${JSON.stringify(name)},
-      description: ${JSON.stringify(description)},
-      options: { codemode: false },
-      output: ${JSON.stringify(TOOL_OUTPUT_SCHEMA)},
-      input: {
-        type: "object",
-        properties: {
-          action: ${JSON.stringify(actionSchema.property)},
-          parameters: { type: "object", properties: ${JSON.stringify(parameters)}, additionalProperties: false, description: "Inputs for the action; use an empty object when none are needed" },
-        },
-        required: ${JSON.stringify(actionSchema.required)},
-        // Models routinely put the inputs next to the action; the schema has to
-        // let that reach execute() instead of rejecting the call.
-        additionalProperties: true,
-      },
-      async execute(input, context) {
-        // Models routinely put the inputs next to the action instead of inside
-        // the parameters object, and dropping them there produced a
-        // "url is required" error for a call that plainly carried a url. Both
-        // shapes are accepted; an explicit parameters object wins on a conflict.
-        const { action: requestedAction, parameters, ...flattened } = input ?? {}
-        const args = { ...flattened, ...(parameters ?? {}), action: requestedAction }
-${reviveDependsOn}${actionSchema.normalize}${normalizeBooleans}        const actionTitles = ${JSON.stringify(AGENT_TOOL_ACTION_TITLES)}
-        const title = Object.hasOwn(actionTitles, args.action) ? actionTitles[args.action] : args.action
-        const progress = (extra) => context.progress({
-          ${name}: {
-            schemaVersion: ${TOOL_SCHEMA_VERSION},
-            action: args.action,
-            description: title,
-            ...extra,
-          },
-        })
-        await progress()
-        const endpoint = process.env.OPENCHAMBER_AGENT_TOOL_URL
-        const token = process.env.OPENCHAMBER_AGENT_TOOL_TOKEN
-        const failure = (payload) => ({
-          output: payload,
-          content: JSON.stringify(payload),
-          metadata: { openchamber: { schemaVersion: ${TOOL_SCHEMA_VERSION}, action: args.action, description: title, ok: false } },
-        })
-        if (!endpoint || !token) {
-          return failure({ schemaVersion: ${TOOL_SCHEMA_VERSION}, ok: false, action: args.action, error: { message: "OpenChamber managed tool connection is unavailable" } })
-        }
-
-        try {
-          const response = await fetch(endpoint, {
-            method: "POST",
-            headers: {
-              authorization: "Bearer " + token,
-              "content-type": "application/json",
-            },
-            // OpenCode 2 no longer hands a tool its session directory, so the
-            // session id goes over instead and OpenChamber resolves the
-            // directory on its own side. The signal fires when the session is
-            // aborted, so the OpenChamber side stops the action too.
-            body: JSON.stringify({ input: args, sessionID: context.sessionID, callID: context.id, tool: ${JSON.stringify(name)} }),
-            signal: context.signal,
-          })
-          const content = await response.text()
-          let result = null
-          try { result = JSON.parse(content) } catch {}
-          const valid = result?.schemaVersion === ${TOOL_SCHEMA_VERSION} && typeof result?.ok === "boolean" && typeof result?.action === "string"
-          await progress({ ok: valid && result.ok === true })
-          if (valid) return { output: result, content, metadata: { openchamber: { schemaVersion: ${TOOL_SCHEMA_VERSION}, action: args.action, description: title, ok: result.ok === true } } }
-          return failure({ schemaVersion: ${TOOL_SCHEMA_VERSION}, ok: false, action: args.action, error: { message: "OpenChamber returned an invalid response", kind: "runtime", status: response.status } })
-        } catch (error) {
-          // A stopped call stays a stopped call. Since OpenCode 2.3.0 a tool
-          // that reads context.signal stops cooperatively, and what it returns
-          // is recorded as the call's result: an ok:false envelope here would
-          // read as an ordinary completed call, and the chat would drop the
-          // page or secret card the user stopped.
-          if (context.signal?.aborted) throw error
-          return failure({ schemaVersion: ${TOOL_SCHEMA_VERSION}, ok: false, action: args.action, error: { message: error instanceof Error ? error.message : String(error), kind: "runtime" } })
-        }
-      },
-    })
-`;
-};
-
 const CODE_MODE_CATALOG_LINES = {
   openchamber: 'OpenChamber projects, sessions and worktrees: dispatch a session, link a PR, list models, move this session into a worktree (it can help when the checkout looks busy; ask unless the request already calls for separate work)',
   openchamber_schedule: 'Scheduled tasks: prompts OpenChamber runs on a schedule',
@@ -692,25 +501,21 @@ const CODE_MODE_CATALOG_LINES = {
 
 const OPENCODE_TOOLS_REPLACED_BY_CONTROL = ['opencode_worktree_create', 'opencode_models'];
 
-const createPluginSource = ({ includeControl, includeSchedule, includeWeb, includeMemory, includeKnowledge, includeNotify, includeRender, includeImage, includeSecret, includeUsage, includeTerminal, includeWorkflow }: Required<PluginOptions>) => {
+const multiActionSchema = (definitions: readonly ActionDefinition[]) => ({
+  property: {
+    type: 'string',
+    enum: definitions.map((entry) => entry.action),
+    description: `OpenChamber action to perform (${definitions.map((entry) => `${entry.action}: ${entry.description}`).join('; ')})`,
+  },
+  required: ['action'],
+  normalize: '',
+});
+
+const createPluginSource = ({ includeControl, includeSchedule, includeWeb, includeMemory, includeKnowledge, includeNotify, includeRender, includeImage, includeSecret, includeUsage, includeTerminal }: Required<PluginOptions>) => {
   const entries = [];
   if (includeControl) {
     entries.push(`    for (const id of ${JSON.stringify(OPENCODE_TOOLS_REPLACED_BY_CONTROL)}) tools.remove(id)
 `);
-  }
-  if (includeWorkflow) {
-    entries.push(createToolEntry({
-      name: 'openchamber_workflow',
-      description: WORKFLOW_TOOL_DESCRIPTION,
-      definitions: OPENCHAMBER_WORKFLOW_ACTION_DEFINITIONS,
-      parameters: WORKFLOW_PARAMETER_PROPERTIES,
-    }));
-    entries.push(createToolEntry({
-      name: WORKFLOW_ANSWER_TOOL,
-      description: WORKFLOW_ANSWER_TOOL_DESCRIPTION,
-      definitions: OPENCHAMBER_WORKFLOW_ANSWER_ACTION_DEFINITIONS,
-      parameters: WORKFLOW_ANSWER_PARAMETER_PROPERTIES,
-    }));
   }
 
   return `const exemptCallbackFromProxy = () => {
@@ -768,8 +573,8 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
 
   const { callbackHost, isSameMachineAddress } = createCallbackAddress(getActiveHost);
 
-  const materializePlugin = async ({ includeControl = true, includeSchedule = false, includeWeb = true, includeMemory = true, includeKnowledge = false, includeNotify = false, includeRender = false, includeShare = false, includeImage = false, includeSecret = false, includeUsage = false, includeTerminal = false, includeWorkflow = false }: PluginOptions = {}) => {
-    if (!includeControl && !includeSchedule && !includeWeb && !includeMemory && !includeKnowledge && !includeNotify && !includeRender && !includeImage && !includeSecret && !includeUsage && !includeTerminal && !includeWorkflow) {
+  const materializePlugin = async ({ includeControl = true, includeSchedule = false, includeWeb = true, includeMemory = true, includeKnowledge = false, includeNotify = false, includeRender = false, includeShare = false, includeImage = false, includeSecret = false, includeUsage = false, includeTerminal = false }: PluginOptions = {}) => {
+    if (!includeControl && !includeSchedule && !includeWeb && !includeMemory && !includeKnowledge && !includeNotify && !includeRender && !includeImage && !includeSecret && !includeUsage && !includeTerminal) {
       throw new Error('At least one OpenChamber managed tool must be enabled to inject the plugin');
     }
     webEnabled = includeWeb;
@@ -787,7 +592,7 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
     ];
     await fsPromises.mkdir(pluginDirectory, { recursive: true });
     await fsPromises.writeFile(pluginManifestPath, PLUGIN_PACKAGE_JSON, { mode: 0o600 });
-    await fsPromises.writeFile(pluginPath, createPluginSource({ includeControl, includeSchedule, includeWeb, includeMemory, includeKnowledge, includeNotify, includeRender, includeShare: includeRender && includeShare, includeImage, includeSecret, includeUsage, includeTerminal, includeWorkflow }), { mode: 0o600 });
+    await fsPromises.writeFile(pluginPath, createPluginSource({ includeControl, includeSchedule, includeWeb, includeMemory, includeKnowledge, includeNotify, includeRender, includeShare: includeRender && includeShare, includeImage, includeSecret, includeUsage, includeTerminal }), { mode: 0o600 });
     return pluginDirectory;
   };
 

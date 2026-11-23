@@ -1,4 +1,3 @@
-import type { WorkflowRun } from "@/lib/workflows/model"
 import type { FilePart, JsonValue, Message, Metadata, ModelRef, Part, PermissionRuleset, Session, SessionStatus, SessionOutcome, StructuredError, TokenUsageInfo } from "./model"
 import type { FormRequest, PermissionRequest } from "./requests"
 import type { RunningShell, ShellEnd } from "./model"
@@ -101,8 +100,6 @@ export type SyncEvent =
   | { type: "openchamber.page-waiting"; properties: { sessionID: string; directory: string | null; page: { id: string; title: string } } }
   | { type: "openchamber.page-settled"; properties: { sessionID: string; pageID: string } }
   | { type: "openchamber.session-assist"; properties: { sessionID: string; directory: string | null; pending: boolean } }
-  | { type: "openchamber.workflow-run"; properties: { run: WorkflowRun } }
-  | { type: "openchamber.workflow-run-removed"; properties: { runId: string; parentSessionId: string } }
 
 export type OpenchamberNotification = {
   kind?: string
@@ -124,7 +121,6 @@ export type RoutedSyncEvent = {
 }
 
 export const GLOBAL_EVENT_DIRECTORY = "global"
-
 
 export function syncEventSessionID(event: SyncEvent): string | undefined {
   switch (event.type) {

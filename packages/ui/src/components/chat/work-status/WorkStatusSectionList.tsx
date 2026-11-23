@@ -5,7 +5,6 @@ import { WorkStatusPrimaryGroup } from './WorkStatusPrimaryGroup';
 import { WorkStatusUsageSection } from './WorkStatusUsageSection';
 import { WorkStatusTelemetrySection } from './WorkStatusTelemetrySection';
 import { WorkStatusSubagentsSection } from './WorkStatusSubagentsSection';
-import { WorkStatusWorkflowsSection } from './WorkStatusWorkflowsSection';
 import { WorkStatusTasksSection } from './WorkStatusTasksSection';
 import { useLoadSessionTodos } from './useLoadSessionTodos';
 import { WorkStatusMcpSection } from './WorkStatusMcpSection';
@@ -31,7 +30,7 @@ export const WorkStatusSectionList: React.FC<{
     telemetry: <WorkStatusTelemetrySection sessionId={sessionId} directory={directory} />,
     subagents: <WorkStatusSubagentsSection sessionId={sessionId} directory={directory} />,
     tasks: <WorkStatusTasksSection sessionId={sessionId} />,
-    workflows: <WorkStatusWorkflowsSection sessionId={sessionId} directory={directory} />,
+    
     mcp: <WorkStatusMcpSection sessionId={sessionId} directory={directory} />,
     pinned: <WorkStatusPinnedSection sessionId={sessionId} directory={directory} />,
     contextSources: <WorkStatusContextSection sessionId={sessionId} directory={directory} />,

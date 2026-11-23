@@ -34,7 +34,6 @@ interface ShutdownDependencies {
   mergeFollowRuntime?: OptionalStop;
   messageQueueRuntime?: OptionalStop;
   dispatchResultsRuntime?: OptionalStop;
-  workflowRuntime?: { shutdown: Cleanup } | null;
   messageSearchRuntime?: OptionalStop;
   scheduledTasksRuntime?: OptionalStop;
   getHealthCheckInterval: () => Timer | null;
@@ -93,7 +92,7 @@ export const createGracefulShutdownRuntime = (dependencies: ShutdownDependencies
     mergeFollowRuntime,
     messageQueueRuntime,
     dispatchResultsRuntime,
-    workflowRuntime = null,
+    
     messageSearchRuntime,
     scheduledTasksRuntime,
     getHealthCheckInterval,
@@ -182,7 +181,7 @@ export const createGracefulShutdownRuntime = (dependencies: ShutdownDependencies
       () => messageQueueRuntime?.stop?.(),
       () => dispatchResultsRuntime?.stop?.(),
       closeAsyncQuestions,
-      () => workflowRuntime?.shutdown(),
+      
       () => messageSearchRuntime?.stop?.(),
       () => scheduledTasksRuntime?.stop?.(),
       stopAllGuestServices,

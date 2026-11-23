@@ -6,7 +6,6 @@ import { GLOBAL_EVENT_DIRECTORY, hostTurnStart, type SyncEvent } from "../agent/
 import type { Metadata } from "../agent/model"
 import type { SpaceProgress } from "../agent/event-source"
 import { spaceCreationStepSchema, spaceTaskTitleSchema } from "@/lib/spaces/spaces-api"
-import { workflowRunSchema } from "@/lib/workflows/model"
 
 const openchamberStatusSchema = z.object({
   type: z.literal("openchamber:session-status"),
@@ -72,16 +71,6 @@ const openchamberSessionAssistSchema = z.object({
   }),
 })
 
-const openchamberWorkflowRunSchema = z.object({
-  type: z.literal("openchamber:workflow-run"),
-  properties: z.object({ run: workflowRunSchema }),
-})
-
-const openchamberWorkflowRunRemovedSchema = z.object({
-  type: z.literal("openchamber:workflow-run-removed"),
-  properties: z.object({ runId: z.string().min(1), parentSessionId: z.string().min(1) }),
-})
-
 const openchamberSpaceStreamSchema = z.object({
   type: z.literal("openchamber:space-stream"),
   properties: z.object({
@@ -104,7 +93,6 @@ const openchamberSpaceTaskTitleSchema = z.object({
   type: z.literal("openchamber:space-task-title.updated"),
   properties: z.object({ spaceId: z.string().regex(/^[0-9a-f]{12}$/), taskTitle: spaceTaskTitleSchema.nullable() }),
 })
-
 
 const openchamberSpaceSetupSchema = z.object({
   type: z.literal("openchamber:space-setup"),
@@ -200,14 +188,6 @@ function translateOpenchamberEvent(type: string, payload: unknown): SyncEvent | 
     case "openchamber:permission-auto-accept.left-for-user": {
       const parsed = openchamberLeftForUserSchema.safeParse(payload)
       return parsed.success ? { type: "openchamber.permission-left-for-user", properties: parsed.data.properties } : null
-    }
-    case "openchamber:workflow-run": {
-      const parsed = openchamberWorkflowRunSchema.safeParse(payload)
-      return parsed.success ? { type: "openchamber.workflow-run", properties: parsed.data.properties } : null
-    }
-    case "openchamber:workflow-run-removed": {
-      const parsed = openchamberWorkflowRunRemovedSchema.safeParse(payload)
-      return parsed.success ? { type: "openchamber.workflow-run-removed", properties: parsed.data.properties } : null
     }
     default:
       return null

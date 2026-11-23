@@ -464,7 +464,6 @@ describe('managed agent tool runtime', () => {
     expect(executeAction).toHaveBeenCalledTimes(2);
   });
 
-
   it('introduces the worktree move and leaves the choice to the user', async () => {
     const { runtime, dataDir } = await createRuntime();
 
@@ -569,27 +568,6 @@ describe('managed agent tool runtime', () => {
     expect(executeAction).toHaveBeenCalledWith('session.messages',
       { action: 'session.messages', sessionId: 'ses_1', limit: 3 }, undefined,
       expect.objectContaining({ contextSessionId: 'ses_1' }));
-  });
-
-  it('declares the workflow tool only when asked, with the scripting guide on script', async () => {
-    const { runtime, dataDir } = await createRuntime();
-    await prepareManagedEnv(runtime, { includeControl: true, includeWorkflow: true });
-    const tools = await loadTools(dataDir, 'workflow-tool');
-
-    expect(tools.openchamber_workflow.input.properties.action.enum).toEqual([
-      'workflow.check', 'workflow.run', 'workflow.status', 'workflow.result', 'workflow.stop', 'workflow.resume', 'workflow.save', 'workflow.list',
-    ]);
-    const parameters = tools.openchamber_workflow.input.properties.parameters.properties;
-    expect(parameters.script.description).toContain('agent(prompt, { id, forkFrom, label, phase, agent, model, schema })');
-    expect(Object.keys(parameters)).toEqual(['script', 'name', 'args', 'runId', 'agent', 'overwrite']);
-    // The answer tool comes along, direct; the managed config denies it outside workflow agents.
-    expect(tools.openchamber_workflow_answer.options).toEqual({ codemode: false });
-    expect(Object.keys(tools.openchamber_workflow_answer.input.properties.parameters.properties)).toEqual(['answer']);
-
-    await prepareManagedEnv(runtime, { includeControl: true });
-    const off = await loadTools(dataDir, 'workflow-tool-off');
-    expect(off.openchamber_workflow).toBeUndefined();
-    expect(off.openchamber_workflow_answer).toBeUndefined();
   });
 
   it('runs the one action of a single-action tool, reviving a call stuffed into the action as JSON', async () => {
@@ -904,7 +882,6 @@ describe('managed agent tool runtime', () => {
       includeKnowledge: true,
       includeNotify: true,
       includeRender: true,
-      includeWorkflow: true,
       includeImage: true,
       includeUsage: true,
     });
@@ -921,8 +898,6 @@ describe('managed agent tool runtime', () => {
       'openchamber_render',
       'openchamber_schedule',
       'openchamber_usage',
-      'openchamber_workflow',
-      'openchamber_workflow_answer',
     ]);
     for (const tool of Object.values(tools)) {
       // Claude Code before 2.1.296 cuts an MCP tool description at 2048
@@ -1235,7 +1210,7 @@ describe('managed agent tool runtime', () => {
     ['not a url', 'localhost', 'localhost'],
   ])('keeps the callback %s away from an environment proxy', async (callbackUrl, existing, expected) => {
     const { runtime, dataDir } = await createRuntime();
-    await prepareManagedEnv(runtime, { includeControl: false, includeMemory: false, includeWeb: false, includeRender: false, includeWorkflow: true });
+    await prepareManagedEnv(runtime, { includeControl: true, includeMemory: false, includeWeb: false, includeRender: false });
     const keys = ['OPENCHAMBER_AGENT_TOOL_URL', 'NO_PROXY', 'no_proxy'];
     const previous = keys.map((key) => process.env[key]);
     try {
@@ -1244,7 +1219,7 @@ describe('managed agent tool runtime', () => {
         if (existing === undefined) delete process.env[key];
         else process.env[key] = existing;
       }
-      await loadTools(dataDir, 'proxy');
+      await loadTools(dataDir, 'proxy', {}, [], [], { mcp: { transform: vi.fn() } });
 
       expect(process.env.NO_PROXY).toBe(expected);
       expect(process.env.no_proxy).toBe(expected);

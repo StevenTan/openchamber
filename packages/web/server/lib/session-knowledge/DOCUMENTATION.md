@@ -249,22 +249,10 @@ to ask for any secret on the tool's card and never in the chat
 tool, and a token pasted in the chat stays in the transcript. The tool
 description says only what the card does.
 
-## When to offer a workflow
-
-A session whose agent has the `openchamber_workflow` tool (a build with
-workflows, the setting on, and OpenChamber launched OpenCode, read through
-`isWorkflowAvailable`) is told when a task is big enough for one
-(`WORKFLOW_GUIDANCE`). A run costs many agents, so the agent starts one only
-when the user asks; when it sees a task with many similar independent pieces
-it says so and offers one. Small tasks never get one. The text asks for a model
-per phase in the same message and starts the run once the user agrees to them:
-without a model named every agent runs on the session's own model, often the
-most expensive one, and dozens of those cost many times a cheap model.
-
 ## Where the tools are called
 
 The tools whose call the chat draws (`openchamber_render`,
-`openchamber_secret`, `openchamber_workflow`) are direct tools; the rest sit
+`openchamber_secret`) are direct tools; the rest sit
 behind Code Mode when `execute` is available and are direct tools otherwise
 (`../agent-tool/DOCUMENTATION.md`). A session that has any of
 the direct ones is told, by name, that they are called directly and never from

@@ -20,9 +20,7 @@ terminal has no session to deliver into.
   persistence, the delivery loop, event handling; plus the pure
   `readDispatchOutcome` and `buildDispatchResultMessage`. The runtime returns
   `pending()` (entries oldest first) and `flush()` (the queued write) for tests
-  and diagnostics. Workflow runs
-  (`../workflows`) reuse `readDispatchOutcome` to tell when an agent's turn
-  ended, and `createMessageId` and `escapeAttribute` for their report.
+  and diagnostics.
   Auto-review (`../auto-review`) reads each step's end with
   `readDispatchOutcome(..., { withText: true })`, which takes the text from
   the newest reply of the turn that has any, and mints its ids with
@@ -121,12 +119,11 @@ single confirmation.
 
 ### Why an idle session's answer goes out while its children still run
 
-Subagents in OpenCode 2 run in the background, as do workflow agents and
-sessions started with `ownWork`: the session answers and goes idle while they
+Subagents in OpenCode 2 run in the background, as do sessions started with
+`ownWork`: the session answers and goes idle while they
 work, and their results arrive later as messages that start a new turn.
 Waiting on them, as `hasWorkingChildren` does for goals and notifications,
-kept a question to an orchestrating session from coming back for hours while
-its workflow ran, though the session had answered in 36 seconds.
+would delay delivery after the session has already answered.
 
 ## Delivery
 

@@ -9,7 +9,6 @@ work-status section's own (`SubagentStatusRow`): one component, the same
 data from `useSubagentRows`, so the panel and the section never disagree; in
 the panel a press opens the card under the row instead of the chat, and the
 row shows the current tool call, which the section leaves out.
-Workflow agents stay in the Workflows panel.
 
 The children come from the live directory stores plus the global session
 list. A session an agent started with `ownWork` often lives in another folder

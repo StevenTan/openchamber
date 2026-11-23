@@ -265,26 +265,22 @@ describe("global session status index", () => {
 })
 
 describe("what a session row says keeps its turn open", () => {
-  test("its own run first, then a running workflow over its agents' subagent state, then a command", () => {
-    expect(resolveSessionTurnActivity("running", true, true)).toBe("running")
-    // A workflow's agents are subagents; the row names the workflow instead.
-    expect(resolveSessionTurnActivity("subagent", true, false)).toBe("workflow")
-    // Between phases no agent is busy, and the workflow still runs.
-    expect(resolveSessionTurnActivity(null, true, false)).toBe("workflow")
-    expect(resolveSessionTurnActivity("subagent", false, true)).toBe("subagent")
-    expect(resolveSessionTurnActivity(null, false, true)).toBe("shell")
-    expect(resolveSessionTurnActivity(null, false, false)).toBeNull()
+  test("its own run first, then a subagent, then a command", () => {
+    expect(resolveSessionTurnActivity("running", true)).toBe("running")
+    expect(resolveSessionTurnActivity("subagent", true)).toBe("subagent")
+    expect(resolveSessionTurnActivity(null, true)).toBe("shell")
+    expect(resolveSessionTurnActivity(null, false)).toBeNull()
     // An agent waiting on its pull request reads as working, after anything that really runs.
-    expect(resolveSessionTurnActivity(null, false, false, true)).toBe("pullRequest")
-    expect(resolveSessionTurnActivity(null, false, true, true)).toBe("shell")
-    expect(resolveSessionTurnActivity("running", false, false, true)).toBe("running")
+    expect(resolveSessionTurnActivity(null, false, true)).toBe("pullRequest")
+    expect(resolveSessionTurnActivity(null, true, true)).toBe("shell")
+    expect(resolveSessionTurnActivity("running", false, true)).toBe("running")
     // An image the session waits on comes after a command and before a pull request.
-    expect(resolveSessionTurnActivity(null, false, false, true, true)).toBe("image")
-    expect(resolveSessionTurnActivity(null, false, true, false, true)).toBe("shell")
+    expect(resolveSessionTurnActivity(null, false, true, true)).toBe("image")
+    expect(resolveSessionTurnActivity(null, true, false, true)).toBe("shell")
     // So does one waiting on a timer or an extension, last of all.
-    expect(resolveSessionTurnActivity(null, false, false, false, false, true)).toBe("extensionWait")
-    expect(resolveSessionTurnActivity(null, false, false, true, false, true)).toBe("pullRequest")
-    expect(resolveSessionTurnActivity("subagent", false, false, false, false, true)).toBe("subagent")
+    expect(resolveSessionTurnActivity(null, false, false, false, true)).toBe("extensionWait")
+    expect(resolveSessionTurnActivity(null, false, true, false, true)).toBe("pullRequest")
+    expect(resolveSessionTurnActivity("subagent", false, false, false, true)).toBe("subagent")
   })
 })
 

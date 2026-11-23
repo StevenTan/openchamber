@@ -4,7 +4,6 @@ import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { applyBackgroundShellEvents, resetBackgroundShells } from '@/sync/background-shells';
 import { replaceGlobalSessionStatusById, setSessionParentResolver, useFirstSessionWithOpenTurn } from '@/sync/global-session-status';
 import { applyPrWatches, resetPrWatchesForRuntimeSwitch } from '@/sync/pr-watch';
-import { setWorkflowRunningSessions } from '@/sync/workflow-activity';
 import { installHookTestDom } from '../test-utils/testDom';
 
 // A worktree row counts time for this session: an idle one its background work
@@ -15,7 +14,6 @@ const reset = () => {
   replaceGlobalSessionStatusById(new Map());
   resetBackgroundShells();
   resetPrWatchesForRuntimeSwitch();
-  setWorkflowRunningSessions([]);
   setSessionParentResolver(() => undefined);
 };
 
@@ -53,7 +51,7 @@ test('a session running or holding a running subagent is found', async () => {
   expect(found).toBe('first');
 });
 
-test('an idle session waiting on a command, a workflow or a pull request is found', async () => {
+test('an idle session waiting on a command or a pull request is found', async () => {
   await act(async () => applyBackgroundShellEvents('/repo', [{
     type: 'shell.started',
     properties: { shell: { id: 'sh_1', sessionID: 'second', command: 'sleep 300', file: '/tmp/sh_1.out', startedAt: 1 } },
@@ -61,10 +59,6 @@ test('an idle session waiting on a command, a workflow or a pull request is foun
   expect(found).toBe('second');
   await act(async () => resetBackgroundShells());
   expect(found).toBeNull();
-
-  await act(async () => setWorkflowRunningSessions(['first']));
-  expect(found).toBe('first');
-  await act(async () => setWorkflowRunningSessions([]));
 
   await act(async () => applyPrWatches(1, 'second', [{
     sessionID: 'second', directory: '/repo', url: 'https://example.test/pr/1', number: 1, title: 'PR', status: 'pending', startedAt: 1,

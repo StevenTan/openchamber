@@ -145,7 +145,7 @@ describe('queue descendant activity', () => {
 
 describe('working children', () => {
   const running = { type: 'running' };
-  const link = (parentID) => ({ openchamber: { kind: 'workflow-agent', parentID } });
+  const link = (parentID) => ({ openchamber: { kind: 'operator-child', parentID } });
   // `children` is what OpenCode lists for `?parentID=root`; `sessions` answers single reads.
   const probeWith = ({ children = [], sessions = {} }) => createSessionActivityProbe({
     buildOpenCodeUrl: (route) => `http://opencode.test${route}`,
@@ -160,21 +160,6 @@ describe('working children', () => {
 
   it('counts a running OpenCode child', async () => {
     expect(await probeWith({ sessions: { child: { id: 'child', parentID: 'root' } } }).hasWorkingChildren('root', { child: running })).toBe(true);
-  });
-
-  it('counts a running workflow agent, which OpenCode does not list as a child', async () => {
-    const probe = probeWith({ sessions: { agent: { id: 'agent', metadata: link('root') } } });
-    expect(await probe.hasWorkingChildren('root', { agent: running })).toBe(true);
-  });
-
-  it("counts a running subagent of an idle workflow agent", async () => {
-    const probe = probeWith({ sessions: { agent: { id: 'agent', metadata: link('root') }, sub: { id: 'sub', parentID: 'agent' } } });
-    expect(await probe.hasWorkingChildren('root', { sub: running })).toBe(true);
-  });
-
-  it("does not count another session's workflow agent or an unrelated session", async () => {
-    const probe = probeWith({ sessions: { agent: { id: 'agent', metadata: link('other') }, other: { id: 'other' }, plain: { id: 'plain' } } });
-    expect(await probe.hasWorkingChildren('root', { root: running, agent: running, plain: running })).toBe(false);
   });
 
   it('is unknown when a running session cannot be read', async () => {

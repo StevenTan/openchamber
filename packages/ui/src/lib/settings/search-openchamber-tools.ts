@@ -121,20 +121,5 @@ export const OPENCHAMBER_TOOLS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     isAvailable: (ctx) => !ctx.isVSCode && useUIStore.getState().agentMemoryFeatureAvailable
       && useUIStore.getState().agentMemoryToolEnabled,
   },
-  {
-    id: 'sessions.agent-workflow-tool',
-    page: 'general',
-    titleKey: 'settings.openchamber.tools.field.agentWorkflowTool',
-    descriptionKey: 'settings.openchamber.tools.field.agentWorkflowToolSummary',
-    keywords: ['agent', 'tool', 'workflow', 'workflows', 'subagents', 'fan out', 'parallel', 'openchamber'],
-    isAvailable: (ctx) => !ctx.isVSCode && useUIStore.getState().agentWorkflowFeatureAvailable,
-  },
-  {
-    id: 'sessions.agent-workflow-auto-approve',
-    page: 'general',
-    titleKey: 'settings.openchamber.tools.workflowAutoApprove.label',
-    descriptionKey: 'settings.openchamber.tools.workflowAutoApprove.info',
-    keywords: ['workflow', 'workflows', 'approve', 'approval', 'auto', 'automatic', 'start', 'without asking', 'unattended', 'overnight', 'lead', 'leads'],
-    isAvailable: (ctx) => !ctx.isVSCode && useUIStore.getState().agentWorkflowFeatureAvailable && useUIStore.getState().agentWorkflowToolEnabled,
-  },
+
 ];

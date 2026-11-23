@@ -18,7 +18,6 @@ describe('operator child sessions', () => {
   test('reads the link the server writes and nothing else', () => {
     expect(operatorChildParentId({ openchamber: { kind: 'operator-child', parentID: 'ses_operator' } })).toBe('ses_operator');
     expect(isOperatorChildSession(child({ openchamber: { kind: 'operator-child', parentID: 'ses_operator' } }))).toBe(true);
-    expect(isOperatorChildSession(child({ openchamber: { kind: 'workflow-agent', parentID: 'ses_run' } }))).toBe(false);
     expect(isOperatorChildSession(child(undefined))).toBe(false);
   });
 

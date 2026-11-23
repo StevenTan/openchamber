@@ -169,7 +169,7 @@ import {
 
 const AGENT_TOOL_BOOLEAN_KEYS = [
   'agentControlToolEnabled', 'agentScheduleToolEnabled', 'agentMemoryToolEnabled', 'agentMemoryDreamingEnabled',
-  'agentKnowledgeToolEnabled', 'agentWorkflowToolEnabled', 'agentWorkflowAutoApprove', 'agentWorkflowAutoApproveLeads', 'agentNotifyToolEnabled',
+  'agentKnowledgeToolEnabled', 'agentNotifyToolEnabled',
   'agentRenderToolEnabled', 'agentImageToolEnabled', 'agentSecretToolEnabled', 'agentUsageToolEnabled', 'agentTerminalToolEnabled',
 ] as const;
 
@@ -727,7 +727,6 @@ export const createSettingsHelpers = (dependencies: SettingsHelpersDependencies)
     if (isBoolean(candidate.draftStartersScheduleTaskAdded)) {
       result.draftStartersScheduleTaskAdded = candidate.draftStartersScheduleTaskAdded;
     }
-
 
     for (const key of ['uiFont', 'monoFont', 'chatFont'] as const) {
       const value = candidate[key];
@@ -1511,7 +1510,7 @@ export const createSettingsHelpers = (dependencies: SettingsHelpersDependencies)
       hasManagedRemoteTunnelToken,
       hasDesktopUiPassword,
       agentMemoryFeatureAvailable: true,
-      agentWorkflowFeatureAvailable: true,
+      
       overviewFeatureAvailable: isOverviewFeatureAvailable(),
       routingFeatureAvailable: true,
       ...appNameFields,

@@ -15,7 +15,7 @@ type ManagedKnowledgeDependencies = Pick<SessionKnowledgeDependencies,
   isToolHost: () => boolean;
   readSettings: () => Promise<ToolSettings | null>;
   isAgentMemoryEnabled: () => Promise<boolean>;
-  isWorkflowToolEnabled: () => Promise<boolean>;
+  
   listWorktrees: (directory: string) => Promise<{ path: string }[]>;
   openCodeSessionClient: (directory: string) => ReturnType<typeof createOpenCodeClient>;
 };
@@ -26,7 +26,7 @@ export const createManagedSessionKnowledgeRuntime = ({
   isToolHost,
   readSettings,
   isAgentMemoryEnabled,
-  isWorkflowToolEnabled,
+  
   listWorktrees,
   openCodeSessionClient,
   ...dependencies
@@ -47,7 +47,7 @@ export const createManagedSessionKnowledgeRuntime = ({
     },
     isPageRenderingAvailable: toolSettingOn('agentRenderToolEnabled'),
     isSecretRequestAvailable: toolSettingOn('agentSecretToolEnabled'),
-    isWorkflowAvailable: async () => isToolHost() && isWorkflowToolEnabled(),
+    
     instructionEntries: {
       put: (sessionID, directory, key, value) => openCodeSessionClient(directory)
         .experimental.session.instructions.entry.put({ sessionID, key, value }),

@@ -29,7 +29,6 @@ import { toast } from '@/components/ui';
 const GitView = lazyWithChunkRecovery(() => import('@/components/views/GitView').then((m) => ({ default: m.GitView })));
 import { areTitleMapsEqual, buildSessionTitleMap, EMPTY_SESSION_TITLE_MAP, getSessionIDFromDedupeKey } from './contextPanelSessionTitles';
 import { ProjectContextPanel } from './RightSidebarTabs';
-import { WorkflowsPanel } from '@/components/chat/workflows/WorkflowsPanel';
 import { SubagentsPanel } from '@/components/chat/subagents/SubagentsPanel';
 import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
 import { useRepositoryReferenceProvider } from '@/components/references/referenceSources';
@@ -285,7 +284,6 @@ const getTabIcon = (
   return surface ? <Icon name={surface.icon} className="h-3.5 w-3.5" /> : undefined;
 };
 
-
 const browserFaviconFor = (url: string, faviconByOrigin: Record<string, string>): string => {
   try {
     return faviconByOrigin[new URL(url).origin] ?? '';
@@ -339,7 +337,6 @@ const useTemporaryChatIds = (sessionIDs: readonly string[]): ReadonlySet<string>
   );
 };
 
-
 const truncateTabLabel = (value: string, maxChars: number): string => {
   if (value.length <= maxChars) {
     return value;
@@ -348,12 +345,11 @@ const truncateTabLabel = (value: string, maxChars: number): string => {
   return `${value.slice(0, maxChars - 3)}...`;
 };
 
-
 const HEADER_DRAG_DISTANCE_PX = 8;
 const HEADER_DRAG_EXCLUDED = 'button, a, input, textarea, select, label, [role="button"], [role="tab"], [role="combobox"], [role="switch"], [role="slider"], [data-sortable-tab-id], [contenteditable="true"]';
 
 const isRemountedSurface = (mode: ContextPanelMode): boolean => (
-  mode === 'context' || mode === 'git' || mode === 'pr' || mode === 'notes' || mode === 'workflows'
+  mode === 'context' || mode === 'git' || mode === 'pr' || mode === 'notes'
 );
 
 const CONTEXT_PANEL_DEFAULT_HEIGHT = 320;
@@ -823,8 +819,6 @@ const WorkspaceContextPanel: React.FC<{ zone: ContextZone }> = ({ zone }) => {
                     : <PullRequestView />)
             : activeTab?.mode === 'notes'
                 ? <ContextPanelHeaderSlotProvider value={headerSlotEl}><ProjectContextPanel visible={workspaceActive && isOpen} /></ContextPanelHeaderSlotProvider>
-            : activeTab?.mode === 'workflows'
-                ? <ContextPanelHeaderSlotProvider value={headerSlotEl}><WorkflowsPanel directory={effectiveDirectory || null} /></ContextPanelHeaderSlotProvider>
             : activeTab?.mode === 'pages' && !activeTab.targetPath
                 ? <ReceivedPagesTab />
         : null;

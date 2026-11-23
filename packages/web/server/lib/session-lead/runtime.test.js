@@ -228,34 +228,6 @@ describe('sleep compaction', () => {
   });
 });
 
-describe('workflow runs without approval', () => {
-  const decide = async (settings, metadata) => {
-    const { createSessionLeadServer } = await import('./server.js');
-    const server = createSessionLeadServer({
-      dataDir: await dataDir(),
-      readSessionMetadata: async () => metadata,
-      updateMetadata: async () => ({ changed: false }),
-      resolveSessionDirectory: async () => '/repo',
-      syncBriefEntry: async () => true,
-      executeControl: async () => ({ sessions: [] }),
-      readWorkflowSettings: async () => settings,
-      createError,
-      buildOpenCodeUrl: (route) => route,
-      getOpenCodeAuthHeaders: () => ({}),
-      registerResult: async () => ({}),
-    });
-    return server.startsWorkflowWithoutApproval('ses_x');
-  };
-
-  it('start at once for every session, for leads only, or never', async () => {
-    expect(await decide({ agentWorkflowAutoApprove: true }, {})).toBe(true);
-    expect(await decide({ agentWorkflowAutoApproveLeads: true }, LEAD)).toBe(true);
-    expect(await decide({ agentWorkflowAutoApproveLeads: true }, {})).toBe(false);
-    expect(await decide({}, LEAD)).toBe(false);
-    expect(await decide(null, LEAD)).toBe(false);
-  });
-});
-
 describe('brief entry', () => {
   it('keeps the brief the conversation began with until a compaction brings it up to date', async () => {
     const briefs = createLeadBriefStore({ dataDir: await dataDir() });

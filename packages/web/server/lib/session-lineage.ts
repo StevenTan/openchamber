@@ -19,7 +19,7 @@ interface SessionMetadata {
 export const OPERATOR_CHILD_KIND = 'operator-child';
 
 const linkedSessionSchema = z.object({
-  metadata: z.object({ openchamber: z.object({ kind: z.enum(['workflow-agent', OPERATOR_CHILD_KIND]), parentID: z.string().min(1) }) }),
+  metadata: z.object({ openchamber: z.object({ kind: z.literal(OPERATOR_CHILD_KIND), parentID: z.string().min(1) }) }),
 });
 
 const hasParentId = (record: unknown): record is { parentID: string } =>

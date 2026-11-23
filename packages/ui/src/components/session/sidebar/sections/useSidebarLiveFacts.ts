@@ -6,7 +6,6 @@ import { collectOpenTurnSessionIds, useGlobalSessionStatusStore } from '@/sync/g
 import { usePrWatchStore } from '@/sync/pr-watch';
 import { useExtensionWaitsStore } from '@/sync/extension-waits';
 import { isSessionUnread } from '@/sync/session-unread';
-import { useWorkflowActivityStore } from '@/sync/workflow-activity';
 import { useGlobalSessionsStore } from '@/stores/useGlobalSessionsStore';
 import { useProjectContextStore } from '@/stores/useProjectContextStore';
 import { runBackgroundNetworkTask } from '@/lib/background-network';
@@ -35,7 +34,6 @@ const selectTurnOutcomeKey = (state: ReturnType<typeof useGlobalSessionsStore.ge
 
 export const useSidebarLiveFacts = (enabled: boolean): SidebarLiveFacts => {
   const activeIds = useGlobalSessionStatusStore((state) => (enabled ? state.activeSessionIds : EMPTY_IDS));
-  const workflowIds = useWorkflowActivityStore((state) => (enabled ? state.runningSessionIds : EMPTY_IDS));
   const shellIds = useBackgroundShellsStore((state) => (enabled ? state.sessionIds : EMPTY_IDS));
   const imageIds = useBackgroundImagesStore((state) => (enabled ? state.sessionIds : EMPTY_IDS));
   const prWatches = usePrWatchStore((state) => (enabled ? state.bySession : EMPTY_PR_WATCHES));
@@ -45,7 +43,7 @@ export const useSidebarLiveFacts = (enabled: boolean): SidebarLiveFacts => {
   return React.useMemo(() => {
     if (!enabled) return EMPTY_SIDEBAR_LIVE_FACTS;
     const [unread = '', failed = ''] = outcomeKey.split('|');
-    const openTurnIds = collectOpenTurnSessionIds(activeIds, [workflowIds, shellIds, imageIds, prWatches.keys(), extensionWaits.keys()]);
+    const openTurnIds = collectOpenTurnSessionIds(activeIds, [shellIds, imageIds, prWatches.keys(), extensionWaits.keys()]);
     return {
       activeIds: openTurnIds,
       blockingIds: new Set([...blocking].flatMap(([sessionId, pending]) => (
@@ -54,7 +52,7 @@ export const useSidebarLiveFacts = (enabled: boolean): SidebarLiveFacts => {
       unreadIds: new Set(unread ? unread.split(',').filter((sessionId) => !openTurnIds.has(sessionId)) : []),
       failedIds: new Set(failed ? failed.split(',') : []),
     };
-  }, [activeIds, blocking, enabled, extensionWaits, imageIds, outcomeKey, prWatches, shellIds, workflowIds]);
+  }, [activeIds, blocking, enabled, extensionWaits, imageIds, outcomeKey, prWatches, shellIds]);
 };
 
 const localHourStart = (): number => {

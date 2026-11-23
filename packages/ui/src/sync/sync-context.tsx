@@ -34,8 +34,6 @@ import { setHostTurnStartRequester } from "./session-activity-timing"
 import { refreshBackgroundImages } from "./background-images"
 import { CHAT_LOCATION_RELEASE_DELAY_MS, PROJECT_LOCATION_RELEASE_DELAY_MS, WORKTREE_LOCATION_RELEASE_DELAY_MS, createRealLocationRelease, directoryUse, isWorktreeDirectory, type LocationRelease } from "./location-release"
 import { subscribeSessionAssistSettled } from "./pending-session-assists"
-import { useWorkflowRunsStore } from "@/lib/workflows/store"
-import { setWorkflowRunningSessions } from "./workflow-activity"
 import { isChatDirectoryPath } from "@/lib/chatDirectories"
 import { getRuntimeLiveStatusSeed, LIVE_STATUS_TTL_MS } from "./runtime-live-memory"
 import { getRuntimeKey } from "@/lib/runtime-switch"
@@ -61,12 +59,6 @@ import { handleEvent } from "./sync-event-dispatch"
 import { subscribeSessionFeatures } from "./session-feature-subscriptions"
 import { createDirectoryEventBatch, publishDirectoryEventBatch } from "./directory-event-batch"
 import { dropCachedSessionMessageRecordsSnapshots } from "./session-message-records"
-
-useWorkflowRunsStore.subscribe((state) => {
-  setWorkflowRunningSessions(Object.entries(state.bySession).flatMap(([sessionId, entry]) => (
-    entry.runs.some((run) => run.state === "running") ? [sessionId] : []
-  )))
-})
 
 useGlobalBlockingRequestsStore.subscribe((state, previous) => {
   if (state.bySession === previous.bySession) return

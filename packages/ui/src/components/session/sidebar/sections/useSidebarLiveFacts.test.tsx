@@ -7,7 +7,6 @@ import { useGlobalSessionsStore } from '@/stores/useGlobalSessionsStore';
 import { applyBackgroundShellEvents, resetBackgroundShells } from '@/sync/background-shells';
 import { replaceGlobalSessionStatusById, setSessionParentResolver } from '@/sync/global-session-status';
 import { applyPrWatches, resetPrWatchesForRuntimeSwitch } from '@/sync/pr-watch';
-import { setWorkflowRunningSessions } from '@/sync/workflow-activity';
 import { installHookTestDom } from '../test-utils/testDom';
 import { useSidebarLiveFacts } from './useSidebarLiveFacts';
 import type { SidebarLiveFacts } from './workFacts';
@@ -30,7 +29,6 @@ const reset = () => {
   replaceGlobalSessionStatusById(new Map());
   resetBackgroundShells();
   resetPrWatchesForRuntimeSwitch();
-  setWorkflowRunningSessions([]);
   setSessionParentResolver(() => undefined);
 };
 
@@ -87,12 +85,7 @@ test('a session idling on a background subagent is running until it ends, then u
   expect(facts.unreadIds.has('waiting')).toBe(true);
 });
 
-test('a session idling on a workflow run or its pull request is running', async () => {
-  await act(async () => setWorkflowRunningSessions(['waiting']));
-  expectWaiting();
-  await act(async () => setWorkflowRunningSessions([]));
-  expect(facts.unreadIds.has('waiting')).toBe(true);
-
+test('a session idling on its pull request is running', async () => {
   await act(async () => applyPrWatches(1, 'waiting', [{
     sessionID: 'waiting', directory: '/repo', url: 'https://example.test/pr/1', number: 1, title: 'PR', status: 'pending', startedAt: 1,
   }]));

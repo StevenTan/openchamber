@@ -123,7 +123,6 @@ const MANAGED_PLUGIN_SETTINGS_KEYS = new Set([
   'agentSecretToolEnabled',
   'agentUsageToolEnabled',
   'agentTerminalToolEnabled',
-  'agentWorkflowToolEnabled',
   'fallbackModel',
   'accountSwitchProviders',
 ]);

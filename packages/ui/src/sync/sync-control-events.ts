@@ -2,7 +2,6 @@ import { type SyncEvent } from "@/lib/agent/events"
 import type { ControlStreamSyncEvent } from "@/lib/openchamberEvents"
 import { applyWaitingPageEvent } from "./global-blocking-requests"
 import { applySessionAssistEvent } from "./pending-session-assists"
-import { useWorkflowRunsStore } from "@/lib/workflows/store"
 import { resolveCachedSessionDirectory } from "./event-routing-index"
 import { notifyWaitingPage } from "./sync-request-notifications"
 
@@ -12,8 +11,6 @@ export const isControlStreamOnlyEvent = (payload: SyncEvent): payload is Control
   payload.type === "openchamber.page-waiting"
   || payload.type === "openchamber.page-settled"
   || payload.type === "openchamber.session-assist"
-  || payload.type === "openchamber.workflow-run"
-  || payload.type === "openchamber.workflow-run-removed"
 )
 
 export const applyControlStreamOnlyEvent = (payload: ControlStreamOnlyEvent): void => {
@@ -25,12 +22,6 @@ export const applyControlStreamOnlyEvent = (payload: ControlStreamOnlyEvent): vo
       return
     case "openchamber.session-assist":
       applySessionAssistEvent(payload.properties, resolveCachedSessionDirectory)
-      return
-    case "openchamber.workflow-run":
-      useWorkflowRunsStore.getState().apply(payload.properties.run)
-      return
-    case "openchamber.workflow-run-removed":
-      useWorkflowRunsStore.getState().remove(payload.properties.parentSessionId, payload.properties.runId)
       return
   }
 }

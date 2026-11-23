@@ -185,28 +185,16 @@ export const REPLY_COMMAND_GUIDANCE = "A command the user should run themselves,
   + " put it in a ```bash block in your reply and end the turn. The block has a Run button; the command runs in this session's folder with no input,"
   + " so nothing that prompts, and when it ends you get its output and continue on your own without a message from the user.";
 
-export const WORKFLOW_GUIDANCE = 'The openchamber_workflow tool runs a script that fans a large task out to many agents in the background.'
-  + ' Start one when the user asks for a workflow.'
-  + ' When the task in front of you has many similar independent pieces (a review per file, an audit across many routes, a migration of many files)'
-  + ' or needs results cross-checked at that scale, say so and offer a workflow; never start one unasked.'
-  + ' A single feature, a few steps or a short loop over files you can do yourself never gets one.'
-  + ' Every agent runs on your own model unless the script names another, and dozens of agents on a top model cost many times what a cheap one does.'
-  + ' So when you propose a workflow, give each phase a model in the same message (look them up with models.list when you have the openchamber_control tool: tools.openchamber.control inside execute, or call openchamber_control directly if execute is unavailable):'
-  + ' a cheap one for reading and checking against a fixed list, a strong one where a phase weighs judgement or writes what lands.'
-  + ' Start the run once the user agrees to the models.'
-  + ' When the user lets runs start without approval in Settings, workflow.run starts the run at once instead of showing it for approval, so agree on the plan and the models in the chat first all the same.';
-
 export const SECRET_REQUEST_GUIDANCE = "The openchamber_secret tool asks the user for a secret (API key, token, password) on a private card in the chat."
   + " Whenever you need one, call it: never ask for a secret in the chat or tell the user to paste one there.";
 
-const directToolNames = ({ rendering, secrets, workflows }: Pick<GuidanceOptions, 'rendering' | 'secrets' | 'workflows'>) => [
+const directToolNames = ({ rendering, secrets }: Pick<GuidanceOptions, 'rendering' | 'secrets'>) => [
   rendering ? 'openchamber_render' : '',
   secrets ? 'openchamber_secret' : '',
-  workflows ? 'openchamber_workflow' : '',
 ].filter(Boolean);
 
-const buildGuidance = ({ linking, naming, rendering, secrets, workflows }: GuidanceOptions) => {
-  const directTools = directToolNames({ rendering, secrets, workflows });
+const buildGuidance = ({ linking, naming, rendering, secrets }: GuidanceOptions) => {
+  const directTools = directToolNames({ rendering, secrets });
   return [
     linking ? SESSION_LINK_GUIDANCE : '',
     linking && naming ? WORK_NAME_GUIDANCE : '',
@@ -215,16 +203,15 @@ const buildGuidance = ({ linking, naming, rendering, secrets, workflows }: Guida
     rendering ? RENDER_PAGE_GUIDANCE : '',
     rendering ? REPLY_COMMAND_GUIDANCE : '',
     secrets ? SECRET_REQUEST_GUIDANCE : '',
-    workflows ? WORKFLOW_GUIDANCE : '',
     directTools.length > 0 ? directToolsGuidance(directTools) : '',
   ].filter(Boolean).join('\n\n');
 };
 
-export const buildKnowledgeEntries = ({ notes, plans, memory, linking = false, naming = false, rendering = false, secrets = false, workflows = false, checkout = null, responseStyleInstruction, extensions, lead }: KnowledgeInput) => {
+export const buildKnowledgeEntries = ({ notes, plans, memory, linking = false, naming = false, rendering = false, secrets = false, checkout = null, responseStyleInstruction, extensions, lead }: KnowledgeInput) => {
   const entries: KnowledgeEntries = {
     [KNOWLEDGE_ENTRY_KEYS.pinned]: truncate(buildPinnedBlock({ notes, plans })),
     [KNOWLEDGE_ENTRY_KEYS.memory]: truncate(buildMemoryBlock(memory)),
-    [KNOWLEDGE_ENTRY_KEYS.guidance]: buildGuidance({ linking, naming, rendering, secrets, workflows }),
+    [KNOWLEDGE_ENTRY_KEYS.guidance]: buildGuidance({ linking, naming, rendering, secrets }),
   };
   if (responseStyleInstruction !== undefined) {
     entries[KNOWLEDGE_ENTRY_KEYS.responseStyle] = (responseStyleInstruction ?? '').trim();
@@ -255,7 +242,6 @@ export const createSessionKnowledgeRuntime = (dependencies: SessionKnowledgeDepe
     readPlaceholderBranch = null,
     isPageRenderingAvailable = async () => false,
     isSecretRequestAvailable = async () => false,
-    isWorkflowAvailable = async () => false,
     readExtensionInstructions = async () => '',
     readLeadBrief = null,
     readSessionMetadata = null,
@@ -349,9 +335,8 @@ export const createSessionKnowledgeRuntime = (dependencies: SessionKnowledgeDepe
 
     const rendering = await Promise.resolve(isPageRenderingAvailable()).catch(() => false);
     const secrets = await Promise.resolve(isSecretRequestAvailable()).catch(() => false);
-    const workflows = await Promise.resolve(isWorkflowAvailable()).catch(() => false);
 
-    return { notes, plans, memory, linking, naming, rendering, secrets, workflows, checkout };
+    return { notes, plans, memory, linking, naming, rendering, secrets, checkout };
   };
 
   const collectSummary = async (directory: string, pins: SessionPins = { notes: [], plans: [] }): Promise<KnowledgeSummary> => {

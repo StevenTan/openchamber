@@ -30,7 +30,6 @@ export const OPENCODE_TOOLS = {
 
 type OpencodeToolName = (typeof OPENCODE_TOOLS)[keyof typeof OPENCODE_TOOLS]
 
-
 const is = (name: OpencodeToolName) => (toolName: ToolName): boolean => normalizeToolName(toolName) === name
 
 export const isShellTool = is(OPENCODE_TOOLS.shell)
@@ -65,8 +64,6 @@ export const carriesFileDiffs = (toolName: ToolName): boolean => {
 export const isExplorationTool = (toolName: ToolName): boolean => EXPLORATION_TOOLS.has(normalizeToolName(toolName))
 export const isWebTool = (toolName: ToolName): boolean => WEB_TOOLS.has(normalizeToolName(toolName))
 export const isWebSearchTool = (toolName: ToolName): boolean => normalizeToolName(toolName) === OPENCODE_TOOLS.websearch
-
-
 
 const inputSchema = z
   .object({
@@ -544,7 +541,6 @@ export function subagentSessionId(metadata: Metadata | undefined): string | unde
   return parsed.sessionID ?? parsed.sessionId
 }
 
-
 export type ToolDescription =
   | { kind: "path"; value: string }
   | { kind: "text"; value: string }
@@ -558,30 +554,11 @@ const MAX_TEXT_LENGTH = 120
 
 const OPENCHAMBER_RENDER_TOOL = "openchamber_render"
 const OPENCHAMBER_SECRET_TOOL = "openchamber_secret"
-const OPENCHAMBER_WORKFLOW_TOOL = "openchamber_workflow"
 const OPENCHAMBER_IMAGE_TOOL = "openchamber_image"
 
-const OPENCHAMBER_TOOLS = new Set(["openchamber", "openchamber_schedule", "openchamber_web", "browser_panel", "openchamber_memory", "openchamber_knowledge", "openchamber_notify", "openchamber_usage", OPENCHAMBER_RENDER_TOOL, OPENCHAMBER_IMAGE_TOOL, OPENCHAMBER_SECRET_TOOL, OPENCHAMBER_WORKFLOW_TOOL])
+const OPENCHAMBER_TOOLS = new Set(["openchamber", "openchamber_schedule", "openchamber_web", "browser_panel", "openchamber_memory", "openchamber_knowledge", "openchamber_notify", "openchamber_usage", OPENCHAMBER_RENDER_TOOL, OPENCHAMBER_IMAGE_TOOL, OPENCHAMBER_SECRET_TOOL])
 
 export const isOpenChamberTool = (toolName: ToolName): boolean => OPENCHAMBER_TOOLS.has(normalizeToolName(toolName))
-
-const proposedWorkflowResultSchema = z.object({
-  ok: z.literal(true),
-  action: z.literal("workflow.run"),
-  data: z.object({ runId: z.string().min(1) }),
-})
-
-export function proposedWorkflowRunId(toolName: ToolName, state: ToolState): string | null {
-  if (toolName !== OPENCHAMBER_WORKFLOW_TOOL || state.status !== "completed") return null
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(state.output)
-  } catch {
-    return null
-  }
-  const result = proposedWorkflowResultSchema.safeParse(parsed)
-  return result.success ? result.data.data.runId : null
-}
 
 const generatedImagesResultSchema = z.object({
   ok: z.literal(true),
@@ -603,7 +580,6 @@ export function generatedImagePaths(toolName: ToolName, state: ToolState): strin
 
 export const isShownInPlace = (toolName: ToolName, state: ToolState): boolean => (
   renderedPage(toolName, state) !== null
-  || proposedWorkflowRunId(toolName, state) !== null
   || generatedImagePaths(toolName, state).length > 0
   || requestedSecret(toolName, state) !== null
   || requestedSecretRun(toolName, state) !== null
@@ -621,7 +597,6 @@ const openChamberCallSchema = z
 const forgetsSavedSecrets = (call: z.infer<typeof openChamberCallSchema>) => isSecretForget(call.action) && (call.parameters?.saved ?? call.saved) === true
 
 export type OpenChamberToolCall = { tool: string; action?: string; awaitsAnswer: boolean }
-
 
 export function mcpToolServer(toolName: ToolName, servers: readonly string[]): string | undefined {
   const trimmed = toolName?.trim() ?? ""
@@ -689,7 +664,6 @@ const ACTION_PREFIX_BY_TOOL = new Map<string, string>(Object.entries({
   openchamber_render: "render",
   openchamber_image: "image",
   openchamber_secret: "secret",
-  openchamber_workflow: "workflow",
 }))
 
 export function openChamberCallSummary(toolName: ToolName, input: ToolInput | undefined): { action: string | undefined; detail: string | undefined } | null {

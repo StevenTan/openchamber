@@ -30,10 +30,10 @@ describe('translateWireEvent', () => {
     expect(update).toMatchObject({ type: 'installation.update-available', properties: { version: '2.1.0' } });
   });
 
-  test("session.created names a workflow agent's run session as its parent", () => {
+  test("session.created names a metadata-linked child's run session as its parent", () => {
     const [event] = translateWireEvent(wire('session.created', {
       sessionID: 'agent',
-      metadata: { openchamber: { kind: 'workflow-agent', parentID: 'run' } },
+      metadata: { openchamber: { kind: 'operator-child', parentID: 'run' } },
       location: { directory: '/repo' },
     }));
     expect(event.properties.info.parentID).toBe('run');

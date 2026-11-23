@@ -53,7 +53,6 @@ export interface KnowledgeInput {
   naming?: boolean;
   rendering?: boolean;
   secrets?: boolean;
-  workflows?: boolean;
   checkout?: Checkout | null;
   responseStyleInstruction?: string | null | undefined;
   extensions?: string | undefined;
@@ -82,7 +81,6 @@ export interface GuidanceOptions {
   naming: boolean;
   rendering: boolean;
   secrets: boolean;
-  workflows: boolean;
 }
 
 export interface SessionKnowledgeDependencies {
@@ -110,7 +108,6 @@ export interface SessionKnowledgeDependencies {
   readPlaceholderBranch?: ((directory: string, branch: string) => string | null | Promise<string | null>) | null;
   isPageRenderingAvailable?: () => boolean | Promise<boolean>;
   isSecretRequestAvailable?: () => boolean | Promise<boolean>;
-  isWorkflowAvailable?: () => boolean | Promise<boolean>;
   readExtensionInstructions?: (directory: string) => Promise<string | null>;
   readLeadBrief?: ((sessionId: string) => Promise<string | null>) | null;
   readSessionMetadata?: ((sessionId: string) => Promise<SessionMetadata | undefined>) | null;

@@ -15,7 +15,6 @@ type BuiltInContextSurfaceId =
   | 'notes'
   | 'context'
   | 'browser'
-  | 'workflows'
   | 'subagents'
   | 'chat'
   | 'pages';
@@ -107,14 +106,6 @@ export const CONTEXT_SURFACES: readonly ContextSurfaceDescriptor[] = [
     availability: 'always',
   },
   {
-    id: 'workflows',
-    descriptionKey: 'contextRail.surface.workflows.description',
-    mode: 'workflows',
-    icon: 'flow-chart',
-    labelKey: 'contextPanel.mode.workflows',
-    availability: 'always',
-  },
-  {
     id: 'subagents',
     descriptionKey: 'contextRail.surface.subagents.description',
     mode: 'subagents',
@@ -154,7 +145,6 @@ const BUILT_IN_SURFACE_GROUPS = {
   terminal: 'tools',
   browser: 'tools',
   notes: 'workspace',
-  workflows: 'workspace',
   subagents: 'workspace',
   chat: 'workspace',
   pages: 'workspace',
@@ -213,7 +203,6 @@ type VisibleRailSurfacesOptions = {
   screenWidth: number;
   tabs: readonly { mode: ContextPanelMode; targetPath?: string | null }[];
   sourceControlConnected: boolean;
-  workflowsShown: boolean;
   receivedPagesShown?: boolean;
   extras?: readonly ContextSurfaceDescriptor[];
 };
@@ -234,9 +223,6 @@ export const getVisibleContextRailSurfaces = (options: VisibleRailSurfacesOption
     }
     if (surface.id === 'pr' && !options.sourceControlConnected
       && !options.tabs.some((tab) => tab.mode === 'pr' && tab.targetPath)) {
-      return false;
-    }
-    if (surface.id === 'workflows' && (options.isVSCode || !options.workflowsShown)) {
       return false;
     }
     if (surface.id === 'pages' && options.receivedPagesShown) {

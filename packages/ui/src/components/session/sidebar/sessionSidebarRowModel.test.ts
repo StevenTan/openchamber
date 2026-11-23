@@ -408,28 +408,6 @@ describe('buildSessionSidebarRowModel', () => {
     expect(guidesOf()).toEqual(['root:', 'parent:1│', 'child:1│ 2└', 'last:1└']);
   });
 
-  test('an expanded session lists its subagents but not its workflow agents or what they started', () => {
-    const agent: SessionNode = {
-      session: { ...session('agent'), metadata: { openchamber: { kind: 'workflow-agent' } } },
-      children: [node('agent-subagent')],
-      worktree: null,
-    };
-    const parent = node('parent', [node('subagent'), agent]);
-    const input = args([project([group([parent])])]);
-    input.expandedParents = new Set(['project:active:parent', 'project:active:agent']);
-    const rows = buildSessionSidebarRowModel(input).rows.flatMap((row) => (
-      row.kind === 'session' ? [`${row.node.session.id}:${String(row.expanded)}`] : []
-    ));
-    expect(rows).toEqual(['parent:true', 'subagent:undefined']);
-
-    const onlyAgents = args([project([group([node('lone', [agent])])])]);
-    onlyAgents.expandedParents = new Set(['project:active:lone']);
-    // No chevron for a row whose only children are workflow agents.
-    expect(buildSessionSidebarRowModel(onlyAgents).rows.flatMap((row) => (
-      row.kind === 'session' ? [`${row.node.session.id}:${String(row.expanded)}`] : []
-    ))).toEqual(['lone:undefined']);
-  });
-
   test('in work sits under Chats and above the projects', () => {
     const working = node('working');
     const input = args([project([group([working, node('other')])])]);

@@ -242,7 +242,7 @@ describe('ready notification while background subagents run', () => {
 
   it('stays silent while a child session that is no OpenCode job runs', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
-    stubOpenCode({ active: () => ({ ses_workflow: { type: 'running' } }), children: [{ id: 'ses_workflow', parentID: 'ses_1' }], jobs: () => [] });
+    stubOpenCode({ active: () => ({ ses_worker: { type: 'running' } }), children: [{ id: 'ses_worker', parentID: 'ses_1' }], jobs: () => [] });
     const { runtime, emitDesktopNotification } = makeRuntime();
 
     await runtime.maybeSendPushForTrigger(stepStarted('ses_1', 'msg_1'));
@@ -906,7 +906,7 @@ describe('clearing a pushed notification once its cause is handled', () => {
     };
     const { runtime, clearApnsNotifications } = makeClearRuntime({ openPushTagsStore });
     const records = {
-      ses_1: { id: 'ses_1', metadata: { openchamber: { kind: 'workflow-agent', parentID: 'ses_parent' } } },
+      ses_1: { id: 'ses_1', metadata: { openchamber: { kind: 'operator-child', parentID: 'ses_parent' } } },
       ses_nested: { id: 'ses_nested', parentID: 'ses_1' },
       ses_operator: { id: 'ses_operator', metadata: { openchamber: { kind: 'operator-child', parentID: 'ses_nested' } } },
       ses_other: { id: 'ses_other' },

@@ -4,7 +4,6 @@ import React from 'react';
 import { isFinalToolStatus, type Message, type Part, type SyntheticMessage } from '@/lib/opencode/model';
 import { readSubagentRun, runningSubagentRunMessage } from '@/lib/opencode/subagent-run';
 import { isSubagentTool, subagentSessionId } from '@/lib/opencode/tools';
-import { useSessionWorkflowRuns } from '@/lib/workflows/store';
 import { useDirectorySync } from '@/sync/sync-context';
 import { readChildSessions } from '@/sync/scoped-blocking-requests';
 import type { State } from '@/sync/types';
@@ -12,7 +11,6 @@ import type { State } from '@/sync/types';
 import type { ChatMessageEntry } from './turns/types';
 
 const EMPTY_RUNS: SyntheticMessage[] = [];
-const NO_EXCLUDED: ReadonlySet<string> = new Set();
 
 const isBusy = (state: Pick<State, 'session_status'>, sessionID: string): boolean => {
     const status = state.session_status[sessionID];
@@ -46,10 +44,9 @@ const accountedChildren = (state: Pick<State, 'part'>, messages: readonly Messag
 export const selectRunningSubagentRuns = (
     state: Pick<State, 'session' | 'session_status' | 'message' | 'part'>,
     parentSessionID: string,
-    excluded: ReadonlySet<string> = NO_EXCLUDED,
 ): SyntheticMessage[] => {
     const busyChildren = readChildSessions(state.session, parentSessionID)
-        .filter((session) => !excluded.has(session.id) && isBusy(state, session.id));
+        .filter((session) => isBusy(state, session.id));
     if (busyChildren.length === 0) return EMPTY_RUNS;
 
     const { known, unjoinedCallSince } = accountedChildren(state, state.message[parentSessionID] ?? []);
@@ -92,20 +89,15 @@ const sameRuns = (left: readonly SyntheticMessage[], right: readonly SyntheticMe
     && left.every((run, index) => run.id === right[index]?.id && run.description === right[index]?.description);
 
 export const useRunningSubagentRuns = (sessionID: string, directory?: string): SyntheticMessage[] => {
-    const workflowRuns = useSessionWorkflowRuns(sessionID || null);
-    const workflowAgents = React.useMemo(() => {
-        const ids = workflowRuns.flatMap((run) => run.agents.flatMap((agent) => (agent.sessionId ? [agent.sessionId] : [])));
-        return ids.length === 0 ? NO_EXCLUDED : new Set(ids);
-    }, [workflowRuns]);
     const selector = React.useMemo(() => {
         let previous = EMPTY_RUNS;
         return (state: State): SyntheticMessage[] => {
             if (!sessionID) return EMPTY_RUNS;
-            const next = selectRunningSubagentRuns(state, sessionID, workflowAgents);
+            const next = selectRunningSubagentRuns(state, sessionID);
             if (sameRuns(previous, next)) return previous;
             previous = next;
             return next;
         };
-    }, [sessionID, workflowAgents]);
+    }, [sessionID]);
     return useDirectorySync(selector, directory);
 };

@@ -50,19 +50,6 @@ export const appendManagedPlugin = (rawConfig: string | undefined, pluginDirecto
 const sameRule = (left: JsonValue, right: ManagedRule) => isJsonObject(left)
   && left.action === right.action && left.resource === right.resource && left.effect === right.effect;
 
-export const appendManagedPermissions = (rawConfig: string | undefined, rules: ManagedRule[]) => {
-  const parsed = parseConfigContent(rawConfig, 'managed tool permissions');
-  if (parsed.permissions !== undefined && !Array.isArray(parsed.permissions)) {
-    throw new Error('OPENCODE_CONFIG_CONTENT permissions must be an array before OpenChamber can inject its managed tool permissions');
-  }
-  const configured = Array.isArray(parsed.permissions) ? parsed.permissions : [];
-  parsed.permissions = [
-    ...configured.filter((existing) => !rules.some((rule) => sameRule(existing, rule))),
-    ...rules,
-  ];
-  return JSON.stringify(parsed);
-};
-
 export const appendManagedSkills = (rawConfig: string | undefined, directories: string[]) => {
   const parsed = parseConfigContent(rawConfig, 'managed skills');
   if (parsed.skills !== undefined && !Array.isArray(parsed.skills)) {

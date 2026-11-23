@@ -25,7 +25,7 @@ describe('a shared page answer', () => {
       summary: 'Schema: B\nWhen: Friday',
       output: '```json\n{\n  "value": "b"\n}\n```',
     });
-    // Its own row opening a turn, like a workflow report: never a plugin notice, and a fork after it starts there.
+    // Its own row opening a turn, a fork after it starts there.
     expect(isBackgroundReportEntry(message)).toBe(true);
     expect(readSessionNotice(message)).toBeUndefined();
     expect(isTurnBoundary(message)).toBe(true);
@@ -40,7 +40,6 @@ describe('a shared page answer', () => {
   });
 
   test('is nothing for other synthetic messages', () => {
-    expect(readShareAnswer(synthetic('report', { source: 'openchamber-workflow', runId: 'r', name: 'n', state: 'completed' }))).toBeUndefined();
     expect(readShareAnswer(synthetic('x', { source: 'openchamber-share-answer' }))).toBeUndefined();
   });
 });

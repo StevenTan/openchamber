@@ -149,23 +149,6 @@ export const OPENCHAMBER_TERMINAL_ACTIONS = Object.freeze(
   OPENCHAMBER_TERMINAL_ACTION_DEFINITIONS.map(({ action }) => action),
 );
 
-export const OPENCHAMBER_WORKFLOW_ACTION_DEFINITIONS = Object.freeze([
-  { action: 'workflow.check', title: 'Check a workflow', description: 'Compile script, or a saved workflow by name, without running it: its name, description and phases' },
-  { action: 'workflow.run', title: 'Propose a workflow run', description: 'script, or name of a saved workflow, with optional args. The run waits for the user to approve it in the chat, or starts at once when their settings allow that; the report arrives here as a message when the run ends. Returns runId and state at once' },
-  { action: 'workflow.status', title: 'Check a workflow run', description: 'Phases, agents with their state, key and session id, recent log lines and a result preview of runId' },
-  { action: 'workflow.result', title: 'Read a workflow result', description: "The whole result of runId; with agent (its key or session id) that agent's prompt and full answer" },
-  { action: 'workflow.stop', title: 'Stop a workflow run', description: 'Stop runId; its running agents are interrupted' },
-  { action: 'workflow.resume', title: 'Resume a workflow run', description: 'Run a stopped or failed runId again: agents asked the same as before return their saved answer, the rest run' },
-  { action: 'workflow.save', title: 'Save a workflow', description: 'Save script as .openchamber/workflows/<meta.name>.js in this project, to run later by name; overwrite replaces one' },
-  { action: 'workflow.list', title: 'List workflows', description: "This project's saved workflows and this session's runs" },
-]);
-
-export const OPENCHAMBER_WORKFLOW_ACTIONS = Object.freeze(
-  OPENCHAMBER_WORKFLOW_ACTION_DEFINITIONS.map(({ action }) => action),
-);
-
-export const WORKFLOW_ANSWER_TOOL = 'openchamber_workflow_answer';
-
 export const CONTROL_ONLY_PARAMETER_PROPERTIES = Object.freeze({
   url: { type: 'string', description: 'session.unlink: the address of the link to remove' },
   identifier: { type: 'string', description: 'session.unlink: the identifier of the link to remove, when no url' },
@@ -189,14 +172,6 @@ export const CONTROL_ONLY_PARAMETER_PROPERTIES = Object.freeze({
   mine: { type: 'boolean', description: 'session.list: only the sessions you created with ownWork, each with its status' },
 });
 
-export const OPENCHAMBER_WORKFLOW_ANSWER_ACTION_DEFINITIONS = Object.freeze([
-  { action: 'workflow.answer', title: 'Submit a workflow answer', description: 'Only for a workflow agent whose prompt asks for it: answer, a JSON value matching the schema in that prompt. Checked on the spot; a mismatch says what to fix' },
-]);
-
-export const OPENCHAMBER_WORKFLOW_ANSWER_ACTIONS = Object.freeze(
-  OPENCHAMBER_WORKFLOW_ANSWER_ACTION_DEFINITIONS.map(({ action }) => action),
-);
-
 const ACTIONS_BY_TOOL: Readonly<Record<string, readonly string[]>> = Object.freeze({
   openchamber: OPENCHAMBER_AGENT_TOOL_ACTIONS,
   openchamber_schedule: OPENCHAMBER_SCHEDULE_ACTIONS,
@@ -209,8 +184,7 @@ const ACTIONS_BY_TOOL: Readonly<Record<string, readonly string[]>> = Object.free
   openchamber_secret: OPENCHAMBER_SECRET_ACTIONS,
   openchamber_usage: OPENCHAMBER_USAGE_ACTIONS,
   openchamber_terminal: OPENCHAMBER_TERMINAL_ACTIONS,
-  openchamber_workflow: OPENCHAMBER_WORKFLOW_ACTIONS,
-  [WORKFLOW_ANSWER_TOOL]: OPENCHAMBER_WORKFLOW_ANSWER_ACTIONS,
+
 });
 
 const bareName = (action: string) => {
@@ -258,6 +232,5 @@ export const OPENCHAMBER_ALL_ACTIONS = Object.freeze([
   ...OPENCHAMBER_SECRET_ACTIONS,
   ...OPENCHAMBER_USAGE_ACTIONS,
   ...OPENCHAMBER_TERMINAL_ACTIONS,
-  ...OPENCHAMBER_WORKFLOW_ACTIONS,
-  ...OPENCHAMBER_WORKFLOW_ANSWER_ACTIONS,
+
 ]);

@@ -9,7 +9,7 @@ export const openchamberToolsLayoutI18n = {
     'settings.openchamber.tools.group.chat': 'In the chat',
     'settings.openchamber.tools.group.knowledge': 'What agents know',
     'settings.openchamber.tools.name.control': 'Sessions and worktrees',
-    'settings.openchamber.tools.name.workflow': 'Workflows',
+    
     'settings.openchamber.tools.name.schedule': 'Schedules',
     'settings.openchamber.tools.name.web': 'Browser',
     'settings.openchamber.tools.name.render': 'Charts and mockups',
@@ -25,7 +25,7 @@ export const openchamberToolsLayoutI18n = {
     'settings.openchamber.tools.group.chat': 'Im Chat',
     'settings.openchamber.tools.group.knowledge': 'Was Agenten wissen',
     'settings.openchamber.tools.name.control': 'Sitzungen und Worktrees',
-    'settings.openchamber.tools.name.workflow': 'Workflows',
+    
     'settings.openchamber.tools.name.schedule': 'Zeitpläne',
     'settings.openchamber.tools.name.web': 'Browser',
     'settings.openchamber.tools.name.render': 'Diagramme und Mockups',
@@ -41,7 +41,7 @@ export const openchamberToolsLayoutI18n = {
     'settings.openchamber.tools.group.chat': 'Dans le chat',
     'settings.openchamber.tools.group.knowledge': 'Ce que savent les agents',
     'settings.openchamber.tools.name.control': 'Sessions et worktrees',
-    'settings.openchamber.tools.name.workflow': 'Workflows',
+    
     'settings.openchamber.tools.name.schedule': 'Planifications',
     'settings.openchamber.tools.name.web': 'Navigateur',
     'settings.openchamber.tools.name.render': 'Graphiques et maquettes',
@@ -57,7 +57,7 @@ export const openchamberToolsLayoutI18n = {
     'settings.openchamber.tools.group.chat': 'In de chat',
     'settings.openchamber.tools.group.knowledge': 'Wat agents weten',
     'settings.openchamber.tools.name.control': 'Sessies en worktrees',
-    'settings.openchamber.tools.name.workflow': 'Workflows',
+    
     'settings.openchamber.tools.name.schedule': 'Planningen',
     'settings.openchamber.tools.name.web': 'Browser',
     'settings.openchamber.tools.name.render': 'Grafieken en mockups',
@@ -73,7 +73,7 @@ export const openchamberToolsLayoutI18n = {
     'settings.openchamber.tools.group.chat': 'En el chat',
     'settings.openchamber.tools.group.knowledge': 'Lo que saben los agentes',
     'settings.openchamber.tools.name.control': 'Sesiones y worktrees',
-    'settings.openchamber.tools.name.workflow': 'Workflows',
+    
     'settings.openchamber.tools.name.schedule': 'Programaciones',
     'settings.openchamber.tools.name.web': 'Navegador',
     'settings.openchamber.tools.name.render': 'Gráficos y maquetas',
@@ -89,7 +89,7 @@ export const openchamberToolsLayoutI18n = {
     'settings.openchamber.tools.group.chat': 'No chat',
     'settings.openchamber.tools.group.knowledge': 'O que os agentes sabem',
     'settings.openchamber.tools.name.control': 'Sessões e worktrees',
-    'settings.openchamber.tools.name.workflow': 'Workflows',
+    
     'settings.openchamber.tools.name.schedule': 'Agendamentos',
     'settings.openchamber.tools.name.web': 'Navegador',
     'settings.openchamber.tools.name.render': 'Gráficos e mockups',
@@ -105,7 +105,7 @@ export const openchamberToolsLayoutI18n = {
     'settings.openchamber.tools.group.chat': 'У чаті',
     'settings.openchamber.tools.group.knowledge': 'Що знають агенти',
     'settings.openchamber.tools.name.control': 'Сесії та worktree',
-    'settings.openchamber.tools.name.workflow': 'Воркфлоу',
+    
     'settings.openchamber.tools.name.schedule': 'Розклади',
     'settings.openchamber.tools.name.web': 'Браузер',
     'settings.openchamber.tools.name.render': 'Графіки й макети',
@@ -121,7 +121,7 @@ export const openchamberToolsLayoutI18n = {
     'settings.openchamber.tools.group.chat': '채팅에서',
     'settings.openchamber.tools.group.knowledge': '에이전트가 아는 것',
     'settings.openchamber.tools.name.control': '세션과 워크트리',
-    'settings.openchamber.tools.name.workflow': '워크플로',
+    
     'settings.openchamber.tools.name.schedule': '예약',
     'settings.openchamber.tools.name.web': '브라우저',
     'settings.openchamber.tools.name.render': '차트와 목업',
@@ -137,7 +137,7 @@ export const openchamberToolsLayoutI18n = {
     'settings.openchamber.tools.group.chat': 'W czacie',
     'settings.openchamber.tools.group.knowledge': 'Co wiedzą agenci',
     'settings.openchamber.tools.name.control': 'Sesje i worktree',
-    'settings.openchamber.tools.name.workflow': 'Workflowy',
+    
     'settings.openchamber.tools.name.schedule': 'Harmonogramy',
     'settings.openchamber.tools.name.web': 'Przeglądarka',
     'settings.openchamber.tools.name.render': 'Wykresy i makiety',
@@ -153,7 +153,7 @@ export const openchamberToolsLayoutI18n = {
     'settings.openchamber.tools.group.chat': 'チャット内',
     'settings.openchamber.tools.group.knowledge': 'エージェントが知っていること',
     'settings.openchamber.tools.name.control': 'セッションとワークツリー',
-    'settings.openchamber.tools.name.workflow': 'ワークフロー',
+    
     'settings.openchamber.tools.name.schedule': 'スケジュール',
     'settings.openchamber.tools.name.web': 'ブラウザ',
     'settings.openchamber.tools.name.render': 'グラフとモックアップ',
@@ -169,7 +169,7 @@ export const openchamberToolsLayoutI18n = {
     'settings.openchamber.tools.group.chat': '在聊天中',
     'settings.openchamber.tools.group.knowledge': '智能体知道的内容',
     'settings.openchamber.tools.name.control': '会话和工作树',
-    'settings.openchamber.tools.name.workflow': '工作流',
+    
     'settings.openchamber.tools.name.schedule': '计划任务',
     'settings.openchamber.tools.name.web': '浏览器',
     'settings.openchamber.tools.name.render': '图表和原型',
@@ -185,7 +185,7 @@ export const openchamberToolsLayoutI18n = {
     'settings.openchamber.tools.group.chat': '在聊天中',
     'settings.openchamber.tools.group.knowledge': '代理程式知道的內容',
     'settings.openchamber.tools.name.control': '工作階段和工作樹',
-    'settings.openchamber.tools.name.workflow': '工作流程',
+    
     'settings.openchamber.tools.name.schedule': '排程',
     'settings.openchamber.tools.name.web': '瀏覽器',
     'settings.openchamber.tools.name.render': '圖表和原型',
@@ -201,7 +201,7 @@ export const openchamberToolsLayoutI18n = {
     'settings.openchamber.tools.group.chat': 'Sohbette',
     'settings.openchamber.tools.group.knowledge': 'Ajanların bildikleri',
     'settings.openchamber.tools.name.control': 'Oturumlar ve worktree\'ler',
-    'settings.openchamber.tools.name.workflow': 'İş akışları',
+    
     'settings.openchamber.tools.name.schedule': 'Zamanlamalar',
     'settings.openchamber.tools.name.web': 'Tarayıcı',
     'settings.openchamber.tools.name.render': 'Grafikler ve taslaklar',
@@ -217,7 +217,7 @@ export const openchamberToolsLayoutI18n = {
     'settings.openchamber.tools.group.chat': 'في المحادثة',
     'settings.openchamber.tools.group.knowledge': 'ما يعرفه الوكلاء',
     'settings.openchamber.tools.name.control': 'الجلسات وأشجار العمل',
-    'settings.openchamber.tools.name.workflow': 'سير العمل',
+    
     'settings.openchamber.tools.name.schedule': 'الجداول',
     'settings.openchamber.tools.name.web': 'المتصفح',
     'settings.openchamber.tools.name.render': 'المخططات والنماذج',
@@ -233,7 +233,7 @@ export const openchamberToolsLayoutI18n = {
     'settings.openchamber.tools.group.chat': 'בצ׳אט',
     'settings.openchamber.tools.group.knowledge': 'מה הסוכנים יודעים',
     'settings.openchamber.tools.name.control': 'הפעלות ועצי עבודה',
-    'settings.openchamber.tools.name.workflow': 'תהליכי עבודה',
+    
     'settings.openchamber.tools.name.schedule': 'תזמונים',
     'settings.openchamber.tools.name.web': 'דפדפן',
     'settings.openchamber.tools.name.render': 'תרשימים ודגמים',

@@ -10,8 +10,7 @@ owns everything that only leads have on the server: the brief file and the
 copy of it the lead's context holds, the `lead.brief` and `lead.digest`
 actions of the `openchamber` tool, handing a session to a lead
 (`lead.handover`), the `openchamber.lead` and `openchamber.lead-brief`
-instruction texts, sleep compaction, the compaction callback route, and
-whether a lead's workflow runs start without approval. The UI owns the mark,
+instruction texts, sleep compaction, the compaction callback route, and the UI owns the mark,
 the start points, the digest row with its answers and dismissals, and the
 Hand to a lead menu (`packages/ui/src/lib/sessionLead.ts`,
 `packages/ui/src/sync/session-lead.ts`). Session knowledge writes the
@@ -73,9 +72,6 @@ entries (`../session-knowledge/`), the control service routes the actions
   `POST /api/openchamber/agent-tool/lead-compaction` on every compaction. Only a
   compaction this runtime started within the last 2 minutes gets a note; every
   other one, and any failure to ask, falls back to the model's summary.
-- Workflow runs start without approval when `agentWorkflowAutoApprove` is on
-  (every session), or when `agentWorkflowAutoApproveLeads` is on and the
-  proposing session is a lead.
 
 ## Decisions
 
@@ -119,9 +115,3 @@ tabs, Cmd+P, search and notifications would keep the old title. The session
 title is shown everywhere already, and the user's own rename is already
 recorded as `workTitle.by === 'user'`.
 
-### Why auto-approval for leads is a second switch and not a third value
-
-`agentWorkflowAutoApprove` is a boolean that older clients read and write.
-A three-valued field would be dropped or overwritten by them; a second
-boolean keeps both working, and the Settings control shows the pair as one
-choice of three.

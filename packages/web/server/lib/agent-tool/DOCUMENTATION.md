@@ -172,22 +172,6 @@ Session control and browser operations are independently enabled:
   control route refuses `terminal.*`. VS Code has no such tool, since the
   plugin is not injected there. Its direct entry says to
   read it when the answer is in a terminal the user is looking at.
-- `openchamber_workflow` — `workflow.*`, scripts that fan a large task out to
-  many agents, run by OpenChamber (`../workflows/DOCUMENTATION.md`). Off by
-  default: enabled only while `agentWorkflowToolEnabled` is `true`, and the
-  workflow runtime refuses every action while it is not. How to write a script is the `script`
-  input's description, read while the agent writes one, for the same reason
-  render's page rules sit on `html`.
-- `openchamber_workflow_answer` — `workflow.answer`, how a workflow agent
-  asked for a schema answer hands it over. The `answer` input is a JSON object
-  rather than JSON text in a string: as text, models escaped JSON inside JSON
-  and some looped until their output budget ran out. Registered with the
-  workflow tool, but the managed config denies it in every session
-  (`managedPermissionRules`) and only the session of such an agent allows it,
-  so no other session carries its declaration. Direct, never behind Code Mode:
-  the agent's prompt names it,
-  and the sessions that see it are the ones that need it.
-
 Both default to on, are toggled in Settings → General → OpenChamber Tools, and take
 effect in the running OpenCode within a couple of seconds — OpenChamber rewrites
 the managed config file OpenCode watches (see
@@ -202,8 +186,7 @@ both settings are `false`.
 - The managed Code Mode adapter gives every tool a direct entry. Memory,
   knowledge, usage and notifications also appear in the shared script catalog.
   Backend-specific control, scheduling and terminal tools keep direct entries.
-  `openchamber_render`, `openchamber_secret`, `openchamber_image`,
-  `openchamber_workflow` and `openchamber_workflow_answer` have direct entries
+  `openchamber_render`, `openchamber_secret` and `openchamber_image` have direct entries
   because the chat renders their dedicated cards from the original calls.
 - Shared Code Mode supplies complete tool descriptions and signatures in its
   MCP definition, including direct entry names. Its catalog contract is owned
@@ -565,7 +548,7 @@ cross an untyped process boundary.
 Array and own-property checks remain for revived inputs, parameter selection
 and action-title dictionaries, including names inherited from Object.
 
-The runtime imports action definitions, workflow limits, render
+The runtime imports action definitions, render
 limits, sharing limits, shared guards and the callback-address helper. Its
 external inputs are HTTP JSON, socket addresses and authorization headers,
 listener host and port, the injected session-directory resolver, and the control
@@ -580,12 +563,6 @@ OpenCode loads the generated plugin through a bare dynamic import and requires
 a directory with a package manifest resolving its entrypoint. The plugin imports
 nothing and declares plain JSON Schema. Its generated comments and source text
 remain unchanged by the server's TypeScript conversion.
-
-### Why workflow permission rules are session-overridable
-
-OpenCode applies configuration rules to every agent before reading the session's
-own rules. The managed rule denies the workflow answer tool globally, while a
-workflow agent's session can allow it.
 
 ## Shared MCP permissions
 

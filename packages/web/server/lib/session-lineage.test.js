@@ -59,13 +59,7 @@ describe('session lineage', () => {
 });
 
 describe('sessionParentId', () => {
-  const link = (parentID) => ({ openchamber: { kind: 'workflow-agent', parentID } });
-
-  it("reads OpenCode's parent first, then a workflow agent's link to the session that ran it", () => {
-    expect(sessionParentId({ id: 'ses_child', parentID: 'ses_parent' })).toBe('ses_parent');
-    expect(sessionParentId({ id: 'ses_agent', metadata: link('ses_run') })).toBe('ses_run');
-    expect(sessionParentId({ id: 'ses_agent', parentID: 'ses_parent', metadata: link('ses_run') })).toBe('ses_parent');
-  });
+  const link = (parentID) => ({ openchamber: { kind: 'unrelated', parentID } });
 
   it("reads an operator's child session as a child of the session that created it", () => {
     const record = { id: 'ses_worker', metadata: { openchamber: { kind: 'operator-child', parentID: 'ses_operator' } } };

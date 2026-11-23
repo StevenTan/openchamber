@@ -202,13 +202,9 @@ export const createInitialUIState = (): Pick<UIStore,
   | 'agentMemoryDreamingVariant'
   | 'agentRenderToolEnabled'
   | 'agentSecretToolEnabled'
-  | 'agentWorkflowToolEnabled'
-  | 'agentWorkflowAutoApprove'
-  | 'agentWorkflowAutoApproveLeads'
   | 'isolatedSpacesEnabled'
   | 'permissionDefaultMode'
   | 'agentMemoryFeatureAvailable'
-  | 'agentWorkflowFeatureAvailable'
   | 'routingFeatureAvailable'
   | 'overviewFeatureAvailable'
   | 'agentMemoryViewedAt'
@@ -443,13 +439,11 @@ export const createInitialUIState = (): Pick<UIStore,
   agentMemoryDreamingVariant: '',
   agentRenderToolEnabled: true,
   agentSecretToolEnabled: true,
-  agentWorkflowToolEnabled: false,
-  agentWorkflowAutoApprove: false,
-  agentWorkflowAutoApproveLeads: false,
+
   isolatedSpacesEnabled: false,
   permissionDefaultMode: 'ask',
   agentMemoryFeatureAvailable: false,
-  agentWorkflowFeatureAvailable: false,
+  
   routingFeatureAvailable: false,
   overviewFeatureAvailable: false,
   agentMemoryViewedAt: {},

@@ -124,7 +124,6 @@ const createInstance = async ({ mode, apiPort, models, instances }) => {
     agentNotifyToolEnabled: true,
     agentRenderToolEnabled: true,
     agentSecretToolEnabled: true,
-    agentWorkflowToolEnabled: true,
   }, null, 2));
 
   if (providers.includes('claude-agent')) writeClaudeLogin(dirs.home);

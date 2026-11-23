@@ -66,7 +66,6 @@ import { diffFindI18n } from './diff-find.i18n';
 import { markdownOutlineI18n } from './markdown-outline.i18n';
 import { markdownGithubI18n } from './markdown-github.i18n';
 import { autocompleteScopeI18n } from './autocomplete-scope.i18n';
-import { workflowsI18n } from './workflows.i18n';
 import { subagentsI18n } from './subagents.i18n';
 import { sessionReferencesI18n } from './session-references.i18n';
 import { guestStatusViewI18n } from './guest-status-view.i18n';
@@ -262,7 +261,7 @@ export const dict: Record<I18nKey, string> = {
   ...markdownOutlineI18n['ja'],
   ...markdownGithubI18n['ja'],
   ...autocompleteScopeI18n['ja'],
-  ...workflowsI18n['ja'],
+  
   ...subagentsI18n['ja'],
   ...sessionReferencesI18n['ja'],
   ...guestStatusViewI18n['ja'],

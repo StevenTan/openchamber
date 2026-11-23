@@ -259,7 +259,6 @@ describe('managed OpenCode config file', () => {
       includeSecret: false,
       includeUsage: false,
       includeTerminal: false,
-      includeWorkflow: false,
     });
   });
 
@@ -362,7 +361,6 @@ describe('managed OpenCode config file', () => {
       includeSecret: false,
       includeUsage: false,
       includeTerminal: false,
-      includeWorkflow: false,
     });
   });
 
@@ -389,7 +387,6 @@ describe('managed OpenCode config file', () => {
       includeSecret: false,
       includeUsage: true,
       includeTerminal: false,
-      includeWorkflow: false,
     });
   });
 
@@ -445,23 +442,6 @@ describe('managed OpenCode config file', () => {
     const on = await createHarness({ settings: { ...toolsOff, agentMemoryToolEnabled: true } });
     await on.runtime.buildManagedChildEnv();
     expect(on.agentToolRuntime.materializePlugin).toHaveBeenCalledWith(expect.objectContaining({ includeMemory: true }));
-  });
-
-  it('injects the workflow tool only once the user turns it on', async () => {
-    const toolsOff = { agentControlToolEnabled: false, agentScheduleToolEnabled: false, agentWebToolEnabled: false, agentKnowledgeToolEnabled: false, agentRenderToolEnabled: false, agentSecretToolEnabled: false };
-    const unset = await createHarness({ settings: toolsOff });
-    await unset.runtime.buildManagedChildEnv();
-    expect(unset.agentToolRuntime.materializePlugin).not.toHaveBeenCalled();
-
-    const present = await createHarness({ settings: { ...toolsOff, agentWorkflowToolEnabled: true } });
-    await present.runtime.buildManagedChildEnv();
-    expect(present.agentToolRuntime.materializePlugin).toHaveBeenCalledWith(expect.objectContaining({ includeWorkflow: true }));
-    // The answer tool is denied everywhere; a workflow agent's session allows it.
-    expect((await present.readConfigFile()).permissions).toEqual([{ action: 'openchamber_workflow_answer', resource: '*', effect: 'deny' }]);
-
-    present.current.settings = { ...toolsOff, agentWorkflowToolEnabled: false };
-    await present.runtime.refreshManagedConfigFile();
-    expect((await present.readConfigFile()).plugins).toEqual(['-opencode.browser', '-opencode-websearch', '-opencode.skill', present.titleDirectory, codexAgentDirectory(present.dataDir), commandDirectory(present.dataDir), searchDirectory(present.dataDir), questionDirectory(present.dataDir), fileDirectory(present.dataDir), turnDiffDirectory(present.dataDir), quotaUsageDirectory(present.dataDir), codeModeDirectory(present.dataDir), workspaceDirectory(present.dataDir)]);
   });
 
   it('denies the plugins switched off in OpenChamber, without touching the plugin list', async () => {

@@ -239,10 +239,10 @@ describe('dispatch results runtime', () => {
     expect(syntheticPosts(openCode)).toEqual([expect.objectContaining({ text: expect.stringContaining('Quick answer') })]);
   });
 
-  it('delivers the answer of an idle session while its subagents, workflow agents and ownWork sessions still run', async () => {
+  it('delivers the answer of an idle session while its subagents, metadata-linked children and ownWork sessions still run', async () => {
     const { runtime, openCode } = await createRuntime();
     openCode.state.sessions.ses_sub = { id: 'ses_sub', parentID: 'ses_child' };
-    openCode.state.sessions.ses_agent = { id: 'ses_agent', metadata: { openchamber: { kind: 'workflow-agent', parentID: 'ses_child' } } };
+    openCode.state.sessions.ses_agent = { id: 'ses_agent', metadata: { openchamber: { kind: 'operator-child', parentID: 'ses_child' } } };
     openCode.state.sessions.ses_worker = { id: 'ses_worker', metadata: { openchamber: { kind: 'operator-child', parentID: 'ses_child' } } };
     openCode.state.active.ses_sub = { type: 'running' };
     openCode.state.active.ses_agent = { type: 'running' };

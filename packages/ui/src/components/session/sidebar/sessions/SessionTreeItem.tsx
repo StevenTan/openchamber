@@ -3,7 +3,6 @@ import { useI18n } from '@/lib/i18n';
 import { SessionNodeItem } from './SessionNodeItem';
 import type { SessionNodeItemProps } from './SessionNodeItem';
 import type { SessionNode } from '../types';
-import { listedChildren } from '../listedChildren';
 import type { SessionSidebarRenderContext } from '../sessionSidebarRowModel';
 import type { SessionNodeRenderExtras } from './sessionNodeItemUtils';
 import { useSessionActions, type DeleteSessionConfirmState } from './useSessionActions';
@@ -191,7 +190,7 @@ function SessionTreeItemComponent({
       blockingBadgeSessionScopes={renderExtras?.blockingBadgeSessionScopes}
       relativeTimeTick={renderExtras?.relativeTimeTick}
     >
-      {renderChildren ? listedChildren(node).map((child) => (
+      {renderChildren ? node.children.map((child) => (
         <SessionTreeItem
           key={child.session.id}
            node={child}

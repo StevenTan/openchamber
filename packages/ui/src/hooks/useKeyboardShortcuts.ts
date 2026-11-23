@@ -38,7 +38,6 @@ import { getVisibleContextRailSurfaces } from '@/lib/surfaces/registry';
 import { useDirectoryStore } from '@/stores/useDirectoryStore';
 import { useProjectsStore } from '@/stores/useProjectsStore';
 import { useSourceControlAuthStore } from '@/stores/useSourceControlAuthStore';
-import { isWorkflowsSurfaceShown } from '@/lib/workflows/panel';
 import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
 import { getCycledPrimaryAgentName } from '@/components/chat/mobileControlsUtils';
 import { focusChatInput } from '@/components/chat/composer/editor/dom';
@@ -506,7 +505,6 @@ export const useKeyboardShortcuts = () => {
             screenWidth: window.innerWidth,
             tabs: panel?.tabs ?? [],
             sourceControlConnected: Object.values(useSourceControlAuthStore.getState().entries).some((entry) => entry.status?.status === 'connected'),
-            workflowsShown: isWorkflowsSurfaceShown(panel?.tabs ?? [], effectiveDirectory),
             receivedPagesShown: hasReceivedPages(useReceivedPagesStore.getState()),
             extras: enabledGuestSurfaces(useGuestsStore.getState().guests, getRuntimeUrlResolver().authenticatedAsset),
           });

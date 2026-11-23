@@ -6,7 +6,6 @@ import { isCapacitorApp } from '@/lib/platform';
 import { isMobileSurfaceRuntime } from '@/lib/runtimeSurface';
 import { shownContextModes } from '@/lib/workspace/zones';
 import { normalizeContextPanelDirectoryKey, useUIStore } from '@/stores/useUIStore';
-import { selectWorkflowsShown } from '@/lib/workflows/availability';
 
 import { phoneGuestPanelModes } from './phone.ts';
 import { useGuestsStore } from './store.ts';
@@ -56,9 +55,6 @@ const openGuestSurfaceOnPhone = (mode: ContextPanelMode): GuestOpenSurfaceResult
 export const openGuestSurface = ({ mode, directory, supported }: OpenGuestSurfaceOptions): GuestOpenSurfaceResult => {
   if (!supported) return { ok: false, code: 'UNSUPPORTED', message: 'This OpenChamber surface has no side panel.' };
   if (isMobileSurfaceRuntime()) return openGuestSurfaceOnPhone(mode);
-  if (mode === 'workflows' && !selectWorkflowsShown(useUIStore.getState())) {
-    return { ok: false, code: 'UNSUPPORTED', message: 'That surface cannot open here.' };
-  }
   const key = directory ? normalizeContextPanelDirectoryKey(directory) : '';
   if (!key) return { ok: false, code: 'NO_DIRECTORY', message: 'No chat or project is open.' };
   if (isShown(key, mode)) return { ok: true };

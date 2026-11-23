@@ -14,7 +14,6 @@ import { useStableEvent } from './timeline/useStableEvent';
 import { useTurnExpansion } from './timeline/useTurnExpansion';
 import { useDisplayMessages } from './timeline/useDisplayMessages';
 import { useTimelineRows } from './timeline/useTimelineRows';
-import { useApprovalFooter } from './timeline/useApprovalFooter';
 import { useUserSendAnimation } from './timeline/useUserSendAnimation';
 import { useTimelineListBinding } from './timeline/useTimelineListBinding';
 import { useTimelineRowIndexes } from './timeline/useTimelineRowIndexes';
@@ -84,7 +83,7 @@ const MessageList = React.forwardRef<MessageListHandle, MessageListProps>(({
     });
 
     const { turnExpansion, toggleTurnActivity, expandTurnActivity } = useTurnExpansion(activityRenderMode);
-    const { baseDisplayMessages, displayMessages } = useDisplayMessages(
+    const { displayMessages } = useDisplayMessages(
         messages,
         sessionKey,
         directory,
@@ -97,7 +96,6 @@ const MessageList = React.forwardRef<MessageListHandle, MessageListProps>(({
         defaultActivityExpanded,
         turnExpansion,
     });
-    const footerWithApprovals = useApprovalFooter(sessionKey, directory, baseDisplayMessages, trailingStreamingEntry, listFooter);
 
     const [liveTail] = React.useState(createLiveTailStore);
     const {
@@ -160,7 +158,7 @@ const MessageList = React.forwardRef<MessageListHandle, MessageListProps>(({
                 onListMetricsChange={stableListMetricsChange}
                 onTimelineDataChange={stableTimelineDataChange}
                 listHeader={listHeader}
-                listFooter={footerWithApprovals}
+                listFooter={listFooter}
                 scrollContainerProps={scrollContainerProps}
                 rowContext={rowContext}
                 endPinningReleased={endPinningReleased}

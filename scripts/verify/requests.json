@@ -1480,20 +1480,6 @@
     "GET /api/quota/:providerId",
     "GET /api/terminal/shells"
   ],
-  "workflows.approval": [
-    "GET /api/command",
-    "GET /api/config/agents/:name",
-    "GET /api/config/command-configs",
-    "GET /api/config/commands/:name/config",
-    "GET /api/config/plugins",
-    "GET /api/config/skills/catalog",
-    "GET /api/environment",
-    "GET /api/openchamber/workflows",
-    "GET /api/openchamber/workflows/saved",
-    "GET /api/terminal/shells",
-    "POST /api/openchamber/workflows/:runId/:action",
-    "POST /api/session/:sessionID"
-  ],
   "workspace.favorites": [],
   "workspace.font-size": [
     "PUT@step /api/config/settings"

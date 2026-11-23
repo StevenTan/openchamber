@@ -42,7 +42,7 @@ export const QuietAction: React.FC<
     </button>
 );
 
-export type OpenActionInput = { label: string; icon: IconName; onOpen: () => void };
+type OpenActionInput = { label: string; icon: IconName; onOpen: () => void };
 
 export const Actions: React.FC<{ open?: OpenActionInput | null }> = ({ open }) => {
     const rawToggle = React.useContext(RawToggleContext);

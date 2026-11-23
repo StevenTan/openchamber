@@ -9,7 +9,6 @@ import { useBackgroundImagesStore } from '@/sync/background-images';
 import { collectOpenTurnSessionIds, useGlobalSessionStatusStore } from '@/sync/global-session-status';
 import { usePrWatchStore } from '@/sync/pr-watch';
 import { useExtensionWaitsStore } from '@/sync/extension-waits';
-import { useWorkflowActivityStore } from '@/sync/workflow-activity';
 import {
   useGlobalBlockingRequestsStore,
   type BlockingFormRequest,
@@ -301,7 +300,6 @@ const buildSnapshot = (instanceName: string, includeTray: boolean): TraySnapshot
   const allSections: Sections = { chats: true, pinned: true, work: true };
 
   const openTurnIds = collectOpenTurnSessionIds(useGlobalSessionStatusStore.getState().activeSessionIds, [
-    useWorkflowActivityStore.getState().runningSessionIds,
     useBackgroundShellsStore.getState().sessionIds,
     useBackgroundImagesStore.getState().sessionIds,
     usePrWatchStore.getState().bySession.keys(),
@@ -420,7 +418,6 @@ export const useTraySync = (): void => {
       if (state.dictionary !== previous.dictionary) scheduleFlush();
     });
     const unsubscribeGlobalStatus = useGlobalSessionStatusStore.subscribe(() => scheduleFlush());
-    const unsubscribeWorkflows = useWorkflowActivityStore.subscribe(() => scheduleFlush());
     const unsubscribeShells = useBackgroundShellsStore.subscribe(() => scheduleFlush());
     const unsubscribeImages = useBackgroundImagesStore.subscribe(() => scheduleFlush());
     const unsubscribePrWatches = usePrWatchStore.subscribe(() => scheduleFlush());
@@ -447,7 +444,6 @@ export const useTraySync = (): void => {
       unsubscribeGlobal();
       unsubscribeLocale();
       unsubscribeGlobalStatus();
-      unsubscribeWorkflows();
       unsubscribeShells();
       unsubscribeImages();
       unsubscribePrWatches();

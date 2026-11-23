@@ -252,9 +252,7 @@ export const SETTINGS_REGISTRY = {
   agentMemoryDreamingModel: field({ scope: 'instance', parse: fromSchema(z.string()), ui: uiStore('agentMemoryDreamingModel', (v) => useUIStore.getState().setAgentMemoryDreamingModel(v)) }),
   agentMemoryDreamingVariant: field({ scope: 'instance', parse: fromSchema(z.string()), ui: uiStore('agentMemoryDreamingVariant', (v) => useUIStore.getState().setAgentMemoryDreamingVariant(v)) }),
   agentKnowledgeToolEnabled: field({ scope: 'instance', parse: parseBoolean, ui: uiStore('agentKnowledgeToolEnabled', (v) => useUIStore.getState().setAgentKnowledgeToolEnabled(v)) }),
-  agentWorkflowToolEnabled: field({ scope: 'instance', parse: parseBoolean, ui: uiStore('agentWorkflowToolEnabled', (v) => useUIStore.getState().setAgentWorkflowToolEnabled(v)) }),
-  agentWorkflowAutoApprove: field({ scope: 'instance', parse: parseBoolean, ui: uiStore('agentWorkflowAutoApprove', setUi('agentWorkflowAutoApprove')) }),
-  agentWorkflowAutoApproveLeads: field({ scope: 'instance', parse: parseBoolean, ui: uiStore('agentWorkflowAutoApproveLeads', setUi('agentWorkflowAutoApproveLeads')) }),
+
   isolatedSpacesEnabled: field({ scope: 'instance', parse: parseBoolean, ui: uiStore('isolatedSpacesEnabled', (v) => useUIStore.getState().setIsolatedSpacesEnabled(v)) }),
   isolatedSpacesIdleStop: field({
     scope: 'instance',
@@ -267,12 +265,7 @@ export const SETTINGS_REGISTRY = {
     parse: parseBoolean,
     ui: uiStore('agentMemoryFeatureAvailable', (v) => useUIStore.getState().setAgentMemoryFeatureAvailable(v), { autoSave: false }),
   }),
-  agentWorkflowFeatureAvailable: field({
-    scope: 'instance',
-    computed: true,
-    parse: parseBoolean,
-    ui: uiStore('agentWorkflowFeatureAvailable', (v) => useUIStore.getState().setAgentWorkflowFeatureAvailable(v), { autoSave: false }),
-  }),
+  
   overviewFeatureAvailable: field({
     scope: 'instance',
     computed: true,

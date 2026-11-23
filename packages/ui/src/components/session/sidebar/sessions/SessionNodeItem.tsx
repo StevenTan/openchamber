@@ -22,7 +22,6 @@ import { getSessionActivityTime } from '@/sync/session-ordering';
 import { streamPerfCount } from '@/stores/utils/streamDebug';
 import { useUIStore } from '@/stores/useUIStore';
 import { DraggableSessionRow } from '../folders/sessionFolderDnd';
-import { listedChildren } from '../listedChildren';
 import { isPinnedZoneRowKey, sessionExpansionKey } from '../sessionSidebarRowModel';
 import { formatSessionCompactDateLabel, formatSessionDateLabel } from '../utils';
 import { DirectoryActionIndicator } from './DirectoryActionIndicator';
@@ -129,7 +128,7 @@ function SessionNodeItemComponent(props: SessionNodeItemProps): React.ReactNode 
   const contextMenuInstanceKey = rowKey ? `session-context:${rowKey}` : null;
   const sessionGoal = getSessionGoal(session);
   const sessionTitle = session.title || t('sessions.sidebar.session.untitled');
-  const hasChildren = listedChildren(node).length > 0;
+  const hasChildren = node.children.length > 0;
   const isPinnedSession = isSessionPinned(pinnedSessionIds, sessionDirectory, session.id);
   const expansionKey = legacyContextKey;
   const isExpanded = expandedParents.has(expansionKey);

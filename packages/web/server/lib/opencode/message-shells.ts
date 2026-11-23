@@ -37,7 +37,7 @@ const textLength = (content: unknown[]) => {
 
 const isEnvelopeTool = <Name>(name: Name) => name === 'execute' || String(name).startsWith('openchamber');
 const MAX_ENVELOPE_CHARS = 256 * 1024;
-const ACTIONS_THE_CHAT_DRAWS_FROM_THEIR_RESULT = new Set(['workflow.run', 'image.generate']);
+const ACTIONS_THE_CHAT_DRAWS_FROM_THEIR_RESULT = new Set(['image.generate']);
 
 const singleTextSchema = z.tuple([z.object({ type: z.literal('text'), text: z.string().max(MAX_ENVELOPE_CHARS) })]);
 const recordedCallSchema = z.object({ tool: z.string(), output: z.string() });

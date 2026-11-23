@@ -2079,10 +2079,10 @@ describe('openchamber session routes', () => {
       expect(restoredIds().sort()).toEqual(['ses_child', 'ses_grandchild', 'ses_root']);
     });
 
-    it("brings back the root's workflow agents, which only OpenChamber's metadata links to it", async () => {
+    it("brings back the root's metadata-linked children, which only OpenChamber's metadata links to it", async () => {
       useTree([
         ...archivedTree,
-        { id: 'ses_agent', metadata: { openchamber: { kind: 'workflow-agent', parentID: 'ses_root' } }, time: { created: 1, archived: 1700 } },
+        { id: 'ses_agent', metadata: { openchamber: { kind: 'operator-child', parentID: 'ses_root' } }, time: { created: 1, archived: 1700 } },
         { id: 'ses_agent_sub', parentID: 'ses_agent', time: { created: 1, archived: 1700 } },
       ]);
       const { app } = createApp();

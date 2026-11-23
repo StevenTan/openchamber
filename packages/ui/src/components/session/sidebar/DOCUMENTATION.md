@@ -34,8 +34,8 @@ widest gap, as a zone's does, and on the desktop holds at the top of the list
 while its matches scroll under it. Each block ends with its own
 pager for more message matches; the active block draws it once its loaded
 matches all show, so a block never ends with two buttons. The active block
-shown whole folds again when the search is cleared or changed. What a session started (a subagent, a
-workflow's agent: any session with a `parentID`) is left out, by title and by
+shown whole folds again when the search is cleared or changed. What a session started (any session
+with a `parentID`) is left out, by title and by
 message: it is part of its parent, and such sessions outnumber the user's own.
 Project and folder names are not searched: every row already shows its
 project, and a project's name would list every conversation in it. No zone, project, worktree or folder row is drawn while a
@@ -370,7 +370,7 @@ no Shift.
 
 ### Why project trees resolve lineage globally
 
-The shared project tree checks parent presence against the global active and archived cache plus the merged active session list. Child expansion uses the lifecycle-ordered global graph. A child whose parent is known renders only beneath that parent, even when its own directory belongs to another project or worktree. An archived parent or intermediate never allows an active descendant to become an independent root. Project buckets contain roots only, so children do not consume root pagination or make a child-only worktree expandable. Temporary `/btw` forks and archived children remain hidden. Workflow agents (`metadata.openchamber.kind === 'workflow-agent'`) stay in the tree but get no rows, and neither does what they started (`listedChildren`): one run can start a hundred, and the run's card and Workflows panel list them. Their pending requests and activity still count for the row above, so an expanded parent's badge scope includes them (`selectBlockingBadgeSessionScopes`). Selection still uses each session's own directory. VS Code applies the same rule after its exact workspace filter.
+The shared project tree checks parent presence against the global active and archived cache plus the merged active session list. Child expansion uses the lifecycle-ordered global graph. A child whose parent is known renders only beneath that parent, even when its own directory belongs to another project or worktree. An archived parent or intermediate never allows an active descendant to become an independent root. Project buckets contain roots only, so children do not consume root pagination or make a child-only worktree expandable. Temporary `/btw` forks and archived children remain hidden. Selection still uses each session's own directory. VS Code applies the same rule after its exact workspace filter.
 
 Bucket-local lineage promoted cross-project subagents to independent rows and left their parent without an expansion control. The missing-parent fallback applies only while both active and archived sources lack the parent, and clears when either parent arrives. The project-section cache tracks each project's visible ancestors and descendants, including their order and record identity, so a lineage or same-ID semantic change rebuilds the affected trees without replacing unrelated project sections.
 
@@ -424,14 +424,13 @@ An agent that calls `session.create` with `ownWork` starts a worker it runs
 itself (`packages/web/server/lib/openchamber-control/DOCUMENTATION.md`). The
 server marks it `metadata.openchamber.kind === 'operator-child'` with the
 caller's id as `parentID`, and `sessionParentID` projects that into
-`session.parentID`, as it does for workflow agents. Everything the tree reads
+`session.parentID`. Everything the tree reads
 from `parentID` follows: the worker renders under its agent wherever it lives
 (another worktree, another project), has no root row and no In work entry of
 its own, rolls its pending permissions and questions into the agent's row and,
 when it lives in the agent's folder, its chat (the chat's docks read that
 folder's store only), archives and restores with it, and leaves In work when the agent's work
-is done. It gets a row under the agent, unlike a workflow agent, because it is
-one session the user may want to open.
+is done. It gets a row under the agent so the user can open it.
 
 - **No count on the agent's row.** A running worker keeps the agent's row
   working through `parentID`, as a subagent does; the workers themselves sit
@@ -700,7 +699,7 @@ the draft rows of its folder. The row is the worktree's (`WorktreeWorkRow`,
   switcher, the tray and the other places that name a session's project see
   it. The places that would carry host data into the space or apply the host
   project's config keep no project for it, visibly in their code: project
-  knowledge and agent memory (`useProjectContextOwner`), workflows, the
+  knowledge and agent memory (`useProjectContextOwner`), the
   config store's project defaults, and a fork into a new worktree, which
   would hold none of the space's changes. A render that names the project
   subscribes to the space (`useSpaceProjectDirectory`), and the open session

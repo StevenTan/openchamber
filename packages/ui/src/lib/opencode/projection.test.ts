@@ -39,13 +39,6 @@ describe("projectSession", () => {
     expect("agent" in session).toBe(false)
   })
 
-  test("a workflow agent nests under the session that ran it, which OpenCode does not know as its parent", () => {
-    const metadata = { openchamber: { kind: "workflow-agent", parentID: "ses_parent" } }
-    expect(projectSession({ ...sessionInfo, metadata }).parentID).toBe("ses_parent")
-    expect(projectSession({ ...sessionInfo, parentID: "ses_opencode", metadata }).parentID).toBe("ses_opencode")
-    expect("parentID" in projectSession({ ...sessionInfo, metadata: { openchamber: { parentID: "ses_parent" } } })).toBe(false)
-  })
-
   test("a session an agent runs for its own work nests under that agent's session until the user takes it over", () => {
     const link = { openchamber: { kind: "operator-child", parentID: "ses_operator", work: { state: "open" } } }
     const child = projectSession({ ...sessionInfo, metadata: link })

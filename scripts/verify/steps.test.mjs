@@ -17,15 +17,15 @@ test("settings expect reads saved global flags without allowing global writes", 
   const calls = []
   t.mock.method(globalThis, "fetch", async (url, options) => {
     calls.push({ url, method: options?.method ?? "GET" })
-    return Response.json({ agentWorkflowToolEnabled: true, agentWorkflowAutoApprove: true })
+    return Response.json({ agentControlToolEnabled: true, agentNotifyToolEnabled: true })
   })
   const ctx = { stand: { apiUrl: "http://stand" } }
-  await runStep({ do: "settings", expect: { agentWorkflowToolEnabled: true, agentWorkflowAutoApprove: true } }, ctx)
+  await runStep({ do: "settings", expect: { agentControlToolEnabled: true, agentNotifyToolEnabled: true } }, ctx)
   assert.deepEqual(calls, [{ url: "http://stand/api/config/settings", method: "GET" }])
-  await assert.rejects(runStep({ do: "settings", values: { agentWorkflowToolEnabled: true } }, ctx), /not profile settings/)
+  await assert.rejects(runStep({ do: "settings", values: { agentControlToolEnabled: true } }, ctx), /not profile settings/)
   await assert.rejects(runStep({ do: "settings", expect: {} }, ctx), /at least one field/)
   t.mock.method(globalThis, "fetch", async () => Response.json({ error: "unavailable" }, { status: 503 }))
-  await assert.rejects(runStep({ do: "settings", expect: { agentWorkflowToolEnabled: true } }, ctx), /reading settings answered 503/)
+  await assert.rejects(runStep({ do: "settings", expect: { agentControlToolEnabled: true } }, ctx), /reading settings answered 503/)
 })
 
 test("message request failures use the scenario's session and can be cleared", async () => {

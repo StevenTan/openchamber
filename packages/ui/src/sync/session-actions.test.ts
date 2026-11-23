@@ -2995,28 +2995,6 @@ describe("forkAfterMessage", () => {
     }
   })
 
-  test("leaves a workflow report that followed the answer out of the fork", async () => {
-    const workflowReport: Message = {
-      id: "msg-workflow-report",
-      role: "synthetic",
-      sessionID: sourceSession.id,
-      time: { created: 1 },
-      metadata: { source: "openchamber-workflow", runId: "run-1", name: "Review", state: "completed" },
-      text: "<openchamber-workflow>\nreview done\n</openchamber-workflow>",
-    }
-    const messages = [...transcript.slice(0, 2), workflowReport, ...transcript.slice(2)]
-    const source = createStore({}, { session: [sourceSession], message: { [sourceSession.id]: messages } })
-    const { forkAfterMessage, setActionRefs } = await import("./session-actions")
-    setActionRefs(createChildStores([[sourceSession.directory, source]]), () => sourceSession.directory)
-
-    await forkAfterMessage(sourceSession.id, "msg-answer-1")
-
-    expect(replyCalls).toEqual([{
-      method: "session.fork",
-      params: { sessionID: sourceSession.id, messageID: workflowReport.id, directory: sourceSession.directory },
-    }])
-  })
-
   test("copies the whole transcript when the answer is the last message", async () => {
     const source = createStore({}, { session: [sourceSession], message: { [sourceSession.id]: transcript } })
     const { forkAfterMessage, setActionRefs } = await import("./session-actions")

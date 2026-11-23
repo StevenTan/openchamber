@@ -8,7 +8,6 @@ import { getPinnedSessionKey } from '@/lib/sessionPins';
 import type { Session } from '@/lib/opencode/model';
 import type { WorktreeMetadata } from '@/types/worktree';
 import type { SessionNode } from '../types';
-import { isWorkflowAgentSession } from '@/lib/sessionWorkflowMetadata';
 
 export type SessionNodeChildRenderExtras = {
   subtreeContainsEditing: Set<string>;
@@ -109,7 +108,7 @@ export const selectBlockingBadgeSessionScopes = (
       sessionIDsByDirectory.set(directory, sessionIDs);
     }
     for (const child of current.children) {
-      if (current === node && isExpanded && !isWorkflowAgentSession(child.session)) continue;
+      if (current === node && isExpanded) continue;
       visit(child);
     }
   };

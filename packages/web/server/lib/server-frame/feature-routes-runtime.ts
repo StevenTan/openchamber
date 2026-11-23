@@ -40,7 +40,6 @@ import { registerMessageQueueRoutes } from '../message-queue/runtime.js';
 import { registerAutoReviewRoutes } from '../auto-review/runtime.js';
 import { registerPrWatchRoutes } from '../pr-watch/runtime.js';
 import { registerExtensionWaitsRoutes } from '../extension-waits/runtime.js';
-import { registerWorkflowRoutes } from '../workflows/routes.js';
 import { registerRoutingPromptRewrite, registerRoutingRoutes } from '../routing/routes.js';
 import { registerConfigEntityRoutes } from '../opencode/config-entity-routes.js';
 import { createThemeFolderWatch } from '../appearance/theme-watch.js';
@@ -203,7 +202,7 @@ type RouteDependencies =
     mergeFollowRuntime?: ReturnType<typeof createMergeFollowRuntime> | null;
     routingRuntime: Parameters<typeof registerRoutingRoutes>[1];
     globalEventHub: GlobalMessageStreamHub | null;
-    workflowRuntime?: Parameters<typeof registerWorkflowRoutes>[1] | null;
+    
   };
 
 export const createFeatureRoutesRuntime = (dependencies: FeatureRuntimeDependencies) => {
@@ -391,7 +390,7 @@ export const createFeatureRoutesRuntime = (dependencies: FeatureRuntimeDependenc
       routingRuntime,
       globalEventHub,
       openchamberVersion,
-      workflowRuntime = null,
+      
     } = routeDependencies;
 
     registerSettingsUtilityRoutes(app, {
@@ -475,7 +474,6 @@ export const createFeatureRoutesRuntime = (dependencies: FeatureRuntimeDependenc
     });
 
     registerOpenChamberControlRoutes(app, { controlService: openChamberControlService, laterPages: laterPagesRuntime });
-    if (workflowRuntime) registerWorkflowRoutes(app, workflowRuntime);
 
     registerMarkdownImageGrantRoutes(app, {
       fsPromises,

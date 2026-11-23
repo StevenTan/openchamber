@@ -1,4 +1,3 @@
-import { getPanelWorkspaceUI } from '../useUIStore';
 import type { UIStoreSlice } from './types';
 
 export const createAgentActions: UIStoreSlice<
@@ -22,9 +21,7 @@ export const createAgentActions: UIStoreSlice<
   | 'setAgentMemoryDreamingVariant'
   | 'setAgentRenderToolEnabled'
   | 'setAgentSecretToolEnabled'
-  | 'setAgentWorkflowToolEnabled'
   | 'setAgentMemoryFeatureAvailable'
-  | 'setAgentWorkflowFeatureAvailable'
   | 'setRoutingFeatureAvailable'
   | 'setOverviewFeatureAvailable'
   | 'markAgentMemoryViewed'
@@ -112,25 +109,8 @@ export const createAgentActions: UIStoreSlice<
     set({ agentSecretToolEnabled: value });
   },
 
-  setAgentWorkflowToolEnabled: (value) => {
-    set({ agentWorkflowToolEnabled: value });
-    if (value) return;
-    // Off hides workflows (`selectWorkflowsShown`), so an open Workflows tab closes too.
-    for (const owner of Object.keys(get().panelWorkspaces)) {
-      const workspace = getPanelWorkspaceUI(owner).getState();
-      for (const [directory, panel] of Object.entries(workspace.contextPanelByDirectory)) {
-        const workflowTabIds = panel.tabs.filter((tab) => tab.mode === 'workflows').map((tab) => tab.id);
-        if (workflowTabIds.length > 0) workspace.closeContextPanelTabs(directory, workflowTabIds);
-      }
-    }
-  },
-
   setAgentMemoryFeatureAvailable: (value) => {
     set({ agentMemoryFeatureAvailable: value });
-  },
-
-  setAgentWorkflowFeatureAvailable: (value) => {
-    set({ agentWorkflowFeatureAvailable: value });
   },
 
   setRoutingFeatureAvailable: (value) => {

@@ -1,7 +1,6 @@
 import React from 'react';
 import { useI18n } from '@/lib/i18n';
 import { useUIStore } from '@/stores/useUIStore';
-import { selectWorkflowsShown } from '@/lib/workflows/availability';
 import { SettingsSortableVisibilityList } from '@/components/sections/shared/SettingsSortableVisibilityList';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,10 +25,9 @@ export const ContextRailSurfacesDialog: React.FC<{
   const setHiddenSurfaces = useUIStore((state) => state.setContextRailHiddenSurfaces);
 
   const guestSurfaces = useGuestSurfaces();
-  const workflowsAvailable = useUIStore(selectWorkflowsShown);
   const surfaces = React.useMemo(
-    () => sortContextSurfaces(contextRailOrder, guestSurfaces).filter((surface) => workflowsAvailable || surface.id !== 'workflows'),
-    [contextRailOrder, guestSurfaces, workflowsAvailable],
+    () => sortContextSurfaces(contextRailOrder, guestSurfaces),
+    [contextRailOrder, guestSurfaces],
   );
 
   const allVisible = hidden.length === 0;

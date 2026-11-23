@@ -821,7 +821,6 @@ describe('session goal tick on v2 messages', () => {
 
   it.each([
     ['continues in a session an agent runs for its own work', { kind: 'operator-child', parentID: 'ses_operator' }, 1],
-    ['leaves a workflow agent to its run', { kind: 'workflow-agent', parentID: 'ses_run' }, 0],
   ])('%s', async (_label, link, continuations) => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const { calls } = v2OpenCode({
@@ -1189,7 +1188,7 @@ describe('session goal and the job list of OpenCode 2.2.6+', () => {
     expect(generate).not.toHaveBeenCalled();
   });
 
-  it('still waits for a running child session that is no OpenCode job, such as a workflow agent', async () => {
+  it('still waits for a running child session that is no OpenCode job, such as a metadata-linked child', async () => {
     quiet();
     v2OpenCode({
       messages: [userRecord, assistantRecord()],

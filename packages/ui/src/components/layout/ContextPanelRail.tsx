@@ -68,7 +68,6 @@ import { ZoneMoveMenuItems } from './ZoneMoveMenuItems';
 import { startZoneDragGesture, type ZoneDragGesture } from './zoneDrag';
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { changeRequestCopy } from '@/lib/source-control/changeRequestCopy';
-import { useWorkflowsSurfaceShown } from '@/lib/workflows/panel';
 
 const RAIL_TOOLTIP_DELAY_MS = 150;
 const RAIL_SCROLL_FADE_PX = 24;
@@ -322,7 +321,6 @@ export const ContextPanelRail: React.FC = () => {
   const guestListening = useGuestListeningStore((state) => state.captureCountByGuest);
   const clearGuestBadge = useGuestBadgeStore((state) => state.clearBadge);
   const tabs = panelState?.tabs ?? EMPTY_TABS;
-  const workflowsShown = useWorkflowsSurfaceShown(tabs, effectiveDirectory || null);
   const receivedPagesShown = hasReceivedPages(useReceivedPages());
   const shownModes = React.useMemo(
     () => shownContextModes(panelState, contextSurfaceZones),
@@ -338,11 +336,10 @@ export const ContextPanelRail: React.FC = () => {
       screenWidth,
       tabs,
       sourceControlConnected,
-      workflowsShown,
       receivedPagesShown,
       extras: guestSurfaces,
     }).map((surface) => (surface.id === 'pr' ? { ...surface, ...trackerRailIcon(repositoryProvider === 'none' ? null : trackerDescriptor) } : surface));
-  }, [contextRailHiddenSurfaces, contextRailOrder, guestSurfaces, receivedPagesShown, repositoryProvider, screenWidth, sourceControlConnected, tabs, trackerDescriptor, workflowsShown]);
+  }, [contextRailHiddenSurfaces, contextRailOrder, guestSurfaces, receivedPagesShown, repositoryProvider, screenWidth, sourceControlConnected, tabs, trackerDescriptor]);
 
   const hasTrackerItems = tabs.some((tab) => tab.mode === 'pr' && tab.targetPath);
   React.useEffect(() => {

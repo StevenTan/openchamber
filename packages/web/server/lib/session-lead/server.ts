@@ -19,11 +19,6 @@ const childrenSchema = z.object({
   sessions: z.array(z.object({ id: z.string(), title: z.string().optional(), status: z.object({ type: z.string() }).optional() })),
 });
 
-interface WorkflowApprovalSettings {
-  agentWorkflowAutoApprove?: unknown;
-  agentWorkflowAutoApproveLeads?: unknown;
-}
-
 interface SessionLeadServerOptions extends Pick<SessionLeadRuntimeOptions, 'buildOpenCodeUrl' | 'getOpenCodeAuthHeaders' | 'isSessionWarm'> {
   dataDir: string;
   readSessionMetadata: (sessionId: string, options: { directory: string }) => Promise<SessionMetadata | null | undefined>;
@@ -31,7 +26,6 @@ interface SessionLeadServerOptions extends Pick<SessionLeadRuntimeOptions, 'buil
   resolveSessionDirectory: (sessionId: string) => Promise<string | null>;
   syncBriefEntry: (sessionId: string, directory: string, brief: string) => Promise<boolean>;
   executeControl: ReturnType<typeof createOpenChamberControlService>['execute'];
-  readWorkflowSettings: () => Promise<WorkflowApprovalSettings | null>;
   createError: LeadActionDependencies['createError'];
   registerResult: Parameters<typeof LeadHandoverFactory>[0]['registerResult'];
 }
@@ -43,7 +37,7 @@ export const createSessionLeadServer = ({
   resolveSessionDirectory,
   syncBriefEntry,
   executeControl,
-  readWorkflowSettings,
+  
   createError,
   buildOpenCodeUrl,
   getOpenCodeAuthHeaders,
@@ -92,13 +86,6 @@ export const createSessionLeadServer = ({
     await briefEntry.refresh(sessionId, directory, lead !== null);
   };
 
-  const startsWorkflowWithoutApproval = async (sessionId: string) => {
-    const settings = await readWorkflowSettings();
-    if (settings?.agentWorkflowAutoApprove === true) return true;
-    if (settings?.agentWorkflowAutoApproveLeads !== true) return false;
-    return readLead(await readSessionMetadata(sessionId, { directory: '' }).catch(() => null)) !== null;
-  };
-
   const registerRoutes = (app: Application, express: Pick<ExpressFactory, 'json'>, authorize: (req: Pick<Request, 'socket' | 'headers'>) => boolean) => {
     app.post<{ sessionID?: unknown }>('/api/openchamber/agent-tool/lead-compaction', express.json({ limit: '16kb' }), async (req, res) => {
       if (!authorize(req)) return res.status(401).json({ error: 'Unauthorized' });
@@ -114,7 +101,7 @@ export const createSessionLeadServer = ({
     readBriefForEntry: briefEntry.forEntry,
     actions,
     processPayload: runtime.processPayload,
-    startsWorkflowWithoutApproval,
+    
     registerRoutes,
   };
 };

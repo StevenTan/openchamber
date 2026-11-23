@@ -80,7 +80,7 @@ export const createSessionActivityProbe = ({ buildOpenCodeUrl, getOpenCodeAuthHe
   };
 
   const hasWorkingWithinDepth = async (sessionId: string, statuses: NonNullable<Awaited<ReturnType<typeof fetchActiveSessionStatuses>>>, maxDepth: number, directOnly = false) => {
-    const parents = new Map<string, { id: string | null; viaWorkflowLink: boolean } | undefined>();
+    const parents = new Map<string, { id: string | null; viaMetadataLink: boolean } | undefined>();
     const signal = requestSignal();
     let unknown = false;
     for (const activeId of Object.keys(statuses)) {
@@ -98,7 +98,7 @@ export const createSessionActivityProbe = ({ buildOpenCodeUrl, getOpenCodeAuthHe
           const body = await openCodeGet(`/api/session/${encodeURIComponent(current)}`, undefined, signal).catch(() => null);
           const parsed = sessionLineageSchema.safeParse(body);
           parents.set(current, parsed.success && parsed.data.id === current
-            ? { id: sessionParentId(parsed.data), viaWorkflowLink: !parsed.data.parentID && sessionParentId(parsed.data) !== null }
+            ? { id: sessionParentId(parsed.data), viaMetadataLink: !parsed.data.parentID && sessionParentId(parsed.data) !== null }
             : undefined);
         }
         const parent = parents.get(current);
@@ -107,7 +107,7 @@ export const createSessionActivityProbe = ({ buildOpenCodeUrl, getOpenCodeAuthHe
           break;
         }
         if (parent.id === sessionId) {
-          if (!directOnly || depth === 0 || parent.viaWorkflowLink) return true;
+          if (!directOnly || depth === 0 || parent.viaMetadataLink) return true;
           break;
         }
         current = parent.id;

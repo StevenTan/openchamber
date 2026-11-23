@@ -12,8 +12,7 @@ export const LEAD_GUIDANCE = [
     + ' "find and fix", "migrate and land". Give each child a model that fits its work (session.create takes model; models.list and models.search find one):'
     + " a strong one where it weighs judgement or writes what lands, a cheaper one for reading and checking; without one it runs on the user's default model."
     + ' Start a separate research child only when what it finds could change what comes next or becomes a question for the user.'
-    + ' Smaller pieces of your own work go to your subagent tool. Many similar independent pieces go to a workflow, which a lead starts'
-    + ' without asking when its direction calls for one, giving each phase a model that fits it as the workflow guidance says.',
+    + ' Smaller pieces of your own work go to your subagent tool.',
   "Research, a plan and a found cause are steps, not the result. Check every child's answer against the result you asked for:"
     + ' "found the cause, fix it separately" in answer to "fix it" goes straight back to that child as unfinished work.'
     + ' A brief to a child asks for the result and for its proof: what the child ran and what it saw. An answer without proof is unfinished too.'

@@ -606,7 +606,7 @@ constructor retains its existing `Object.assign` behavior.
 - One failed directory status lookup produces `unknown` for only that
   directory and does not erase other session results.
 - `session.list` returns top-level sessions newest first (no parent by
-  `sessionParentId`: OpenCode's, a workflow agent's or an ownWork link);
+  `sessionParentId`: OpenCode's or an ownWork link);
   `children` adds subagents and those. Each session is
   trimmed to `id`, `title`, `directory`, `updated`, `archived`, `parentID`,
   `agent`, `model`, `outcome` (plus the In work fields and `status` below):
@@ -786,9 +786,7 @@ properties.
 Distinct intents have their own descriptions and inputs so models can choose
 between them. Turning a capability off removes its complete schema and guidance;
 image generation spends money on another model, notifications interrupt the user,
-and terminal reads can expose secrets. The workflow-answer tool is denied by
-default and allowed only in workflow sessions whose prompts request a schema
-answer, so unrelated sessions never carry its declaration. Memory reads use the
+and terminal reads can expose secrets. Memory reads use the
 title index already in the session; listing serves a missing or stale index.
 
 ### Why bare actions resolve inside the calling tool
@@ -918,7 +916,7 @@ dropping slots or ignoring the requested time.
 ### Why a background message waits behind a page and does not end it
 
 A dispatched session's result, a pull request or extension wait's wake, a
-workflow report, a restart resume, another agent's `session.send`, a run of
+a restart resume, another agent's `session.send`, a run of
 OpenCode's own scheduler or a prompt queued for after the turn can arrive
 while a page or a secret card waits. OpenCode keeps it
 in the session's inbox until the waiting call returns, and the agent reads it at
@@ -1097,8 +1095,7 @@ under one chevron, reshuffled them when the caller was archived, and made
 `work.name` in each rename the caller. So nesting is now the agent's explicit
 claim, `ownWork`, for a worker it runs and collects itself; overnight an
 operator starts a dozen of them, and as roots they crowded the user's own
-sessions and In work. The link is OpenChamber metadata, as for workflow
-agents, and never OpenCode's `parentID`: OpenCode wakes a `parentID` parent
+sessions and In work. The link is OpenChamber metadata, and never OpenCode's `parentID`: OpenCode wakes a `parentID` parent
 with a `<subagent>` report after every round, while an operator decides when
 it reads its workers (`returnResult`, `session.messages`).
 

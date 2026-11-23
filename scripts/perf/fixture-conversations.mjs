@@ -468,14 +468,6 @@ export const DESIGN_SESSIONS = [
 // The OpenAI protocol sends a message's content as a string or as a list of parts.
 export const fixtureMessageText = (content) => (Array.isArray(content) ? content.map((part) => part?.text ?? "").join("\n") : String(content ?? ""))
 
-// Turns behavior scenarios (scripts/verify) send that no design shot shows.
-// The workflow's agents answer slowly so a scenario sees the run while it works.
-const VERIFY_WORKFLOW_SCRIPT = [
-  "export const meta = { name: 'api-exports', description: 'Lists what each API file exports', phases: ['Read'] }",
-  "phase('Read')",
-  "return parallel(['src/api/retry.ts', 'src/api/client.ts'].map((file) => () => agent('List what ' + file + ' exports.', { label: file, model: 'perf/stream-100cps' })))",
-].join("\n")
-
 /**
  * Turns the behavior scenarios (`scripts/verify`) play that no design shot
  * shows. `OPERATOR_PROMPT` makes the agent start a worker session as part of
@@ -560,14 +552,6 @@ const VERIFY_TURNS = [
     }],
   }],
   answer: "Going with the policy you picked.\n",
-}, {
-  id: "verify_workflow",
-  prompt: "Run the workflow we agreed on over the API files.",
-  steps: [{
-    text: "Starting the workflow we agreed on.",
-    calls: [{ name: "openchamber_workflow", arguments: { action: "workflow.run", parameters: { script: VERIFY_WORKFLOW_SCRIPT } } }],
-  }],
-  answer: "The workflow card is in the chat; its report comes back here when the run ends.\n",
 }, {
   id: "operator_1",
   prompt: OPERATOR_PROMPT,

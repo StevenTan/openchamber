@@ -1,7 +1,7 @@
 /** Sessions an agent runs as part of its own work: why their chat takes no prompts, taking one over, and Done while they still run. Merged into each locale's main dictionary. */
 export const operatorChildrenI18n = {
   en: {
-    "chat.workflow.proposedBy": "Proposed in {title}",
+    
     "sessions.sidebar.session.menu.takeOver": "Take over",
     "chat.container.readOnlyOperatorChildPromptBanner": "Another agent runs this session. To write here, choose Take over in its menu in the sidebar.",
     "chat.container.readOnlyFolderMissingBanner": "This session's folder {name} no longer exists, so it opens read-only.",
@@ -19,7 +19,7 @@ export const operatorChildrenI18n = {
     "sessions.operatorChildren.done.stopMany": "Stop them",
   },
   de: {
-    "chat.workflow.proposedBy": "Vorgeschlagen in {title}",
+    
     "sessions.sidebar.session.menu.takeOver": "Übernehmen",
     "chat.container.readOnlyOperatorChildPromptBanner": "Ein anderer Agent steuert diese Sitzung. Um hier zu schreiben, wähle „Übernehmen“ in ihrem Menü in der Seitenleiste.",
     "chat.container.readOnlyFolderMissingBanner": "Der Ordner {name} dieser Sitzung existiert nicht mehr, daher ist sie nur lesbar.",
@@ -37,7 +37,7 @@ export const operatorChildrenI18n = {
     "sessions.operatorChildren.done.stopMany": "Alle stoppen",
   },
   fr: {
-    "chat.workflow.proposedBy": "Proposé dans {title}",
+    
     "sessions.sidebar.session.menu.takeOver": "Prendre la main",
     "chat.container.readOnlyOperatorChildPromptBanner": "Un autre agent pilote cette session. Pour écrire ici, choisis « Prendre la main » dans son menu de la barre latérale.",
     "chat.container.readOnlyFolderMissingBanner": "Le dossier {name} de cette session n'existe plus, elle s'ouvre donc en lecture seule.",
@@ -55,7 +55,7 @@ export const operatorChildrenI18n = {
     "sessions.operatorChildren.done.stopMany": "Les arrêter",
   },
   nl: {
-    "chat.workflow.proposedBy": "Voorgesteld in {title}",
+    
     "sessions.sidebar.session.menu.takeOver": "Overnemen",
     "chat.container.readOnlyOperatorChildPromptBanner": "Een andere agent stuurt deze sessie. Kies Overnemen in het menu van de sessie in de zijbalk om hier te schrijven.",
     "chat.container.readOnlyFolderMissingBanner": "De map {name} van deze sessie bestaat niet meer, dus ze opent alleen-lezen.",
@@ -73,7 +73,7 @@ export const operatorChildrenI18n = {
     "sessions.operatorChildren.done.stopMany": "Allemaal stoppen",
   },
   es: {
-    "chat.workflow.proposedBy": "Propuesto en {title}",
+    
     "sessions.sidebar.session.menu.takeOver": "Tomar el control",
     "chat.container.readOnlyOperatorChildPromptBanner": "Otro agente dirige esta sesión. Para escribir aquí, elige «Tomar el control» en su menú de la barra lateral.",
     "chat.container.readOnlyFolderMissingBanner": "La carpeta {name} de esta sesión ya no existe, así que se abre en modo de solo lectura.",
@@ -91,7 +91,7 @@ export const operatorChildrenI18n = {
     "sessions.operatorChildren.done.stopMany": "Detenerlas",
   },
   ja: {
-    "chat.workflow.proposedBy": "{title} で提案",
+    
     "sessions.sidebar.session.menu.takeOver": "引き継ぐ",
     "chat.container.readOnlyOperatorChildPromptBanner": "このセッションは別のエージェントが動かしています。ここに書き込むには、サイドバーのメニューで「引き継ぐ」を選んでください。",
     "chat.container.readOnlyFolderMissingBanner": "このセッションのフォルダー {name} はもう存在しないため、読み取り専用で開きます。",
@@ -109,7 +109,7 @@ export const operatorChildrenI18n = {
     "sessions.operatorChildren.done.stopMany": "すべて停止する",
   },
   'pt-BR': {
-    "chat.workflow.proposedBy": "Proposto em {title}",
+    
     "sessions.sidebar.session.menu.takeOver": "Assumir",
     "chat.container.readOnlyOperatorChildPromptBanner": "Outro agente conduz esta sessão. Para escrever aqui, escolha Assumir no menu dela na barra lateral.",
     "chat.container.readOnlyFolderMissingBanner": "A pasta {name} desta sessão não existe mais, então ela abre somente para leitura.",
@@ -127,7 +127,7 @@ export const operatorChildrenI18n = {
     "sessions.operatorChildren.done.stopMany": "Parar todas",
   },
   uk: {
-    "chat.workflow.proposedBy": "Запропоновано в {title}",
+    
     "sessions.sidebar.session.menu.takeOver": "Забрати собі",
     "chat.container.readOnlyOperatorChildPromptBanner": "Цю сесію веде інший агент. Щоб писати тут, вибери «Забрати собі» в її меню в бічній панелі.",
     "chat.container.readOnlyFolderMissingBanner": "Теки {name} цієї сесії більше немає, тому вона відкривається лише для читання.",
@@ -145,7 +145,7 @@ export const operatorChildrenI18n = {
     "sessions.operatorChildren.done.stopMany": "Зупинити всі",
   },
   ko: {
-    "chat.workflow.proposedBy": "{title}에서 제안됨",
+    
     "sessions.sidebar.session.menu.takeOver": "가져오기",
     "chat.container.readOnlyOperatorChildPromptBanner": "다른 에이전트가 이 세션을 실행하고 있어요. 여기에 쓰려면 사이드바의 세션 메뉴에서 가져오기를 선택하세요.",
     "chat.container.readOnlyFolderMissingBanner": "이 세션의 폴더 {name}이(가) 더 이상 없어서 읽기 전용으로 열려요.",
@@ -163,7 +163,7 @@ export const operatorChildrenI18n = {
     "sessions.operatorChildren.done.stopMany": "모두 중지",
   },
   pl: {
-    "chat.workflow.proposedBy": "Zaproponowano w {title}",
+    
     "sessions.sidebar.session.menu.takeOver": "Przejmij",
     "chat.container.readOnlyOperatorChildPromptBanner": "Tę sesję prowadzi inny agent. Aby tu pisać, wybierz Przejmij w jej menu na pasku bocznym.",
     "chat.container.readOnlyFolderMissingBanner": "Folder {name} tej sesji już nie istnieje, więc otwiera się tylko do odczytu.",
@@ -181,7 +181,7 @@ export const operatorChildrenI18n = {
     "sessions.operatorChildren.done.stopMany": "Zatrzymaj wszystkie",
   },
   'zh-CN': {
-    "chat.workflow.proposedBy": "在 {title} 中提出",
+    
     "sessions.sidebar.session.menu.takeOver": "接管",
     "chat.container.readOnlyOperatorChildPromptBanner": "此会话由另一个智能体运行。要在这里输入，请在侧边栏中它的菜单里选择“接管”。",
     "chat.container.readOnlyFolderMissingBanner": "此会话的文件夹 {name} 已不存在，因此以只读方式打开。",
@@ -199,7 +199,7 @@ export const operatorChildrenI18n = {
     "sessions.operatorChildren.done.stopMany": "全部停止",
   },
   'zh-TW': {
-    "chat.workflow.proposedBy": "在 {title} 中提出",
+    
     "sessions.sidebar.session.menu.takeOver": "接管",
     "chat.container.readOnlyOperatorChildPromptBanner": "此工作階段由另一個代理程式執行。要在這裡輸入，請在側邊欄中它的選單裡選擇「接管」。",
     "chat.container.readOnlyFolderMissingBanner": "此工作階段的資料夾 {name} 已不存在，因此以唯讀方式開啟。",
@@ -217,7 +217,7 @@ export const operatorChildrenI18n = {
     "sessions.operatorChildren.done.stopMany": "全部停止",
   },
   tr: {
-    "chat.workflow.proposedBy": "{title} içinde önerildi",
+    
     "sessions.sidebar.session.menu.takeOver": "Devral",
     "chat.container.readOnlyOperatorChildPromptBanner": "Bu oturumu başka bir ajan yürütüyor. Buraya yazmak için kenar çubuğundaki menüsünden Devral seçeneğini seç.",
     "chat.container.readOnlyFolderMissingBanner": "Bu oturumun {name} klasörü artık yok, bu yüzden salt okunur açılıyor.",
@@ -235,7 +235,7 @@ export const operatorChildrenI18n = {
     "sessions.operatorChildren.done.stopMany": "Hepsini durdur",
   },
   ar: {
-    "chat.workflow.proposedBy": "مقترح في {title}",
+    
     "sessions.sidebar.session.menu.takeOver": "تولَّ الجلسة",
     "chat.container.readOnlyOperatorChildPromptBanner": "يدير وكيل آخر هذه الجلسة. لتكتب هنا، اختر «تولَّ الجلسة» من قائمتها في الشريط الجانبي.",
     "chat.container.readOnlyFolderMissingBanner": "لم يعد مجلد هذه الجلسة {name} موجودًا، لذا تُفتح للقراءة فقط.",
@@ -253,7 +253,7 @@ export const operatorChildrenI18n = {
     "sessions.operatorChildren.done.stopMany": "أوقفها كلها",
   },
   he: {
-    "chat.workflow.proposedBy": "הוצע ב־{title}",
+    
     "sessions.sidebar.session.menu.takeOver": "לקחת לעצמך",
     "chat.container.readOnlyOperatorChildPromptBanner": "סוכן אחר מריץ את השיחה הזו. כדי לכתוב כאן, בחר \"לקחת לעצמך\" בתפריט שלה בסרגל הצד.",
     "chat.container.readOnlyFolderMissingBanner": "התיקייה {name} של השיחה הזו כבר לא קיימת, ולכן היא נפתחת לקריאה בלבד.",

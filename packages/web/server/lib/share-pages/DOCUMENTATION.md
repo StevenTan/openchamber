@@ -304,8 +304,8 @@ document on the server would need a second copy of that renderer.
 ### Why the answer arrives as a steered message and not as the call's result
 
 The person may answer days later. The call returns at once, and the answer
-wakes the session the way a dispatched session's result or a workflow report
-does (`../dispatch-results/`, `../workflows/`), so the agent's turn is never held.
+wakes the session the way a dispatched session's result does
+(`../dispatch-results/`), so the agent's turn is never held.
 
 ### Why the envelope says the identity is not verified
 

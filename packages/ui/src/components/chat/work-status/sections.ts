@@ -10,7 +10,6 @@ export const WORK_STATUS_SECTION_IDS = [
   'telemetry',
   'subagents',
   'tasks',
-  'workflows',
   'mcp',
   'pinned',
 ] as const;
@@ -24,7 +23,6 @@ export const WORK_STATUS_SECTION_LABEL_KEYS = {
   telemetry: 'chat.workStatus.section.telemetry',
   subagents: 'chat.workStatus.section.subagents',
   tasks: 'chat.workStatus.section.tasks',
-  workflows: 'chat.workStatus.section.workflows',
   mcp: 'chat.workStatus.section.mcp',
   pinned: 'chat.workStatus.section.pinned',
   contextSources: 'chat.workStatus.section.contextBreakdown',
@@ -55,7 +53,7 @@ const DEFAULT_ORDER_WITH_CONTEXT_SOURCES_LAST: readonly WorkStatusPanelSectionId
 ];
 
 const isDefaultOrderWithContextSourcesLast = (order: readonly WorkStatusPanelSectionId[]): boolean => {
-  const placed = order.filter((id) => id !== 'telemetry' && id !== 'workflows' && id !== 'tasks');
+  const placed = order.filter((id) => id !== 'telemetry' && id !== 'tasks');
   return placed.length === DEFAULT_ORDER_WITH_CONTEXT_SOURCES_LAST.length
     && placed.every((id, index) => id === DEFAULT_ORDER_WITH_CONTEXT_SOURCES_LAST[index]);
 };

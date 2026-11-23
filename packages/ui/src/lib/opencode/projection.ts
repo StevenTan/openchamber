@@ -34,25 +34,19 @@ import {
   type Vcs,
 } from "./model"
 import { formatModelSelection, parseModelSelection } from "../modelIdentifier"
-import { workflowAgentParentId } from "../sessionWorkflowMetadata"
 import { operatorChildParentId } from "../sessionOperatorChild"
 
 export type AssistantContentItem = SessionMessageAssistant["content"][number]
 export type AssistantToolItem = Extract<AssistantContentItem, { type: "tool" }>
 
-
-const linkedParentID = (metadata: Session["metadata"]): string | undefined => (
-  workflowAgentParentId(metadata) ?? operatorChildParentId(metadata)
-)
-
 export const sessionParentID = (record: { parentID?: string; metadata?: Session["metadata"] }): string | undefined => (
-  record.parentID ?? linkedParentID(record.metadata)
+  record.parentID ?? operatorChildParentId(record.metadata)
 )
 
 export function withSessionMetadata(session: Session, metadata: Metadata): Session {
   const next: Session = { ...session, metadata }
-  if (session.parentID !== linkedParentID(session.metadata)) return next
-  const parentID = linkedParentID(metadata)
+  if (session.parentID !== operatorChildParentId(session.metadata)) return next
+  const parentID = operatorChildParentId(metadata)
   if (parentID) next.parentID = parentID
   else delete next.parentID
   return next
@@ -96,7 +90,6 @@ export function projectProject(info: ProjectWire): Project {
 export function projectVcs(info: VcsInfo): Vcs {
   return compact({ branch: info.branch.current, defaultBranch: info.branch.default })
 }
-
 
 export function toolOutputText(content: readonly ToolContent[] | undefined): string {
   if (!content || content.length === 0) return ""
@@ -184,7 +177,6 @@ export function projectToolPart(
   })
 }
 
-
 export function projectAssistantContent(
   content: readonly AssistantContentItem[],
   owner: { sessionID: string; messageID: string; created: number; completed?: number },
@@ -248,7 +240,6 @@ function projectAssistantMessage(info: SessionMessageAssistant, sessionID: strin
     metadata: info.metadata,
   })
 }
-
 
 function fileAttachmentUrl(file: PromptFileAttachment): string {
   if (file.source.type === "uri") return file.source.uri
@@ -339,7 +330,6 @@ export function projectUserParts(
   })
   return parts
 }
-
 
 export type ProjectedMessage = {
   message: Message
@@ -502,7 +492,6 @@ function finiteExit(exit: number | "Infinity" | "-Infinity" | "NaN" | undefined)
 export function projectMessages(items: readonly SessionMessageInfo[], sessionID: string): ProjectedMessage[] {
   return items.map((item) => projectMessage(item, sessionID))
 }
-
 
 const isDocument = (entry: ConfigEntry): entry is ConfigDocument => entry.type === "document"
 

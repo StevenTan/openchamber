@@ -7,9 +7,7 @@ import { getProviderModelDisplayName } from '@/lib/modelDisplay';
 import type { SubagentRun } from '@/lib/opencode/subagent-run';
 import { useSubagentReports } from './useSubagentReports';
 import { normalizePath } from '@/lib/pathNormalization';
-import { isWorkflowAgentSession } from '@/lib/sessionWorkflowMetadata';
 import { spaceIdOfDirectory } from '@/lib/spaces/space-route';
-import { useSessionWorkflowRuns } from '@/lib/workflows/store';
 import { isAsyncQuestion } from '@/sync/async-questions';
 import { useConfigStore } from '@/stores/useConfigStore';
 import { resolveGlobalSessionDirectory } from '@/stores/useGlobalSessionsStore';
@@ -39,7 +37,6 @@ export type SubagentRow = {
   reportLine: string | null;
 };
 
-
 type SubagentRowLook = { icon: IconName; color: string | undefined; labelKey: I18nKey | null };
 
 const sessionTokenTotal = (child: Session): number => {
@@ -64,17 +61,12 @@ export const useSubagentRows = (sessionId: string | null, directory: string | nu
   const projects = useProjectsStore((state) => state.projects);
   const worktrees = useSessionUIStore((state) => state.availableWorktreesByProject);
   const statuses = useAllSessionStatuses();
-  const workflowRuns = useSessionWorkflowRuns(sessionId);
-  const workflowAgentIds = React.useMemo(
-    () => new Set(workflowRuns.flatMap((run) => run.agents.flatMap((agent) => (agent.sessionId ? [agent.sessionId] : [])))),
-    [workflowRuns],
-  );
   const sessions = useSessionsWithListedChildren(sessionId);
   const children = React.useMemo(
     () => (sessionId ? sessions.filter((candidate) => (
-      candidate.parentID === sessionId && !workflowAgentIds.has(candidate.id) && !isWorkflowAgentSession(candidate)
+      candidate.parentID === sessionId
     )) : []),
-    [sessions, sessionId, workflowAgentIds],
+    [sessions, sessionId],
   );
 
   const { perChildCost } = React.useMemo(() => computeRollup(sessions, sessionId), [sessions, sessionId]);

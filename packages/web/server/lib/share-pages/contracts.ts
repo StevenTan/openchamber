@@ -10,3 +10,11 @@ export interface ShareStoreOptions {
 export interface ShareRelaySettings {
   privateRelay?: { relayUrl?: string } | null;
 }
+
+export interface SyntheticMessage {
+  text: string;
+  description: string;
+  metadata: Record<string, string>;
+  delivery: string;
+  resume: boolean;
+}

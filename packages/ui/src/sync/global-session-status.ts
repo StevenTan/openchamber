@@ -15,10 +15,8 @@ import {
 import { countSyncPerformance } from './performance-diagnostics';
 import { hasRunningShell, useBackgroundShellsStore } from './background-shells';
 import { hasRunningImage, useBackgroundImagesStore } from './background-images';
-import { useWorkflowActivityStore } from './workflow-activity';
 import { usePrWatchStore } from './pr-watch';
 import { useExtensionWaitsStore } from './extension-waits';
-
 
 type ActiveStatusType = 'busy' | 'retry';
 
@@ -118,18 +116,16 @@ export const hasBackgroundWork = (sessionId: string, activeSessionIds: ReadonlyS
   || useExtensionWaitsStore.getState().bySession.has(sessionId)
 );
 
-type SessionTurnActivity = 'running' | 'workflow' | 'subagent' | 'shell' | 'image' | 'pullRequest' | 'extensionWait';
+type SessionTurnActivity = 'running' | 'subagent' | 'shell' | 'image' | 'pullRequest' | 'extensionWait';
 
 export const resolveSessionTurnActivity = (
   status: 'running' | 'subagent' | null,
-  workflowRunning: boolean,
   waitingOnShell: boolean,
   waitingOnPullRequest = false,
   waitingOnImage = false,
   waitingOnExtension = false,
 ): SessionTurnActivity | null => {
   if (status === 'running') return status;
-  if (workflowRunning) return 'workflow';
   if (status) return status;
   if (waitingOnShell) return 'shell';
   if (waitingOnImage) return 'image';
@@ -142,24 +138,22 @@ export const useSessionTurnActivity = (sessionId: string): SessionTurnActivity |
     if (state.activeSessionIds.has(sessionId)) return 'running';
     return hasActiveSubagent(sessionId, state.activeSessionIds) ? 'subagent' : null;
   });
-  const workflowRunning = useWorkflowActivityStore((state) => state.runningSessionIds.has(sessionId));
   const waitingOnShell = useBackgroundShellsStore((state) => state.sessionIds.has(sessionId));
   const waitingOnImage = useBackgroundImagesStore((state) => state.sessionIds.has(sessionId));
   const waitingOnPullRequest = usePrWatchStore((state) => state.bySession.has(sessionId));
   const waitingOnExtension = useExtensionWaitsStore((state) => state.bySession.has(sessionId));
-  return resolveSessionTurnActivity(status, workflowRunning, waitingOnShell, waitingOnPullRequest, waitingOnImage, waitingOnExtension);
+  return resolveSessionTurnActivity(status, waitingOnShell, waitingOnPullRequest, waitingOnImage, waitingOnExtension);
 };
 
 export const useFirstSessionWithOpenTurn = (sessionIds: readonly string[]): string | null => {
   const inTurn = useGlobalSessionStatusStore((state) => (
     sessionIds.find((id) => state.activeSessionIds.has(id) || hasActiveSubagent(id, state.activeSessionIds)) ?? null
   ));
-  const inWorkflow = useWorkflowActivityStore((state) => sessionIds.find((id) => state.runningSessionIds.has(id)) ?? null);
   const onShell = useBackgroundShellsStore((state) => sessionIds.find((id) => state.sessionIds.has(id)) ?? null);
   const onImage = useBackgroundImagesStore((state) => sessionIds.find((id) => state.sessionIds.has(id)) ?? null);
   const onPullRequest = usePrWatchStore((state) => sessionIds.find((id) => state.bySession.has(id)) ?? null);
   const onExtension = useExtensionWaitsStore((state) => sessionIds.find((id) => state.bySession.has(id)) ?? null);
-  return inTurn ?? inWorkflow ?? onShell ?? onImage ?? onPullRequest ?? onExtension;
+  return inTurn ?? onShell ?? onImage ?? onPullRequest ?? onExtension;
 };
 
 export const collectOpenTurnSessionIds = (
