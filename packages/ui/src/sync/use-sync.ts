@@ -1,7 +1,6 @@
 import { conversationClient } from "@/lib/agent/active"
 import { useCallback, useMemo } from "react"
 import type { Message, Part } from "@/lib/opencode/model"
-import { opencodeClient } from "@/lib/opencode/client"
 import { Binary } from "./binary"
 import { upsertSessionRecord } from "./session-records"
 import { adoptSessionMove } from "./session-actions"
@@ -29,7 +28,7 @@ const sessionReadDirectorySources: SessionReadDirectorySources = {
     const record = useGlobalSessionsStore.getState().entityById.get(sessionID)
     return record ? withAdmittedLineage(sessionID, resolveGlobalSessionDirectory(record)) : null
   },
-  readUnscoped: (sessionID) => opencodeClient.getSessionUnscoped(sessionID),
+  readUnscoped: (sessionID) => conversationClient.getSessionUnscoped(sessionID),
   adopt: adoptSessionMove,
 }
 

@@ -1,4 +1,4 @@
-import { opencodeClient } from "@/lib/opencode/client"
+import { conversationClient } from "@/lib/agent/active"
 import { getRuntimeKey } from "@/lib/runtime-switch"
 import { hasShelledToolContent } from "@/lib/opencode/toolContentShells"
 import { materializeSessionSnapshots } from "./materialization"
@@ -25,7 +25,7 @@ export function completeToolContent(target: CompletionTarget, messageID: string)
     || !state.part[messageID]?.some(hasShelledToolContent)) {
     return Promise.resolve()
   }
-  const completion = opencodeClient.getToolContentMessage(target.sessionID, messageID, target.directory)
+  const completion = conversationClient.getToolContentMessage(target.sessionID, messageID, target.directory)
     .then((record) => {
       if (getRuntimeKey() !== runtimeKey) return
       if (getSyncChildStores().getChild(storeDirectory) !== store) return

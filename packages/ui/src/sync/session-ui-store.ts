@@ -1292,7 +1292,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       if (id && !isGuessedDir && sessionProject && !options?.keepSingleProject) {
         useSessionDisplayStore.getState().setSingleProjectId(sessionProject.id)
       }
-      opencodeClient.setDirectory(resolvedDir ?? undefined)
+      getAgentBackend().runtime.setDirectory(resolvedDir ?? undefined)
     } catch (e) {
       console.warn("Failed to set OpenCode directory for session switch:", e)
     }
@@ -2413,7 +2413,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       writeRuntimeSessionMemory(runtimeMemoryKey(), { sessionId, directory: normalized })
       if (moved && normalized && !useConfigStore.getState().providersLoaded) {
         useDirectoryStore.getState().setDirectory(normalized, { showOverlay: false })
-        opencodeClient.setDirectory(normalized)
+        getAgentBackend().runtime.setDirectory(normalized)
       }
     }
   },

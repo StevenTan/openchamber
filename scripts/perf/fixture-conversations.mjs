@@ -298,21 +298,21 @@ export const DESIGN_SESSIONS = [
             reasoning: "Сигнал треба прокинути в sleep, інакше пауза між повторами переживе скасування. Спершу подивлюся, хто ще викликає withRetry.",
             text: "Перечитаю хелпер і гляну, хто його викликає, перш ніж правити.",
             calls: [
-              { name: "read", arguments: { path: "src/api/retry.ts" } },
-              { name: "grep", arguments: { pattern: "withRetry", path: "src" } },
+              { name: "openchamber_commands_exec_command", arguments: { cmd: fixtureCommand({ read: "src/api/retry.ts" }) } },
+              { name: "openchamber_commands_exec_command", arguments: { cmd: fixtureCommand({ read: "src/api/client.ts" }) } },
             ],
           },
           {
             text: "Викликає тільки `client.ts`, і сигнал він уже передає. Правлю хелпер:",
             calls: [
-              { name: "edit", arguments: { path: "src/api/retry.ts", oldString: RETRY_SLEEP, newString: RETRY_SLEEP_AFTER } },
-              { name: "edit", arguments: { path: "src/api/retry.ts", oldString: RETRY_CATCH_BEFORE, newString: RETRY_CATCH_AFTER } },
+              { name: "file_edit", arguments: { path: "src/api/retry.ts", oldString: RETRY_SLEEP, newString: RETRY_SLEEP_AFTER } },
+              { name: "file_edit", arguments: { path: "src/api/retry.ts", oldString: RETRY_CATCH_BEFORE, newString: RETRY_CATCH_AFTER } },
             ],
           },
           {
             reasoning: "Обидві правки в одному файлі; варто переконатися, що client.ts не зачепило.",
             text: "Перевіряю, що змінилось:",
-            calls: [{ name: "shell", arguments: { command: "git diff --stat" } }],
+            calls: [{ name: "openchamber_commands_exec_command", arguments: { cmd: "git diff --stat" } }],
           },
         ],
         answer: AGENT_SUMMARY,

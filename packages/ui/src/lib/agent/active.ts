@@ -25,13 +25,21 @@ export const conversationClient: ConversationClient = {
     rememberSessionBackend(session)
     return session
   },
+  async getSessionUnscoped(id) {
+    const session = await getSessionBackend(id).client.getSessionUnscoped(id)
+    rememberSessionBackend(session)
+    return session
+  },
+  captureSessionCleanup: (directory, runtimeKey) => getAgentBackend().client.captureSessionCleanup(directory, runtimeKey),
   deleteSession: (id, directory) => getSessionBackend(id).client.deleteSession(id, directory),
   renameSession: (id, title, directory) => getSessionBackend(id).client.renameSession(id, title, directory),
   getSessionMessages: (id, options, directory) => getSessionBackend(id).client.getSessionMessages(id, options, directory),
   getSessionMessage: (id, messageID, directory) => getSessionBackend(id).client.getSessionMessage(id, messageID, directory),
+  getToolContentMessage: (id, messageID, directory) => getSessionBackend(id).client.getToolContentMessage(id, messageID, directory),
   getSessionInbox: (id, directory) => getSessionBackend(id).client.getSessionInbox(id, directory),
   switchSessionModel: (id, model, directory) => getSessionBackend(id).client.switchSessionModel(id, model, directory),
   switchSessionAgent: (id, agent, directory) => getSessionBackend(id).client.switchSessionAgent(id, agent, directory),
+  applySendSelection: (id, selection, directory, runtimeKey) => getSessionBackend(id).client.applySendSelection(id, selection, directory, runtimeKey),
   sendMessage: (input) => getSessionBackend(input.id).client.sendMessage(input),
   abortSession: (id, directory) => getSessionBackend(id).client.abortSession(id, directory),
   getProvidersForConfig: (directory, options) => getAgentBackend().client.getProvidersForConfig(directory, options),

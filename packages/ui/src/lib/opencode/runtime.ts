@@ -1,5 +1,5 @@
 import type { AgentRuntime } from '../agent/runtime'
-import { opencodeClient } from './client'
+import { isOpencodeNotFound, opencodeClient } from './client'
 import { OpencodeApiError } from './api-error'
 import { isOpenCodeTrustPending } from '../opencodeTrust'
 import { isLocationNotFoundError } from './location-errors'
@@ -18,6 +18,7 @@ export const openCodeRuntime: AgentRuntime = {
     if (isLocationNotFoundError(error) || await opencodeClient.getDirectoryAvailability(directory) === 'missing') return 'missing'
     return 'failed'
   },
+  isNotFoundError: isOpencodeNotFound,
   reconnectToRuntimeBaseUrl: () => opencodeClient.reconnectToRuntimeBaseUrl(),
   prepare: () => opencodeClient.learnMessagePageShellsSupport(),
   releaseLocation: (directory) => opencodeClient.releaseLocation(directory),

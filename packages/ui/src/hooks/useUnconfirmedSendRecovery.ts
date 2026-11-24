@@ -3,7 +3,7 @@ import * as React from 'react';
 
 import { deleteChatDirectory } from '@/lib/chatDirectories';
 import type { ChatDraftIdentity } from '@/lib/chatDraftPersistence';
-import { isOpencodeNotFound, opencodeClient } from '@/lib/opencode/client';
+import { getSessionBackend } from '@/lib/agent/registry';
 import { captureRuntimeInstance } from '@/lib/runtime-switch';
 import { holdPageLock, recoverUnconfirmedSends, type UnconfirmedSendServer } from '@/lib/unconfirmedSends';
 import { useSessionDraftsStore } from '@/stores/useSessionDraftsStore';
@@ -12,11 +12,11 @@ import { isChatDirectoryStillReferenced, waitForConnectionOrThrow } from '@/sync
 
 type Restore = (target: ChatDraftIdentity, text: string, confirmedMentions: Set<string>) => void;
 
-const absentOnNotFound = async <T>(read: Promise<T>, absent: T): Promise<T> => {
+const absentOnNotFound = async <T>(sessionID: string, read: Promise<T>, absent: T): Promise<T> => {
     try {
         return await read;
     } catch (error) {
-        if (isOpencodeNotFound(error)) return absent;
+        if (error instanceof Error && getSessionBackend(sessionID).runtime.isNotFoundError(error)) return absent;
         throw error;
     }
 };
@@ -25,10 +25,12 @@ const serverOfThisRuntime = (): UnconfirmedSendServer => ({
     isCurrent: captureRuntimeInstance(),
     ready: waitForConnectionOrThrow,
     sessionDirectory: (sessionId) => absentOnNotFound(
-        opencodeClient.getSessionUnscoped(sessionId).then((session) => session.directory ?? null),
+        sessionId,
+        conversationClient.getSessionUnscoped(sessionId).then((session) => session.directory ?? null),
         null,
     ),
     hasMessage: (sessionId, messageId, directory) => absentOnNotFound(
+        sessionId,
         conversationClient.getSessionMessage(sessionId, messageId, directory).then(() => true),
         false,
     ),

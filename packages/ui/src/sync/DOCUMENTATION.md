@@ -23,6 +23,11 @@ Managed restart notifications use `opencode-restart-resuming` only when every in
 
 This document covers the current client-side session/data architecture in `packages/ui/src/sync` and the rules for updating stores safely.
 
+Conversation reads, creation cleanup, request selection and tool-result completion
+use `lib/agent` and the session's owning backend. Directory selection and
+background-job refreshes use its runtime contract. The OpenCode adapter owns the
+SDK requests and native directory, selection and message-ancestry semantics.
+
 `sync-context.tsx` owns the provider's shared recovery refs, lifecycle effects and public exports. Its module-lifetime observers run in the module body after dependency evaluation. Runtime contexts keep their global identity in `sync-runtime-context.ts`. Event dispatch, routing, snapshots, and reactive readers own their mechanics outside the provider. `viewed-sessions.ts` keeps mutable view tracking private and exposes reads through accessors.
 
 ### Why provider effects keep their shared refs together

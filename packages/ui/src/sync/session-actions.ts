@@ -1063,7 +1063,7 @@ export async function createSession(
   try {
     if (getRuntimeKey() !== runtimeKey || getAgentBackend().events.identity !== runtimeClient) return null
     const effectiveDirectory = directoryOverride ?? dir()
-    const cleanupSession = await opencodeClient.captureSessionCleanup(effectiveDirectory, runtimeKey)
+    const cleanupSession = await conversationClient.captureSessionCleanup(effectiveDirectory, runtimeKey)
     if (getRuntimeKey() !== runtimeKey || getAgentBackend().events.identity !== runtimeClient) return null
     const sessionMetadata = title ? withUserWorkTitle(metadata ?? {}, title) : metadata
     const session = await conversationClient.createSession(
@@ -2227,7 +2227,7 @@ async function applyFormSelection(record: Session | undefined, sessionId: string
     variant: model?.variant,
     agent,
   })
-  await opencodeClient.applySendSelection(
+  await conversationClient.applySendSelection(
     sessionId,
     { model: model ? selection.model : undefined, agent: selection.agent },
     directory,

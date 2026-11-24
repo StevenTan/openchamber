@@ -18,7 +18,6 @@ import { applyForkedSession, noteForkedSessionPatched } from "./forked-session"
 import { useBtwStore } from "@/stores/useBtwStore"
 import { syncDebug } from "./debug"
 import { normalizePath } from "@/lib/pathNormalization"
-import { opencodeClient } from "@/lib/opencode/client"
 import { usePermissionStore } from "@/stores/permissionStore"
 import { policySnapshotFromWire } from "@/stores/utils/permissionAutoAccept"
 import { useRoutingStore } from "@/stores/useRoutingStore"
@@ -210,7 +209,7 @@ export function handleEvent(
       scheduleCatalogReload(result.kind, childStores, null)
     }
     if (payload.type === "server.connected") {
-      void runBackgroundNetworkTask(() => refreshBackgroundImages(() => opencodeClient.listRunningImageJobs()))
+      void runBackgroundNetworkTask(() => refreshBackgroundImages(() => getAgentBackend().runtime.listRunningImageJobs()))
         .catch(() => undefined)
       if (expectedRuntimeKey === getRuntimeKey() && claimFirstServerConnect(childStores, expectedRuntimeKey)) {
         childStores.retryFailedBootstraps()
@@ -221,7 +220,7 @@ export function handleEvent(
         const refreshing = childStores.refreshAfterStreamRestart(getAgentBackend().runtime.getDirectory())
         for (const dir of directoriesWithRunningShells()) {
           if (refreshing.has(normalizePath(dir) ?? dir)) continue
-          void runBackgroundNetworkTask(() => refreshBackgroundShells(dir, (target) => opencodeClient.listRunningShells(target)))
+          void runBackgroundNetworkTask(() => refreshBackgroundShells(dir, (target) => getAgentBackend().runtime.listRunningShells(target)))
             .catch(() => undefined)
         }
         void reconcileActivityAfterGap(childStores)

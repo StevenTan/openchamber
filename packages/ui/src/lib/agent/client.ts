@@ -53,13 +53,17 @@ export interface ConversationClient {
   listSessions(directory?: string | null): Promise<Session[]>;
   createSession(params?: { id?: string; title?: string; agent?: string; model?: ModelSelection; metadata?: Metadata }, directory?: string | null): Promise<Session>;
   getSession(id: string, directory?: string | null, signal?: AbortSignal): Promise<Session>;
+  getSessionUnscoped(id: string): Promise<Session>;
+  captureSessionCleanup(directory: string | null | undefined, runtimeKey: string): Promise<(sessionID: string) => Promise<void>>;
   deleteSession(id: string, directory?: string | null): Promise<boolean>;
   renameSession(id: string, title: string, directory?: string | null): Promise<void>;
   getSessionMessages(id: string, options?: { limit?: number; cursor?: string; order?: 'asc' | 'desc'; partShells?: boolean }, directory?: string | null): Promise<MessagePage>;
   getSessionMessage(id: string, messageID: string, directory?: string | null): Promise<{ info: Message; parts: Part[] }>;
+  getToolContentMessage(id: string, messageID: string, directory: string): Promise<{ info: Message; parts: Part[] }>;
   getSessionInbox(id: string, directory?: string | null): Promise<readonly PendingInboxMessage[]>;
   switchSessionModel(id: string, model: ModelSelection, directory?: string | null): Promise<void>;
   switchSessionAgent(id: string, agent: string, directory?: string | null): Promise<void>;
+  applySendSelection(id: string, selection: { model?: ModelSelection; agent?: string }, directory: string | null | undefined, runtimeKey: string | undefined): Promise<void>;
   sendMessage(input: SendMessageInput): Promise<string>;
   abortSession(id: string, directory?: string | null): Promise<boolean>;
   getProvidersForConfig(directory?: string | null, options?: { fresh?: boolean }): Promise<ProviderCatalog>;

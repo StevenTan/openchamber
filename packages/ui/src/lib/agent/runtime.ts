@@ -13,6 +13,7 @@ export interface AgentRuntime {
   setDirectory(directory: string | undefined): void
   getDirectoryAvailability(directory: string): Promise<DirectoryAvailability>
   classifyDirectoryError(error: Error | undefined, directory: string): Promise<'trust-pending' | 'missing' | 'failed'>
+  isNotFoundError(error: Error): boolean
   reconnectToRuntimeBaseUrl(): void
   prepare(): void
   releaseLocation(directory: string): Promise<void>

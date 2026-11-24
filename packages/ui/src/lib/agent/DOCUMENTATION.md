@@ -15,6 +15,12 @@ and transport in `../opencode`. Sync owns transcript membership and store writes
   live updates. Adapters project native records before publishing them.
 - `ConversationClient` supplies session creation and history, model and agent
   selection, sends, interruption and answers to pending requests.
+- Unscoped session lookup resolves the session's current directory independently
+  of the selected folder. Tool-result completion reads the owning message through
+  the backend; ordinary message lookup stays strict to the requested session.
+- Session cleanup is captured before creation and remains bound to that backend,
+  directory and runtime after selection changes. Pending-request replies apply
+  the send selection through the session's backend before submitting the answer.
 - Failed authoritative reads reject. Successful empty pages retain their cursor
   semantics; a transport failure cannot become an empty conversation.
 - Session records carry `backendID`. Loaded history, new sessions, live creation
@@ -27,6 +33,8 @@ and transport in `../opencode`. Sync owns transcript membership and store writes
 - The runtime supplies health, directory initialization, conversation defaults
   and pending-request snapshots. Native configuration files and authentication
   remain owned by the corresponding adapter and its settings.
+- The runtime classifies missing-record errors for send recovery and owns
+  directory selection and background-job refreshes after a reconnect.
 - Web, Electron, VS Code, hosted mobile and Capacitor use the same contracts.
   Their runtime transport continues to own authentication and relay routing.
 

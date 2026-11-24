@@ -23,6 +23,7 @@ import { DatabaseSync } from "node:sqlite"
 import { CdpClient, launchChrome, reservePort, resolveChrome, resolveProfileDir, wait } from "../perf/cdp.mjs"
 import { DESIGN_PROJECT_FILES, DESIGN_RETRY_EDITED, DESIGN_SESSIONS } from "../perf/fixture-conversations.mjs"
 import { REPO_ROOT, restoreState, startFixture, startIsolatedServer } from "../perf/isolated-server.mjs"
+import { writeFixtureCommands } from "../perf/shell-command.mjs"
 
 const HELP = `Usage: node scripts/design/shots.mjs --label <name> [options]
 
@@ -137,6 +138,7 @@ const writeProject = (fixturePort, { uncommitted }) => {
     writeFileSync(join(PROJECT, file), content)
   }
   git(["init", "-q", "-b", "main"])
+  writeFixtureCommands(PROJECT)
   // The perf tooling writes its read fixtures into every project it serves,
   // and opencode.json names this run's fixture port.
   writeFileSync(join(PROJECT, ".git/info/exclude"), "perf-read/\nopencode.json\n")
