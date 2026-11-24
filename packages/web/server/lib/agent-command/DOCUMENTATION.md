@@ -3,7 +3,8 @@
 ## Ownership
 
 This module owns session-scoped command processes, their output buffers, the
-command MCP service, session memory, sleep timers, and the `openchamber-command-tool` policy plugin. `exec_command` starts a process;
+command MCP service, session memory, sleep timers, and the `openchamber-command-tool` policy plugin source. OpenCode's adapter in
+`../opencode/agent-tool-plugin.ts` materializes that plugin. `exec_command` starts a process;
 `write_stdin` waits on it, reads new output, and sends pipe or raw PTY input.
 The service also provides `clock_sleep`, `store` and `load`. Their state lives
 in the OpenChamber server, scoped to the calling application session.

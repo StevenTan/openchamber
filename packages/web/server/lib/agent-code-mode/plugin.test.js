@@ -10,6 +10,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { Effect, Exit, Schema, Scope, Stream } from 'effect';
 import { materializeCodeModePlugin } from './runtime.js';
 import { createAgentToolRuntime } from '../agent-tool/runtime.js';
+import { resolveOpenCodeMcpContext } from '../opencode/mcp-context.js';
 import { createToolPermissions } from '../agent-tool/permissions.js';
 import { createOpenChamberControlService } from '../openchamber-control/service.js';
 import { createSecretFiles } from '../openchamber-control/secret-request.js';
@@ -27,13 +28,13 @@ async function fixture({ pluginOptions, events = Stream.never, ...dependencies }
   });
   const captured = [];
   let listener;
-  const runtime = createAgentToolRuntime({ crypto, fsPromises: fs, path, instanceDir: directory,
+  const runtime = createAgentToolRuntime({ resolveMcpContext: resolveOpenCodeMcpContext, crypto,
     resolveSessionDirectory: async () => directory, getActivePort: () => listener.address().port, permissions: policy,
     codeModeFileActivity: async (phase, request, tool, input) => { captured.push({ phase, source: request._meta?.['openchamber/source'], tool, input }); return {}; },
     ...dependencies,
   });
   const app = express();
-  if (pluginOptions) await runtime.materializePlugin(pluginOptions);
+  if (pluginOptions) runtime.configureTools(pluginOptions);
   app.get('/page', (_req, res) => res.send('FETCH_BODY'));
   runtime.registerRoutes(app, express);
   listener = await new Promise(resolve => { const server = app.listen(0, '127.0.0.1', () => resolve(server)); });
@@ -92,7 +93,7 @@ it('discovers execute through MCP with the complete shared catalog and keeps bac
   expect(JSON.stringify(event.system)).toContain('ENVIRONMENT');
   expect(JSON.stringify(event.system)).not.toContain('OLD_CATALOG');
   expect(f.tools.get('native_probe').options.codemode).toBe(false);
-  await f.runtime.materializePlugin({ includeWeb: false });
+  f.runtime.configureTools({ includeWeb: false });
   expect((await f.client.listTools()).tools.find(tool => tool.name === 'execute').description).not.toContain('tools.browser.');
   expect((await f.run('return await tools.browser.snapshot({});')).output.ok).toBe(false);
 });
@@ -116,7 +117,7 @@ it('runs shared MCP files and commands concurrently with structured output, prog
 it('shares control, schedule and terminal calls between direct MCP and scripts with session identity and permissions', async () => {
   const executeAction = vi.fn(async action => ({ action }));
   const f = await fixture({ executeAction });
-  await f.runtime.materializePlugin({ includeControl: true, includeSchedule: true, includeTerminal: true });
+  f.runtime.configureTools({ includeControl: true, includeSchedule: true, includeTerminal: true });
   const tools = (await f.client.listTools()).tools;
   for (const name of ['control', 'schedule', 'terminal']) {
     expect(tools.map(tool => tool.name)).toContain(name);

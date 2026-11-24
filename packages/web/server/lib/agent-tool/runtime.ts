@@ -44,9 +44,7 @@ import { RENDER_PAGE_UI_DESCRIPTION } from './render-tool.js';
 import { SECRET_PARAMETER_PROPERTIES, SECRET_TOOL_DESCRIPTION } from './secret-tool.js';
 import { createCallbackAddress } from './callback-address.js';
 import { createCommandToolRuntime } from '../agent-command/src/runtime.js';
-import { materializeSearchPlugin } from '../agent-search/runtime.js';
-import { browserMcpSetup, createBrowserMcpRuntime } from '../browser-control/mcp.js';
-import { LEAD_COMPACTION_HOOK } from '../session-lead/agent-tool-plugin.js';
+import { createBrowserMcpRuntime } from '../browser-control/mcp.js';
 import { controlErrorFields } from '../openchamber-control/error.js';
 import type { ControlInput } from '../openchamber-control/contracts.js';
 import type { ControlOptions, createOpenChamberControlService } from '../openchamber-control/service.js';
@@ -54,8 +52,7 @@ import type { Application, ExpressFactory, Request } from '../shared/http-contra
 import type { createQuestionRuntime } from '../agent-question/src/runtime.js';
 import { createQuestionMcpRuntime, registerQuestionFormRoutes } from '../agent-question/src/mcp.js';
 import { createFileMcpRuntime } from '../agent-file/mcp.js';
-import { createControlMcpRuntime, controlMcpSetup, type ControlMcpTool } from './control-mcp.js';
-import { resolveOpenCodeMcpContext } from '../opencode/mcp-context.js';
+import { createControlMcpRuntime, type ControlMcpTool } from './control-mcp.js';
 import type { ResolveMcpContext } from './mcp-context.js';
 import type { ToolPermissions } from './permissions.js';
 import type { CodeModeFileActivity } from '../agent-code-mode/mcp.js';
@@ -97,7 +94,7 @@ export interface AgentToolPayload {
   callID?: unknown;
 }
 
-export interface PluginOptions {
+export interface ToolOptions {
   includeControl?: boolean;
   includeSchedule?: boolean;
   includeWeb?: boolean;
@@ -114,10 +111,6 @@ export interface PluginOptions {
 
 export interface AgentToolDependencies {
   crypto: Pick<typeof import('node:crypto'), 'randomBytes' | 'timingSafeEqual'>;
-  fsPromises: Pick<typeof import('node:fs/promises'), 'mkdir' | 'writeFile'>;
-  path: Pick<typeof import('node:path'), 'join'>;
-  instanceDir: string;
-  env?: NodeJS.ProcessEnv;
   getActivePort: () => number | null;
   getActiveHost?: () => string | null | undefined;
   executeAction?: ReturnType<typeof createOpenChamberControlService>['execute'];
@@ -125,7 +118,7 @@ export interface AgentToolDependencies {
   getCommandEnvironment?: Parameters<typeof createCommandToolRuntime>[0]['getEnvironment'];
   hasPendingInput: Parameters<typeof createCommandToolRuntime>[0]['hasPendingInput'];
   questionRuntime: ReturnType<typeof createQuestionRuntime>;
-  resolveMcpContext?: ResolveMcpContext;
+  resolveMcpContext: ResolveMcpContext;
   permissions: ToolPermissions;
   codeModeFileActivity?: CodeModeFileActivity;
 }
@@ -163,7 +156,6 @@ const TOOL_OUTPUT_SCHEMA = {
   additionalProperties: true,
 };
 
-const PLUGIN_ID = 'openchamber-agent-tool';
 const ACTIONS = new Set([
   ...OPENCHAMBER_AGENT_TOOL_ACTIONS,
   ...OPENCHAMBER_SCHEDULE_ACTIONS,
@@ -178,23 +170,6 @@ const ACTIONS = new Set([
   ...OPENCHAMBER_TERMINAL_ACTIONS,
 
 ]);
-const AGENT_TOOL_ACTION_TITLES = Object.fromEntries(
-  [
-    ...OPENCHAMBER_AGENT_TOOL_ACTION_DEFINITIONS,
-    ...OPENCHAMBER_SCHEDULE_ACTION_DEFINITIONS,
-    ...OPENCHAMBER_WEB_ACTION_DEFINITIONS,
-    ...OPENCHAMBER_MEMORY_ACTION_DEFINITIONS,
-    ...OPENCHAMBER_KNOWLEDGE_ACTION_DEFINITIONS,
-    ...OPENCHAMBER_NOTIFY_ACTION_DEFINITIONS,
-    ...OPENCHAMBER_RENDER_ACTION_DEFINITIONS,
-    ...OPENCHAMBER_IMAGE_ACTION_DEFINITIONS,
-    ...OPENCHAMBER_SECRET_ACTION_DEFINITIONS,
-    ...OPENCHAMBER_USAGE_ACTION_DEFINITIONS,
-    ...OPENCHAMBER_TERMINAL_ACTION_DEFINITIONS,
-
-  ].map(({ action, title }) => [action, title]),
-);
-
 const WEB_PARAMETER_NAMES = ['url', 'selector', 'text', 'value', 'submit', 'direction', 'viewport', 'label', 'tabId'];
 const MEMORY_ONLY_PARAMETER_NAMES = ['body', 'scope', 'memoryId', 'type'];
 const MEMORY_PARAMETER_NAMES = [...MEMORY_ONLY_PARAMETER_NAMES, 'title'];
@@ -499,8 +474,6 @@ const CODE_MODE_CATALOG_LINES = {
   openchamber_terminal: "OpenChamber's terminal panel, read-only: list a folder's terminals and read what one printed. Read it when the answer is in a terminal the user is looking at",
 };
 
-const OPENCODE_TOOLS_REPLACED_BY_CONTROL = ['opencode_worktree_create', 'opencode_models'];
-
 const multiActionSchema = (definitions: readonly ActionDefinition[]) => ({
   property: {
     type: 'string',
@@ -511,48 +484,9 @@ const multiActionSchema = (definitions: readonly ActionDefinition[]) => ({
   normalize: '',
 });
 
-const createPluginSource = ({ includeControl, includeSchedule, includeWeb, includeMemory, includeKnowledge, includeNotify, includeRender, includeImage, includeSecret, includeUsage, includeTerminal }: Required<PluginOptions>) => {
-  const entries = [];
-  if (includeControl) {
-    entries.push(`    for (const id of ${JSON.stringify(OPENCODE_TOOLS_REPLACED_BY_CONTROL)}) tools.remove(id)
-`);
-  }
-
-  return `const exemptCallbackFromProxy = () => {
-  const endpoint = process.env.OPENCHAMBER_AGENT_TOOL_URL
-  if (!endpoint || !URL.canParse(endpoint)) return
-  const host = new URL(endpoint).hostname.replace(/^\\[|\\]$/g, "")
-  for (const key of ["NO_PROXY", "no_proxy"]) {
-    const entries = (process.env[key] || "").split(",").map((entry) => entry.trim()).filter(Boolean)
-    if (!entries.includes(host)) process.env[key] = [...entries, host].join(",")
-  }
-}
-
-export default {
-  id: ${JSON.stringify(PLUGIN_ID)},
-  setup: async (ctx) => {
-    exemptCallbackFromProxy()
-    await ctx.tool.transform((tools) => {
-${entries.join('')}    })${includeWeb ? browserMcpSetup(AGENT_TOOL_ACTION_TITLES) : ''}${includeMemory || includeKnowledge || includeUsage || includeNotify || includeControl || includeSchedule || includeTerminal || includeRender || includeImage || includeSecret ? controlMcpSetup(AGENT_TOOL_ACTION_TITLES) : ''}${includeControl ? LEAD_COMPACTION_HOOK : ''}
-  },
-}
-`;
-};
-
-const PLUGIN_PACKAGE_JSON = `${JSON.stringify({
-  name: 'openchamber-agent-tool',
-  version: '0.0.0',
-  private: true,
-  type: 'module',
-  exports: { '.': './index.js' },
-}, null, 2)}\n`;
-
 export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
   const {
     crypto,
-    fsPromises,
-    path,
-    instanceDir,
     getActivePort,
     getActiveHost = () => null,
     executeAction,
@@ -560,23 +494,16 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
     getCommandEnvironment,
     hasPendingInput,
     questionRuntime,
-    resolveMcpContext = resolveOpenCodeMcpContext,
+    resolveMcpContext,
     permissions,
   } = dependencies;
-  const pluginRoot = path.join(instanceDir, 'agent-tool');
-  const pluginDirectory = path.join(pluginRoot, PLUGIN_ID);
-  const pluginPath = path.join(pluginDirectory, 'index.js');
-  const pluginManifestPath = path.join(pluginDirectory, 'package.json');
   let activeToken: string | null = null;
   let controlTools: ControlMcpTool[] = [];
   let webEnabled = true;
 
   const { callbackHost, isSameMachineAddress } = createCallbackAddress(getActiveHost);
 
-  const materializePlugin = async ({ includeControl = true, includeSchedule = false, includeWeb = true, includeMemory = true, includeKnowledge = false, includeNotify = false, includeRender = false, includeShare = false, includeImage = false, includeSecret = false, includeUsage = false, includeTerminal = false }: PluginOptions = {}) => {
-    if (!includeControl && !includeSchedule && !includeWeb && !includeMemory && !includeKnowledge && !includeNotify && !includeRender && !includeImage && !includeSecret && !includeUsage && !includeTerminal) {
-      throw new Error('At least one OpenChamber managed tool must be enabled to inject the plugin');
-    }
+  const configureTools = ({ includeControl = true, includeSchedule = false, includeWeb = true, includeMemory = true, includeKnowledge = false, includeNotify = false, includeRender = false, includeShare = false, includeImage = false, includeSecret = false, includeUsage = false, includeTerminal = false }: ToolOptions = {}) => {
     webEnabled = includeWeb;
     controlTools = [
       ...includeMemory ? [{ name: 'memory', description: CODE_MODE_CATALOG_LINES.openchamber_memory + '\n\n' + MEMORY_TOOL_DESCRIPTION, definitions: OPENCHAMBER_MEMORY_ACTION_DEFINITIONS, parameters: MEMORY_PARAMETER_PROPERTIES }] : [],
@@ -590,10 +517,7 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
       ...includeImage ? [{ name: 'image', description: IMAGE_TOOL_DESCRIPTION, definitions: OPENCHAMBER_IMAGE_ACTION_DEFINITIONS, parameters: IMAGE_PARAMETER_PROPERTIES }] : [],
       ...includeSecret ? [{ name: 'secret', description: SECRET_TOOL_DESCRIPTION, definitions: OPENCHAMBER_SECRET_ACTION_DEFINITIONS, parameters: SECRET_PARAMETER_PROPERTIES }] : [],
     ];
-    await fsPromises.mkdir(pluginDirectory, { recursive: true });
-    await fsPromises.writeFile(pluginManifestPath, PLUGIN_PACKAGE_JSON, { mode: 0o600 });
-    await fsPromises.writeFile(pluginPath, createPluginSource({ includeControl, includeSchedule, includeWeb, includeMemory, includeKnowledge, includeNotify, includeRender, includeShare: includeRender && includeShare, includeImage, includeSecret, includeUsage, includeTerminal }), { mode: 0o600 });
-    return pluginDirectory;
+    return { includeControl, includeSchedule, includeWeb, includeMemory, includeKnowledge, includeNotify, includeRender, includeShare: includeRender && includeShare, includeImage, includeSecret, includeUsage, includeTerminal };
   };
 
   const createChildEnv = () => {
@@ -719,7 +643,7 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
     });
   };
 
-  const commandToolRuntime = createCommandToolRuntime({ instanceDir, resolveSessionDirectory, getEnvironment: getCommandEnvironment, hasPendingInput, authorize, trackInflight, abortSession, resolveMcpContext, permissions });
+  const commandToolRuntime = createCommandToolRuntime({ resolveSessionDirectory, getEnvironment: getCommandEnvironment, hasPendingInput, authorize, trackInflight, abortSession, resolveMcpContext, permissions });
   const browserMcp = createBrowserMcpRuntime({
     name: 'panel',
     description: WEB_TOOL_DESCRIPTION,
@@ -739,17 +663,13 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
   const mcpServices = createAgentMcpServices({ openchamber_commands: commandToolRuntime.mcp, file: fileMcp, browser: browserMcp, request: questionMcp, openchamber: controlMcp }, { resolveContext: resolveMcpContext, permissions, fileActivity: dependencies.codeModeFileActivity, browserEnabled: () => webEnabled, authorize });
 
   return {
-    pluginDirectory,
-    materializePlugin,
+    configureTools,
     createChildEnv,
     authorizeRequest: authorize,
     registerRoutes,
     registerQuestionFormRoutes: (app: Application, express: Pick<ExpressFactory, 'json'>) => registerQuestionFormRoutes(questionRuntime, app, express),
     execute,
     abortSession,
-    materializeCommandPlugin: commandToolRuntime.materializePlugin,
-    materializeSearchPlugin: () => materializeSearchPlugin(instanceDir),
-    materializeQuestionPlugin: () => questionRuntime.materializePlugin(instanceDir),
     closeCommands: () => Promise.all([mcpServices.close(), commandToolRuntime.close()]),
     observeCommandEvent: commandToolRuntime.observeEvent,
   };

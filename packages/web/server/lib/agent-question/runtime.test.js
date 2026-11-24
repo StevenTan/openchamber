@@ -9,6 +9,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createQuestionRuntime, questionStoreDirectory } from './dist/runtime.js';
 import { createAgentToolRuntime } from '../agent-tool/runtime.js';
+import { resolveOpenCodeMcpContext } from '../opencode/mcp-context.js';
 
 const cleanup = [];
 afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); });
@@ -62,8 +63,8 @@ describe('asynchronous questions', () => {
     const nativeQuestion = { description: 'Native question usage notes', input: {}, execute: vi.fn() };
     const originalQuestion = { ...nativeQuestion };
     let listener;
-    const agentRuntime = createAgentToolRuntime({
-      crypto, fsPromises: fs, path, instanceDir: f.dataDir, questionRuntime: runtime,
+    const agentRuntime = createAgentToolRuntime({ resolveMcpContext: resolveOpenCodeMcpContext,
+      crypto, questionRuntime: runtime,
       getActivePort: () => listener.address().port,
       permissions: { session: async () => ({ directory: f.dataDir, projectDirectory: f.dataDir, assert: approve }) },
     });

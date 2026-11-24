@@ -2,7 +2,6 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 import { TerminalManager } from "./terminal-manager.js";
-import { COMMAND_PLUGIN_ID, createCommandPluginSource } from "./plugin.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { truncateOutput } from "./output.js";
 import { commandWait, continuationWait } from "./wait.js";
@@ -21,7 +20,6 @@ const streamEvent = z.discriminatedUnion("type", [
 ]);
 
 interface CommandRuntimeOptions extends CallbackAuthorization {
-  instanceDir: string;
   resolveSessionDirectory: (sessionID: string) => Promise<string | null>;
   getEnvironment?: (() => NodeJS.ProcessEnv) | undefined;
   hasPendingInput: (sessionID: string, signal: AbortSignal) => Promise<boolean>;
@@ -54,7 +52,6 @@ interface CallbackAuthorization {
 }
 
 export function createCommandToolRuntime({
-  instanceDir,
   resolveSessionDirectory,
   getEnvironment,
   hasPendingInput,
@@ -64,11 +61,6 @@ export function createCommandToolRuntime({
   abortSession,
   permissions,
 }: CommandRuntimeOptions) {
-  const pluginDirectory = path.join(
-    instanceDir,
-    "agent-tool",
-    COMMAND_PLUGIN_ID,
-  );
   let managers = new Map<string, TerminalManager>();
   let closed = false;
   let clock = createSleepClock({ hasPendingInput });
@@ -107,35 +99,6 @@ export function createCommandToolRuntime({
       if (result.signal) response.signal = result.signal;
     }
     return response;
-  };
-
-  const materializePlugin = async () => {
-    const source = createCommandPluginSource();
-    await fs.mkdir(pluginDirectory, { recursive: true });
-    for (const [name, content] of [
-      [
-        "package.json",
-        JSON.stringify({
-          name: COMMAND_PLUGIN_ID,
-          version: "0.0.0",
-          private: true,
-          type: "module",
-          exports: { ".": "./index.js" },
-        }) + "\n",
-      ],
-      ["index.js", source],
-    ] as const) {
-      const file = path.join(pluginDirectory, name);
-      const previous = await fs
-        .readFile(file, "utf8")
-        .catch((error: NodeJS.ErrnoException) => {
-          if (error.code === "ENOENT") return null;
-          throw error;
-        });
-      if (previous !== content)
-        await fs.writeFile(file, content, { mode: 0o600 });
-    }
-    return pluginDirectory;
   };
 
   const reset = () => {
@@ -227,7 +190,6 @@ export function createCommandToolRuntime({
   };
 
   return {
-    materializePlugin,
     mcp,
     registerRoutes,
     reset,

@@ -7,6 +7,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createAgentToolRuntime } from '../agent-tool/runtime.js';
+import { resolveOpenCodeMcpContext } from '../opencode/mcp-context.js';
 import plugin from './plugin.js';
 
 const cleanup = [];
@@ -16,7 +17,7 @@ async function fixture() {
   cleanup.push(() => fs.rm(directory, { recursive: true, force: true }));
   const approve = vi.fn(async () => {});
   let listener;
-  const runtime = createAgentToolRuntime({ crypto, fsPromises: fs, path, instanceDir: directory,
+  const runtime = createAgentToolRuntime({ resolveMcpContext: resolveOpenCodeMcpContext, crypto,
     resolveSessionDirectory: async sessionID => sessionID === 'session' ? directory : null,
     getActivePort: () => listener.address().port,
     permissions: { session: async sessionID => {

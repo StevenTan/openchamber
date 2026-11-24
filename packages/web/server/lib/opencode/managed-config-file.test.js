@@ -27,6 +27,7 @@ const createHarness = async ({ settings = {}, env = {}, listExtensionSkillDirect
   const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'openchamber-managed-config-'));
   temporaryDirectories.push(dataDir);
   const agentToolRuntime = {
+    configureTools: flags => flags,
     pluginDirectory: path.join(dataDir, 'agent-tool', 'openchamber-agent-tool'),
     materializePlugin: vi.fn(async (flags) => {
       await fs.mkdir(agentToolRuntime.pluginDirectory, { recursive: true });
@@ -187,7 +188,7 @@ describe('managed OpenCode config file', () => {
       path,
       instanceDir: dataDir,
       env: {},
-      agentToolRuntime: { materializePlugin: vi.fn(), createChildEnv: () => ({}), materializeCommandPlugin: async () => commandDirectory(dataDir), materializeSearchPlugin: async () => searchDirectory(dataDir), materializeQuestionPlugin: async () => questionDirectory(dataDir) },
+      agentToolRuntime: { configureTools: flags => flags, materializePlugin: vi.fn(), createChildEnv: () => ({}), materializeCommandPlugin: async () => commandDirectory(dataDir), materializeSearchPlugin: async () => searchDirectory(dataDir), materializeQuestionPlugin: async () => questionDirectory(dataDir) },
       limitFailoverRuntime: { materializePlugin: vi.fn(async () => failoverDirectory) },
       readSettings: () => current.settings,
     });

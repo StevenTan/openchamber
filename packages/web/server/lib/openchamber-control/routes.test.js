@@ -7,6 +7,7 @@ import request from 'supertest';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createAgentToolRuntime } from '../agent-tool/runtime.js';
+import { resolveOpenCodeMcpContext } from '../opencode/mcp-context.js';
 import { BrowserControlError } from '../browser-control/broker.js';
 import { OpenChamberControlError } from './error.js';
 import { registerOpenChamberControlRoutes } from './routes.js';
@@ -91,8 +92,8 @@ describe('terminal output', () => {
   it('still reaches an agent through the authenticated managed-tool callback', async () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'openchamber-control-routes-'));
     try {
-      const agentTool = createAgentToolRuntime({ crypto, fsPromises: fs, path, instanceDir: dataDir, getActivePort: () => 3901, executeAction: execute });
-      await agentTool.materializePlugin({ includeTerminal: true });
+      const agentTool = createAgentToolRuntime({ resolveMcpContext: resolveOpenCodeMcpContext, crypto, getActivePort: () => 3901, executeAction: execute });
+      agentTool.configureTools({ includeTerminal: true });
       const token = agentTool.createChildEnv().OPENCHAMBER_AGENT_TOOL_TOKEN;
       const app = createApp(execute);
       agentTool.registerRoutes(app, express);

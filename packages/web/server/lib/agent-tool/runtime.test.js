@@ -8,6 +8,8 @@ import request from 'supertest';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createAgentToolRuntime } from './runtime.js';
+import { materializeAgentToolPlugin } from '../opencode/agent-tool-plugin.js';
+import { resolveOpenCodeMcpContext } from '../opencode/mcp-context.js';
 import { createOpenChamberControlService } from '../openchamber-control/service.js';
 import { createProjectContextRuntime } from '../project-context/runtime.js';
 import { createProjectIdFromPath } from '../projects/project-id.js';
@@ -31,16 +33,14 @@ const createRuntime = async (overrides = {}) => {
   const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'openchamber-agent-tool-'));
   temporaryDirectories.push(dataDir);
   const executeAction = vi.fn(async () => ({ projects: [] }));
-  const runtime = createAgentToolRuntime({
+  const shared = createAgentToolRuntime({ resolveMcpContext: resolveOpenCodeMcpContext,
     crypto,
-    fsPromises: fs,
-    path,
-    instanceDir: dataDir,
     getActivePort: () => 3901,
     executeAction,
     permissions: { session: async () => ({ directory: dataDir, projectDirectory: dataDir, assert: async () => {} }) },
     ...overrides,
   });
+  const runtime = { ...shared, materializePlugin: options => materializeAgentToolPlugin(dataDir, shared.configureTools(options)) };
   return { runtime, dataDir, executeAction };
 };
 
@@ -149,6 +149,35 @@ const loadTools = async (dataDir, tag, hooks = {}, removed = [], namespaces = []
   }
   return registered;
 };
+
+it('configures and invokes the shared MCP catalog with an injected backend identity', async () => {
+  let listener;
+  const { runtime, dataDir, executeAction } = await createRuntime({
+    getActivePort: () => listener.address().port,
+    resolveMcpContext: request => ({ sessionID: request._meta['app/session'], callID: request._meta['app/call'], signal: request.signal }),
+    resolveSessionDirectory: async () => '/project',
+  });
+  runtime.configureTools({ includeControl: false, includeWeb: false, includeMemory: true, includeKnowledge: true });
+  const app = express();
+  runtime.registerRoutes(app, express);
+  listener = await new Promise(resolve => { const server = app.listen(0, '127.0.0.1', () => resolve(server)); });
+  mcpCleanup.push(async () => { await runtime.closeCommands(); await new Promise(resolve => listener.close(resolve)); });
+  const client = new Client({ name: 'shared-tools', version: '1' });
+  const transport = new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${listener.address().port}/api/openchamber/control-tool/mcp`), {
+    requestInit: { headers: { authorization: 'Bearer ' + runtime.createChildEnv().OPENCHAMBER_AGENT_TOOL_TOKEN } },
+  });
+  mcpCleanup.push(async () => { await transport.terminateSession(); await client.close(); });
+  await client.connect(transport);
+  expect((await client.listTools()).tools.map(tool => tool.name)).toEqual(['memory', 'knowledge']);
+  const result = await client.callTool({ name: 'memory', arguments: { action: 'memory.list' }, _meta: { 'app/session': 'app-session', 'app/call': 'app-call' } });
+  expect(result.structuredContent).toMatchObject({ ok: true, action: 'memory.list' });
+  expect(executeAction).toHaveBeenCalledWith('memory.list', { action: 'memory.list' }, '/project', {
+    contextSessionId: 'app-session', contextCallId: 'app-call', signal: expect.any(AbortSignal),
+  });
+  await expect(fs.stat(path.join(dataDir, 'agent-tool'))).rejects.toHaveProperty('code', 'ENOENT');
+  runtime.configureTools({ includeControl: false, includeWeb: false, includeMemory: false });
+  expect((await client.listTools()).tools).toEqual([]);
+});
 
 it('uses the backend context for direct MCP calls and retains permissions and activity metadata', async () => {
   const permission = { assert: vi.fn(async () => {}) };

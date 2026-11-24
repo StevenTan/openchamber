@@ -2,7 +2,11 @@
 
 ## Purpose
 
-This module exposes typed OpenCode custom tools and shared native MCP services.
+This module owns shared MCP services and their tool catalog. The host injects
+calling identity, session-directory resolution, pending-input reads and permissions.
+`configureTools()` selects the catalog independently of backend plugin files.
+The OpenCode adapter in `../opencode/managed-agent-tools.ts` supplies those host
+dependencies; `../opencode/agent-tool-plugin.ts` writes its policy plugins.
 Session control and browser operations are independently enabled:
 
 - `openchamber_control` — projects, sessions, worktrees, and showing a file to the
@@ -114,7 +118,7 @@ Session control and browser operations are independently enabled:
   relay, and their answers come back later as messages
   (`../share-pages/DOCUMENTATION.md`). The `share` input and the description's
   one sentence about it exist only while sharing is available
-  (`materializePlugin({ includeShare })`, decided in
+  (`configureTools({ includeShare })`, decided in
   `../opencode/managed-config-file.js` with `isSharingAvailable`): in
   enterprise mode without a pinned relay the agent never hears of it, and the
   managed config is rewritten when the policy changes.
@@ -226,7 +230,9 @@ metadata and failure handling identical, which is what the caller depends on.
 ## Runtime flow
 
 1. The OpenChamber HTTP listener binds and publishes its authoritative port.
-2. `materializePlugin()` writes the plugin under
+2. The managed OpenCode config calls `configureTools()` with the enabled tools.
+   This updates shared MCP discovery, including when all optional tools are off.
+   Separately, its adapter writes the enabled policy plugin under
    `<instance-dir>/agent-tool/` and returns its directory; the managed
    config layer lists that directory in `<instance-dir>/opencode.managed.json` and
    rewrites the file whenever a tool setting changes. `<instance-dir>` is
@@ -502,7 +508,8 @@ Code Mode connects to the shared server factories through SDK in-memory transpor
 `mcp-context.ts` defines the injected session, call and cancellation context.
 Backend adapters resolve that identity outside model arguments; OpenCode's adapter
 in `../opencode/mcp-context.ts` reads its session metadata. The host resolves the
-working directory from the application session.
+working directory from the application session. The identity resolver is required;
+shared services do not select a backend implicitly.
 
 - Web and Desktop managed OpenCode: injected automatically.
 - External OpenCode selected with `OPENCODE_HOST` or skip-start: not injected,
@@ -533,7 +540,7 @@ the existing trimming, case folding and IPv4-mapped IPv6 handling. Its callers
 are this folder's runtime and `../git/repository-credential-runtime.js`; imports
 keep their `.js` specifiers.
 
-`runtime.ts` owns the callback envelope, plugin options, dependency contract
+`runtime.ts` owns the callback envelope, tool options, dependency contract
 and result envelope. Action fields remain unchecked until their owning service
 validates them. `AgentToolInput` extends the control service's `ControlInput`
 with the adapter and tool-specific fields. Execution options and successful

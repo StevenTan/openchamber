@@ -10,6 +10,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { createToolPermissions } from './permissions.js';
 import { registerToolPermissionRoutes } from './permission-routes.js';
 import { createAgentToolRuntime } from './runtime.js';
+import { resolveOpenCodeMcpContext } from '../opencode/mcp-context.js';
 
 const cleanup = [];
 afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); });
@@ -67,7 +68,7 @@ it('persists project approvals for later sessions while once and rejection stay 
 
 it('runs MCP mutations only after the existing permission HTTP API approves their diff', async () => {
   const f = await fixture();
-  const runtime = createAgentToolRuntime({ crypto, fsPromises: fs, path, instanceDir: f.directory, permissions: f.permissions,
+  const runtime = createAgentToolRuntime({ resolveMcpContext: resolveOpenCodeMcpContext, crypto, permissions: f.permissions,
     resolveSessionDirectory: async () => f.directory, getActivePort: () => listener.address().port });
   const app = express();
   runtime.registerRoutes(app, express);

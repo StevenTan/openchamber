@@ -19,6 +19,12 @@ binding and snapshot contract belong to `../quota/DOCUMENTATION.md`.
 `mcp-context.ts` translates OpenCode's authoritative MCP session metadata and
 request identity into the shared `ResolveMcpContext` contract used by tool services.
 
+`managed-agent-tools.ts` composes that resolver, session-directory and inbox reads,
+permission policy and event delivery, and file activity capture for shared tools.
+`managed-config-file.ts` configures the shared tool catalog before registering
+plugins. `agent-tool-plugin.ts` materializes OpenCode policy plugins separately
+from MCP catalog configuration.
+
 Diagnostic logging for the timeline export (`proxy.js` error lines, the lifecycle journal, the local diagnostics route in `../server-frame/core-routes.js`) is described in `../diagnostics/DOCUMENTATION.md`.
 
 ## Ownership

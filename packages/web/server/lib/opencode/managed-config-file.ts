@@ -9,7 +9,7 @@ import { materializeCodeModePlugin } from '../agent-code-mode/runtime.js';
 import { materializeCodexAgentPlugin } from './codex-agent-plugin.js';
 import { materializeWorkspaceDependencies } from '../workspace-dependencies/runtime.js';
 import { materializeFilePlugin } from '../agent-file/materialize.js';
-import type { createAgentToolRuntime } from '../agent-tool/runtime.js';
+import type { createManagedAgentTools } from './managed-agent-tools.js';
 import type { LimitFailoverConfigurationInput } from '../limit-failover/policy.js';
 
 export interface ManagedConfigSettings extends LimitFailoverConfigurationInput {
@@ -31,7 +31,7 @@ export interface ManagedConfigDependencies {
   path: typeof import('node:path');
   instanceDir: string;
   env?: NodeJS.ProcessEnv;
-  agentToolRuntime?: Pick<ReturnType<typeof createAgentToolRuntime>, 'materializePlugin' | 'createChildEnv' | 'materializeCommandPlugin' | 'materializeSearchPlugin' | 'materializeQuestionPlugin'> | null;
+  agentToolRuntime?: Pick<ReturnType<typeof createManagedAgentTools>, 'configureTools' | 'materializePlugin' | 'createChildEnv' | 'materializeCommandPlugin' | 'materializeSearchPlugin' | 'materializeQuestionPlugin'> | null;
   limitFailoverRuntime?: { materializePlugin: () => Promise<string> } | null;
   readSettings: () => ManagedConfigSettings | null | Promise<ManagedConfigSettings | null>;
   listExtensionSkillDirectories?: () => Promise<string[]>;
@@ -102,9 +102,11 @@ export const createManagedConfigRuntime = ({
     const includeUsage = settings?.agentUsageToolEnabled === true;
     const includeTerminal = settings?.agentTerminalToolEnabled === true;
 
+    const tools = agentToolRuntime?.configureTools({ includeControl, includeSchedule, includeWeb, includeMemory, includeKnowledge, includeNotify, includeRender, includeShare, includeImage, includeSecret, includeUsage, includeTerminal });
+
     const directories = [];
-    if (agentToolRuntime && (includeControl || includeSchedule || includeWeb || includeMemory || includeKnowledge || includeNotify || includeRender || includeImage || includeSecret || includeUsage || includeTerminal)) {
-      directories.push(await agentToolRuntime.materializePlugin({ includeControl, includeSchedule, includeWeb, includeMemory, includeKnowledge, includeNotify, includeRender, includeShare, includeImage, includeSecret, includeUsage, includeTerminal }));
+    if (agentToolRuntime && tools && (includeControl || includeSchedule || includeWeb || includeMemory || includeKnowledge || includeNotify || includeRender || includeImage || includeSecret || includeUsage || includeTerminal)) {
+      directories.push(await agentToolRuntime.materializePlugin(tools));
     }
     if (agentToolRuntime && limitFailoverRuntime && isLimitFailoverConfigured(settings)) {
       directories.push(await limitFailoverRuntime.materializePlugin());

@@ -2403,7 +2403,6 @@ async function main(options: WebUiServerOptions = {}) {
   });
   agentToolRuntime = createManagedAgentTools({
     instanceDir,
-    env: process.env,
     control: openChamberControlService,
     client: () => openCodeSessionClient(),
     server: () => server,

@@ -9,6 +9,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createAgentToolRuntime } from '../agent-tool/runtime.js';
+import { materializeAgentToolPlugin } from '../opencode/agent-tool-plugin.js';
+import { resolveOpenCodeMcpContext } from '../opencode/mcp-context.js';
 
 let root, runtime, listener, client, transport, env, config, executeAction, panelTool, approve;
 const caller = { sessionID: 'session-a', agent: 'build', messageID: 'message-a', id: 'call-a' };
@@ -16,8 +18,8 @@ const caller = { sessionID: 'session-a', agent: 'build', messageID: 'message-a',
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'browser-mcp-'));
   executeAction = vi.fn(async () => ({ content: [{ type: 'text', text: 'Clicked Save' }] }));
-  runtime = createAgentToolRuntime({
-    crypto, fsPromises: fs, path, instanceDir: root,
+  runtime = createAgentToolRuntime({ resolveMcpContext: resolveOpenCodeMcpContext,
+    crypto,
     getActivePort: () => listener.address().port,
     resolveSessionDirectory: async session => path.join(root, session),
     executeAction,
@@ -28,7 +30,7 @@ beforeEach(async () => {
   listener = await new Promise(resolve => { const server = app.listen(0, '127.0.0.1', () => resolve(server)); });
   env = runtime.createChildEnv();
   for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
-  const directory = await runtime.materializePlugin({ includeControl: false, includeMemory: false, includeWeb: true });
+  const directory = await materializeAgentToolPlugin(root, runtime.configureTools({ includeControl: false, includeMemory: false, includeWeb: true }));
   const plugin = await import(pathToFileURL(path.join(directory, 'index.js')).href);
   panelTool = { execute: async (input, context) => ({ output: (await call('panel', input, context.sessionID)).structuredContent }) };
   approve = vi.fn(async () => {});

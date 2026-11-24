@@ -6,6 +6,8 @@ import { pathToFileURL } from 'node:url';
 import express from 'express';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createAgentToolRuntime } from '../agent-tool/runtime.js';
+import { materializeCommandPlugin } from '../opencode/agent-tool-plugin.js';
+import { resolveOpenCodeMcpContext } from '../opencode/mcp-context.js';
 import { setImmediate } from 'node:timers/promises';
 import { TerminalManager } from './dist/terminal-manager.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -30,8 +32,8 @@ beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-command-'));
   const app = express();
   hasPendingInput = vi.fn(async () => false);
-  runtime = createAgentToolRuntime({
-    crypto, fsPromises: fs, path, instanceDir: root,
+  runtime = createAgentToolRuntime({ resolveMcpContext: resolveOpenCodeMcpContext,
+    crypto,
     getActivePort: () => server.address().port,
     resolveSessionDirectory: async (id) => id.startsWith('session-') ? root : null,
     getCommandEnvironment: () => ({ ...process.env, COMMAND_TOOL_CONFIGURED_ENV: 'configured' }),
@@ -42,7 +44,7 @@ beforeEach(async () => {
   server = await new Promise(resolve => { const listener = app.listen(0, '127.0.0.1', () => resolve(listener)); });
   childEnv = runtime.createChildEnv();
   for (const [key, value] of Object.entries(childEnv)) vi.stubEnv(key, value);
-  const directory = await runtime.materializeCommandPlugin();
+  const directory = await materializeCommandPlugin(root);
   const plugin = await import(pathToFileURL(path.join(directory, 'index.js')).href);
   approvals = vi.fn(async () => {});
   registered = new Map([['shell', {}]]);
@@ -438,7 +440,7 @@ describe('managed command tools', () => {
 
   it('keeps command handles across plugin materialization and retires them on session deletion', async () => {
     const started = await run('exec_command', { cmd: nodeCommand('setInterval(() => {}, 1000)'), yield_time_ms: 0 });
-    await runtime.materializeCommandPlugin();
+    await materializeCommandPlugin(root);
     expect((await run('write_stdin', { session_id: started.session_id, yield_time_ms: 0 })).status).toBe('running');
     await runtime.observeCommandEvent({ type: 'session.deleted', data: { sessionID: context.sessionID } });
     await expect(run('write_stdin', { session_id: started.session_id, yield_time_ms: 0 })).rejects.toThrow('Command session not found');
