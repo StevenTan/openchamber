@@ -121,6 +121,7 @@ export interface AgentToolDependencies {
   resolveMcpContext: ResolveMcpContext;
   permissions: ToolPermissions;
   codeModeFileActivity?: CodeModeFileActivity;
+  authorizeMcpRequest?: ((request: Pick<Request, 'headers'>) => boolean) | undefined;
 }
 
 export interface ResultFields {
@@ -643,7 +644,8 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
     });
   };
 
-  const commandToolRuntime = createCommandToolRuntime({ resolveSessionDirectory, getEnvironment: getCommandEnvironment, hasPendingInput, authorize, trackInflight, abortSession, resolveMcpContext, permissions });
+  const authorizeMcp = (request: Pick<Request, 'socket' | 'headers'>) => authorize(request) || dependencies.authorizeMcpRequest?.(request) === true;
+  const commandToolRuntime = createCommandToolRuntime({ resolveSessionDirectory, getEnvironment: getCommandEnvironment, hasPendingInput, authorize: authorizeMcp, trackInflight, abortSession, resolveMcpContext, permissions });
   const browserMcp = createBrowserMcpRuntime({
     name: 'panel',
     description: WEB_TOOL_DESCRIPTION,
@@ -660,7 +662,7 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
   const questionMcp = createQuestionMcpRuntime(questionRuntime, resolveMcpContext, permissions);
   const fileMcp = createFileMcpRuntime(permissions, resolveMcpContext);
   const controlMcp = createControlMcpRuntime(() => controlTools, execute, resolveMcpContext, trackInflight, { ...TOOL_OUTPUT_SCHEMA, type: 'object' }, permissions);
-  const mcpServices = createAgentMcpServices({ openchamber_commands: commandToolRuntime.mcp, file: fileMcp, browser: browserMcp, request: questionMcp, openchamber: controlMcp }, { resolveContext: resolveMcpContext, permissions, fileActivity: dependencies.codeModeFileActivity, browserEnabled: () => webEnabled, authorize });
+  const mcpServices = createAgentMcpServices({ openchamber_commands: commandToolRuntime.mcp, file: fileMcp, browser: browserMcp, request: questionMcp, openchamber: controlMcp }, { resolveContext: resolveMcpContext, permissions, fileActivity: dependencies.codeModeFileActivity, browserEnabled: () => webEnabled, authorize: authorizeMcp });
 
   return {
     configureTools,

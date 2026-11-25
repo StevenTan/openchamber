@@ -15,12 +15,18 @@ interface MobileEffortButtonProps {
 const LONG_PRESS_MS = 500;
 
 export const MobileEffortButton: React.FC<MobileEffortButtonProps> = ({ onCycleThinking, onOpenThinking, className }) => {
-    const { t } = useI18n();
     const currentProviderId = useConfigStore((state) => state.currentProviderId);
     const currentModelId = useConfigStore((state) => state.currentModelId);
     const hasVariants = useConfigStore((state) => state.getCurrentModelVariants().length > 0);
     const effectiveVariant = useConfigStore((state) => state.currentVariant);
     const variantSelection = useConfigStore((state) => state.currentVariantSelection);
+    if (isAutoModel(currentProviderId, currentModelId) || !hasVariants) return null;
+    const variant = variantSelection.override === null ? undefined : variantSelection.override ?? effectiveVariant;
+    return <MobileEffortControl variant={variant} onCycleThinking={onCycleThinking} onOpenThinking={onOpenThinking} className={className} />;
+};
+
+export function MobileEffortControl({ variant, onCycleThinking, onOpenThinking, className }: MobileEffortButtonProps & { variant?: string }) {
+    const { t } = useI18n();
     const longPressTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
     const longPressedRef = React.useRef(false);
     const clearLongPress = () => {
@@ -29,9 +35,6 @@ export const MobileEffortButton: React.FC<MobileEffortButtonProps> = ({ onCycleT
     };
     React.useEffect(() => clearLongPress, []);
 
-    if (isAutoModel(currentProviderId, currentModelId) || !hasVariants) return null;
-
-    const variant = variantSelection.override === null ? undefined : variantSelection.override ?? effectiveVariant;
     const label = variant ? formatEffortLabel(variant) : t('chat.modelControls.default');
 
     return (
@@ -68,4 +71,4 @@ export const MobileEffortButton: React.FC<MobileEffortButtonProps> = ({ onCycleT
             <span className={cn('whitespace-nowrap', getEffortToneClass(variant))}>{label}</span>
         </button>
     );
-};
+}

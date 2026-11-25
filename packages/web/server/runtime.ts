@@ -203,6 +203,8 @@ import { createRelayService, relayBlockedByEnterprise } from './lib/relay/servic
 import { createRelayHostLock } from './lib/relay/host-lock.js';
 import { createRelayKeyStore } from './lib/relay/key-store.js';
 import { createManagedAgentTools } from './lib/opencode/managed-agent-tools.js';
+import { createAgentBackendHost } from './lib/agent-backends/host.js';
+import { registerAgentBackendRoutes } from './lib/agent-backends/routes.js';
 import { createQuestionRuntime, questionStoreDirectory } from './lib/agent-question/src/runtime.js';
 import { createBrowserControlBroker } from './lib/browser-control/broker.js';
 import { createBrowserClientEvents } from './lib/browser-control/client-events.js';
@@ -1661,6 +1663,12 @@ const environmentRuntime = composeEnvironmentRuntime({
   readOpenCodeServiceEnv: () => readOpenCodeServiceEnv(OPENCODE_CONFIG_DIR),
   isEnterpriseMode: () => isEnterpriseMode(),
 });
+const agentBackendHost = createAgentBackendHost({
+  dataDir: OPENCHAMBER_DATA_DIR, server: () => server,
+  tools: () => { if (!agentToolRuntime) throw new Error('Agent tools are unavailable'); return agentToolRuntime; },
+  environment: () => overlayEnvironment({ ...process.env, PATH: buildAugmentedPath() }, environmentRuntime.forOpenCode()),
+  publish: event => broadcastOpenChamberUiEvent(event), hub: globalMessageStreamHub,
+});
 const staticRoutesRuntime = createStaticRoutesRuntime({
   fs,
   path,
@@ -2339,7 +2347,7 @@ const gracefulShutdownRuntime = createGracefulShutdownRuntime({
   getHealthCheckInterval: () => healthCheckInterval,
   clearHealthCheckInterval: (value) => clearInterval(value),
   getTerminalRuntime: () => terminalRuntime,
-  closeAgentCommands: () => agentToolRuntime?.closeCommands(),
+  closeAgentCommands: async () => { await agentBackendHost.close(); return agentToolRuntime?.closeCommands(); },
   setTerminalRuntime: (value) => {
     terminalRuntime = value;
   },
@@ -2394,22 +2402,13 @@ async function main(options: WebUiServerOptions = {}) {
       ? process.env.OPENCHAMBER_HOST.trim()
       : '127.0.0.1');
   const instanceDir = await prepareInstanceDir({ fsPromises, path, dataDir: OPENCHAMBER_DATA_DIR });
-  questionRuntime = createQuestionRuntime({
-    dataDir: questionStoreDirectory(OPENCHAMBER_DATA_DIR, process.env.OPENCHAMBER_RUNTIME || 'web', effectiveBindHost, port),
-    client: () => openCodeSessionClient(),
-    globalEventHub: globalMessageStreamHub,
-    isSessionArchived: (sessionID) => openChamberSessionService.sessionArchive.isArchived(sessionID),
-    isEnabled: () => !isExternalOpenCode && !ENV_SKIP_OPENCODE_START,
-  });
-  agentToolRuntime = createManagedAgentTools({
-    instanceDir,
-    control: openChamberControlService,
-    client: () => openCodeSessionClient(),
-    server: () => server,
-    getCommandEnvironment: () => overlayEnvironment({ ...process.env, PATH: buildAugmentedPath() }, environmentRuntime.forOpenCode()),
-    questionRuntime,
+  ({ questionRuntime, agentToolRuntime } = agentBackendHost.createTools({
+    instanceDir, control: openChamberControlService, client: openCodeSessionClient,
     permissionOptions: { dataDir: OPENCHAMBER_DATA_DIR, buildOpenCodeUrl, getOpenCodeAuthHeaders, globalEventHub: globalMessageStreamHub },
-  });
+    questionDataDir: questionStoreDirectory(OPENCHAMBER_DATA_DIR, process.env.OPENCHAMBER_RUNTIME || 'web', effectiveBindHost, port),
+    isSessionArchived: sessionID => openChamberSessionService.sessionArchive.isArchived(sessionID),
+    isEnabled: () => !isExternalOpenCode && !ENV_SKIP_OPENCODE_START,
+  }));
   limitFailoverRuntime = createLimitFailoverRuntime({
     fsPromises,
     path,
@@ -2789,6 +2788,7 @@ async function main(options: WebUiServerOptions = {}) {
   app.use(spaceArchive.guard);
   app.use((req, res, next) => (spacesHost ? spacesHost.middleware(req, res, next) : next()));
   agentToolRuntime.registerQuestionFormRoutes(app, express);
+  registerAgentBackendRoutes(app, express, agentBackendHost.backend, agentToolRuntime);
   server.prependListener('upgrade', (...args) => { spacesHost?.upgradeHandler(...args); });
   const startSpacesHost = (host: NonNullable<typeof spacesHost>) => {
     host.prepareUpgrades({ uiAuthController, isRequestOriginAllowed });

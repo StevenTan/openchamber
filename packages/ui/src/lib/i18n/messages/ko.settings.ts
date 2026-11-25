@@ -2843,4 +2843,13 @@ export const settingsDict = {
   "settings.usage.configuration.deleteConfirm": "\"{name}\" 및 저장된 사용량 설정을 삭제할까요?",
   "settings.usage.configuration.account": "서비스 계정",
   "settings.usage.configuration.accountHint": "연결된 인스턴스에서 해당 서비스의 로그인 상태 또는 인증 정보를 사용합니다.",
+  'settings.backends.title': 'Antigravity',
+  'settings.backends.backend': "백엔드",
+  'settings.backends.binary': "Antigravity 실행 파일 경로",
+  'settings.backends.login': "Google로 로그인",
+  'settings.backends.install': 'Antigravity 설치',
+  'settings.backends.verifying': '계정 및 모델 확인 중…',
+  'settings.backends.signedIn': '로그인됨',
+  'settings.backends.signOut': '로그아웃',
+  'settings.backends.signOutMessage': '진행 중인 Antigravity 대화가 중지됩니다. 대화 기록은 유지됩니다.',
 } as const;

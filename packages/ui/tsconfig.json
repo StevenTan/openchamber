@@ -26,6 +26,9 @@
       "@openchamber/sdk/schemas": [
         "../sdk/src/schemas.ts"
       ],
+      "@openchamber/sdk/agent-backends": [
+        "../sdk/src/agent-backends.ts"
+      ],
       "@/*": [
         "./src/*"
       ],

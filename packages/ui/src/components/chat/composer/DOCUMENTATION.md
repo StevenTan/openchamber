@@ -3,6 +3,15 @@
 The chat composer: the prompt language, the editor that renders it, and
 everything between typing and sending.
 
+New-conversation drafts select OpenCode or Antigravity beside the model controls.
+Existing conversations keep their backend. Both backends use ModelControlsView
+for layout, model triggers, searchable model menus and thinking selectors. Backend
+adapters supply catalog data and selection actions. Antigravity choices come from
+the native conversation's ACP configuration; agent controls appear when supported.
+Desktop and mobile use the same draft selection.
+Draft composers preload Antigravity's native model catalog for their directory
+before backend selection. The first send uses the prepared native draft.
+
 `ChatInput.tsx` (one directory up) composes the hooks and render helpers in
 `input/`. Those modules hold the composer's state and event handlers and wire
 the language, editor, attachment and submission modules together.

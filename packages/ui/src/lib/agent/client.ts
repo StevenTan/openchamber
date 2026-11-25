@@ -2,7 +2,7 @@ import type { ContextPartMetadata } from '@/lib/messages/contextParts';
 import type { SpaceMark } from '@/lib/spaces/spaces-store';
 import type { Agent, Model, Provider } from './catalog';
 import type { FormValue } from './requests';
-import type { Message, Metadata, ModelRef, ModelSelection, Part, Session, SyntheticMessage, UserMessage } from './model';
+import type { Message, Metadata, ModelSelection, Part, Session, SyntheticMessage, UserMessage } from './model';
 
 export type SessionPage = {
   sessions: Session[];
@@ -26,7 +26,7 @@ export type MessagePage = {
 };
 
 export type PendingInboxMessage = { info: UserMessage | SyntheticMessage; parts: Part[] | null };
-export type ProviderCatalog = { providers: Provider[]; models: Model[]; default?: ModelRef };
+export type ProviderCatalog = { providers: Provider[]; models: Model[]; default?: ModelSelection };
 export type SkillMentions = { names: readonly string[]; instructionFor: (names: readonly string[]) => string | null };
 export type SyntheticContextInput = { id?: string; text: string; metadata?: ContextPartMetadata; description?: string };
 export type SendMessageInput = {
@@ -51,10 +51,10 @@ export type SendMessageInput = {
 export interface ConversationClient {
   listSessionsPage(options?: SessionListOptions): Promise<SessionPage>;
   listSessions(directory?: string | null): Promise<Session[]>;
-  createSession(params?: { id?: string; title?: string; agent?: string; model?: ModelSelection; metadata?: Metadata }, directory?: string | null): Promise<Session>;
+  createSession(params?: { id?: string; title?: string; agent?: string; model?: ModelSelection; metadata?: Metadata; backendID?: string }, directory?: string | null): Promise<Session>;
   getSession(id: string, directory?: string | null, signal?: AbortSignal): Promise<Session>;
   getSessionUnscoped(id: string): Promise<Session>;
-  captureSessionCleanup(directory: string | null | undefined, runtimeKey: string): Promise<(sessionID: string) => Promise<void>>;
+  captureSessionCleanup(directory: string | null | undefined, runtimeKey: string, backendID?: string): Promise<(sessionID: string) => Promise<void>>;
   deleteSession(id: string, directory?: string | null): Promise<boolean>;
   renameSession(id: string, title: string, directory?: string | null): Promise<void>;
   getSessionMessages(id: string, options?: { limit?: number; cursor?: string; order?: 'asc' | 'desc'; partShells?: boolean }, directory?: string | null): Promise<MessagePage>;
@@ -66,7 +66,7 @@ export interface ConversationClient {
   applySendSelection(id: string, selection: { model?: ModelSelection; agent?: string }, directory: string | null | undefined, runtimeKey: string | undefined): Promise<void>;
   sendMessage(input: SendMessageInput): Promise<string>;
   abortSession(id: string, directory?: string | null): Promise<boolean>;
-  getProvidersForConfig(directory?: string | null, options?: { fresh?: boolean }): Promise<ProviderCatalog>;
+  getProvidersForConfig(directory?: string | null, options?: { fresh?: boolean; sessionID?: string }): Promise<ProviderCatalog>;
   listAgents(directory?: string | null): Promise<Agent[]>;
   replyToPermission(sessionID: string, requestID: string, reply: 'once' | 'always' | 'reject', options?: { message?: string; directory?: string | null }): Promise<boolean>;
   replyToForm(sessionID: string, formID: string, answer: Record<string, FormValue>, directory?: string | null): Promise<boolean>;

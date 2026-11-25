@@ -2843,4 +2843,13 @@ export const settingsDict = {
   "settings.usage.configuration.deleteConfirm": "Видалити \"{name}\" і збережену конфігурацію використання?",
   "settings.usage.configuration.account": "Обліковий запис сервісу",
   "settings.usage.configuration.accountHint": "Використовує вхід або облікові дані сервісу в підключеному екземплярі.",
+  'settings.backends.title': 'Antigravity',
+  'settings.backends.backend': "Сервер",
+  'settings.backends.binary': "Шлях до програми Antigravity",
+  'settings.backends.login': "Увійти через Google",
+  'settings.backends.install': 'Встановити Antigravity',
+  'settings.backends.verifying': 'Перевірка облікового запису та моделей…',
+  'settings.backends.signedIn': 'Вхід виконано',
+  'settings.backends.signOut': 'Вийти',
+  'settings.backends.signOutMessage': 'Це зупинить активні розмови Antigravity. Історію розмов буде збережено.',
 } as const;

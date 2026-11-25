@@ -5,6 +5,7 @@ export type DraftSessionSelection = {
   modelID: string
   agent?: string
   variant?: string | null
+  backendID?: string
 }
 
 export const trimAgent = (agent: string | undefined): string | undefined => (
@@ -14,4 +15,5 @@ export const trimAgent = (agent: string | undefined): string | undefined => (
 export const draftSessionCreateSelection = (selection: DraftSessionSelection): SessionCreateSelection => ({
   model: { providerID: selection.providerID, id: selection.modelID, variant: selection.variant },
   agent: trimAgent(selection.agent),
+  backendID: selection.backendID,
 })

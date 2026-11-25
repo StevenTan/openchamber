@@ -38,11 +38,33 @@ interface EventHub {
 }
 interface Dependencies {
   dataDir: string;
-  client: () => { session: Pick<SessionApi, "get" | "form" | "synthetic"> };
+  client: (sessionID?: string) => { session: QuestionSessionApi };
   globalEventHub: EventHub;
   isSessionArchived(sessionID: string): Promise<boolean>;
   isEnabled(): boolean;
   retryMs?: number;
+}
+export interface QuestionSessionApi {
+  get(input: { sessionID: string }, options?: { signal: AbortSignal }): Promise<void>;
+  form: {
+    get(input: { sessionID: string; formID: string }, options?: { signal: AbortSignal }): Promise<{ state: { status: string; answer?: Answer } }>;
+    create(input: Parameters<SessionApi['form']['create']>[0], options?: { signal: AbortSignal }): Promise<void>;
+    reply(input: Parameters<SessionApi['form']['reply']>[0], options?: { signal: AbortSignal }): Promise<void>;
+    cancel(input: Parameters<SessionApi['form']['cancel']>[0], options?: { signal: AbortSignal }): Promise<void>;
+  };
+  synthetic(input: Parameters<SessionApi['synthetic']>[0], options?: { signal: AbortSignal }): Promise<void>;
+}
+export function createOpenCodeQuestionSession(api: Pick<SessionApi, 'get' | 'form' | 'synthetic'>): QuestionSessionApi {
+  return {
+    get: async (input, options) => { await api.get(input, options); },
+    form: {
+      async get(input, options) { const form = await api.form.get(input, options); return { state: { status: form.state.status, ...form.state.status === 'answered' && { answer: z.record(z.string(), z.string()).parse(form.state.answer) } } }; },
+      create: async (input, options) => { await api.form.create(input, options); },
+      reply: async (input, options) => { await api.form.reply(input, options); },
+      cancel: async (input, options) => { await api.form.cancel(input, options); },
+    },
+    synthetic: async (input, options) => { await api.synthetic(input, options); },
+  };
 }
 const settlementEvent = z.discriminatedUnion("type", [
   z.object({ type: z.literal("form.replied"), data: z.object({ id: z.string(), sessionID: z.string(), answer: z.record(z.string(), z.string()) }) }),
@@ -127,7 +149,7 @@ export function createQuestionRuntime({ dataDir, client, globalEventHub, isSessi
     return { ...entry, resolution: answer ? { status: "answered", answer, messageID } : { status: "cancelled", messageID } };
   };
   const reconcileForm = async (entry: Entry) => {
-    const api = client().session;
+    const api = client(entry.sessionID).session;
     const options = { signal: AbortSignal.timeout(15_000) };
     await api.get({ sessionID: entry.sessionID }, options);
     if (entry.resolution.status === "pending") {
@@ -146,7 +168,7 @@ export function createQuestionRuntime({ dataDir, client, globalEventHub, isSessi
   const deliver = async (group: [ResolvedEntry, ...ResolvedEntry[]]) => {
     const first = group[0];
     const resolution = first.resolution;
-    const api = client().session;
+    const api = client(first.sessionID).session;
     const options = { signal: AbortSignal.timeout(15_000) };
     await api.get({ sessionID: first.sessionID }, options);
     for (const entry of group) {

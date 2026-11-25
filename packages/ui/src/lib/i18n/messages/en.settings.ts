@@ -2833,4 +2833,13 @@ export const settingsDict = {
   "settings.usage.configuration.deleteConfirm": "Delete \"{name}\" and its saved usage configuration?",
   "settings.usage.configuration.account": "Service account",
   "settings.usage.configuration.accountHint": "Uses the service’s sign-in or credentials on the connected instance.",
+  'settings.backends.title': 'Antigravity',
+  'settings.backends.backend': "Backend",
+  'settings.backends.binary': "Antigravity binary path",
+  'settings.backends.login': "Sign in with Google",
+  'settings.backends.install': 'Install Antigravity',
+  'settings.backends.verifying': 'Checking account and models…',
+  'settings.backends.signedIn': 'Signed in',
+  'settings.backends.signOut': 'Sign out',
+  'settings.backends.signOutMessage': 'This stops running Antigravity conversations. Conversation history is kept.',
 } as const;

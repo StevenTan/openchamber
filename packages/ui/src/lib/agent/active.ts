@@ -2,7 +2,7 @@ import '../agentBackends'
 import type { ConversationClient } from "./client"
 import { getAgentBackend, getSessionBackend, rememberSessionBackend } from './registry'
 
-export { getAgentBackend, selectAgentBackend } from './registry'
+export { getAgentBackend } from './registry'
 
 export const conversationClient: ConversationClient = {
   async listSessionsPage(options) {
@@ -16,7 +16,7 @@ export const conversationClient: ConversationClient = {
     return sessions
   },
   async createSession(params, directory) {
-    const session = await getAgentBackend().client.createSession(params, directory)
+    const session = await getAgentBackend(params?.backendID ?? 'opencode').client.createSession(params, directory)
     rememberSessionBackend(session)
     return session
   },
@@ -30,7 +30,7 @@ export const conversationClient: ConversationClient = {
     rememberSessionBackend(session)
     return session
   },
-  captureSessionCleanup: (directory, runtimeKey) => getAgentBackend().client.captureSessionCleanup(directory, runtimeKey),
+  captureSessionCleanup: (directory, runtimeKey, backendID) => getAgentBackend(backendID ?? 'opencode').client.captureSessionCleanup(directory, runtimeKey),
   deleteSession: (id, directory) => getSessionBackend(id).client.deleteSession(id, directory),
   renameSession: (id, title, directory) => getSessionBackend(id).client.renameSession(id, title, directory),
   getSessionMessages: (id, options, directory) => getSessionBackend(id).client.getSessionMessages(id, options, directory),

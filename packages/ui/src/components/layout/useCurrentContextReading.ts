@@ -1,9 +1,10 @@
+import React from 'react';
 import { DEFAULT_CONTEXT_LIMIT } from '@/components/chat/work-status/contextUsage';
 import { useContextWindowLimits } from '@/hooks/useContextWindowLimits';
 import type { Message } from '@/lib/opencode/model';
 import { findLatestContextFill } from '@/stores/utils/tokenUtils';
 import { useSessionUIStore } from '@/sync/session-ui-store';
-import { useSessionMessagesSelector } from '@/sync/sync-context';
+import { useDirectorySync, useSessionMessagesSelector } from '@/sync/sync-context';
 
 type ContextFillReading = { state: 'measured'; totalTokens: number } | { state: 'compacted' } | null;
 
@@ -24,6 +25,7 @@ export const useCurrentContextReading = () => {
   const directory = useSessionUIStore((state) => state.currentSessionDirectory) ?? undefined;
   const fill = useSessionMessagesSelector(sessionId ?? '', directory, selectContextFill, isSameContextFill);
   const { context } = useContextWindowLimits(sessionId, directory);
+  const backendID = useDirectorySync(React.useCallback(state => state.session.find(session => session.id === sessionId)?.backendID, [sessionId]), directory);
   const limit = context > 0 ? context : DEFAULT_CONTEXT_LIMIT;
-  return { sessionId, fill, limit };
+  return { sessionId, fill: backendID === 'antigravity' && context <= 0 ? null : fill, limit };
 };

@@ -1,3 +1,5 @@
+import type { NewSessionDraftState, NewSessionDraftTarget } from './new-session-draft'
+export type { NewSessionDraftState } from './new-session-draft'
 import type { ContextPartMetadata } from "@/lib/messages/contextParts"
 import { readEffortRevision, rememberEffort } from "@/lib/modelEfforts"
 import { draftSessionMetadata } from "./draft-session-metadata"
@@ -341,30 +343,6 @@ function notifyMessageSent(sessionId: string): void {
     .catch(() => { /* ignore */ })
 }
 
-
-type NewSessionDraftTarget = "chat" | "project"
-
-export type NewSessionDraftState = {
-  draftId: number
-  open: boolean
-  selectedProjectId?: string | null
-  directoryOverride: string | null
-  permissionMode?: PermissionMode
-  pendingWorktreeRequestId?: string | null
-  bootstrapPendingDirectory?: string | null
-  worktreeStartDirectory?: { worktreeRoot: string; directory: string | null } | null
-  preserveDirectoryOverride?: boolean
-  parentID: string | null
-  title?: string
-  initialPrompt?: string
-  syntheticParts?: SyntheticContextPart[]
-  targetFolderId?: string
-  projectContextPins?: { notes: string[]; plans: string[] }
-  target: NewSessionDraftTarget
-  preparedChatDirectory?: string | null
-  workDraftId?: string
-  lead?: boolean
-}
 
 export type SetCurrentSessionOptions = {
   transition?: "submitted-draft"
@@ -1500,6 +1478,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       targetFolderId: options?.targetFolderId,
       projectContextPins: options?.projectContextPins,
       lead: options?.lead === true ? true : undefined,
+      backendID: options?.backendID,
     }
 
     set({
@@ -1829,7 +1808,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       if (!capturedTarget && !options?.sessionId && draft?.open) {
         if (sentDraftIds.has(draft.draftId)) throw new Error("The session is still being created.")
         sentDraftIds.add(draft.draftId)
-        const selection: DraftSessionSelection = { providerID, modelID, agent: trimmedAgent, variant }
+        const selection: DraftSessionSelection = { providerID, modelID, agent: trimmedAgent, variant, backendID: draft.backendID }
         let directory: string | null = null
         let chatDirectoryCleanup: CapturedChatDirectoryCleanup | null = null
         try {
@@ -1847,7 +1826,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
         }
         const sessionDirectory = directory
 
-        const sessionId = descendingId("ses")
+        const sessionId = draft.backendID === 'antigravity' ? `ses_ag_${descendingId("ses").slice(4)}` : descendingId("ses")
         adoptDraftPanelWorkspace(draftPanelOwner(draft, capturedRuntimeKey), sessionPanelOwner(sessionId, capturedRuntimeKey))
         options?.progress?.sessionMinted?.(sessionId, draft.target === "chat" ? sessionDirectory : null)
         const draftAgent = saveDraftSessionSelection(sessionId, selection)

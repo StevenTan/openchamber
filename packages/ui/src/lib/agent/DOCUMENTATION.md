@@ -5,14 +5,21 @@
 This module owns the application conversation model, conversation operations and
 normalized event subscription and runtime contracts. `active.ts` dispatches
 conversation operations through the backend registry. `../agentBackends.ts`
-registers the application's backend factories and selects the startup backend.
+registers the application's backend factories. The application backend combines
+conversation lists, pending requests and live events from both backends.
 The OpenCode adapter owns SDK calls, native event decoding
 and transport in `../opencode`. Sync owns transcript membership and store writes.
+The Antigravity adapter uses the host ACP routes and OpenChamber event channel.
+Its native model catalog and records are projected into the same conversation
+and sync contracts. New-conversation drafts select their backend; existing
+conversations retain their stored backend.
 
 ## Invariants
 
 - Conversation, message, part and event identities are identical in history and
   live updates. Adapters project native records before publishing them.
+  Antigravity user text and attachments use the shared optimistic part IDs so
+  authoritative updates replace their pending counterparts in place.
 - `ConversationClient` supplies session creation and history, model and agent
   selection, sends, interruption and answers to pending requests.
 - Unscoped session lookup resolves the session's current directory independently
@@ -27,6 +34,9 @@ and transport in `../opencode`. Sync owns transcript membership and store writes
   events and persisted records establish runtime-scoped ownership. Operations
   on a known session use its owning backend even when another backend is selected.
   Persisted records without `backendID` belong to OpenCode.
+- OpenCode supplies the host configuration and workspace catalog. Antigravity's
+  model catalog belongs to its draft or native conversation and does not replace
+  OpenCode's provider configuration. VS Code uses OpenCode alone.
 - An `AgentBackend` supplies the conversation client, event source and runtime.
   The source's identity identifies the connection whose replacement restarts sync.
   A subscription owns its existing reconnect and cleanup behavior.
@@ -37,6 +47,11 @@ and transport in `../opencode`. Sync owns transcript membership and store writes
   directory selection and background-job refreshes after a reconnect.
 - Web, Electron, VS Code, hosted mobile and Capacitor use the same contracts.
   Their runtime transport continues to own authentication and relay routing.
+- Assistant records can carry an authoritative context fill and limit separately
+  from accumulated token counters. Antigravity projects ACP usage updates into
+  this reading, with native database measurements supplying cache counters.
+  Context readouts hide unknown Antigravity windows, and model catalogs expose
+  limits only for models whose native turns have reported them.
 
 ## Decisions
 

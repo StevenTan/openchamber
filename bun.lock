@@ -135,6 +135,7 @@
         "openchamber-guest-check": "./scripts/check-guest.ts",
       },
       "dependencies": {
+        "@agentclientprotocol/sdk": "1.6.0",
         "zod": "^4.3.6",
       },
     },
@@ -399,6 +400,7 @@
       },
       "dependencies": {
         "7zip-bin": "5.2.0",
+        "@agentclientprotocol/sdk": "1.6.0",
         "@clack/prompts": "^1.1.0",
         "@gitbeaker/rest": "43.8.0",
         "@modelcontextprotocol/sdk": "1.32.2",
@@ -510,6 +512,8 @@
   },
   "packages": {
     "7zip-bin": ["7zip-bin@5.2.0", "https://registry.npmmirror.com/7zip-bin/-/7zip-bin-5.2.0.tgz", {}, "sha512-ukTPVhqG4jNzMro2qA9HSCSSVJN3aN7tlb+hfqYCt3ER0yWroeA2VR38MNrOHLQ/cVj+DaIMad0kFCtWWowh/A=="],
+
+    "@agentclientprotocol/sdk": ["@agentclientprotocol/sdk@1.6.0", "https://registry.npmmirror.com/@agentclientprotocol/sdk/-/sdk-1.6.0.tgz", { "peerDependencies": { "zod": "^3.25.0 || ^4.0.0" } }, "sha512-XxXrmX7aZkDgOB0Rg9cu+ZFyiUUc5lF2n9seO3Gc4OR+MTdfZOwIqF6m3LvsmmM8K3qgPmXkDH8/IFM2u9vdcQ=="],
 
     "@alloc/quick-lru": ["@alloc/quick-lru@5.2.0", "https://registry.npmmirror.com/@alloc/quick-lru/-/quick-lru-5.2.0.tgz", {}, "sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw=="],
 
@@ -803,7 +807,7 @@
 
     "@codemirror/legacy-modes": ["@codemirror/legacy-modes@6.5.5", "https://registry.npmmirror.com/@codemirror/legacy-modes/-/legacy-modes-6.5.5.tgz", { "dependencies": { "@codemirror/streamparser": "^6.0.0" } }, "sha512-9ltT214oMb3Y1w5eAZMSigzrjzZnMI2Wa3Feq73rU/i4C56MkwrpfswfQYOr28C5pXr6dWwspNTMyeHXlzWMxg=="],
 
-    "@codemirror/lint": ["@codemirror/lint@6.9.7", "https://registry.npmmirror.com/@codemirror/lint/-/lint-6.9.7.tgz", { "dependencies": { "@codemirror/state": "^6.0.0", "@codemirror/view": "^6.42.0", "crelt": "^1.0.5" } }, "sha512-28/+iWLYxKxsvGYhSYL7zaCZqLz5+FFFDq9tVsvGv9kv8RY4fFAchJ5WX9M3YrrRlTIsECjsXPqeNgnSmNP2dg=="],
+    "@codemirror/lint": ["@codemirror/lint@6.9.8", "https://registry.npmmirror.com/@codemirror/lint/-/lint-6.9.8.tgz", { "dependencies": { "@codemirror/state": "^6.0.0", "@codemirror/view": "^6.42.0", "crelt": "^1.0.5" } }, "sha512-qNvtcE73xUto/D1RvtgSRI4A1Hg8ekxlvtZpjHpdpisLBnhyu82EUEJMEgaxkjuQCA8vqnrylENWKOsEDCOHcw=="],
 
     "@codemirror/search": ["@codemirror/search@6.7.2", "https://registry.npmmirror.com/@codemirror/search/-/search-6.7.2.tgz", { "dependencies": { "@codemirror/state": "^6.0.0", "@codemirror/view": "^6.37.0", "crelt": "^1.0.5" } }, "sha512-gUYkYhT2+n/+VGZ+8EzE5WFkYZUZYm1VOKDudIsNqh42uRVQJ0a6Yss9sdKT3MeOYfuL1N6AZA57oza0Oyr0LA=="],
 

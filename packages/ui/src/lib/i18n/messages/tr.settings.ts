@@ -2834,4 +2834,13 @@ export const settingsDict = {
   "settings.usage.configuration.deleteConfirm": "\"{name}\" ve kayıtlı kullanım yapılandırması silinsin mi?",
   "settings.usage.configuration.account": "Hizmet hesabı",
   "settings.usage.configuration.accountHint": "Bağlı örnekte hizmetin oturumunu veya kimlik bilgilerini kullanır.",
+  'settings.backends.title': 'Antigravity',
+  'settings.backends.backend': "Arka uç",
+  'settings.backends.binary': "Antigravity çalıştırılabilir dosya yolu",
+  'settings.backends.login': "Google ile oturum aç",
+  'settings.backends.install': 'Antigravity yükle',
+  'settings.backends.verifying': 'Hesap ve modeller denetleniyor…',
+  'settings.backends.signedIn': 'Oturum açıldı',
+  'settings.backends.signOut': 'Oturumu kapat',
+  'settings.backends.signOutMessage': 'Bu işlem çalışan Antigravity sohbetlerini durdurur. Sohbet geçmişi korunur.',
 };

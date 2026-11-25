@@ -2843,4 +2843,13 @@ export const settingsDict = {
   "settings.usage.configuration.deleteConfirm": "「{name}」と保存済みの使用量設定を削除しますか？",
   "settings.usage.configuration.account": "サービスのアカウント",
   "settings.usage.configuration.accountHint": "接続先でのサービスへのログイン状態または認証情報を使用します。",
+  'settings.backends.title': 'Antigravity',
+  'settings.backends.backend': "バックエンド",
+  'settings.backends.binary': "Antigravity の実行ファイルパス",
+  'settings.backends.login': "Google でログイン",
+  'settings.backends.install': 'Antigravity をインストール',
+  'settings.backends.verifying': 'アカウントとモデルを確認中…',
+  'settings.backends.signedIn': 'ログイン済み',
+  'settings.backends.signOut': 'ログアウト',
+  'settings.backends.signOutMessage': '実行中の Antigravity の会話を停止します。会話履歴は保持されます。',
 } as const;

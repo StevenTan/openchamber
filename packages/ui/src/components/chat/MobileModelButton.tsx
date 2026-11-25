@@ -1,5 +1,5 @@
 import React from 'react';
-import { cn } from '@/lib/utils';
+import { MobileModelTrigger } from './ModelControlsView';
 import { useConfigStore } from '@/stores/useConfigStore';
 import { getModelDisplayName } from './mobileControlsUtils';
 import { ProviderLogo } from '@/components/ui/ProviderLogo';
@@ -32,33 +32,16 @@ export const MobileModelButton: React.FC<MobileModelButtonProps> = ({ onOpenMode
         : undefined;
 
     return (
-        <button
-            type="button"
-            onClick={onOpenModel}
-            onMouseDown={(event) => event.preventDefault()}
-            onPointerDownCapture={(event) => {
-                if (event.pointerType === 'touch') {
-                    event.preventDefault();
-                }
-            }}
-            className={cn(
-                'inline-flex h-9 -my-[5px] min-h-0 min-w-0 items-stretch',
-                'rounded-lg',
-                'typography-micro font-medium text-foreground/80',
-                'focus:outline-none hover:bg-[var(--interactive-hover)]',
-                className
-            )}
-            title={unavailableText ?? modelLabel}
-            aria-label={unavailableText}
-        >
-            <span className="flex h-full w-full min-w-0 items-center gap-1">
-                {unavailableText ? (
-                    <Icon name="error-warning" className="size-4 flex-shrink-0 text-[var(--status-warning)]" />
-                ) : currentProviderId && !isAuto ? (
-                    <ProviderLogo providerId={currentProviderId} className="size-4 flex-shrink-0" />
-                ) : null}
-                <span className="truncate">{modelLabel}</span>
-            </span>
-        </button>
+        <MobileModelTrigger
+            onOpenModel={onOpenModel}
+            className={className}
+            label={modelLabel}
+            unavailableText={unavailableText}
+            icon={unavailableText ? (
+                <Icon name="error-warning" className="size-4 flex-shrink-0 text-[var(--status-warning)]" />
+            ) : currentProviderId && !isAuto ? (
+                <ProviderLogo providerId={currentProviderId} className="size-4 flex-shrink-0" />
+            ) : null}
+        />
     );
 };

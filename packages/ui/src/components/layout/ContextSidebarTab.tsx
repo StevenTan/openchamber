@@ -27,6 +27,7 @@ import { useInContextPanelHeader } from './contextPanelHeaderSlotContext';
 import { toolContentShellChars } from '@/lib/opencode/toolContentShells';
 import { composeContextBreakdown, type ContextBuckets } from './contextBreakdown';
 import { computeSessionTokenTotals } from '@/components/chat/work-status/contextUsage';
+import { useContextWindowLimits } from '@/hooks/useContextWindowLimits';
 
 type SessionMessage = { info: Message; parts: Part[] };
 
@@ -429,6 +430,7 @@ export const ContextPanelContent: React.FC = () => {
   const copyResetTimeoutRef = React.useRef<number | null>(null);
   const currentSessionId = useSessionUIStore((state) => state.currentSessionId);
   const currentSessionDirectory = useSessionUIStore((state) => state.currentSessionDirectory);
+  const contextWindow = useContextWindowLimits(currentSessionId, currentSessionDirectory ?? undefined);
   const sessions = useSessions(currentSessionDirectory ?? undefined);
   const sessionMessages = useSessionMessageRecords(
     currentSessionId ?? '',
@@ -508,11 +510,13 @@ export const ContextPanelContent: React.FC = () => {
       latestAssistantInfo?.modelID || '',
     );
 
-    const contextLimit = providerModel.contextLimit;
+    const isNative = currentSession?.backendID === 'antigravity';
+    const contextLimit = isNative ? contextWindow.context : providerModel.contextLimit;
+    const contextTokens = isNative && contextFill?.state === 'measured' ? contextFill.totalTokens : tokenBreakdown.total;
     const usagePercent = isCompacted
       ? null
       : contextLimit && contextLimit > 0
-        ? Math.min(999, (tokenBreakdown.total / contextLimit) * 100)
+        ? Math.min(999, (contextTokens / contextLimit) * 100)
         : 0;
 
     const systemMessage = [...sessionMessages].reverse().find((entry) => entry.info.role === 'system');
@@ -520,7 +524,7 @@ export const ContextPanelContent: React.FC = () => {
 
     const computedBreakdown = computeContextBreakdown(sessionMessages, systemPrompt);
 
-    const breakdown = composeContextBreakdown(computedBreakdown, { windowTokens: tokenBreakdown.total, compacted: isCompacted });
+    const breakdown = composeContextBreakdown(computedBreakdown, { windowTokens: contextTokens, compacted: isCompacted });
 
     const firstMessageTs = sessionMessages[0]?.info?.time?.created;
     const lastMessageTs = sessionMessages.length > 0
@@ -541,10 +545,12 @@ export const ContextPanelContent: React.FC = () => {
       cacheHitRate,
       totalAssistantCost,
       contextLimit,
+      contextTokens,
+      showContext: !isNative || (contextLimit ?? 0) > 0,
       breakdown,
       breakdownTotal: breakdown.total,
     };
-  }, [currentSessionId, providers, sessionMessages, sessions, t]);
+  }, [currentSessionId, providers, sessionMessages, sessions, t, contextWindow.context]);
 
   if (!currentSessionId) {
     return (
@@ -587,11 +593,11 @@ export const ContextPanelContent: React.FC = () => {
           </div>
         </div>
 
-        <div className="mb-5 rounded-lg bg-[var(--surface-elevated)]/70 px-4 py-3.5">
+        {viewModel.showContext && <div className="mb-5 rounded-lg bg-[var(--surface-elevated)]/70 px-4 py-3.5">
           <div className="flex items-baseline justify-between">
             <span className="typography-micro text-muted-foreground">{t('contextSidebar.section.context')}</span>
             <span className="typography-micro tabular-nums text-muted-foreground">
-              {viewModel.usagePercent === null ? '—' : formatNumber(viewModel.tokenBreakdown.total)}
+              {viewModel.usagePercent === null ? '—' : formatNumber(viewModel.contextTokens)}
               {viewModel.contextLimit ? ` / ${formatNumber(viewModel.contextLimit)}` : ''}
             </span>
           </div>
@@ -611,7 +617,7 @@ export const ContextPanelContent: React.FC = () => {
               ? t('contextUsage.compacted.description')
               : t('contextSidebar.context.percentUsed', { percent: viewModel.usagePercent.toFixed(1) })}
           </div>
-        </div>
+        </div>}
 
         <div className="mb-5 grid grid-cols-2 gap-2">
           {([

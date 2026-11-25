@@ -2816,4 +2816,13 @@ export const settingsDict = {
   "settings.usage.configuration.deleteConfirm": "هل تريد حذف \"{name}\" وإعدادات الاستخدام المحفوظة؟",
   "settings.usage.configuration.account": "حساب الخدمة",
   "settings.usage.configuration.accountHint": "يستخدم تسجيل الدخول أو بيانات اعتماد الخدمة على المثيل المتصل.",
+  'settings.backends.title': 'Antigravity',
+  'settings.backends.backend': "المحرك",
+  'settings.backends.binary': "مسار برنامج Antigravity",
+  'settings.backends.login': "تسجيل الدخول باستخدام Google",
+  'settings.backends.install': 'تثبيت Antigravity',
+  'settings.backends.verifying': 'جارٍ التحقق من الحساب والنماذج…',
+  'settings.backends.signedIn': 'تم تسجيل الدخول',
+  'settings.backends.signOut': 'تسجيل الخروج',
+  'settings.backends.signOutMessage': 'سيؤدي هذا إلى إيقاف محادثات Antigravity الجارية. سيُحتفظ بسجل المحادثات.',
 } as const;

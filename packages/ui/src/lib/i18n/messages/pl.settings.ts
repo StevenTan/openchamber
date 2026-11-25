@@ -2844,4 +2844,13 @@ export const settingsDict = {
   "settings.usage.configuration.deleteConfirm": "Usunąć \"{name}\" i zapisaną konfigurację użycia?",
   "settings.usage.configuration.account": "Konto usługi",
   "settings.usage.configuration.accountHint": "Używa logowania lub danych uwierzytelniających usługi w połączonej instancji.",
+  'settings.backends.title': 'Antigravity',
+  'settings.backends.backend': "Zaplecze",
+  'settings.backends.binary': "Ścieżka programu Antigravity",
+  'settings.backends.login': "Zaloguj się przez Google",
+  'settings.backends.install': 'Zainstaluj Antigravity',
+  'settings.backends.verifying': 'Sprawdzanie konta i modeli…',
+  'settings.backends.signedIn': 'Zalogowano',
+  'settings.backends.signOut': 'Wyloguj się',
+  'settings.backends.signOutMessage': 'Spowoduje to zatrzymanie trwających rozmów Antigravity. Historia rozmów zostanie zachowana.',
 };

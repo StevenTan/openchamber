@@ -2843,4 +2843,13 @@ export const settingsDict = {
   "settings.usage.configuration.deleteConfirm": "刪除「{name}」及其儲存的用量設定？",
   "settings.usage.configuration.account": "服務帳號",
   "settings.usage.configuration.accountHint": "使用目前執行個體上該服務的登入狀態或專用憑證。",
+  'settings.backends.title': 'Antigravity',
+  'settings.backends.backend': "後端",
+  'settings.backends.binary': "Antigravity 程式路徑",
+  'settings.backends.login': "使用 Google 登入",
+  'settings.backends.install': '安裝 Antigravity',
+  'settings.backends.verifying': '正在驗證帳戶和模型…',
+  'settings.backends.signedIn': '已登入',
+  'settings.backends.signOut': '登出',
+  'settings.backends.signOutMessage': '這會停止執行中的 Antigravity 對話，並保留對話記錄。',
 } as const;

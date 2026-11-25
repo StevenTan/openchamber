@@ -2816,4 +2816,13 @@ export const settingsDict = {
   "settings.usage.configuration.deleteConfirm": "למחוק את \"{name}\" ואת הגדרות השימוש השמורות שלו?",
   "settings.usage.configuration.account": "חשבון השירות",
   "settings.usage.configuration.accountHint": "משתמש בכניסה או בפרטי ההזדהות של השירות במופע המחובר.",
+  'settings.backends.title': 'Antigravity',
+  'settings.backends.backend': "מנוע",
+  'settings.backends.binary': "נתיב התוכנית Antigravity",
+  'settings.backends.login': "כניסה באמצעות Google",
+  'settings.backends.install': 'התקנת Antigravity',
+  'settings.backends.verifying': 'בדיקת החשבון והמודלים…',
+  'settings.backends.signedIn': 'מחובר',
+  'settings.backends.signOut': 'יציאה',
+  'settings.backends.signOutMessage': 'פעולה זו תעצור שיחות Antigravity פעילות. היסטוריית השיחות תישמר.',
 } as const;

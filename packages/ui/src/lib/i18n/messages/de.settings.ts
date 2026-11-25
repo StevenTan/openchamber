@@ -2834,4 +2834,13 @@ export const settingsDict = {
   "settings.usage.configuration.deleteConfirm": "\"{name}\" und die gespeicherte Nutzungskonfiguration löschen?",
   "settings.usage.configuration.account": "Dienstkonto",
   "settings.usage.configuration.accountHint": "Verwendet die Anmeldung oder Zugangsdaten des Dienstes auf der verbundenen Instanz.",
+  'settings.backends.title': 'Antigravity',
+  'settings.backends.backend': "Backend",
+  'settings.backends.binary': "Antigravity-Programmpfad",
+  'settings.backends.login': "Mit Google anmelden",
+  'settings.backends.install': 'Antigravity installieren',
+  'settings.backends.verifying': 'Konto und Modelle werden geprüft…',
+  'settings.backends.signedIn': 'Angemeldet',
+  'settings.backends.signOut': 'Abmelden',
+  'settings.backends.signOutMessage': 'Dies beendet laufende Antigravity-Unterhaltungen. Der Verlauf bleibt erhalten.',
 };

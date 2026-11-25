@@ -2,7 +2,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { OpenCode } from '@opencode/client';
 import { z } from 'zod';
-import { createToolPermissions } from '../agent-tool/permissions.js';
+import { createToolPermissions, type ToolPermissionPolicy } from '../agent-tool/permissions.js';
 import { registerToolPermissionRoutes } from '../agent-tool/permission-routes.js';
 import type { GlobalMessageStreamHub } from '../event-stream/global-hub.js';
 import type { Application, ExpressFactory } from '../shared/http-contracts.js';
@@ -12,6 +12,7 @@ interface Options {
   buildOpenCodeUrl(path: string, query: string): string;
   getOpenCodeAuthHeaders(): Record<string, string>;
   globalEventHub: Pick<GlobalMessageStreamHub, 'injectEvent'>;
+  applicationPolicy?(sessionID: string): ToolPermissionPolicy | undefined;
 }
 
 export function createOpenCodeToolPermissions(options: Options) {
@@ -22,6 +23,8 @@ export function createOpenCodeToolPermissions(options: Options) {
   const runtime = createToolPermissions({
     file: path.join(options.dataDir, 'tool-permissions.json'),
     readPolicy: async sessionID => {
+      const application = options.applicationPolicy?.(sessionID);
+      if (application) return application;
       const session = await client().session.get({ sessionID });
       const scoped = client(session.location.directory);
       const agentID = session.agent ?? (await scoped.config.get()).reduce((agent, entry) => entry.type === 'document' ? entry.info.default_agent ?? agent : agent, 'build');

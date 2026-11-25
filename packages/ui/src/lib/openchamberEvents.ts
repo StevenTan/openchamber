@@ -20,6 +20,7 @@ import { z } from 'zod';
 import { trackedItemRecordsSchema } from './trackedItems/model';
 import type { SyncEvent } from './agent/events';
 import { classifyStreamPayload } from '@/lib/opencode/stream-payload';
+import { dispatchBackendEvent, type AgentBackendEvent } from './agent/control-events';
 import { parseEnvelope, getEventProperties } from './control-event-envelope';
 
 type ScheduledTaskRanEvent = {
@@ -205,6 +206,7 @@ const notificationPropertiesSchema = z.object({
 });
 
 type OpenChamberEvent =
+  | AgentBackendEvent
   | { type: 'terminal-sessions-changed' }
   | { type: 'notification'; payload: z.infer<typeof notificationPropertiesSchema> }
   | { type: 'event-stream-ready'; connectionId: string | null }
@@ -396,6 +398,7 @@ const signalEvents = new Map<string, OpenChamberEvent>([
 ]);
 
 const dispatchFromEnvelope = (envelope: { type: string; properties: unknown }) => {
+  if (dispatchBackendEvent(envelope, listeners)) return;
   if (envelope.type === 'openchamber:terminal-sessions-changed') {
     for (const listener of listeners) listener({ type: 'terminal-sessions-changed' });
     return;

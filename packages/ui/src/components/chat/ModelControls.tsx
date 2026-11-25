@@ -11,7 +11,6 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuLabel,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { handleDropdownNavigationKey } from '@/components/ui/dropdown-navigation';
@@ -28,10 +27,8 @@ import { Spinner } from "@/components/ui/spinner";
 import { ArrowsMerge } from '@/components/icons/ArrowsMerge';
 import type { IconName } from "@/components/icon/icons";
 import { ModelPickerCardBody, ModelPickerList, type ModelPickerEntry } from '@/components/model-picker/ModelPickerList';
-import { useIsVSCodeRuntime } from '@/hooks/useRuntimeAPIs';
 import { isDesktopShell } from '@/lib/desktop';
 import { useAgentColors } from '@/hooks/useAgentColors';
-import { useDeviceInfo } from '@/lib/device';
 import { mergeModelMetadataWithLiveModel } from '@/lib/modelMetadata';
 import { getModelDisplayName as getSharedModelDisplayName } from '@/lib/modelDisplay';
 import { formatCompactNumber } from '@/lib/numberFormat';
@@ -52,7 +49,7 @@ import { useSync } from '@/sync/use-sync';
 import { useUIStore } from '@/stores/useUIStore';
 import { useModelLists } from '@/hooks/useModelLists';
 import { useIsTextTruncated } from '@/hooks/useIsTextTruncated';
-import { formatEffortLabel, getCycledPrimaryAgentName, getEffortTone, getEffortToneClass, isPrimaryMode, type MobileControlsPanel } from './mobileControlsUtils';
+import { formatEffortLabel, getCycledPrimaryAgentName, isPrimaryMode, type MobileControlsPanel } from './mobileControlsUtils';
 import { getCurrentIntlLocale, isRightToLeft, useI18n } from '@/lib/i18n';
 import { useOpenCodeReadiness } from '@/hooks/useOpenCodeReadiness';
 import { eventMatchesShortcut, formatShortcutForDisplay, getEffectiveShortcutCombo, normalizeCombo } from '@/lib/shortcuts';
@@ -70,6 +67,10 @@ import type { BtwSelection } from '@/stores/useBtwStore';
 import { listModelVariantIds, type ModelVariantSource } from '@/lib/modelVariants';
 import { effortMemoryKey, rememberEffort, resolveEffortChoice, resolveEffortForModelSelection } from '@/lib/modelEfforts';
 import { restingAgentColor } from '@/lib/agentColors';
+import { useConversationBackend } from '@/hooks/useConversationBackend';
+import { NativeConversationModelControls } from './ConversationBackendControls';
+import { ModelControlsLayout, ModelPickerLabel, ModelSelectorMenu, ThinkingSelector } from './ModelControlsView';
+import { useModelControlsAppearance, useModelPickerLabels } from './useModelControlsAppearance';
 
 type IconComponent = IconName;
 
@@ -365,7 +366,12 @@ const ReadinessMark: React.FC<{ unavailable: boolean; className: string }> = ({ 
     unavailable ? <Icon name="error-warning" className={className} /> : <Spinner className={className} />
 );
 
-export const ModelControls: React.FC<ModelControlsProps> = ({
+export const ModelControls: React.FC<ModelControlsProps> = (props) => {
+    const { backendID } = useConversationBackend();
+    return backendID === 'antigravity' ? <NativeConversationModelControls className={props.className} /> : <OpenCodeModelControls {...props} />;
+};
+
+const OpenCodeModelControls: React.FC<ModelControlsProps> = ({
     className,
     mobilePanel,
     onMobilePanelChange,
@@ -519,11 +525,8 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
     const isAutoSelected = isAutoModel(currentProviderId, currentModelId);
     const modelUnavailable = useModelMissingFromCatalog(catalogDirectory, currentProviderId, currentModelId);
 
-    const { isMobile: deviceIsMobile } = useDeviceInfo();
-    const uiIsMobile = useUIStore((state) => state.isMobile);
-    const isMobile = deviceIsMobile || uiIsMobile;
+    const { isMobile, buttonHeight, controlIconSize, providerLogoSize, controlTextSize } = useModelControlsAppearance();
     const isDesktop = React.useMemo(() => isDesktopShell(), []);
-    const isVSCodeRuntime = useIsVSCodeRuntime();
     const isCompact = isMobile;
     const [localMobilePanel, setLocalMobilePanel] = React.useState<MobileControlsPanel>(null);
     const usingExternalMobilePanel = mobilePanel !== undefined && typeof onMobilePanelChange === 'function';
@@ -542,10 +545,8 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
     const agentListRef = React.useRef<HTMLDivElement>(null);
     const modelMenuSide = usePopupSideOnOpen(agentMenuOpen, modelTriggerRef, 'top');
     const agentMenuSide = usePopupSideOnOpen(isAgentSelectorOpen, agentTriggerRef, 'top');
-    const variantTriggerRef = React.useRef<HTMLDivElement>(null);
     useWidthMorph(modelTriggerRef);
     useWidthMorph(agentTriggerRef);
-    useWidthMorph(variantTriggerRef);
     const setAgentMenuOpen = selection ? onModelSelectorOpenChange ?? setLocalModelSelectorOpen : setModelSelectorOpen;
     const openAddProviderSettings = React.useCallback(() => {
         requestProviderConnect(true);
@@ -609,12 +610,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         return getCurrentAgent?.();
     }, [agents, getCurrentAgent, uiAgentName]);
 
-    const sizeVariant: 'mobile' | 'vscode' | 'default' = isMobile ? 'mobile' : isVSCodeRuntime ? 'vscode' : 'default';
-    const buttonHeight = sizeVariant === 'mobile' ? 'h-9' : sizeVariant === 'vscode' ? 'h-6' : 'h-8';
-    const controlIconSize = sizeVariant === 'mobile' ? 'size-5' : sizeVariant === 'vscode' ? 'size-4' : 'size-4';
-    const providerLogoSize = sizeVariant === 'mobile' ? 'size-[21px]' : 'size-[17px]';
-    const controlTextSize = isCompact ? 'typography-micro' : 'typography-meta';
-    const inlineGapClass = sizeVariant === 'mobile' ? 'gap-x-1' : sizeVariant === 'vscode' ? 'gap-x-2' : 'gap-x-4';
+
 
     const currentProvider = selection ? providers.find((provider) => provider.id === currentProviderId) : getCurrentProvider();
     const models = Array.isArray(currentProvider?.models) ? currentProvider.models : [];
@@ -1522,23 +1518,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         };
     }, []);
 
-    const modelPickerLabels = {
-        searchPlaceholder: t('chat.modelControls.searchModels'),
-        list: t('chat.modelControls.modelListAria'),
-        noResults: t('chat.modelControls.noModelsFound'),
-        favorites: t('chat.modelControls.favorites'),
-        recent: t('chat.modelControls.recent'),
-        keyboardHint: t('chat.modelControls.keyboardHintNavigate'),
-        favorite: t('chat.modelControls.favoriteAria'),
-        unfavorite: t('chat.modelControls.unfavoriteAria'),
-        provider: t('chat.modelControls.provider'),
-        capabilities: t('chat.modelControls.capabilities'),
-        capabilityToolCalling: t('chat.modelControls.capability.toolCalling'),
-        capabilityReasoning: t('chat.modelControls.capability.reasoning'),
-        input: t('chat.modelControls.input'),
-        output: t('chat.modelControls.output'),
-        costPerMillion: t('chat.modelControls.costPerMillion'),
-    };
+    const modelPickerLabels = useModelPickerLabels();
 
     const renderMobileModelTooltip = () => {
         if (!isCompact || mobileTooltipOpen !== 'model') return null;
@@ -2153,71 +2133,25 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         return (
             <Tooltip delayDuration={600}>
                 {!isCompact ? (
-                    <DropdownMenu open={isReady && agentMenuOpen} onOpenChange={isReady ? handleModelMenuOpenChange : undefined}>
-                        <TooltipTrigger asChild>
-                            <DropdownMenuTrigger asChild nativeButton={false}>
-                                <div
-                                    ref={modelTriggerRef}
-                                    aria-label={modelUnavailableText}
-                                    className={cn(
-                                        'model-controls__model-trigger flex items-center gap-1.5 cursor-pointer select-none hover:bg-transparent hover:opacity-70 min-w-0 overflow-hidden',
-                                        buttonHeight
-                                    )}
-                                >
-                                    {!modelSelectionReady ? (
-                                        <>
-                                            <ReadinessMark unavailable={isUnavailable} className={cn(controlIconSize, 'text-muted-foreground flex-shrink-0')} />
-                                            <span className={cn(
-                                                'model-controls__model-label',
-                                                controlTextSize,
-                                                'font-medium whitespace-nowrap text-muted-foreground min-w-0'
-                                            )}>
-                                                {readinessLabel}
-                                            </span>
-                                        </>
+                    <ModelSelectorMenu open={isReady && agentMenuOpen} onOpenChange={isReady ? handleModelMenuOpenChange : undefined}
+                        side={modelMenuSide} onKeyDownCapture={handleModelShortcutKeyDownCapture} triggerRef={modelTriggerRef} ariaLabel={modelUnavailableText}
+                        trigger={
+                                <ModelPickerLabel
+                                    labelRef={modelLabelRef}
+                                    label={modelSelectionReady ? currentModelDisplayName : readinessLabel}
+                                    pending={!modelSelectionReady}
+                                    truncated={isModelLabelTruncated}
+                                    icon={!modelSelectionReady ? (
+                                        <ReadinessMark unavailable={isUnavailable} className={cn(controlIconSize, 'text-muted-foreground flex-shrink-0')} />
                                     ) : isAutoSelected ? (
                                         <Icon name="openchamber" className={cn(controlIconSize, 'flex-shrink-0')} />
                                     ) : modelUnavailable ? (
                                         <Icon name="error-warning" className={cn(controlIconSize, 'flex-shrink-0 text-[var(--status-warning)]')} />
                                     ) : currentProviderId ? (
-                                        <>
-                                            <ProviderLogo
-                                                providerId={currentProviderId}
-                                                className={cn(providerLogoSize, 'flex-shrink-0')}
-                                            />
-                                            <Icon name="pencil-ai" className={cn(controlIconSize, 'text-primary/60 hidden')} />
-                                        </>
-                                    ) : (
-                                        <Icon name="pencil-ai" className={cn(controlIconSize, 'text-muted-foreground')} />
-                                    )}
-                                    {modelSelectionReady && (
-                                        <span
-                                            ref={modelLabelRef}
-                                            key={`${currentProviderId}-${currentModelId}`}
-                                            className={cn(
-                                                'model-controls__model-label overflow-hidden text-ellipsis',
-                                                controlTextSize,
-                                                'font-medium whitespace-nowrap text-foreground min-w-0',
-                                                'max-w-[260px]'
-                                            )}
-                                        >
-                                            <span className={cn('marquee-text', isModelLabelTruncated && 'marquee-text--active')}>
-                                                {currentModelDisplayName}
-                                            </span>
-                                        </span>
-                                    )}
-                                </div>
-                            </DropdownMenuTrigger>
-                        </TooltipTrigger>
-                        <DropdownMenuContent
-                            side={modelMenuSide}
-                            className="w-[min(380px,calc(100vw-2rem))] p-0 flex flex-col overflow-hidden"
-                            align="end"
-                            alignOffset={-40}
-                            constrainToMain
-                            collisionAvoidance={{ side: 'none', align: 'shift' }}
-                            onKeyDownCapture={handleModelShortcutKeyDownCapture}
-                        >
+                                        <ProviderLogo providerId={currentProviderId} className={cn(providerLogoSize, 'flex-shrink-0')} />
+                                    ) : <Icon name="pencil-ai" className={cn(controlIconSize, 'text-muted-foreground')} />}
+                                />
+                        }>
                             <ModelPickerList
                                 providers={providers}
                                 favoriteModels={favoriteModelsList}
@@ -2271,8 +2205,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                                 tooltipsEnabled={agentMenuOpen}
                                 onEscape={() => setAgentMenuOpen(false)}
                             />
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                    </ModelSelectorMenu>
                 ) : (
                     <button
                         type="button"
@@ -2470,26 +2403,6 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
 
         const displayVariant = currentVariant ? formatEffortLabel(currentVariant) : t('chat.modelControls.default');
         const isDefault = !currentVariant;
-        const isGreyEffort = getEffortTone(currentVariant) === 'default';
-        const triggerLabel = (
-            <>
-                <Icon name="brain-ai-3" className={cn('model-controls__variant-icon flex-shrink-0 text-muted-foreground group-hover:text-foreground', controlIconSize)} />
-                <span aria-hidden="true" className={cn('model-controls__variant-slash text-muted-foreground/60', controlTextSize)}>/</span>
-                <span
-                    className={cn(
-                        'model-controls__variant-label',
-                        controlTextSize,
-                        'font-medium min-w-0 truncate lowercase',
-                        getEffortToneClass(currentVariant),
-                        isGreyEffort ? 'group-hover:text-foreground' : 'group-hover:opacity-100',
-                        isMobile && 'max-w-[60px]',
-                        isDesktop && 'max-w-[180px]',
-                    )}
-                >
-                    {displayVariant}
-                </span>
-            </>
-        );
         const isInherited = !selection && !isDefault && currentVariantSelection.override === undefined;
         const agentVariant = currentAgent?.model?.providerID === currentProviderId
             && currentAgent.model.id === currentModelId
@@ -2507,79 +2420,14 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                 ? t('chat.modelControls.inheritedVariantTooltip', { variant: displayVariant })
                 : `${t('chat.modelControls.thinking')}: ${displayVariant}`;
 
-        if (isCompact) {
-            return (
-                <button
-                    type="button"
-                    onClick={() => setActiveMobilePanel('variant')}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onPointerDownCapture={(event) => {
-                        if (event.pointerType === 'touch') event.preventDefault();
-                    }}
-                    aria-label={tooltipText}
-                    className={cn(
-                        'model-controls__variant-trigger group -my-[5px] flex flex-shrink-0 items-center gap-1 px-1.5 focus:outline-none',
-                        buttonHeight,
-                        'cursor-pointer hover:bg-transparent',
-                    )}
-                >
-                    {triggerLabel}
-                </button>
-            );
-        }
-
-        return (
-            <Tooltip delayDuration={600}>
-                <DropdownMenu>
-                    <TooltipTrigger asChild>
-                        <DropdownMenuTrigger asChild nativeButton={false}>
-                            <div
-                                ref={variantTriggerRef}
-                                aria-label={tooltipText}
-                                className={cn(
-                                    'model-controls__variant-trigger group flex flex-shrink-0 items-center gap-1 cursor-pointer select-none hover:bg-transparent overflow-hidden',
-                                    buttonHeight,
-                                )}
-                            >
-                                {triggerLabel}
-                            </div>
-                        </DropdownMenuTrigger>
-                    </TooltipTrigger>
-                    <DropdownMenuContent side="top" align="end" alignOffset={-40} className="w-max max-w-[calc(100vw-2rem)]">
-                        <DropdownMenuLabel className={PICKER_SECTION_HEADER_CLASS}>{t('chat.modelControls.thinking')}</DropdownMenuLabel>
-                        <DropdownMenuItem className="typography-meta" onSelect={() => handleVariantSelect(undefined)}>
-                            <div className="flex items-center justify-between gap-2 w-full min-w-0">
-                                <span className="typography-meta font-medium text-foreground truncate min-w-0 lowercase">{t('chat.modelControls.default')}</span>
-                                {isDefault && <Icon name="check" className="size-4 text-inherit flex-shrink-0" />}
-                            </div>
-                        </DropdownMenuItem>
-                        {displayVariants.map((variant) => {
-                            const selected = currentVariant === variant;
-                            const label = formatEffortLabel(variant);
-                            return (
-                                <DropdownMenuItem
-                                    key={variant}
-                                    className="typography-meta"
-                                    onSelect={() => handleVariantSelect(variant)}
-                                >
-                                    <div className="flex items-center justify-between gap-2 w-full min-w-0">
-                                        <span className="typography-meta font-medium text-foreground truncate min-w-0 lowercase">{label}</span>
-                                        {selected && <Icon name="check" className="size-4 text-inherit flex-shrink-0" />}
-                                    </div>
-                                </DropdownMenuItem>
-                            );
-                        })}
-                        <div className="-mx-1 -mb-1 mt-1 flex items-center gap-x-4 overflow-hidden whitespace-nowrap border-t border-edge-muted px-3 pt-1 pb-1.5 typography-micro text-muted-foreground">
-                            <span>{t('chat.modelControls.keyboardHintNavigate')}</span>
-                            {thinkingShortcut ? <span>{t('chat.modelControls.keyboardHintSwitchThinking', { shortcut: thinkingShortcut })}</span> : null}
-                        </div>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-                <TooltipContent side="top">
-                    <TooltipLabelWithShortcut label={tooltipText} shortcut={thinkingShortcut} />
-                </TooltipContent>
-            </Tooltip>
-        );
+        return <ThinkingSelector
+            variant={currentVariant}
+            options={[undefined, ...displayVariants]}
+            onSelect={handleVariantSelect}
+            tooltip={tooltipText}
+            shortcut={thinkingShortcut}
+            onOpenMobile={() => setActiveMobilePanel('variant')}
+        />;
     };
 
     const renderAgentMark = () => agentUnavailable ? (
@@ -2795,36 +2643,19 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         );
     };
 
-    const inlineMobileSelection = isMobile && Boolean(selection);
-    const inlineClassName = cn(
-        'flex items-center min-w-0',
-        !isMobile && '@container/model-controls',
-        isMobile && 'w-full',
-        className,
-    );
-
     if (agentOnly) {
-        return <div className={cn(inlineClassName, 'justify-end')}>{renderAgentSelector()}</div>;
+        return <ModelControlsLayout className={className} model={null} agent={renderAgentSelector()} />;
     }
 
     return (
         <>
-            <div className={inlineClassName}>
-                <div
-                    className={cn(
-                        'flex items-center min-w-0 flex-1',
-                        inlineMobileSelection ? 'justify-between' : 'justify-end',
-                        inlineGapClass,
-                        sizeVariant === 'default' && 'model-controls__row pe-3',
-                    )}
-                >
-                    <div className={cn('flex items-center min-w-0', isMobile ? 'gap-x-0.5' : sizeVariant === 'vscode' ? 'gap-x-2' : 'gap-x-1.5')}>
-                        {renderModelSelector()}
-                        {renderVariantSelector()}
-                    </div>
-                    {!isAutoSelected && renderAgentSelector()}
-                </div>
-            </div>
+            <ModelControlsLayout
+                className={className}
+                model={renderModelSelector()}
+                effort={renderVariantSelector()}
+                agent={!isAutoSelected && renderAgentSelector()}
+                spread={isMobile && Boolean(selection)}
+            />
 
             {renderMobileModelPanel()}
             {renderMobileModelDetails()}

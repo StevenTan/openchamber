@@ -34,6 +34,8 @@ import { AutoReviewStrip } from '../../AutoReviewStrip';
 import { PullRequestWatchStrip } from '../../PullRequestWatchStrip';
 import { ExtensionWaitStrip } from '../../ExtensionWaitStrip';
 import { ModelControls } from '../../ModelControls';
+import { ModelControlsLayout } from '../../ModelControlsView';
+import { NativeConversationModelControls, ConversationBackendPicker } from '../../ConversationBackendControls';
 
 import { RevertedMessagesStrip } from '../../RevertedMessagesStrip';
 import { SessionFolderMissingRow } from '../../SessionFolderMissingRow';
@@ -68,7 +70,7 @@ type Dependencies = {
     sessionScope: Pick<ReturnType<typeof useComposerSessionScope>, 'newSessionDraftOpen' | 'isBtwActive' | 'isBtwPanelVisible' | 'hasPendingForm' | 'currentSessionId' | 'currentSessionDirectoryForSync' | 'currentDirectory' | 'setReviewDialogOpen' | 'sessionFolder' | 'trustPausedDirectory' | 'btwComposerSessionId' | 'inputMode'>;
     queueState: Pick<ReturnType<typeof useComposerQueueState>, 'queuedMessages' | 'parentMessageQueueTarget'>;
     draftTarget: Pick<ReturnType<typeof useComposerDraftTarget>, 'showDraftTargetSelectors' | 'messageWaitsForSpace'>;
-    selection: Pick<ReturnType<typeof useComposerSelection>, 'currentAgentName' | 'effectiveBtwSelection'>;
+    selection: Pick<ReturnType<typeof useComposerSelection>, 'currentAgentName' | 'effectiveBtwSelection' | 'backendID'>;
     queueActions: Pick<ReturnType<typeof useComposerQueueActions>, 'handleQueuedMessageEdit' | 'handleQueuedMessageSend'>;
     sessionLifecycle: Pick<ReturnType<typeof useComposerSessionLifecycle>, 'sessionPhase' | 'handleOpenMobilePanel'>;
     editorActions: Pick<ReturnType<typeof useComposerEditorActions>, 'handleCycleThinking' | 'handleOpenThinkingPanel' | 'handleCycleAgent'>;
@@ -348,15 +350,13 @@ export function useComposerRows({
                 />
             ) : (
                 <>
-                    <div className="flex min-w-0 items-center gap-0.5">
-                        <MemoMobileModelButton onOpenModel={() => handleOpenMobilePanel('model')} className="min-w-0 px-0" />
-                        <MemoMobileEffortButton onCycleThinking={handleCycleThinking} onOpenThinking={handleOpenThinkingPanel} />
-                    </div>
-                    <MemoMobileAgentButton
-                        onOpenAgentPanel={handleOpenAgentPanel}
-                        onCycleAgent={handleCycleAgent}
-                        className="flex-shrink-0 px-0"
-                    />
+                    <ConversationBackendPicker />
+                    {selection.backendID === 'antigravity' ? <NativeConversationModelControls className="flex-1" /> : <ModelControlsLayout className="flex-1" spread
+                        model={<MemoMobileModelButton onOpenModel={() => handleOpenMobilePanel('model')} className="min-w-0 px-0" />}
+                        effort={<MemoMobileEffortButton onCycleThinking={handleCycleThinking} onOpenThinking={handleOpenThinkingPanel} />}
+                        agent={<MemoMobileAgentButton onOpenAgentPanel={handleOpenAgentPanel} onCycleAgent={handleCycleAgent} className="flex-shrink-0 px-0" />}
+                    />}
+
                 </>
             )}
         </div>

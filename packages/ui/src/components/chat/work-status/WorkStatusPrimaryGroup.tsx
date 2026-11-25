@@ -6,7 +6,7 @@ import { useNestedGitDirectory } from '@/hooks/useNestedGitDirectory';
 import { useWorktreeBootstrapPending } from '@/hooks/useWorktreeBootstrapPending';
 import { runBackgroundNetworkTask } from '@/lib/background-network';
 import { useFreshestSourceControlVisualSummaryForBranch } from '@/stores/useGitHubPrStatusStore';
-import { useSessionMessages } from '@/sync/sync-context';
+import { useSession, useSessionMessages } from '@/sync/sync-context';
 import { useContextWindowLimits } from '@/hooks/useContextWindowLimits';
 import { useUIStore } from '@/stores/useUIStore';
 import { useProjectsStore } from '@/stores/useProjectsStore';
@@ -153,10 +153,11 @@ export const WorkStatusPrimaryGroup: React.FC<Props> = ({ sessionId, directory, 
 
   const sessionMessages = useSessionMessages(sessionId ?? '', directory ?? undefined);
   const { context: contextLimit } = useContextWindowLimits(sessionId, directory ?? undefined);
+  const session = useSession(sessionId ?? '', directory ?? undefined);
 
   const contextUsage = React.useMemo(
-    () => computeContextUsage(sessionMessages, contextLimit),
-    [sessionMessages, contextLimit],
+    () => session?.backendID === 'antigravity' && contextLimit <= 0 ? null : computeContextUsage(sessionMessages, contextLimit),
+    [sessionMessages, contextLimit, session?.backendID],
   );
 
   const lastReplyCacheHit = React.useMemo(() => computeLastReplyCacheHit(sessionMessages), [sessionMessages]);

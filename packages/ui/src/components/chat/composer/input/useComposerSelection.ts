@@ -13,6 +13,7 @@ import { selectAutoReady, useRoutingStore } from '@/stores/useRoutingStore';
 import { useKeybinds } from '@/hooks/useKeybind';
 import { getNextFavoriteModel } from '@/lib/modelRefs';
 import { modelVariantNames, nextThinkingVariant } from '@/lib/modelVariants';
+import { useConversationBackend, useNativeConversationCatalog } from '@/hooks/useConversationBackend';
 
 type Dependencies = {
     column: Pick<ReturnType<typeof useComposerColumn>, 'columnPinned'>;
@@ -23,6 +24,8 @@ type Dependencies = {
 export function useComposerSelection({
     column, editorState, sessionScope,
 }: Dependencies) {
+    const backend = useConversationBackend();
+    useNativeConversationCatalog(backend);
     const { columnPinned } = column;
     const { composerFormRef } = editorState;
     const {
@@ -175,8 +178,17 @@ export function useComposerSelection({
     } : {});
 
     return {
-        currentProviderId, currentModelId, currentModelMetadata, agents, mailboxTarget, shownSessionId,
-        currentAgentName, currentVariant, effectiveBtwSelection, configCatalogLoaded, setAgent,
+        currentProviderId: backend.backendID === 'antigravity' ? 'antigravity' : currentProviderId,
+        currentModelId: backend.backendID === 'antigravity' ? backend.modelID : currentModelId,
+        currentModelMetadata: backend.backendID === 'antigravity' ? {
+            id: backend.modelID, providerId: 'antigravity', name: backend.model?.name,
+            tool_call: true, attachment: true, modalities: { input: ['text', 'image'], output: ['text'] },
+        } : currentModelMetadata,
+        agents, mailboxTarget, shownSessionId,
+        currentAgentName: backend.backendID === 'antigravity' ? 'antigravity' : currentAgentName,
+        currentVariant: backend.backendID === 'antigravity' ? backend.variant : currentVariant,
+        effectiveBtwSelection, configCatalogLoaded: backend.backendID === 'antigravity' ? Boolean(backend.catalog) : configCatalogLoaded, setAgent,
         btwModelSelectorOpen, setBtwModelSelectorOpen, pinnedComposerSelection,
+        backendID: backend.backendID,
     };
 }

@@ -2833,4 +2833,13 @@ export const settingsDict = {
   "settings.usage.configuration.deleteConfirm": "\"{name}\" en de opgeslagen gebruiksconfiguratie verwijderen?",
   "settings.usage.configuration.account": "Serviceaccount",
   "settings.usage.configuration.accountHint": "Gebruikt de aanmelding of inloggegevens van de dienst op de verbonden instantie.",
+  'settings.backends.title': 'Antigravity',
+  'settings.backends.backend': "Backend",
+  'settings.backends.binary': "Pad naar Antigravity",
+  'settings.backends.login': "Inloggen met Google",
+  'settings.backends.install': 'Antigravity installeren',
+  'settings.backends.verifying': 'Account en modellen controleren…',
+  'settings.backends.signedIn': 'Ingelogd',
+  'settings.backends.signOut': 'Uitloggen',
+  'settings.backends.signOutMessage': 'Dit stopt actieve Antigravity-gesprekken. De gespreksgeschiedenis blijft bewaard.',
 } as const;

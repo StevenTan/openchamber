@@ -1,10 +1,10 @@
-import { afterEach, describe, expect, test } from 'bun:test'
-import { conversationClient, selectAgentBackend } from './active'
+import { describe, expect, test } from 'bun:test'
+import { conversationClient } from './active'
 import { registerAgentBackend } from './registry'
+import { createApplicationBackend } from './application'
 import { createOpenCodeBackend } from '../opencode/backend'
 import type { Session } from './model'
-
-afterEach(() => selectAgentBackend('opencode'))
+import type { AgentBackend } from './backend'
 
 describe('conversation backend routing', () => {
   test('session operations retain their owner while new sessions use the selected backend', async () => {
@@ -36,11 +36,9 @@ describe('conversation backend routing', () => {
         },
       }))
     }
-    selectAgentBackend('first')
-    const first = await conversationClient.createSession()
-    const cleanup = await conversationClient.captureSessionCleanup('/project', 'runtime')
-    selectAgentBackend('second')
-    const second = await conversationClient.createSession()
+    const first = await conversationClient.createSession({ backendID: 'first' })
+    const cleanup = await conversationClient.captureSessionCleanup('/project', 'runtime', 'first')
+    const second = await conversationClient.createSession({ backendID: 'second' })
     await conversationClient.abortSession(first.id)
     await conversationClient.abortSession(second.id)
     expect(await conversationClient.getSessionUnscoped(first.id)).toBe(first)
@@ -59,7 +57,7 @@ describe('conversation backend routing', () => {
     }
     const backend = createOpenCodeBackend()
     const messages: string[] = []
-    registerAgentBackend('history', () => ({
+    const history: AgentBackend = {
       ...backend,
       id: 'history',
       client: {
@@ -67,10 +65,11 @@ describe('conversation backend routing', () => {
         listSessionsPage: async () => ({ sessions: [session], cursor: {} }),
         sendMessage: async (input) => { messages.push(input.text); return 'message' },
       },
-    }))
-    selectAgentBackend('history')
+    }
+    registerAgentBackend('history', () => history)
+    const standard = { ...backend, client: { ...backend.client, listSessionsPage: async () => ({ sessions: [], cursor: {} }) } }
+    registerAgentBackend('application', () => createApplicationBackend(standard, { ...history, client: { ...history.client, listSessions: async () => [session] } }))
     await conversationClient.listSessionsPage()
-    selectAgentBackend('opencode')
     await conversationClient.sendMessage({ id: session.id, providerID: 'provider', text: 'Continue' })
     expect(messages).toEqual(['Continue'])
   })

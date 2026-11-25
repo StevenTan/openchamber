@@ -99,10 +99,12 @@ export function createCodeModeMcpRuntime(
       return { tools: [tool, ...entries.filter(entry => entry.namespace === 'openchamber').map(entry => entry.tool)] };
     });
     server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
+      const sessionToken = extra.requestInfo?.headers['x-openchamber-session'];
+      const meta = { ...extra._meta, ...sessionToken && { 'openchamber/sessionToken': sessionToken } };
       if (request.params.name !== 'execute') {
         const control = clients.find(source => source.namespace === 'openchamber');
         if (!control) throw new Error('OpenChamber control tools are unavailable');
-        return control.client.callTool(request.params, CallToolResultSchema, { signal: extra.signal, timeout: 43_200_000 });
+        return control.client.callTool({ ...request.params, _meta: meta }, CallToolResultSchema, { signal: extra.signal, timeout: 43_200_000 });
       }
       const context = resolveContext(extra);
       const policy = await permissions.session(context.sessionID);
@@ -115,7 +117,7 @@ export function createCodeModeMcpRuntime(
         let capture: Schema.JsonObject = {};
         let result;
         try {
-          result = CallToolResultSchema.parse(await entry.client.callTool({ name: entry.tool.name, arguments: object(args), _meta: extra._meta }, CallToolResultSchema, { signal, timeout: 43_200_000 }));
+          result = CallToolResultSchema.parse(await entry.client.callTool({ name: entry.tool.name, arguments: object(args), _meta: meta }, CallToolResultSchema, { signal, timeout: 43_200_000 }));
         } finally {
           if (editing) capture = await fileActivity('after', extra, name, args);
         }

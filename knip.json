@@ -99,6 +99,7 @@
         "scripts/check-guest.ts",
         "src/ui/index.ts",
         "src/schemas.ts",
+        "src/agent-backends.ts",
         "src/**/*.{test,spec}.ts",
         "scripts/**/*.{test,spec}.ts"
       ],

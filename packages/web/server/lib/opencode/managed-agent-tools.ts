@@ -16,17 +16,21 @@ type Options = Pick<AgentToolDependencies, 'getCommandEnvironment' | 'questionRu
   client(): SessionClient;
   server(): Server | null;
   permissionOptions: Parameters<typeof createOpenCodeToolPermissions>[0];
+  applicationContext?: AgentToolDependencies['resolveMcpContext'];
+  applicationDirectory?(sessionID: string): string | undefined;
+  authorizeMcpRequest?: AgentToolDependencies['authorizeMcpRequest'];
 };
 
-export function createManagedAgentTools({ control, client, server, permissionOptions, instanceDir, ...dependencies }: Options) {
+export function createManagedAgentTools({ control, client, server, permissionOptions, instanceDir, applicationContext, applicationDirectory, ...dependencies }: Options) {
   const permissions = createOpenCodeToolPermissions(permissionOptions);
   const runtime = createAgentToolRuntime({
     ...dependencies, crypto, permissions,
-    resolveMcpContext: resolveOpenCodeMcpContext,
-    codeModeFileActivity: createCodeModeFileActivity(permissionOptions),
+    resolveMcpContext: applicationContext ?? resolveOpenCodeMcpContext,
+    codeModeFileActivity: (phase, request, tool, input) => applicationDirectory?.((applicationContext ?? resolveOpenCodeMcpContext)(request).sessionID)
+      ? Promise.resolve({}) : createCodeModeFileActivity(permissionOptions)(phase, request, tool, input),
     executeAction: (...args) => control.execute(...args),
-    resolveSessionDirectory: sessionID => control.resolveSessionDirectory(sessionID),
-    hasPendingInput: async (sessionID, signal) => (await client().session.inbox.list({ sessionID }, { signal })).length > 0,
+    resolveSessionDirectory: async sessionID => applicationDirectory?.(sessionID) ?? control.resolveSessionDirectory(sessionID),
+    hasPendingInput: async (sessionID, signal) => applicationDirectory?.(sessionID) ? false : (await client().session.inbox.list({ sessionID }, { signal })).length > 0,
     getActivePort: () => {
       const address = server()?.address();
       return address && !isString(address) ? address.port : null;

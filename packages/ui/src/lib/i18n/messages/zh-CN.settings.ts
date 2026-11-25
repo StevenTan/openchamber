@@ -2843,4 +2843,13 @@ export const settingsDict = {
   "settings.usage.configuration.deleteConfirm": "删除「{name}」及其保存的用量配置？",
   "settings.usage.configuration.account": "服务账号",
   "settings.usage.configuration.accountHint": "使用当前实例上该服务的登录状态或专用凭据。",
+  'settings.backends.title': 'Antigravity',
+  'settings.backends.backend': "后端",
+  'settings.backends.binary': "Antigravity 程序路径",
+  'settings.backends.login': "使用 Google 登录",
+  'settings.backends.install': '安装 Antigravity',
+  'settings.backends.verifying': '正在验证账户和模型…',
+  'settings.backends.signedIn': '已登录',
+  'settings.backends.signOut': '退出登录',
+  'settings.backends.signOutMessage': '这会停止正在运行的 Antigravity 会话，保留会话历史。',
 } as const;

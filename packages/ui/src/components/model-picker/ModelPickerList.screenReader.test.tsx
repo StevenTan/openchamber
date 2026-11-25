@@ -88,11 +88,11 @@ afterEach(async () => {
   dom.close();
 });
 
-const renderPicker = async (favoriteModels: ModelPickerEntry[] = []) => {
+const renderPicker = async (favoriteModels: ModelPickerEntry[] = [], modelProviders = providers) => {
   await act(async () => {
     root.render(
       <ModelPickerList
-        providers={providers}
+        providers={modelProviders}
         favoriteModels={favoriteModels}
         recentModels={[]}
         searchQuery=""
@@ -157,4 +157,19 @@ test('a favorite row, which shows its provider only as a logo, names the provide
   const row = activeRow()!;
   expect(row.closest('[role="group"]')?.getAttribute('aria-label')).toBe('Favorites');
   expect(rowName(row)).toBe('Beta Lab Small');
+});
+
+test('model rows show known context sizes and leave unknown sizes out', async () => {
+  await renderPicker([], [{
+    id: 'antigravity',
+    name: 'Antigravity',
+    models: [
+      { id: 'unknown', name: 'Unknown context', limit: { context: 0, output: 0 } },
+      { id: 'known', name: 'Known context', limit: { context: 200000, output: 8192 } },
+    ],
+  }]);
+  const rows = document.querySelectorAll('[role="option"]');
+  expect(rows).toHaveLength(2);
+  expect(rows[0].querySelector('[id$="-context"]')?.textContent ?? null).toBeNull();
+  expect(rows[1].querySelector('[id$="-context"]')?.textContent).toBe('200K');
 });

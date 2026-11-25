@@ -96,6 +96,7 @@ export type AssistantMessage = MessageBase & {
   tokens?: TokenUsageInfo
   snapshot?: { start?: string; end?: string; files?: string[] }
   retry?: { attempt: number; at: number; error: StructuredError }
+  context?: { used: number; limit: number }
 }
 
 export type SyntheticMessage = MessageBase & {

@@ -11,6 +11,7 @@ import { NotificationSettings } from './NotificationSettings';
 import { VoiceSettings } from './VoiceSettings';
 import { TunnelSettings } from './TunnelSettings';
 import { OpenCodeCliSettings } from './OpenCodeCliSettings';
+import { AgentBackendSettings } from './AgentBackendSettings';
 import { EnvironmentVariablesSettings } from './EnvironmentVariablesSettings';
 import { IsolatedSpacesSettings } from './IsolatedSpacesSettings';
 import { OpenChamberToolsSettings } from './OpenChamberToolsSettings';
@@ -117,6 +118,7 @@ const GeneralSectionContent: React.FC = () => {
             <GeneralInterfaceSettings />
             {isLocalDesktop && <DesktopQuickAccessSettings />}
             {!isVSCode && <OpenCodeCliSettings />}
+            {!isVSCode && <AgentBackendSettings />}
             {!isVSCode && <EnvironmentVariablesSettings key={runtimeEndpointEpoch} />}
             <GeneralFilesAndTerminalSettings />
             <AppLinkSecuritySettings />

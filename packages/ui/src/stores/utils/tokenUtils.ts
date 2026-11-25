@@ -45,6 +45,7 @@ export type ContextFillMessage = {
     tokens?: TokenBreakdown;
     status?: string;
     error?: AssistantMessage['error'];
+    context?: { used: number; limit: number };
 };
 
 type LatestContextFill =
@@ -62,7 +63,7 @@ export const findLatestContextFill = (messages: readonly ContextFillMessage[]): 
 
         if (message?.role !== 'assistant') continue;
 
-        const totalTokens = contextTokensFromBreakdown(message.tokens);
+        const totalTokens = message.context?.used ?? contextTokensFromBreakdown(message.tokens);
         if (totalTokens > 0) return { state: 'measured', index, totalTokens };
     }
 

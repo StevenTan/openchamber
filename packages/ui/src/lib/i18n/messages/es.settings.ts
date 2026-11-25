@@ -2843,4 +2843,13 @@ export const settingsDict = {
   "settings.usage.configuration.deleteConfirm": "¿Eliminar \"{name}\" y su configuración guardada?",
   "settings.usage.configuration.account": "Cuenta del servicio",
   "settings.usage.configuration.accountHint": "Usa la sesión o las credenciales del servicio en la instancia conectada.",
+  'settings.backends.title': 'Antigravity',
+  'settings.backends.backend': "Motor",
+  'settings.backends.binary': "Ruta del ejecutable de Antigravity",
+  'settings.backends.login': "Iniciar sesión con Google",
+  'settings.backends.install': 'Instalar Antigravity',
+  'settings.backends.verifying': 'Verificando la cuenta y los modelos…',
+  'settings.backends.signedIn': 'Sesión iniciada',
+  'settings.backends.signOut': 'Cerrar sesión',
+  'settings.backends.signOutMessage': 'Esto detiene las conversaciones de Antigravity en curso. Se conserva el historial.',
 } as const;

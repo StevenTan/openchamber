@@ -1,3 +1,4 @@
+import { BACKEND_SEARCH_ITEMS } from './search-backends';
 import type { I18nKey, I18nParams } from '@/lib/i18n/store';
 import { getCustomizableShortcutActions } from '@/lib/shortcuts';
 import { canKeepScreenAwake } from '@/lib/platform';
@@ -853,20 +854,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     keywords: ['desktop', 'lan', 'network', 'phone', 'tablet'],
     isAvailable: (ctx) => ctx.isDesktopLocalOrigin,
   },
-  {
-    id: 'sessions.opencode-binary',
-    page: 'general',
-    titleKey: 'settings.openchamber.opencodeCli.field.binaryPath',
-    keywords: ['opencode', 'cli', 'binary', 'path'],
-    isAvailable: (ctx) => !ctx.isVSCode,
-  },
-  {
-    id: 'sessions.opencode-restart',
-    page: 'general',
-    titleKey: 'settings.openchamber.opencodeCli.actions.restart',
-    keywords: ['opencode', 'restart', 'reload', 'plugin'],
-    isAvailable: (ctx) => !ctx.isVSCode,
-  },
+  ...BACKEND_SEARCH_ITEMS,
   {
     id: 'general.environment-variables',
     page: 'general',

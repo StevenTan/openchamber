@@ -1046,7 +1046,7 @@ async function resolveBlockingRequestTarget(
 }
 
 
-export type SessionCreateSelection = { model?: ModelSelection; agent?: string }
+export type SessionCreateSelection = { model?: ModelSelection; agent?: string; backendID?: string }
 
 export async function createSession(
   title?: string,
@@ -1063,11 +1063,11 @@ export async function createSession(
   try {
     if (getRuntimeKey() !== runtimeKey || getAgentBackend().events.identity !== runtimeClient) return null
     const effectiveDirectory = directoryOverride ?? dir()
-    const cleanupSession = await conversationClient.captureSessionCleanup(effectiveDirectory, runtimeKey)
+    const cleanupSession = await conversationClient.captureSessionCleanup(effectiveDirectory, runtimeKey, selection?.backendID)
     if (getRuntimeKey() !== runtimeKey || getAgentBackend().events.identity !== runtimeClient) return null
     const sessionMetadata = title ? withUserWorkTitle(metadata ?? {}, title) : metadata
     const session = await conversationClient.createSession(
-      { id, title, metadata: sessionMetadata, model: selection?.model, agent: selection?.agent },
+      { id, title, metadata: sessionMetadata, model: selection?.model, agent: selection?.agent, backendID: selection?.backendID },
       effectiveDirectory,
     )
 
@@ -2179,7 +2179,7 @@ function resolveFormSelection(record: Session | undefined, sessionId: string): F
   const picks = useSelectionStore.getState()
   const agentPick = picks.getSessionAgentPick(sessionId) ?? undefined
   if (
-    record
+    record && (record.backendID ?? 'opencode') === 'opencode'
     && (isReviewSession(record) || !record.parentID)
     && useSessionUIStore.getState().currentSessionId === sessionId
   ) {

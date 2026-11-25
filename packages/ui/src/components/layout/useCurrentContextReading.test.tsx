@@ -57,9 +57,10 @@ const assistant = (id: string, total: number): Message => ({
 
 let store: ReturnType<typeof useDirectoryStore> | null = null
 let renders = 0
+let reading: ReturnType<typeof useCurrentContextReading>
 
 const ReadingProbe = () => {
-  useCurrentContextReading()
+  reading = useCurrentContextReading()
   return null
 }
 
@@ -84,6 +85,7 @@ describe('useCurrentContextReading', () => {
     previousSurface = window.__OPENCHAMBER_SURFACE__
     window.__OPENCHAMBER_SURFACE__ = 'desktop'
     const spies = [
+      spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(JSON.stringify({ revision: 0, enabled: false, minutes: 5, sessions: [] }), { headers: { 'content-type': 'application/json' } })),
       spyOn(opencodeClient, 'getFilesystemHomeInfo').mockResolvedValue({ home: '/home' }),
       spyOn(opencodeClient, 'getFilesystemHome').mockResolvedValue('/home'),
       spyOn(opencodeClient, 'getLocation').mockResolvedValue({
@@ -142,5 +144,14 @@ describe('useCurrentContextReading', () => {
 
     await seed([session(3)], [])
     expect(renders).toBe(measured + 2)
+  })
+
+  test('native context uses its reported limit and hides unknown usage', async () => {
+    const native = { ...session(1), backendID: 'antigravity' }
+    await seed([native], [])
+    expect(reading.fill).toBeNull()
+    const message = { ...assistant('msg_1', 50000), context: { used: 32000, limit: 128000 } }
+    await seed([native], [message])
+    expect(reading).toMatchObject({ fill: { state: 'measured', totalTokens: 32000 }, limit: 128000 })
   })
 })
