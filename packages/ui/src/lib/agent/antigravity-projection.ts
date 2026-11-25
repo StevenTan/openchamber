@@ -5,14 +5,6 @@ import type { ProviderCatalog } from './client';
 import { partIds } from '../opencode/model';
 
 const emptyUsage = () => ({ input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } });
-const acpContext = (turn?: AcpTurn) => {
-  if (!turn) return undefined;
-  for (let index = turn.updates.length - 1; index >= 0; index--) {
-    const usage = turn.updates[index];
-    if (usage.sessionUpdate === 'usage_update') return { used: usage.used, limit: usage.size };
-  }
-  return turn.context;
-};
 export function acpSession(session: AcpConversation): Session {
   const model = session.config.find(option => option.category === 'model' && option.type === 'select');
   const thought = session.config.find(option => option.category === 'thought_level' && option.type === 'select');
@@ -27,7 +19,7 @@ export function acpCatalog(session: AcpConversation): ProviderCatalog {
   const thought = session.config.find(option => option.category === 'thought_level' && option.type === 'select');
   const variants = thought?.type === 'select' ? thought.options.flatMap(option => 'group' in option ? option.options : [option]).map(option => ({ id: option.value })) : [];
   const models = model?.type === 'select' ? model.options.flatMap(option => 'group' in option ? option.options : [option]) : [];
-  const limits = new Map(session.turns.map(turn => [turn.modelID, acpContext(turn)?.limit ?? 0]));
+  const limits = new Map(session.turns.map(turn => [turn.modelID, turn.context?.limit ?? 0]));
   return {
     providers: [{ id: 'antigravity', name: 'Antigravity', activation: 'enabled', package: 'antigravity' }],
     models: models.map(option => ({ id: option.value, modelID: option.value, providerID: 'antigravity', name: option.name,
@@ -73,6 +65,6 @@ export function acpMessages(session: AcpConversation, turn: AcpTurn): Array<{ in
     })),
     { info: { id: turn.assistantID, sessionID: session.id, role: 'assistant', agent: 'antigravity', providerID: 'antigravity', modelID: turn.modelID, ...turn.variant && { variant: turn.variant }, time: { created: turn.created, ...turn.completed && { completed: turn.completed } },
       ...turn.completed && { finish: turn.error ? 'error' as const : 'stop' as const }, ...turn.error && { error: { type: 'AntigravityError', message: turn.error } },
-      ...turn.tokens && { tokens: turn.tokens }, context: acpContext(turn) }, parts },
+      ...turn.tokens && { tokens: turn.tokens }, context: turn.context }, parts },
   ];
 }

@@ -48,8 +48,8 @@ conversations retain their stored backend.
 - Web, Electron, VS Code, hosted mobile and Capacitor use the same contracts.
   Their runtime transport continues to own authentication and relay routing.
 - Assistant records can carry an authoritative context fill and limit separately
-  from accumulated token counters. Antigravity projects ACP usage updates into
-  this reading, with native database measurements supplying cache counters.
+  from accumulated token counters. Antigravity uses native database measurements
+  for context fill, window size and cache counters.
   Context readouts hide unknown Antigravity windows, and model catalogs expose
   limits only for models whose native turns have reported them.
 

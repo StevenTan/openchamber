@@ -31,9 +31,8 @@ mobile clients use the host routes; the VS Code extension uses OpenCode.
   own their tool behavior and resource permissions for both backends.
 - Enterprise mode blocks the Antigravity process because its providers are
   outside OpenCode's provider policy.
-- ACP usage updates supply the current context fill and window size. Completed
-  turns also read the private profile's conversation SQLite database for token
-  and cache counters, using the MIT-licensed Protobuf decoder from
+- Completed turns read the private profile's conversation SQLite database for
+  context fill, window size, token and cache counters, using the MIT-licensed Protobuf decoder from
   `nkjDSLcvanv/antigravity-codex-theme`. Database access is read-only; unavailable
   measurements have no fabricated context limit.
 
