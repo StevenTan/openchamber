@@ -31,6 +31,8 @@ leaves the saved catalog intact.
 
 The account source uses the template's account sign-in on the connected instance.
 Managed credentials retain the template's existing storage and account lifecycle.
+The Antigravity account source reads native quota groups through the configured
+conversation backend, including Gemini and Claude/GPT rolling windows.
 
 The provider-response source is supported by Codex on managed servers. The
 `openchamber-quota-usage` plugin matches each OpenCode request's provider ID to

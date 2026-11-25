@@ -34,6 +34,7 @@ export interface AcpConversation {
   config: NonNullable<NewSessionResponse['configOptions']>;
   turns: AcpTurn[];
   tokens?: AcpTokenUsage;
+  archived?: number | null;
 }
 
 export type AcpConversationEvent =

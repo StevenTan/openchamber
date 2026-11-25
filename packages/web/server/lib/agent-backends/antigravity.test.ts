@@ -8,6 +8,8 @@ import type { AcpConversationEvent } from '@openchamber/sdk/agent-backends';
 import { createAntigravityBackend } from './antigravity.js';
 import { createBackendMcpIdentity } from './mcp-identity.js';
 import { EventEmitter, once } from 'node:events';
+import { createAgentBackendHost } from './host.js';
+import { createOpenCodeClient } from '../openchamber-sessions/opencode-client.js';
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -63,9 +65,29 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
   assert.deepEqual(session.turns.at(-1)?.context, { used: 30, limit: 64 });
   assert.deepEqual(session.tokens, session.turns.at(-1)?.tokens);
   await backend.close();
+  const openCodeArchives: Array<[string, boolean]> = [];
+  const host = createAgentBackendHost({
+    dataDir: directory, environment: () => process.env, server: () => null,
+    tools: () => { throw new Error('Tool runtime is unused'); }, publish: () => {},
+    hub: { injectEvent: () => {}, subscribeEvent: () => () => {}, subscribeStatus: () => () => {} },
+    openCodeClient: () => createOpenCodeClient({ baseUrl: 'http://127.0.0.1', headers: {}, fetch: async (url, init) => {
+      if (init?.method === 'PATCH') { openCodeArchives.push(['ses_opencode', JSON.parse(String(init.body)).archived]); return new Response(null, { status: 204 }); }
+      return Response.json({ data: { id: 'ses_opencode', time: { archived: 1234 } } });
+    } }),
+  });
+  cleanups.push(() => host.close());
+  await host.archive.setArchived(session.id, true);
+  const archivedAt = await host.archive.readArchivedAt(session.id);
+  assert.ok(Number.isInteger(archivedAt));
+  await host.archive.setArchived('ses_opencode', true);
+  assert.equal(await host.archive.readArchivedAt('ses_opencode'), 1234);
+  assert.deepEqual(openCodeArchives, [['ses_opencode', true]]);
   const reopened = make();
   cleanups.push(() => reopened.close());
   assert.deepEqual((await reopened.get(session.id)).turns, session.turns);
+  assert.equal(await reopened.archive.readArchivedAt(session.id), archivedAt);
+  await reopened.archive.setArchived(session.id, false);
+  assert.equal(await reopened.archive.readArchivedAt(session.id), null);
   const stopped = new Promise<void>(resolve => { onCompleted = resolve; });
   await reopened.send(session.id, { id: 'msg_stop', text: 'working', files: [], context: [] });
   await reopened.abort(session.id);

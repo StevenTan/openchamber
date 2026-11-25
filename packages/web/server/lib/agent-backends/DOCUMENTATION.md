@@ -20,6 +20,8 @@ mobile clients use the host routes; the VS Code extension uses OpenCode.
   the adopted host ID.
 - Host message identities and streamed updates are persisted together. Reloading
   history projects those records with the same identities as live updates.
+- Archive timestamps belong to the host conversation record. Archive and restore
+  use the common session routes and publish native conversation updates.
 - Antigravity prompt steering admits additional user messages and asynchronous
   answers into the running turn. The latest prompt's completion ends that turn.
 - The custom main agent uses the supplied MCP servers. OpenChamber's MCP services
@@ -35,6 +37,9 @@ mobile clients use the host routes; the VS Code extension uses OpenCode.
   context fill, window size, token and cache counters, using the MIT-licensed Protobuf decoder from
   `nkjDSLcvanv/antigravity-codex-theme`. Database access is read-only; unavailable
   measurements have no fabricated context limit.
+- Account quotas use the signed-in ACP worker's localhost
+  `RetrieveUserQuotaSummary` endpoint. A native session-list request starts the
+  worker without a model turn; the front and worker logs identify its HTTP port.
 
 ## Boundaries
 

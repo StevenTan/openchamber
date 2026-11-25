@@ -1664,7 +1664,7 @@ const environmentRuntime = composeEnvironmentRuntime({
   isEnterpriseMode: () => isEnterpriseMode(),
 });
 const agentBackendHost = createAgentBackendHost({
-  dataDir: OPENCHAMBER_DATA_DIR, server: () => server,
+  dataDir: OPENCHAMBER_DATA_DIR, server: () => server, openCodeClient: openCodeSessionClient,
   tools: () => { if (!agentToolRuntime) throw new Error('Agent tools are unavailable'); return agentToolRuntime; },
   environment: () => overlayEnvironment({ ...process.env, PATH: buildAugmentedPath() }, environmentRuntime.forOpenCode()),
   publish: event => broadcastOpenChamberUiEvent(event), hub: globalMessageStreamHub,
@@ -2065,7 +2065,7 @@ const openChamberSessionService = createOpenChamberSessionService({
   worktreeBootstrapStore,
   hydrateWorktreeCheckout: featureRoutesRuntime.hydrateBoundCheckout,
   createChangeRequestWorktree: featureRoutesRuntime.createChangeRequestWorktree,
-  dataDir: OPENCHAMBER_DATA_DIR,
+  dataDir: OPENCHAMBER_DATA_DIR, archiveBackend: agentBackendHost.archive,
   sessionMetadataStore,
   persistSessionMetadata: persistSessionMetadataPatch,
   updateSessionMetadata: updateSessionMetadataWith,

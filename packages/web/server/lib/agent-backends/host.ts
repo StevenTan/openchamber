@@ -9,6 +9,8 @@ import { createManagedAgentTools } from '../opencode/managed-agent-tools.js';
 import type { GlobalMessageStreamHub } from '../event-stream/global-hub.js';
 import type { AcpConversationEvent } from '@openchamber/sdk/agent-backends';
 import { createQuestionRuntime, createOpenCodeQuestionSession } from '../agent-question/src/runtime.js';
+import { createOpenCodeSessionArchive, type OpenCodeSessionArchive } from '../openchamber-sessions/session-archive.js';
+import { configureAntigravityQuotaReader } from '../quota/providers/antigravity/index.js';
 
 interface Options {
   dataDir: string;
@@ -17,6 +19,7 @@ interface Options {
   environment(): NodeJS.ProcessEnv;
   publish(event: { type: 'openchamber:acp'; properties: AcpConversationEvent }): void;
   hub: Pick<GlobalMessageStreamHub, 'injectEvent' | 'subscribeEvent' | 'subscribeStatus'>;
+  openCodeClient: Parameters<typeof createOpenCodeSessionArchive>[0]['clientFor'];
 }
 export function createAgentBackendHost(options: Options) {
   const identity = createBackendMcpIdentity();
@@ -36,6 +39,8 @@ export function createAgentBackendHost(options: Options) {
       ];
     },
   });
+  configureAntigravityQuotaReader(() => backend.quota());
+  const openCodeArchive = createOpenCodeSessionArchive({ clientFor: options.openCodeClient });
   const applicationDirectory = (sessionID: string) => backend.lookup(sessionID)?.directory;
   const unsubscribe = options.hub.subscribeEvent(event => {
     const parsed = z.object({ type: z.enum(['permission.asked', 'permission.replied', 'form.created', 'form.replied', 'form.cancelled']), data: z.object({ sessionID: z.string().optional(), form: z.object({ sessionID: z.string() }).optional() }) }).safeParse(event.payload);
@@ -51,8 +56,13 @@ export function createAgentBackendHost(options: Options) {
     const directory = applicationDirectory(sessionID);
     return directory ? { directory, projectDirectory: directory, rules: [] } : undefined;
   };
+  const archiveFor = (sessionID: string) => sessionID.startsWith('ses_ag_') ? backend.archive : openCodeArchive;
   return {
     backend,
+    archive: {
+      setArchived: (sessionID: string, archived: boolean) => archiveFor(sessionID).setArchived(sessionID, archived),
+      readArchivedAt: (sessionID: string, readOptions?: Parameters<OpenCodeSessionArchive['readArchivedAt']>[1]) => archiveFor(sessionID).readArchivedAt(sessionID, readOptions),
+    },
     close: async () => { unsubscribe(); await backend.close(); },
     toolOptions,
     applicationPolicy,

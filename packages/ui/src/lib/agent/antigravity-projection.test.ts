@@ -14,6 +14,10 @@ test('native context and cache counters feed the shared usage display', () => {
   expect(computeContextUsage(messages, 512000)).toEqual({ state: 'measured', totalTokens: 18265, limit: 512000, percent: 3.5673828125 });
   expect(computeLastReplyCacheHit(messages)).toBeCloseTo(86.11552148918697);
   expect(acpSession(session).tokens).toEqual(tokens);
+  session.archived = 3;
+  expect(acpSession(session).time.archived).toBe(3);
+  session.archived = null;
+  expect(acpSession(session).time.archived).toBeUndefined();
   expect(acpCatalog(session).models.map(model => model.limit.context)).toEqual([512000, 0]);
   delete turn.context;
   expect(acpMessages(session, turn)[1].info).toMatchObject({ context: undefined });

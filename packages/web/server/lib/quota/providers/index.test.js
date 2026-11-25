@@ -12,12 +12,21 @@ import { resetClaudeQuotaCache } from './claude/index.js';
 import { configureClaudeCredentialEnvironment } from './claude/auth.js';
 import { fetchQuotaForProvider, listConfiguredQuotaProviders } from './index.js';
 import { mutateQuotaConfiguration } from '../configurations.js';
+import { configureAntigravityQuotaReader } from './antigravity/index.js';
 
 describe('quota provider registry', () => {
   afterEach(() => {
+    configureAntigravityQuotaReader(undefined);
     resetClaudeQuotaCache();
     configureClaudeCredentialEnvironment(() => process.env);
     vi.unstubAllGlobals();
+  });
+
+  it('includes the native Antigravity account in configured quota reads', async () => {
+    configureAntigravityQuotaReader(async () => ({ groups: [{ displayName: 'Gemini Models', buckets: [{ window: 'weekly', remainingFraction: 0.93 }] }] }));
+    const { configuration } = mutateQuotaConfiguration('POST', undefined, { name: 'Antigravity', templateId: 'antigravity', source: 'account', providerId: null });
+    expect(await listConfiguredQuotaProviders()).toContain(configuration.id);
+    expect(await fetchQuotaForProvider(configuration.id)).toMatchObject({ ok: true, usage: { models: { 'Gemini Models': { windows: { weekly: { usedPercent: 7 } } } } } });
   });
 
   it('does not coalesce Claude reads across a home change, including an unavailable home', async () => {

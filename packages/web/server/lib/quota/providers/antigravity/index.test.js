@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ANTIGRAVITY_ACCOUNTS_PATHS } from '../../utils/index.js';
-import { fetchQuota } from './index.js';
+import { fetchQuota, configureAntigravityQuotaReader, isConfigured } from './index.js';
 
 const originalPaths = [...ANTIGRAVITY_ACCOUNTS_PATHS];
 let directory;
@@ -16,6 +16,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  configureAntigravityQuotaReader(undefined);
   vi.unstubAllGlobals();
   ANTIGRAVITY_ACCOUNTS_PATHS.splice(0, ANTIGRAVITY_ACCOUNTS_PATHS.length, ...originalPaths);
   rmSync(directory, { recursive: true, force: true });
@@ -26,6 +27,18 @@ const account = (refreshToken = 'test-refresh') => {
 };
 
 describe('Antigravity provider composition', () => {
+  it('displays native account quota groups and their reported windows', async () => {
+    configureAntigravityQuotaReader(async () => ({ groups: [
+      { displayName: 'Gemini Models', buckets: [{ bucketId: 'gemini-weekly', window: 'weekly', remainingFraction: 0.93 }] },
+      { displayName: 'Claude and GPT models', buckets: [{ bucketId: '3p-5h', window: '5h', remainingFraction: 1 }] },
+    ] }));
+    expect(isConfigured()).toBe(true);
+    expect(await fetchQuota()).toMatchObject({ ok: true, configured: true, usage: { models: {
+      'Gemini Models': { windows: { weekly: { usedPercent: 7 } } },
+      'Claude and GPT models': { windows: { '5h': { usedPercent: 0 } } },
+    } } });
+  });
+
   it('reports an unconfigured account without making requests', async () => {
     const fetch = vi.fn();
     vi.stubGlobal('fetch', fetch);

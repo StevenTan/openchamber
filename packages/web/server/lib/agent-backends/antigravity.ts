@@ -14,6 +14,7 @@ import { isEnterpriseMode } from '../enterprise-mode.js';
 import { resolveAntigravityExecutable, installAntigravityExecutable, AntigravityNotInstalledError } from './antigravity-executable.js';
 import { createAntigravityAuthentication } from './antigravity-auth.js';
 import { readAntigravityUsage } from './antigravity-usage.js';
+import { readAntigravityQuota } from './antigravity-quota.js';
 
 interface Options {
   dataDir: string;
@@ -230,6 +231,15 @@ export function createAntigravityBackend(options: Options) {
       return session;
     },
     async rename(id: string, title: string) { const session = await get(id); session.title = title; await save(session); options.publish({ type: 'session', session }); },
+    archive: {
+      async setArchived(id: string, archived: boolean) {
+        const session = await get(id);
+        session.archived = archived ? Date.now() : null;
+        await save(session);
+        options.publish({ type: 'session', session });
+      },
+      async readArchivedAt(id: string) { return (await get(id)).archived ?? null; },
+    },
     async remove(id: string) { const session = await get(id); await (await load(session)).closeSession({ sessionId: session.nativeID }); await fs.unlink(path.join(root, `${id}.json`)); conversations.delete(id); loaded.delete(id); options.publish({ type: 'deleted', sessionID: id, directory: session.directory }); },
     async model(id: string, modelID: string, variant?: string | null) {
       const session = await get(id);
@@ -241,6 +251,11 @@ export function createAntigravityBackend(options: Options) {
     },
     async abort(id: string) { const session = await get(id); await (await load(session)).cancel({ sessionId: session.nativeID }); },
     statuses: () => Object.fromEntries([...active.keys()].map(id => [id, { type: 'busy' }])),
+    async quota() {
+      const acp = await connect();
+      await acp.listSessions({});
+      return readAntigravityQuota(path.join(root, 'profile'), process?.pid);
+    },
     async settings() { await ready; return { ...settings, installed: Boolean(resolveAntigravityExecutable(root, settings.binary, options.environment())) }; },
     async install() {
       if (isEnterpriseMode()) throw Object.assign(new Error('Antigravity is unavailable in enterprise mode'), { status: 403, code: 'enterprise_mode' });

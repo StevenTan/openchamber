@@ -276,6 +276,17 @@ describe('openchamber session routes', () => {
   describe('archiving a batch of sessions', () => {
     const tagged = (tag) => Object.assign(new Error(tag), { _tag: tag });
 
+    it('delegates archive and restore operations to the archive backend', async () => {
+      const archiveBackend = { setArchived: vi.fn(async () => {}), readArchivedAt: vi.fn(async () => null) };
+      const { app } = createApp({ archiveBackend });
+      await request(app).post('/api/openchamber/sessions/archive').send({ ids: ['ses_ag_native', 'ses_opencode'], archivedAt: 1700 }).expect(200);
+      expect(archiveBackend.setArchived).toHaveBeenCalledWith('ses_ag_native', true);
+      expect(archiveBackend.setArchived).toHaveBeenCalledWith('ses_opencode', true);
+      expect(sessionUpdateMock).not.toHaveBeenCalled();
+      await request(app).post('/api/openchamber/sessions/unarchive').send({ ids: ['ses_ag_native'] }).expect(200);
+      expect(archiveBackend.setArchived).toHaveBeenLastCalledWith('ses_ag_native', false);
+    });
+
     it('archives every id on OpenCode and leaves the announcement to OpenCode', async () => {
       const { app, archiveStore, broadcastGlobalUiEvent } = createApp();
       const response = await request(app)

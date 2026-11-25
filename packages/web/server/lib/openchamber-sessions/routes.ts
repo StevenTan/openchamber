@@ -122,7 +122,7 @@ export interface SessionServiceDependencies {
   createChangeRequestWorktree?: ((input: { directory: string; number: number; name?: string; branchName?: string; startCommand?: string; createCommand?: string }) => Promise<SessionMoveWorktree>) | null;
   dataDir?: string | null;
   archiveStore?: ReturnType<typeof createArchiveStore> | null;
-  openCodeArchive?: Parameters<typeof createSessionArchive>[0]['openCode'] | null;
+  archiveBackend?: Parameters<typeof createSessionArchive>[0]['openCode'] | null;
   sessionMetadataStore?: MetadataStore | null;
   persistSessionMetadata?: MetadataStore['setSessionMetadata'] | null;
   updateSessionMetadata?: MetadataStore['updateSessionMetadata'] | null;
@@ -665,7 +665,7 @@ export const createOpenChamberSessionService = (dependencies: SessionServiceDepe
     createChangeRequestWorktree = null,
     dataDir = null,
     archiveStore: injectedArchiveStore = null,
-    openCodeArchive: injectedOpenCodeArchive = null,
+    archiveBackend: injectedArchiveBackend = null,
     sessionMetadataStore: injectedSessionMetadataStore = null,
     persistSessionMetadata = null,
     updateSessionMetadata = null,
@@ -716,7 +716,7 @@ export const createOpenChamberSessionService = (dependencies: SessionServiceDepe
   };
   const sessionArchive = createSessionArchive({
     store: archiveStore,
-    openCode: injectedOpenCodeArchive || createOpenCodeSessionArchive({ clientFor }),
+    openCode: injectedArchiveBackend || createOpenCodeSessionArchive({ clientFor }),
     announce: broadcastArchived,
   });
 

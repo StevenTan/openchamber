@@ -142,7 +142,7 @@ export function createAntigravityAdapter(): AgentBackend {
           const existing = sessions.has(event.session.id);
           sessions.set(event.session.id, event.session);
           const info = acpSession(event.session);
-          emit(event.session.directory, existing ? { type: 'session.patched', properties: { sessionID: info.id, patch: { title: info.title, model: info.model, time: info.time, tokens: info.tokens } } } : { type: 'session.created', properties: { info } });
+          emit(event.session.directory, existing ? { type: 'session.patched', properties: { sessionID: info.id, patch: { title: info.title, model: info.model, time: { ...info.time, archived: event.session.archived ?? null }, tokens: info.tokens } } } : { type: 'session.created', properties: { info } });
           return;
         }
         if (event.type === 'deleted') { sessions.delete(event.sessionID); emit(event.directory, { type: 'session.deleted', properties: { sessionID: event.sessionID } }); return; }
