@@ -504,6 +504,9 @@ handlers attach activity metadata after completion. Execution uses the existing 
 
 `mcp.ts` owns Streamable HTTP connection handling shared by the command, browser,
 question, file, control and Code Mode services. They use the same listener and callback authentication.
+`catalog.ts` owns the model-facing server names and HTTP paths. OpenCode's
+configuration plugins and the host's ACP injection use this same catalog;
+backend adapters supply the authentication and session identity.
 Code Mode connects to the shared server factories through SDK in-memory transports.
 `mcp-services.ts` owns their script registration, authenticated routes and shutdown.
 `mcp-context.ts` defines the injected session, call and cancellation context.

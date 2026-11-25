@@ -1,3 +1,4 @@
+import { AGENT_MCP_SERVERS } from './catalog.js';
 import type { Application, ExpressFactory, Request } from '../shared/http-contracts.js';
 import { createCodeModeMcpRuntime } from '../agent-code-mode/mcp.js';
 import type { createMcpRuntime } from './mcp.js';
@@ -22,14 +23,14 @@ export function createAgentMcpServices(services: Services, options: Options) {
     { namespace: 'openchamber', runtime: services.openchamber, permission: controlMcpPermission },
   ], options.resolveContext, options.permissions);
   const routes = [
-    ['browser-tool', services.browser, '1mb'], ['async-question', services.request, '1mb'],
-    ['file-tool', services.file, '50mb'], ['control-tool', services.openchamber, '1mb'],
-    ['code-mode', codeMode, '50mb'],
+    [AGENT_MCP_SERVERS.browser.path, services.browser, '1mb'], [AGENT_MCP_SERVERS.request.path, services.request, '1mb'],
+    [AGENT_MCP_SERVERS.file.path, services.file, '50mb'], ['/api/openchamber/control-tool/mcp', services.openchamber, '1mb'],
+    [AGENT_MCP_SERVERS.openchamber.path, codeMode, '50mb'],
   ] as const;
   return {
     registerRoutes(app: Application, express: Pick<ExpressFactory, 'json'>) {
       for (const [route, mcp, limit] of routes) {
-        app.all(`/api/openchamber/${route}/mcp`, express.json({ limit }), async (req, res) => {
+        app.all(route, express.json({ limit }), async (req, res) => {
           if (!options.authorize(req)) return res.status(401).json({ error: 'Unauthorized' });
           await mcp.handleRequest(req, res);
         });

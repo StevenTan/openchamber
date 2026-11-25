@@ -38,7 +38,7 @@ interface EventHub {
 }
 interface Dependencies {
   dataDir: string;
-  client: (sessionID?: string) => { session: QuestionSessionApi };
+  client: (sessionID?: string) => { session: QuestionSessionApi } | Promise<{ session: QuestionSessionApi }>;
   globalEventHub: EventHub;
   isSessionArchived(sessionID: string): Promise<boolean>;
   isEnabled(): boolean;
@@ -149,7 +149,7 @@ export function createQuestionRuntime({ dataDir, client, globalEventHub, isSessi
     return { ...entry, resolution: answer ? { status: "answered", answer, messageID } : { status: "cancelled", messageID } };
   };
   const reconcileForm = async (entry: Entry) => {
-    const api = client(entry.sessionID).session;
+    const api = (await client(entry.sessionID)).session;
     const options = { signal: AbortSignal.timeout(15_000) };
     await api.get({ sessionID: entry.sessionID }, options);
     if (entry.resolution.status === "pending") {
@@ -168,7 +168,7 @@ export function createQuestionRuntime({ dataDir, client, globalEventHub, isSessi
   const deliver = async (group: [ResolvedEntry, ...ResolvedEntry[]]) => {
     const first = group[0];
     const resolution = first.resolution;
-    const api = client(first.sessionID).session;
+    const api = (await client(first.sessionID)).session;
     const options = { signal: AbortSignal.timeout(15_000) };
     await api.get({ sessionID: first.sessionID }, options);
     for (const entry of group) {

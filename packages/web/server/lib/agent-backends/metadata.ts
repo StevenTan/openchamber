@@ -1,12 +1,11 @@
 import { createSessionMetadataStore } from '../openchamber-sessions/session-metadata-store.js';
-import type { MetadataDecider, OpenCodeSessionMetadata, SessionMetadata } from '../openchamber-sessions/session-metadata-store.js';
+import type { MetadataDecider, SessionMetadata } from '../openchamber-sessions/session-metadata-store.js';
 import { isRecord } from '../shared/guards.js';
-import type { createAntigravityBackend } from './antigravity.js';
+import type { BackendRegistry } from './registry.js';
 
 export function createBackendMetadata(options: {
   dataDir: string;
-  backend(): ReturnType<typeof createAntigravityBackend>;
-  openCode: OpenCodeSessionMetadata;
+  registry(): BackendRegistry;
   onWrite(sessionID: string, metadata: SessionMetadata | undefined): void;
   publish(event: { type: 'openchamber:session-metadata'; properties: { sessionID: string; metadata: SessionMetadata | undefined } }): void;
   notifyGoalChanged(sessionID: string, directory: string, metadata: SessionMetadata | undefined): Promise<void>;
@@ -14,8 +13,8 @@ export function createBackendMetadata(options: {
   const store = createSessionMetadataStore({
     dataDir: options.dataDir,
     openCode: {
-      read: (sessionID, input) => sessionID.startsWith('ses_ag_') ? options.backend().get(sessionID).then(session => session.metadata ?? {}) : options.openCode.read(sessionID, input),
-      write: (sessionID, metadata, input) => (sessionID.startsWith('ses_ag_') ? options.backend().metadata(sessionID, metadata) : options.openCode.write(sessionID, metadata, input)).then(() => options.onWrite(sessionID, metadata)),
+      read: async (sessionID, input) => { const registry = options.registry(); await registry.ready; return registry.forSession(sessionID).metadata.read(sessionID, input); },
+      write: async (sessionID, metadata, input) => { const registry = options.registry(); await registry.ready; await registry.forSession(sessionID).metadata.write(sessionID, metadata, input); options.onWrite(sessionID, metadata); },
     },
   });
   const persist = async (sessionID: string, patch: SessionMetadata, { directory = '' }: { directory?: string | undefined } = {}) => {

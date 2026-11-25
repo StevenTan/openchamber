@@ -15,6 +15,10 @@ mobile clients use the host routes; the VS Code extension uses OpenCode.
 
 - A prepared native session belongs to a draft and becomes the first conversation
   when sent. Its ACP configuration supplies the model and thinking-level catalog.
+- The host registry selects an adapter from the recorded session owner. Native
+  records restore ownership at startup; preparation and ID adoption register it
+  before dispatch. OpenCode is the default owner. Session readers, dispatch,
+  metadata, archive, model catalogs and question delivery use that registry.
 - Creation adopts the composer's host conversation ID while retaining the
   prepared native session and its MCP credential. Credential resolution follows
   the adopted host ID.
@@ -72,6 +76,12 @@ capabilities. The application conversation client covers ordinary conversations;
 OpenCode-specific configuration and advanced session operations stay in its
 adapter. The ACP wire types have a separate `@openchamber/sdk/agent-backends`
 entry point, independent of guest panel APIs.
+
+### Why ownership comes from session records
+
+The persisted native conversation identifies its backend independently of its
+public ID. Restoring that ownership before dispatch preserves existing records
+and lets ID adoption use the same adapter.
 
 ## Google sign-in
 

@@ -26,7 +26,12 @@ import { createAgentMemoryRuntime } from '../agent-memory/runtime.js';
 import { createBackendSessionService } from './session-service.js';
 import { createOpenChamberSessionService } from '../openchamber-sessions/routes.js';
 import { createChatsScope } from '../scheduled-tasks/chats-scope.js';
+import { createBackendRegistry } from './registry.js';
+import { createAntigravityAdapter } from './antigravity-adapter.js';
+import { createOpenCodeAdapter } from './opencode-adapter.js';
+import type { BackendID } from './contracts.js';
 import { createWorktreeBootstrapStore } from '../git/worktree-bootstrap-storage.js';
+import { createServer } from 'node:http';
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -47,8 +52,10 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
   const instructions = createSessionInstructions(directory, { put: async () => {}, remove: async () => {} });
   const identity = createBackendMcpIdentity();
   let userInputs = 0;
+  const owners = new Map<string, BackendID>();
   const turnDiffs = createTurnDiffRuntime(directory, async (id, reference) => backend.recordFileDiff(id, reference));
   const make = () => createAntigravityBackend({ dataDir: directory, initializeSession: async () => {},
+      registerSession: (id, previous) => { if (previous) owners.delete(previous); owners.set(id, 'antigravity'); },
       onUserInput: () => { userInputs++; }, readInstructions: instructions.read, turnDiffs, environment: () => process.env, mcpServers: id => { identity.token(id); return []; }, reassignSession: identity.reassign, publish, publishForm: () => {} });
   const backend = make();
   cleanups.push(() => backend.close());
@@ -134,7 +141,14 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
     worktreeBootstrapStore: createWorktreeBootstrapStore({ filePath: path.join(directory, 'bootstrap.json') }),
     hydrateWorktreeCheckout: async () => { throw new Error('Worktree hydration is unused'); },
   });
-  const service = createBackendSessionService(openCodeService, backend, async () => true, createChatsScope(path.join(directory, 'chats')));
+  const registry = createBackendRegistry({
+    opencode: createOpenCodeAdapter({ setArchived: async () => {}, readArchivedAt: async () => null }, { read: async () => ({}), write: async () => {} }),
+    antigravity: createAntigravityAdapter(backend),
+  }, owners, backend.ready);
+  const service = createBackendSessionService(openCodeService, registry, async () => true, createChatsScope(path.join(directory, 'chats')));
+  const selected = await service.create({ backendID: 'opencode', model: 'antigravity/second', directory });
+  assert.equal(selected.agent, 'antigravity');
+  assert.deepEqual(selected.model, { providerID: 'antigravity', modelID: 'second' });
   const beforeInput = userInputs;
   await service.send(session.id, { prompt: 'Agent follow-up', promptedBySessionId: 'ses_sender' });
   await backend.wait(session.id, new AbortController().signal);
@@ -142,7 +156,8 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
   await service.send(session.id, { prompt: 'User follow-up' });
   await backend.wait(session.id, new AbortController().signal);
   assert.equal(userInputs, beforeInput + 1);
-  const sessions = createApplicationSessions({ openCode: async () => { throw new Error('OpenCode is unavailable'); }, antigravity: backend });
+  const sessions = createApplicationSessions({ openCode: async () => { throw new Error('OpenCode is unavailable'); }, registry });
+  await registry.forSession(session.id).question(() => { throw new Error('OpenCode is unavailable'); }).get({ sessionID: session.id });
   assert.equal((await sessions.get(session.id)).id, session.id);
   assert.deepEqual(await sessions.active(session.id), {});
   const history = await sessions.messages(session.id, { order: 'desc', limit: 1 });
@@ -175,13 +190,17 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
   scheduler.stop();
   await backend.close();
   const openCodeArchives: Array<[string, boolean]> = [];
+  const listener = createServer();
+  await new Promise<void>(resolve => listener.listen(0, '127.0.0.1', resolve));
+  cleanups.push(() => new Promise<void>((resolve, reject) => listener.close(error => error ? reject(error) : resolve())));
   const host = createAgentBackendHost({
     dataDir: directory, initializeSession: async () => {},
-      onUserInput: () => {}, readInstructions: async () => [], environment: () => process.env, server: () => null,
+    onUserInput: () => {}, readInstructions: async () => [], environment: () => process.env, server: () => listener,
     tools: () => { throw new Error('Tool runtime is unused'); }, publish: () => {},
+    openCodeMetadata: { read: async () => ({}), write: async () => {} },
     hub: { injectEvent: () => {}, subscribeEvent: () => () => {}, subscribeStatus: () => () => {} },
     openCodeClient: () => createOpenCodeClient({ baseUrl: 'http://127.0.0.1', headers: {}, fetch: async (url, init) => {
-      if (init?.method === 'PATCH') { openCodeArchives.push(['ses_opencode', JSON.parse(String(init.body)).archived]); return new Response(null, { status: 204 }); }
+      if (init?.method === 'PATCH') { openCodeArchives.push([path.basename(new URL(String(url)).pathname), JSON.parse(String(init.body)).archived]); return new Response(null, { status: 204 }); }
       return Response.json({ data: { id: 'ses_opencode', time: { archived: 1234 } } });
     } }),
   });
@@ -191,7 +210,19 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
   assert.ok(Number.isInteger(archivedAt));
   await host.archive.setArchived('ses_opencode', true);
   assert.equal(await host.archive.readArchivedAt('ses_opencode'), 1234);
-  assert.deepEqual(openCodeArchives, [['ses_opencode', true]]);
+  await host.archive.setArchived('ses_ag_external', true);
+  assert.deepEqual(openCodeArchives, [['ses_opencode', true], ['ses_ag_external', true]]);
+  const injected = await host.backend.get(selected.sessionId);
+  await host.backend.send(injected.id, { id: 'msg_catalog', text: 'mcp-catalog', files: [], context: [] });
+  await host.backend.wait(injected.id, new AbortController().signal);
+  const catalog = injected.turns.at(-1)?.updates.flatMap(update => update.sessionUpdate === 'agent_message_chunk' && update.content.type === 'text' ? [JSON.parse(update.content.text)] : []).flat();
+  assert.deepEqual(catalog, [
+    { name: 'openchamber', path: '/api/openchamber/code-mode/mcp' },
+    { name: 'openchamber_commands', path: '/api/openchamber/command-tool/mcp' },
+    { name: 'file', path: '/api/openchamber/file-tool/mcp' },
+    { name: 'browser', path: '/api/openchamber/browser-tool/mcp' },
+    { name: 'request', path: '/api/openchamber/async-question/mcp' },
+  ]);
   const reopened = make();
   cleanups.push(() => reopened.close());
   assert.deepEqual((await reopened.get(session.id)).turns, session.turns);

@@ -1,3 +1,4 @@
+import { AGENT_MCP_SERVERS } from '../../agent-tool/catalog.js';
 import { COMMAND_MCP_SERVER } from "./contracts.js";
 
 export const COMMAND_PLUGIN_ID = "openchamber-command-tool";
@@ -9,7 +10,7 @@ const stdinTool = commandServer + '_write_stdin'
 export default {
   id: ${JSON.stringify(COMMAND_PLUGIN_ID)},
   async setup(ctx) {
-    const endpoint = new URL('/api/openchamber/command-tool', process.env.OPENCHAMBER_AGENT_TOOL_URL).href
+    const endpoint = new URL(${JSON.stringify(AGENT_MCP_SERVERS.commands.path)}, process.env.OPENCHAMBER_AGENT_TOOL_URL).href
     const token = process.env.OPENCHAMBER_AGENT_TOOL_TOKEN
     const host = new URL(endpoint).hostname.replace(/^\[|\]$/g, '')
     for (const key of ['NO_PROXY', 'no_proxy']) {
@@ -34,7 +35,7 @@ export default {
     })
     await ctx.mcp.transform(servers => {
       servers.set(commandServer, {
-        type: 'remote', url: endpoint + '/mcp', oauth: false, codemode: false,
+        type: 'remote', url: endpoint, oauth: false, codemode: false,
         headers: { authorization: 'Bearer ' + token },
       })
     })

@@ -1,3 +1,4 @@
+import { AGENT_MCP_SERVERS } from '../../agent-tool/catalog.js';
 import { z } from "zod";
 
 const option = z.string().trim().min(1);
@@ -29,7 +30,7 @@ export const questionTool = {
 export const createQuestionPluginSource = () => `export default {
   id: "openchamber-question-tool",
   async setup(ctx) {
-    const endpoint = new URL('/api/openchamber/async-question/mcp', process.env.OPENCHAMBER_AGENT_TOOL_URL).href
+    const endpoint = new URL(${JSON.stringify(AGENT_MCP_SERVERS.request.path)}, process.env.OPENCHAMBER_AGENT_TOOL_URL).href
     const host = new URL(endpoint).hostname.replace(/^\\[|\\]$/g, '')
     for (const key of ['NO_PROXY', 'no_proxy']) {
       const entries = (process.env[key] || '').split(',').map(value => value.trim()).filter(Boolean)
@@ -50,7 +51,7 @@ export const createQuestionPluginSource = () => `export default {
       })
     })
     await ctx.mcp.transform(servers => {
-      servers.set('request', {
+      servers.set(${JSON.stringify(AGENT_MCP_SERVERS.request.name)}, {
         type: 'remote', url: endpoint, oauth: false, codemode: false,
         headers: { authorization: 'Bearer ' + process.env.OPENCHAMBER_AGENT_TOOL_TOKEN },
       })

@@ -66,7 +66,9 @@ const connection = new AgentSideConnection(client => ({
       await client.sessionUpdate({ sessionId: input.sessionId, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Done' } } });
       return { stopReason: 'end_turn' };
     }
-    const text = input.prompt.filter(part => part.type === 'text').map(part => part.text).join('');
+    const text = command === 'mcp-catalog'
+      ? JSON.stringify(sessions.get(input.sessionId).mcpServers.map(server => ({ name: server.name, path: new URL(server.url).pathname })))
+      : input.prompt.filter(part => part.type === 'text').map(part => part.text).join('');
     if (text === 'usage') {
       const directory = path.join(profile, 'antigravity-acp', 'conversations');
       await fs.mkdir(directory, { recursive: true });

@@ -1,3 +1,4 @@
+import { AGENT_MCP_SERVERS } from '../../agent-tool/catalog.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
@@ -47,9 +48,9 @@ const cardActions = new Map([
 export default {
   id: 'openchamber-code-mode',
   effect: (ctx: PluginContext) => Effect.gen(function* () {
-    const endpoint = new URL('/api/openchamber/code-mode/mcp', process.env.OPENCHAMBER_AGENT_TOOL_URL);
+    const endpoint = new URL(AGENT_MCP_SERVERS.openchamber.path, process.env.OPENCHAMBER_AGENT_TOOL_URL);
     const headers = { authorization: 'Bearer ' + process.env.OPENCHAMBER_AGENT_TOOL_TOKEN };
-    yield* ctx.mcp.transform(servers => servers.set('openchamber', { type: 'remote', url: endpoint.href, oauth: false, codemode: false, headers }));
+    yield* ctx.mcp.transform(servers => servers.set(AGENT_MCP_SERVERS.openchamber.name, { type: 'remote', url: endpoint.href, oauth: false, codemode: false, headers }));
     const client = yield* Effect.acquireRelease(Effect.tryPromise(async () => {
       const client = new Client({ name: 'openchamber-opencode', version: '1.0.0' });
       await client.connect(new StreamableHTTPClientTransport(endpoint, { requestInit: { headers } }));

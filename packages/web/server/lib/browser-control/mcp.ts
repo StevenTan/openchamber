@@ -1,3 +1,4 @@
+import { AGENT_MCP_SERVERS } from '../agent-tool/catalog.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, CallToolResultSchema, ListToolsRequestSchema, type Tool } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
@@ -64,8 +65,8 @@ export function createBrowserMcpRuntime(
 export function browserMcpSetup(titles: Record<string, string>) {
   return String.raw`
     await ctx.mcp.transform(servers => {
-      servers.set('browser', {
-        type: 'remote', url: new URL('/api/openchamber/browser-tool/mcp', process.env.OPENCHAMBER_AGENT_TOOL_URL).href,
+      servers.set(${JSON.stringify(AGENT_MCP_SERVERS.browser.name)}, {
+        type: 'remote', url: new URL(${JSON.stringify(AGENT_MCP_SERVERS.browser.path)}, process.env.OPENCHAMBER_AGENT_TOOL_URL).href,
         oauth: false, codemode: false,
         headers: { authorization: 'Bearer ' + process.env.OPENCHAMBER_AGENT_TOOL_TOKEN },
       })

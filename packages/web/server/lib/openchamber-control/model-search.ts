@@ -1,37 +1,25 @@
 import { asNonEmptyString } from '../shared/guards.js';
-import type { ModelInfo } from '@opencode/client';
+import type { CatalogModel } from '../agent-backends/contracts.js';
 import type { ControlClient } from './opencode-client.js';
 import type { ControlInput } from './contracts.js';
 import type { ControlDependencies } from './service.js';
+import { readOpenCodeModels } from '../agent-backends/opencode-adapter.js';
 
 type ControlSettings = NonNullable<Awaited<ReturnType<ControlDependencies['readSettingsFromDiskMigrated']>>>;
 const PREFERENCE_BY_RANK = new Map([[2, 'favorite'], [1, 'recent']]);
 const isSafeInteger = (value: unknown): value is number => Number.isSafeInteger(value);
 
-export function createModelSearch({ getClient, readSettingsFromDiskMigrated, antigravity }: {
+export function createModelSearch({ getClient, readSettingsFromDiskMigrated, registry }: {
   getClient(directory: string): Promise<ControlClient>;
   readSettingsFromDiskMigrated: ControlDependencies['readSettingsFromDiskMigrated'];
-  antigravity: ControlDependencies['antigravity'];
+  registry: ControlDependencies['backendRegistry'];
 }) {
   const searchModels = async (input: ControlInput, contextDirectory: ControlInput['directory'], sessionID?: string | null) => {
-    type CatalogModel = Pick<ModelInfo, 'id' | 'providerID' | 'name'> & Partial<Pick<ModelInfo, 'family' | 'time' | 'cost' | 'status'>> & { variants: readonly { id: string }[] };
-    const native = sessionID?.startsWith('ses_ag_') ? antigravity : undefined;
+    await registry?.ready;
     const settings = await readSettingsFromDiskMigrated();
-    let entries: readonly CatalogModel[];
-    let providerNames: Map<string, string>;
-    if (native && sessionID) {
-      const session = await native.get(sessionID);
-      const model = session.config.find(option => option.category === 'model' && option.type === 'select');
-      const thought = session.config.find(option => option.category === 'thought_level' && option.type === 'select');
-      const variants = thought?.type === 'select' ? thought.options.flatMap(option => 'group' in option ? option.options : [option]).map(option => ({ id: option.value })) : [];
-      entries = model?.type === 'select' ? model.options.flatMap(option => 'group' in option ? option.options : [option]).map(option => ({ id: option.value, providerID: 'antigravity', name: option.name, variants })) : [];
-      providerNames = new Map([['antigravity', 'Antigravity']]);
-    } else {
-      const client = await getClient(asNonEmptyString(input.directory) || asNonEmptyString(contextDirectory) || '');
-      const [catalog, providers] = await Promise.all([client.model.list(), client.provider.list()]);
-      entries = catalog.data;
-      providerNames = new Map(providers.data.map(provider => [provider.id, provider.name]));
-    }
+    const directory = asNonEmptyString(input.directory) || asNonEmptyString(contextDirectory) || '';
+    const readModels = registry?.forSession(sessionID ?? undefined).models ?? readOpenCodeModels;
+    const { models: entries, providers: providerNames } = await readModels(getClient, directory, sessionID);
     const refKey = (ref: ControlSettings['recentModels']) => {
       const fields: { providerID?: unknown; modelID?: unknown } | undefined = ref == null ? undefined : Object(ref);
       return `${fields?.providerID}/${fields?.modelID}`;

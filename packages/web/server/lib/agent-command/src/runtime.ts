@@ -1,3 +1,4 @@
+import { AGENT_MCP_SERVERS } from '../../agent-tool/catalog.js';
 import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
@@ -171,7 +172,7 @@ export function createCommandToolRuntime({
     express: CallbackParser,
   ) => {
     app.all(
-      "/api/openchamber/command-tool/mcp",
+      AGENT_MCP_SERVERS.commands.path,
       express.json({ limit: "1mb" }),
       async (req: CallbackRequest, res: CallbackResponse) => {
         if (!authorize(req)) return res.status(401).json({ error: "Unauthorized" });

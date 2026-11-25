@@ -1,7 +1,7 @@
+import type { BackendRegistry } from '../agent-backends/registry.js';
 import { createModelSearch } from './model-search.js';
 import { z } from 'zod';
 import { createApplicationSessions } from '../agent-backends/sessions.js';
-import type { createAntigravityBackend } from '../agent-backends/antigravity.js';
 import { asNonEmptyString, isBoolean, isRecord } from '../shared/guards.js';
 import path from 'node:path';
 import nodeFsPromises from 'node:fs/promises';
@@ -23,7 +23,7 @@ import { createWorkMembership } from '../session-work/membership.js';
 import { createSessionListing, positiveInteger } from './session-listing.js';
 import { isPinnedMetadata, userStatePatch } from '../session-work/state.js';
 import { playwrightCallSchema } from '../browser-control/playwright.js';
-import type { SessionInfo, PermissionReplyInput, SessionFormCancelInput, FormInfo } from '@opencode/client';
+import type { SessionInfo, PermissionReplyInput, SessionFormCancelInput } from '@opencode/client';
 import type { ControlClient } from './opencode-client.js';
 import type { FormValues } from './form-answer.js';
 import type { PageAnswerInput } from './render-page.js';
@@ -107,7 +107,7 @@ export interface ControlDependencies {
   sharePages?: Parameters<typeof createRenderPageAction>[0]['sharePages'];
   archiveStore?: { entry: (sessionID: string) => Promise<number | null | undefined> } | null;
   isOpenCodeDirectoryTrusted?: ((directory: string) => Promise<boolean>) | null;
-  antigravity?: ReturnType<typeof createAntigravityBackend>;
+  backendRegistry?: BackendRegistry;
   replyToolPermission?: (input: PermissionReplyInput) => Promise<boolean>;
   createClient?: (options: Parameters<typeof OpenCode.make>[0]) => ControlClient;
   imageFsPromises?: ImageGenerationDependencies['fsPromises'];
@@ -522,7 +522,7 @@ export const createOpenChamberControlService = (dependencies: ControlDependencie
     });
   };
 
-  const applicationSessions = createApplicationSessions({ openCode: getClient, antigravity: dependencies.antigravity });
+  const applicationSessions = createApplicationSessions({ openCode: getClient, registry: dependencies.backendRegistry });
 
   const workNamer = workNaming ? createWorkNamer({
     ...workNaming,
@@ -608,7 +608,7 @@ export const createOpenChamberControlService = (dependencies: ControlDependencie
     };
   };
 
-  const searchModels = createModelSearch({ getClient, readSettingsFromDiskMigrated, antigravity: dependencies.antigravity });
+  const searchModels = createModelSearch({ getClient, readSettingsFromDiskMigrated, registry: dependencies.backendRegistry });
 
   const activeSessions = async () => {
     const statuses = await applicationSessions.active();
@@ -799,8 +799,7 @@ export const createOpenChamberControlService = (dependencies: ControlDependencie
   };
 
   const answerForm = async ({ sessionID, formID, answer, message }: { sessionID: string; formID: string; answer?: FormValues | null; message?: string | undefined }) => {
-    const forms = sessionID.startsWith('ses_ag_') && dependencies.antigravity
-      ? dependencies.antigravity.questionSession.form : (await sessionClient(sessionID)).session.form;
+    const forms = await applicationSessions.forms(sessionID, () => sessionClient(sessionID));
     try {
       if (!answer) {
         const cancellation: FormCancellation = { sessionID, formID };
@@ -816,22 +815,17 @@ export const createOpenChamberControlService = (dependencies: ControlDependencie
   };
 
   const dismissOpenForms = async (sessionID: string) => {
-    if (sessionID.startsWith('ses_ag_') && dependencies.antigravity) {
-      const session = await dependencies.antigravity.get(sessionID);
-      for (const form of session.forms.filter(form => form.state.status === 'pending')) await dependencies.antigravity.questionSession.form.cancel({ sessionID, formID: z.string().parse(form.id) });
-      return;
-    }
-    const client = await sessionClient(sessionID);
-    let forms: (FormInfo & { state?: { status?: string } })[];
+    const client = await applicationSessions.forms(sessionID, () => sessionClient(sessionID));
+    let forms: Awaited<ReturnType<typeof client.list>>;
     try {
-      forms = await client.session.form.list({ sessionID });
+      forms = await client.list({ sessionID });
     } catch (error) {
       throw asAnswerError(error);
     }
     for (const form of Array.isArray(forms) ? forms : []) {
       if (!asNonEmptyString(form?.id) || (form.state && form.state.status !== 'pending')) continue;
       try {
-        await client.session.form.cancel({ sessionID, formID: form.id });
+        await client.cancel({ sessionID, formID: form.id });
       } catch (error) {
         if (!isGoneTag(controlErrorFields(error)?._tag)) throw asAnswerError(error);
       }
@@ -898,7 +892,7 @@ export const createOpenChamberControlService = (dependencies: ControlDependencie
       if (resolvedSessionDirectory) directory = resolvedSessionDirectory;
     }
     const payload: SessionPayload = {};
-    if (parentSessionID?.startsWith('ses_ag_')) payload.backendID = 'antigravity';
+    if (parentSessionID && dependencies.backendRegistry) { await dependencies.backendRegistry.ready; payload.backendID = dependencies.backendRegistry.forSession(parentSessionID).id; }
     if (directory) payload.directory = directory;
     if (hasText(input.projectId)) payload.projectId = input.projectId.trim();
     if (hasText(input.title)) payload.title = input.title.trim();

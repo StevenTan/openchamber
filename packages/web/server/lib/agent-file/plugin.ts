@@ -1,3 +1,4 @@
+import { AGENT_MCP_SERVERS } from '../agent-tool/catalog.js';
 import { z } from 'zod';
 import type { Schema } from 'effect';
 import type { Tool } from '@opencode/schema/tool';
@@ -17,7 +18,7 @@ const resultFiles = z.object({ files: z.array(z.object({
 export default {
   id: 'openchamber-file-tools',
   async setup(ctx: Context) {
-    const endpoint = new URL('/api/openchamber/file-tool/mcp', process.env.OPENCHAMBER_AGENT_TOOL_URL).href;
+    const endpoint = new URL(AGENT_MCP_SERVERS.file.path, process.env.OPENCHAMBER_AGENT_TOOL_URL).href;
     await ctx.tool.transform(tools => {
       for (const name of ['read', 'write', 'edit', 'patch', 'glob', 'grep']) tools.remove(name);
       for (const name of FILE_MCP_TOOLS) tools.update(name, tool => {
@@ -32,7 +33,7 @@ export default {
       });
     });
     await ctx.mcp.transform(servers => {
-      servers.set('file', { type: 'remote', url: endpoint, oauth: false, codemode: false,
+      servers.set(AGENT_MCP_SERVERS.file.name, { type: 'remote', url: endpoint, oauth: false, codemode: false,
         headers: { authorization: 'Bearer ' + process.env.OPENCHAMBER_AGENT_TOOL_TOKEN } });
     });
   },

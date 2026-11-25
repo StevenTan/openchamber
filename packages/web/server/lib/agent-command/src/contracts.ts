@@ -1,6 +1,8 @@
 import { z } from "zod";
 
-export const COMMAND_MCP_SERVER = "openchamber_commands";
+import { AGENT_MCP_SERVERS } from "../../agent-tool/catalog.js";
+
+export const COMMAND_MCP_SERVER = AGENT_MCP_SERVERS.commands.name;
 
 const waitTime = (value: number) =>
   z.number().int().min(0).default(value);

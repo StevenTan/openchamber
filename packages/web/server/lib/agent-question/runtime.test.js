@@ -37,9 +37,9 @@ async function fixture() {
     }),
   };
   const archived = vi.fn(async () => false);
-  const runtime = () => {
+  const runtime = (client = () => ({ session })) => {
     const result = createQuestionRuntime({
-      dataDir, client: () => ({ session }), isSessionArchived: archived, isEnabled: () => true, retryMs: 5,
+      dataDir, client, isSessionArchived: archived, isEnabled: () => true, retryMs: 5,
       globalEventHub: {
         subscribeEvent: listener => { eventListener = listener; return () => { eventListener = undefined; }; },
         subscribeStatus: listener => { statusListener = listener; return () => { statusListener = undefined; }; },
@@ -250,7 +250,7 @@ describe('asynchronous questions', () => {
     await before.resolve('ses_1', one.question_id, { status: 'answered', answer: { q0: 'Blue' } });
     await before.stop();
     f.forms.clear();
-    const after = f.runtime();
+    const after = f.runtime(async () => ({ session: f.session }));
     after.start();
     await vi.waitFor(() => expect(f.delivered.size).toBe(1));
     await vi.waitFor(() => expect(f.forms.has(two.question_id)).toBe(true));

@@ -1,3 +1,4 @@
+import { AGENT_MCP_SERVERS } from './catalog.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, type Tool } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
@@ -112,8 +113,8 @@ export function createControlMcpRuntime(
 export function controlMcpSetup(titles: Record<string, string>) {
   return String.raw`
     await ctx.mcp.transform(servers => {
-      servers.set('openchamber', {
-        type: 'remote', url: new URL('/api/openchamber/code-mode/mcp', process.env.OPENCHAMBER_AGENT_TOOL_URL).href,
+      servers.set(${JSON.stringify(AGENT_MCP_SERVERS.openchamber.name)}, {
+        type: 'remote', url: new URL(${JSON.stringify(AGENT_MCP_SERVERS.openchamber.path)}, process.env.OPENCHAMBER_AGENT_TOOL_URL).href,
         oauth: false, codemode: false,
         headers: { authorization: 'Bearer ' + process.env.OPENCHAMBER_AGENT_TOOL_TOKEN },
       })

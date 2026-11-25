@@ -28,6 +28,7 @@ interface Options {
   readInstructions(sessionID: string): Promise<Array<{ text: string }>>;
   onUserInput?(sessionID: string): void;
   publish(event: AcpConversationEvent): void;
+  registerSession?(sessionID: string, previousID?: string): void;
   publishForm(type: 'form.created' | 'form.replied' | 'form.cancelled', data: { form?: Parameters<QuestionSessionApi['form']['create']>[0]; id?: string; sessionID?: string; answer?: Parameters<QuestionSessionApi['form']['reply']>[0]['answer'] }, directory: string): void;
 }
 const settingsSchema = z.object({ binary: z.string().default('agy') });
@@ -51,6 +52,7 @@ export function createAntigravityBackend(options: Options) {
       if (!name.startsWith('ses_ag_') || !name.endsWith('.json')) continue;
       const session: StoredConversation = JSON.parse(await fs.readFile(path.join(root, name), 'utf8'));
       conversations.set(session.id, session);
+      options.registerSession?.(session.id);
     }
     try { settings = settingsSchema.parse(JSON.parse(await fs.readFile(path.join(root, 'settings.json'), 'utf8'))); }
     catch (cause) { if (!(cause instanceof Error && 'code' in cause && cause.code === 'ENOENT')) throw cause; }
@@ -163,6 +165,7 @@ export function createAntigravityBackend(options: Options) {
     conversations.set(id, session);
     loaded.set(id, native.sessionId);
     await save(session);
+    options.registerSession?.(session.id);
     await releaseIdleSessions(acp, id);
     return session;
   };
@@ -242,7 +245,7 @@ export function createAntigravityBackend(options: Options) {
     },
   });
   return {
-    get, prepare, send,
+    get, prepare, send, ready,
     async wait(sessionID: string, signal: AbortSignal) {
       signal.throwIfAborted();
       const pending = prompts.get(sessionID) ?? Promise.resolve();
@@ -283,6 +286,7 @@ export function createAntigravityBackend(options: Options) {
         conversations.delete(previous);
         loaded.delete(previous);
         session.id = id;
+        options.registerSession?.(id, previous);
         conversations.set(id, session);
         loaded.set(id, session.nativeID);
         await fs.rename(path.join(root, `${previous}.json`), path.join(root, `${id}.json`));
@@ -331,7 +335,7 @@ export function createAntigravityBackend(options: Options) {
       });
     },
     async abort(id: string) { const session = await get(id); await withSession(session, acp => acp.cancel({ sessionId: session.nativeID })); },
-    statuses: () => Object.fromEntries([...active.keys()].map(id => [id, { type: 'busy' }])),
+    statuses: () => Object.fromEntries([...active.keys()].map(id => [id, { type: 'busy' as const }])),
     async quota() {
       const acp = await connect();
       await acp.listSessions({});

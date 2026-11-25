@@ -703,8 +703,7 @@ const broadcastPermissionUiEvent = <Payload>(payload: Payload) => {
 
 const { store: sessionMetadataStore, read: readStoredSessionMetadata, persist: persistSessionMetadataPatch, update: updateSessionMetadataWith } = createBackendMetadata({
   dataDir: OPENCHAMBER_DATA_DIR,
-  backend: () => agentBackendHost.backend,
-  openCode: createOpenCodeSessionMetadata({ buildOpenCodeUrl: (...args) => buildOpenCodeUrl(...args), getOpenCodeAuthHeaders: () => getOpenCodeAuthHeaders() }),
+  registry: () => agentBackendHost.registry,
   onWrite: (sessionID, metadata) => {
     if (sessionLineage.noteMetadata(sessionID, metadata)) permissionAutoAcceptRuntime.forgetSession(sessionID);
   },
@@ -1649,6 +1648,7 @@ const environmentRuntime = composeEnvironmentRuntime({
 });
 const agentBackendHost = createManagedAgentBackendHost({
   dataDir: OPENCHAMBER_DATA_DIR, server: () => server, openCodeClient: openCodeSessionClient,
+  openCodeMetadata: createOpenCodeSessionMetadata({ buildOpenCodeUrl: (...args) => buildOpenCodeUrl(...args), getOpenCodeAuthHeaders: () => getOpenCodeAuthHeaders() }),
   tools: () => { if (!agentToolRuntime) throw new Error('Agent tools are unavailable'); return agentToolRuntime; },
   environment: () => overlayEnvironment({ ...process.env, PATH: buildAugmentedPath() }, environmentRuntime.forOpenCode()),
   publish: broadcastOpenChamberUiEvent, hub: globalMessageStreamHub,
@@ -1925,7 +1925,7 @@ const scheduledChatsScope = createChatsScope(OPENCHAMBER_CHATS_DIR, {
 const scheduledWorktreeBridge = createUnregisteredScheduledWorktreeBridge();
 const scheduledTasksRuntime = createScheduledTasksRuntime({
   antigravity: agentBackendHost.backend,
-  readSession: sessionID => createApplicationSessions({ openCode: async () => openCodeSessionClient(''), antigravity: agentBackendHost.backend }).get(sessionID),
+  readSession: sessionID => createApplicationSessions({ openCode: async () => openCodeSessionClient(''), registry: agentBackendHost.registry }).get(sessionID),
   waitApplicationCommands: async sessionID => { await agentToolRuntime?.waitCommands(sessionID); },
   projectConfigRuntime,
   chatsScope: scheduledChatsScope,
@@ -2041,7 +2041,7 @@ const scheduledTaskService = createScheduledTaskService({
   scheduledTasksRuntime,
   chatsScope: scheduledChatsScope,
   resolvePrimaryWorktreeRoot,
-  readModelCatalog: createBackendModelCatalog(agentBackendHost.backend, readModelCatalog),
+  readModelCatalog: createBackendModelCatalog(agentBackendHost.registry, readModelCatalog),
 });
 const openChamberSessionService = createOpenChamberSessionService({
   onSessionArchived: (sessionID, archivedAt) => extensionSessionEvents.processPayload({
@@ -2173,9 +2173,9 @@ function executeServiceControl(action: string, input?: ControlInput, contextDire
   return openChamberControlService.execute(action, input, contextDirectory, options);
 }
 
-const applicationSessionService = createBackendSessionService(openChamberSessionService, agentBackendHost.backend, sessionKnowledgeRuntime.sync, scheduledChatsScope);
+const applicationSessionService = createBackendSessionService(openChamberSessionService, agentBackendHost.registry, sessionKnowledgeRuntime.sync, scheduledChatsScope);
 const openChamberControlService = createOpenChamberControlService({
-  antigravity: agentBackendHost.backend,
+  backendRegistry: agentBackendHost.registry,
   replyToolPermission: async input => agentToolRuntime?.permissions.reply(input.sessionID, input.requestID, input.decision, input.message) ?? false,
   isHiddenSession: (sessionID, record) => hiddenSessions.has(sessionID, record),
   chatsScope: scheduledChatsScope,
