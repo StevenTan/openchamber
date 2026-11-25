@@ -1,5 +1,5 @@
 import type { Application, ExpressFactory, Request } from '../shared/http-contracts.js';
-import { createCodeModeMcpRuntime, type CodeModeFileActivity } from '../agent-code-mode/mcp.js';
+import { createCodeModeMcpRuntime } from '../agent-code-mode/mcp.js';
 import type { createMcpRuntime } from './mcp.js';
 import type { ResolveMcpContext } from './mcp-context.js';
 import type { ToolPermissions } from './permissions.js';
@@ -9,7 +9,6 @@ type Services = Record<'openchamber_commands' | 'file' | 'browser' | 'request' |
 interface Options {
   resolveContext: ResolveMcpContext;
   permissions: ToolPermissions;
-  fileActivity?: CodeModeFileActivity | undefined;
   browserEnabled(): boolean;
   authorize(request: Pick<Request, 'socket' | 'headers'>): boolean;
 }
@@ -21,7 +20,7 @@ export function createAgentMcpServices(services: Services, options: Options) {
     { namespace: 'browser', runtime: services.browser, permission: () => 'openchamber_web', enabled: options.browserEnabled },
     { namespace: 'request', runtime: services.request, permission: () => 'question' },
     { namespace: 'openchamber', runtime: services.openchamber, permission: controlMcpPermission },
-  ], options.resolveContext, options.permissions, options.fileActivity);
+  ], options.resolveContext, options.permissions);
   const routes = [
     ['browser-tool', services.browser, '1mb'], ['async-question', services.request, '1mb'],
     ['file-tool', services.file, '50mb'], ['control-tool', services.openchamber, '1mb'],

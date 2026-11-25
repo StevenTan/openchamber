@@ -24,7 +24,7 @@ export interface ScheduledTaskServiceDependencies {
   scheduledTasksRuntime: Pick<Scheduler, 'syncProject' | 'validateTarget' | 'cancelWaitingPrompt' | 'runNow'> & Partial<Pick<Scheduler, 'getStatus'>>;
   chatsScope?: ReturnType<typeof createChatsScope> | null;
   resolvePrimaryWorktreeRoot?: typeof resolveGitWorktreeRoot | null;
-  readModelCatalog?: ((directory: string) => Promise<(ModelCatalogEntry | null | undefined)[]>) | null;
+  readModelCatalog?: ((directory: string, providerID?: string) => Promise<(ModelCatalogEntry | null | undefined)[]>) | null;
 }
 
 interface ModelCatalogEntry {
@@ -146,7 +146,7 @@ export const createScheduledTaskService = (dependencies: ScheduledTaskServiceDep
       ? resolvedDirectory
       : await resolveExecutionDirectory(projectID, task.targetSessionId, { tolerateMissingTarget: true });
     if (directory === null) return;
-    const entries = await readModelCatalog(directory);
+    const entries = await readModelCatalog(directory, providerID);
     if (!Array.isArray(entries) || entries.length === 0) return;
     const known = entries.some((model) => model?.providerID === providerID
       && (model.id === modelID || model.modelID === modelID));

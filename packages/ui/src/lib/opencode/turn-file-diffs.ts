@@ -1,29 +1,7 @@
-import { z } from 'zod';
 import type { Part } from './model';
 
-const fileStats = z.object({
-  file: z.string(),
-  status: z.enum(['added', 'deleted', 'modified']),
-  additions: z.number().optional(),
-  deletions: z.number().optional(),
-  error: z.string().optional(),
-});
-export const recordedTurnDiffSchema = z.object({
-  version: z.literal(1),
-  sessionID: z.string(),
-  turnID: z.string(),
-  revision: z.number().optional(),
-  files: z.array(fileStats.extend({ patch: z.string().optional() })).optional(),
-  error: z.string().optional(),
-  unavailable: z.boolean().optional(),
-});
-const turnDiffReferenceSchema = z.object({
-  turnID: z.string().optional(),
-  revision: z.number().optional(),
-  files: z.array(fileStats).optional(),
-  error: z.string().optional(),
-});
-type TurnDiffReference = z.infer<typeof turnDiffReferenceSchema>;
+import { turnDiffReferenceSchema, type TurnDiffReference } from '@openchamber/sdk/agent-backends';
+export { recordedTurnDiffSchema } from '@openchamber/sdk/agent-backends';
 
 const readTurnDiffReference = (parts: readonly Part[]): TurnDiffReference | undefined => {
   for (let index = parts.length - 1; index >= 0; index--) {
@@ -36,11 +14,7 @@ const readTurnDiffReference = (parts: readonly Part[]): TurnDiffReference | unde
 };
 
 export const latestTurnDiffReference = (messages: readonly { parts: readonly Part[] }[]): TurnDiffReference | undefined => {
-  for (let index = messages.length - 1; index >= 0; index--) {
-    const reference = readTurnDiffReference(messages[index].parts);
-    if (reference) return reference;
-  }
-  return undefined;
+  return turnDiffReferences(messages).at(-1);
 };
 
 /** A displayed turn can contain several admitted prompts whose messages are hidden. */
@@ -49,7 +23,7 @@ export const turnDiffReferences = (messages: readonly { parts: readonly Part[] }
   for (const message of messages) {
     for (const part of message.parts) {
       const reference = readTurnDiffReference([part]);
-      if (reference) references.set(reference.turnID, reference);
+      if (reference && (reference.revision ?? Infinity) >= (references.get(reference.turnID)?.revision ?? -1)) references.set(reference.turnID, reference);
     }
   }
   return [...references.values()];

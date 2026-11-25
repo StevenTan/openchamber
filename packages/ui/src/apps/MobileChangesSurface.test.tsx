@@ -4,7 +4,7 @@ import { expect, spyOn, test } from 'bun:test';
 import { Window } from 'happy-dom';
 import { OpenCode, type FileDiffInfo } from '@opencode/client';
 import { SyncProvider, useDirectoryStore } from '@/sync/sync-context';
-import { opencodeClient } from '@/lib/opencode/client';
+import { turnDiffClient } from '@/lib/agent/turn-diffs';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import type { GitLogEntry, GitStatus } from '@/lib/api/types';
 import type {
@@ -499,7 +499,7 @@ test('mobile changes last turn scope lists the turn diffs, opens one, and shows 
     }
   }, originalFetch);
 
-  const turnDiffs = spyOn(opencodeClient, 'getRecordedTurnDiff').mockResolvedValue(recordedDiff([
+  const turnDiffs = spyOn(turnDiffClient, 'read').mockResolvedValue(recordedDiff([
     { file: 'src/added.ts', status: 'added', additions: 1, deletions: 0,
       patch: 'diff --git a/src/added.ts b/src/added.ts\nindex 1111111..2222222 100644\nBinary files a/src/added.ts and b/src/added.ts differ\n' },
     { file: 'src/modified.ts', status: 'modified', additions: 1, deletions: 1,
@@ -668,7 +668,7 @@ test('mobile changes last turn scope paints loading before the turn fetch settle
 
   let releaseTurn: (files: FileDiffInfo[]) => void = () => {};
   const pendingTurn = new Promise<FileDiffInfo[]>((resolve) => { releaseTurn = resolve; });
-  const turnDiffs = spyOn(opencodeClient, 'getRecordedTurnDiff').mockImplementation(() => pendingTurn.then(recordedDiff));
+  const turnDiffs = spyOn(turnDiffClient, 'read').mockImplementation(() => pendingTurn.then(recordedDiff));
   const { createRoot } = await import('react-dom/client');
   const { I18nProvider } = await import('@/lib/i18n');
   const { RuntimeAPIContext } = await import('@/contexts/runtimeAPIContext');

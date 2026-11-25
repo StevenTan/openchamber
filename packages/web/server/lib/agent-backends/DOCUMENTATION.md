@@ -40,8 +40,32 @@ mobile clients use the host routes; the VS Code extension uses OpenCode.
 - Account quotas use the signed-in ACP worker's localhost
   `RetrieveUserQuotaSummary` endpoint. A native session-list request starts the
   worker without a model turn; the front and worker logs identify its HTTP port.
+- Native turn creation and completion anchor the host's shared file diff runtime.
+  File mutations persist the reference on the native turn and publish it with
+  live updates. Conversation deletion deletes its host diff records; archiving
+  retains them.
+- Shared MCP handlers persist tool inputs, results and activity metadata under
+  `tool-activity/<session-id>.jsonl`. Native turns retain these host records for
+  live and history projection, including file patches and interaction answers.
+  The original MCP call ID identifies card callbacks.
+- Session creation applies the host's default approval mode. Draft submission
+  awaits the selected mode before dispatching the first prompt.
+- The application session service routes ordinary create, send, status, history
+  and interruption to the session's backend. Queued messages and scheduled runs
+  select that same service. Native scheduled runs use the host's worktree
+  lifecycle; goal mode remains an OpenCode capability.
+- Session instructions are stored by the host. The OpenCode adapter delivers
+  instruction entries; Antigravity receives their current text with each prompt.
+  A user's direct message settles pending page and secret cards. Synthetic queue
+  and scheduler messages leave those cards waiting.
 
 ## Boundaries
+
+Antigravity retains the five most recently used native sessions. Above that
+limit, idle sessions close through ACP while their stored history remains
+available. Running prompts and native requests stay resident until they finish.
+Reading host history does not start a worker; the next prompt or model change
+loads a closed native session with its existing identity.
 
 Native forks, side conversations and subagent management are separate backend
 capabilities. The application conversation client covers ordinary conversations;

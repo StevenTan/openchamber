@@ -15,7 +15,7 @@ import { authorizeCommand } from './permissions.js';
 import type { ToolPermissions } from '../../agent-tool/permissions.js';
 
 const streamEvent = z.discriminatedUnion("type", [
-  z.object({ type: z.enum(["session.inbox.enqueued", "session.deleted"]), data: z.object({ sessionID: z.string() }) }),
+  z.object({ type: z.enum(["session.inbox.enqueued", "openchamber.session.input", "session.deleted"]), data: z.object({ sessionID: z.string() }) }),
   z.object({ type: z.enum(["connect", "disconnect", "error", "initial-error"]) }),
 ]);
 
@@ -191,6 +191,7 @@ export function createCommandToolRuntime({
 
   return {
     mcp,
+    wait: async (sessionID: string) => { await managers.get(sessionID)?.wait(); },
     registerRoutes,
     reset,
     close: () => {
@@ -203,7 +204,7 @@ export function createCommandToolRuntime({
       const parsed = streamEvent.safeParse(payload);
       if (!parsed.success) return;
       const event = parsed.data;
-      if (event.type === "session.inbox.enqueued") clock.interrupt(event.data.sessionID);
+      if (event.type === "session.inbox.enqueued" || event.type === "openchamber.session.input") clock.interrupt(event.data.sessionID);
       if (event.type === "session.deleted") return releaseSession(event.data.sessionID)
         .catch(error => console.error("[agent-command] session cleanup failed:", error.message));
       if (event.type === "connect" && clock.signal.aborted) clock = createSleepClock({ hasPendingInput });

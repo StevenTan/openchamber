@@ -1,3 +1,5 @@
+import type { SessionPayload } from './payload.js';
+export type { SessionPayload } from './payload.js';
 import { asNonEmptyString } from '../shared/guards.js';
 import express from 'express';
 import { z } from 'zod';
@@ -52,33 +54,6 @@ import type { createChatsScope } from '../scheduled-tasks/chats-scope.js';
 import type { createFeatureRoutesRuntime } from '../server-frame/feature-routes-runtime.js';
 import type { createRoutingRuntime } from '../routing/runtime.js';
 import type { createWorktreeBootstrapStore } from '../git/worktree-bootstrap-storage.js';
-
-export interface SessionPayload {
-  entries?: unknown;
-  linked?: unknown;
-  model?: unknown;
-  providerID?: unknown;
-  modelID?: unknown;
-  goal?: unknown;
-  goalTokenBudget?: unknown;
-  ids?: unknown;
-  archivedAt?: unknown;
-  projectId?: unknown;
-  projectID?: unknown;
-  directory?: unknown;
-  pullRequest?: unknown;
-  worktree?: unknown;
-  setUpstream?: unknown;
-  patch?: unknown;
-  expected?: unknown;
-  title?: unknown;
-  prompt?: unknown;
-  agent?: unknown;
-  variant?: unknown;
-  promptedBySessionId?: unknown;
-  messageId?: unknown;
-  carry?: unknown;
-}
 
 interface WorktreeFields {
   name?: unknown;

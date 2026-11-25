@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import { ClientSideConnection, ndJsonStream, PROTOCOL_VERSION, type McpServer, type SessionNotification, type RequestPermissionRequest } from '@agentclientprotocol/sdk';
 import { z } from 'zod';
-import type { AcpConversation, AcpConversationEvent, AcpSend, AcpTurn, AcpPrompt } from '@openchamber/sdk/agent-backends';
+import type { AcpConversation, AcpConversationEvent, AcpSend, AcpTurn, AcpPrompt, AgentToolCall } from '@openchamber/sdk/agent-backends';
 import type { QuestionSessionApi } from '../agent-question/src/runtime.js';
 import { createMessageId } from '../dispatch-results/runtime.js';
 import { isEnterpriseMode } from '../enterprise-mode.js';
@@ -15,16 +15,23 @@ import { resolveAntigravityExecutable, installAntigravityExecutable, Antigravity
 import { createAntigravityAuthentication } from './antigravity-auth.js';
 import { readAntigravityUsage } from './antigravity-usage.js';
 import { readAntigravityQuota } from './antigravity-quota.js';
+import type { createTurnDiffRuntime } from '../turn-diffs/runtime.js';
+import type { TurnDiffReference } from '@openchamber/sdk/agent-backends';
 
 interface Options {
   dataDir: string;
+  turnDiffs: Pick<ReturnType<typeof createTurnDiffRuntime>, 'begin' | 'finish' | 'remove'>;
   environment(): NodeJS.ProcessEnv;
   mcpServers(sessionID: string): McpServer[];
   reassignSession(from: string, to: string): void;
+  initializeSession(sessionID: string, directory: string): Promise<void>;
+  readInstructions(sessionID: string): Promise<Array<{ text: string }>>;
+  onUserInput?(sessionID: string): void;
   publish(event: AcpConversationEvent): void;
   publishForm(type: 'form.created' | 'form.replied' | 'form.cancelled', data: { form?: Parameters<QuestionSessionApi['form']['create']>[0]; id?: string; sessionID?: string; answer?: Parameters<QuestionSessionApi['form']['reply']>[0]['answer'] }, directory: string): void;
 }
 const settingsSchema = z.object({ binary: z.string().default('agy') });
+const MAX_RESIDENT_SESSIONS = 5;
 const errorMessage = (cause: unknown) => cause instanceof Error ? cause.message : String(cause);
 type StoredConversation = AcpConversation & { forms: Array<Parameters<QuestionSessionApi['form']['create']>[0] & { state: { status: 'pending' | 'answered' | 'cancelled'; answer?: Record<string, string> } }> };
 
@@ -33,7 +40,8 @@ export function createAntigravityBackend(options: Options) {
   const conversations = new Map<string, StoredConversation>();
   const active = new Map<string, AcpTurn>();
   const prompts = new Map<string, Promise<unknown>>();
-  const loaded = new Set<string>();
+  const loaded = new Map<string, string>();
+  const inUse = new Map<string, number>();
   let connection: Promise<ClientSideConnection> | undefined;
   let process: ReturnType<typeof spawn> | undefined;
   let settings = { binary: 'agy' };
@@ -117,63 +125,88 @@ export function createAntigravityBackend(options: Options) {
       return acp;
     })().catch(cause => { connection = undefined; throw cause; });
   };
-  const load = async (session: AcpConversation) => {
-    const acp = await connect();
-    if (!loaded.has(session.id)) {
-      const state = await acp.loadSession({ sessionId: session.nativeID, cwd: session.directory, mcpServers: options.mcpServers(session.id) });
-      session.config = state.configOptions ?? [];
-      loaded.add(session.id);
+  const releaseIdleSessions = async (acp: ClientSideConnection, currentID?: string) => {
+    for (const [id, nativeID] of loaded) {
+      if (loaded.size <= MAX_RESIDENT_SESSIONS) break;
+      if (id === currentID || active.has(id) || inUse.has(id)) continue;
+      await acp.closeSession({ sessionId: nativeID });
+      loaded.delete(id);
     }
-    return acp;
+  };
+  const withSession = async <T>(session: AcpConversation, operation: (acp: ClientSideConnection) => Promise<T>): Promise<T> => {
+    const acp = await connect();
+    inUse.set(session.id, (inUse.get(session.id) ?? 0) + 1);
+    try {
+      if (!loaded.has(session.id)) {
+        const state = await acp.loadSession({ sessionId: session.nativeID, cwd: session.directory, mcpServers: options.mcpServers(session.id) });
+        session.config = state.configOptions ?? [];
+      }
+      loaded.delete(session.id);
+      loaded.set(session.id, session.nativeID);
+      return await operation(acp);
+    } finally {
+      const count = (inUse.get(session.id) ?? 0) - 1;
+      if (count) inUse.set(session.id, count);
+      else inUse.delete(session.id);
+      await releaseIdleSessions(acp, session.id);
+    }
   };
   const prepare = async (directory: string) => {
     await ready;
     const draft = [...conversations.values()].find(item => item.draft && item.directory === directory);
-    if (draft) { await load(draft); return draft; }
+    if (draft) return withSession(draft, async () => draft);
     const id = `ses_ag_${randomUUID().replaceAll('-', '')}`;
     const acp = await connect();
     const native = await acp.newSession({ cwd: directory, mcpServers: options.mcpServers(id) });
     const now = Date.now();
     const session: StoredConversation = { id, nativeID: native.sessionId, directory, title: 'New session', created: now, updated: now, draft: true, config: native.configOptions ?? [], turns: [], forms: [] };
     conversations.set(id, session);
-    loaded.add(id);
+    loaded.set(id, native.sessionId);
     await save(session);
+    await releaseIdleSessions(acp, id);
     return session;
   };
-  const send = async (sessionID: string, input: AcpSend) => {
+  const send = async (sessionID: string, input: AcpSend, source: 'user' | 'synthetic' = 'user') => {
     const session = await get(sessionID);
-    const acp = await load(session);
-    let turn = active.get(sessionID);
-    if (turn) turn.followups.push({ id: input.id, text: input.text, files: input.files, created: Date.now() });
-    else {
-      const model = session.config.find(option => option.category === 'model' && option.type === 'select');
-      const thought = session.config.find(option => option.category === 'thought_level' && option.type === 'select');
-      turn = { id: input.id, assistantID: createMessageId(Date.now() + 1), modelID: model?.type === 'select' ? model.currentValue : '', ...thought?.type === 'select' && { variant: thought.currentValue }, text: input.text, files: input.files, created: Date.now(), updates: [], followups: [] };
-      session.turns.push(turn);
-      active.set(sessionID, turn);
-    }
-    session.updated = Date.now();
-    await save(session);
-    publishTurn(session, turn);
-    const prompt: AcpPrompt = [...input.context.map(item => ({ type: 'text' as const, text: item.text })), { type: 'text', text: input.text }];
-    for (const file of input.files) {
-      const data = /^data:([^;,]+);base64,(.*)$/s.exec(file.url);
-      if (file.mime.startsWith('image/') && data) prompt.push({ type: 'image', mimeType: file.mime, data: z.string().parse(data[2]) });
-      else prompt.push({ type: 'resource_link', uri: file.url, name: file.filename ?? file.url, mimeType: file.mime });
-    }
-    const responding: Promise<void> = acp.prompt({ sessionId: session.nativeID, prompt }).then(() => {}, cause => { turn.error = errorMessage(cause); }).then(async () => {
-      if (prompts.get(sessionID) !== responding) return;
-      turn.completed = Date.now();
-      session.updated = turn.completed;
-      active.delete(sessionID);
-      prompts.delete(sessionID);
-      refreshUsage(session);
+    return withSession(session, async acp => {
+      if (source === 'user') options.onUserInput?.(sessionID);
+      let turn = active.get(sessionID);
+      if (turn) turn.followups.push({ id: input.id, text: input.text, files: input.files, created: Date.now() });
+      else {
+        const model = session.config.find(option => option.category === 'model' && option.type === 'select');
+        const thought = session.config.find(option => option.category === 'thought_level' && option.type === 'select');
+        turn = { id: input.id, assistantID: createMessageId(Date.now() + 1), modelID: model?.type === 'select' ? model.currentValue : '', ...thought?.type === 'select' && { variant: thought.currentValue }, text: input.text, files: input.files, created: Date.now(), updates: [], followups: [], toolCalls: [] };
+        session.turns.push(turn);
+        active.set(sessionID, turn);
+        await options.turnDiffs.begin({ sessionID, turnID: turn.id, directory: session.directory });
+      }
+      session.updated = Date.now();
       await save(session);
-      options.publish({ type: 'session', session });
       publishTurn(session, turn);
+      const instructions = await options.readInstructions(sessionID);
+      const prompt: AcpPrompt = [...instructions, ...input.context].map(item => ({ type: 'text' as const, text: item.text }));
+      prompt.push({ type: 'text', text: input.text });
+      for (const file of input.files) {
+        const data = /^data:([^;,]+);base64,(.*)$/s.exec(file.url);
+        if (file.mime.startsWith('image/') && data) prompt.push({ type: 'image', mimeType: file.mime, data: z.string().parse(data[2]) });
+        else prompt.push({ type: 'resource_link', uri: file.url, name: file.filename ?? file.url, mimeType: file.mime });
+      }
+      const responding: Promise<void> = acp.prompt({ sessionId: session.nativeID, prompt }).then(() => {}, cause => { turn.error = errorMessage(cause); }).then(async () => {
+        if (prompts.get(sessionID) !== responding) return;
+        turn.completed = Date.now();
+        await options.turnDiffs.finish(sessionID);
+        session.updated = turn.completed;
+        active.delete(sessionID);
+        prompts.delete(sessionID);
+        refreshUsage(session);
+        await save(session);
+        options.publish({ type: 'session', session });
+        publishTurn(session, turn);
+        await releaseIdleSessions(acp);
+      });
+      prompts.set(sessionID, responding);
+      return input.id;
     });
-    prompts.set(sessionID, responding);
-    return input.id;
   };
   const disconnect = async () => {
     const acp = connection && await connection;
@@ -210,7 +243,37 @@ export function createAntigravityBackend(options: Options) {
   });
   return {
     get, prepare, send,
+    async wait(sessionID: string, signal: AbortSignal) {
+      signal.throwIfAborted();
+      const pending = prompts.get(sessionID) ?? Promise.resolve();
+      let abort: () => void;
+      const stopped = new Promise<never>((_resolve, reject) => {
+        abort = () => reject(signal.reason);
+        signal.addEventListener('abort', abort, { once: true });
+      });
+      await Promise.race([pending, stopped]).finally(() => signal.removeEventListener('abort', abort));
+    },
     lookup: (id: string) => conversations.get(id),
+    async recordToolCall(id: string, call: AgentToolCall, turnID: string | undefined) {
+      const session = await get(id);
+      for (const turn of session.turns.filter(turn => turn.id === turnID)) {
+        const calls = turn.toolCalls ?? [];
+        const index = calls.findIndex(item => item.id === call.id);
+        if (index === -1) calls.push(call);
+        else calls[index] = call;
+        turn.toolCalls = calls;
+        await save(session);
+        publishTurn(session, turn);
+      }
+    },
+    async recordFileDiff(id: string, reference: TurnDiffReference) {
+      const session = await get(id);
+      const turn = active.get(id);
+      if (!turn) throw new Error('File change has no active turn');
+      turn.fileDiff = reference;
+      await save(session);
+      publishTurn(session, turn);
+    },
     async list(directory?: string) { await ready; return [...conversations.values()].filter(item => !item.draft && (!directory || item.directory === directory)); },
     async create(directory: string, title?: string, id?: string) {
       const session = await prepare(directory);
@@ -221,14 +284,21 @@ export function createAntigravityBackend(options: Options) {
         loaded.delete(previous);
         session.id = id;
         conversations.set(id, session);
-        loaded.add(id);
+        loaded.set(id, session.nativeID);
         await fs.rename(path.join(root, `${previous}.json`), path.join(root, `${id}.json`));
       }
       session.draft = false;
       if (title) session.title = title;
       await save(session);
+      await options.initializeSession(session.id, session.directory);
       options.publish({ type: 'session', session });
       return session;
+    },
+    async metadata(id: string, metadata: import('../openchamber-sessions/session-metadata-store.js').SessionMetadata | undefined) {
+      const session = await get(id);
+      session.metadata = z.record(z.string(), z.json()).optional().parse(metadata);
+      await save(session);
+      options.publish({ type: 'session', session });
     },
     async rename(id: string, title: string) { const session = await get(id); session.title = title; await save(session); options.publish({ type: 'session', session }); },
     archive: {
@@ -240,16 +310,27 @@ export function createAntigravityBackend(options: Options) {
       },
       async readArchivedAt(id: string) { return (await get(id)).archived ?? null; },
     },
-    async remove(id: string) { const session = await get(id); await (await load(session)).closeSession({ sessionId: session.nativeID }); await fs.unlink(path.join(root, `${id}.json`)); conversations.delete(id); loaded.delete(id); options.publish({ type: 'deleted', sessionID: id, directory: session.directory }); },
+    async remove(id: string) {
+      const session = await get(id);
+      return withSession(session, async acp => {
+        await acp.closeSession({ sessionId: session.nativeID });
+        await fs.unlink(path.join(root, `${id}.json`));
+        await options.turnDiffs.remove(id);
+        conversations.delete(id);
+        loaded.delete(id);
+        options.publish({ type: 'deleted', sessionID: id, directory: session.directory });
+      });
+    },
     async model(id: string, modelID: string, variant?: string | null) {
       const session = await get(id);
-      const acp = await load(session);
-      session.config = (await acp.setSessionConfigOption({ sessionId: session.nativeID, configId: 'model', value: modelID })).configOptions;
-      if (variant) session.config = (await acp.setSessionConfigOption({ sessionId: session.nativeID, configId: 'thought_level', value: variant })).configOptions;
-      await save(session);
-      options.publish({ type: 'session', session });
+      return withSession(session, async acp => {
+        session.config = (await acp.setSessionConfigOption({ sessionId: session.nativeID, configId: 'model', value: modelID })).configOptions;
+        if (variant) session.config = (await acp.setSessionConfigOption({ sessionId: session.nativeID, configId: 'thought_level', value: variant })).configOptions;
+        await save(session);
+        options.publish({ type: 'session', session });
+      });
     },
-    async abort(id: string) { const session = await get(id); await (await load(session)).cancel({ sessionId: session.nativeID }); },
+    async abort(id: string) { const session = await get(id); await withSession(session, acp => acp.cancel({ sessionId: session.nativeID })); },
     statuses: () => Object.fromEntries([...active.keys()].map(id => [id, { type: 'busy' }])),
     async quota() {
       const acp = await connect();
@@ -284,7 +365,7 @@ export function createAntigravityBackend(options: Options) {
         async get(input) {
           const form = (await get(input.sessionID)).forms.find(item => item.id === input.formID);
           if (!form) throw Object.assign(new Error('Form not found'), { status: 404 });
-          return { state: { status: form.state.status, ...form.state.status === 'answered' && { answer: z.record(z.string(), z.string()).parse(form.state.answer) } } };
+          return form;
         },
         async create(input) {
           const session = await get(input.sessionID);
@@ -310,7 +391,7 @@ export function createAntigravityBackend(options: Options) {
           options.publishForm('form.cancelled', { id: input.formID, sessionID: session.id }, session.directory);
         },
       },
-      synthetic: async input => { await send(input.sessionID, { id: input.id ?? createMessageId(Date.now()), text: input.text, files: [], context: [] }); },
+      synthetic: async input => { await send(input.sessionID, { id: input.id ?? createMessageId(Date.now()), text: input.text, files: [], context: [] }, 'synthetic'); },
     } satisfies QuestionSessionApi,
     async close() {
       await authentication.close();

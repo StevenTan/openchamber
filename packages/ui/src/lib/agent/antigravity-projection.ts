@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { AcpConversation, AcpTurn } from '@openchamber/sdk/agent-backends';
+import type { AcpConversation, AcpTurn, AgentToolCall } from '@openchamber/sdk/agent-backends';
 import type { Session, Message, Part, ToolPart } from './model';
 import type { ProviderCatalog } from './client';
 import { partIds } from '../opencode/model';
@@ -9,7 +9,7 @@ export function acpSession(session: AcpConversation): Session {
   const model = session.config.find(option => option.category === 'model' && option.type === 'select');
   const thought = session.config.find(option => option.category === 'thought_level' && option.type === 'select');
   return { id: session.id, backendID: 'antigravity', projectID: session.directory, directory: session.directory,
-    title: session.title, agent: 'antigravity', cost: 0, tokens: session.tokens ?? emptyUsage(),
+    title: session.title, agent: 'antigravity', cost: 0, tokens: session.tokens ?? emptyUsage(), metadata: session.metadata ? z.record(z.string(), z.json()).parse(session.metadata) : undefined,
     ...model?.type === 'select' && { model: { id: model.currentValue, providerID: 'antigravity', ...thought?.type === 'select' && { variant: thought.currentValue } } },
     time: { created: session.created, updated: session.updated, ...session.archived != null && { archived: session.archived } } };
 }
@@ -33,7 +33,19 @@ export function acpMessages(session: AcpConversation, turn: AcpTurn): Array<{ in
   const base = { sessionID: session.id, messageID: turn.assistantID };
   const parts: Part[] = [];
   const tools = new Map<string, ToolPart>();
-  for (const update of turn.updates) {
+  const recorded = (call: AgentToolCall): ToolPart => {
+    const output = call.result?.content.filter(item => item.type === 'text').map(item => item.text).join('\n') ?? '';
+    const metadata = z.record(z.string(), z.json()).parse({ ...call.result?._meta, ...call.metadata });
+    const error = call.error ?? (call.result?.isError ? output : undefined);
+    return { ...base, id: `${turn.assistantID}_${call.id}`, callID: call.callID, type: 'tool', tool: `${call.namespace}_${call.name}`,
+      state: error !== undefined ? { status: 'error', input: z.record(z.string(), z.json()).parse(call.input), error, metadata, time: { start: call.started, end: call.completed! } }
+        : call.completed ? { status: 'completed', input: z.record(z.string(), z.json()).parse(call.input), output, metadata, time: { start: call.started, end: call.completed }, attachments: call.result?.content.filter(item => item.type === 'image').map((item, index) => ({ ...base, type: 'file' as const, id: `${call.id}_${index}`, mime: item.mimeType!, url: `data:${item.mimeType};base64,${item.data}` })) }
+          : { status: 'running', input: z.record(z.string(), z.json()).parse(call.input), metadata, time: { start: call.started } } };
+  };
+  for (let index = 0; index <= turn.updates.length; index++) {
+    parts.push(...(turn.toolCalls ?? []).filter(call => call.updateIndex === index).map(recorded));
+    const update = turn.updates[index];
+    if (!update) break;
     if ((update.sessionUpdate === 'agent_message_chunk' || update.sessionUpdate === 'agent_thought_chunk') && update.content.type === 'text') {
       const type = update.sessionUpdate === 'agent_message_chunk' ? 'text' : 'reasoning';
       const last = parts.at(-1);
@@ -41,6 +53,7 @@ export function acpMessages(session: AcpConversation, turn: AcpTurn): Array<{ in
       else parts.push({ ...base, id: `${turn.assistantID}_${parts.length}`, type, text: update.content.text, time: { start: turn.created, ...turn.completed && { end: turn.completed } } });
     }
     if (update.sessionUpdate === 'tool_call' || update.sessionUpdate === 'tool_call_update') {
+      if (turn.toolCalls) continue;
       let tool = tools.get(update.toolCallId);
       if (!tool) {
         tool = { ...base, id: `${turn.assistantID}_${update.toolCallId}`, callID: update.toolCallId, type: 'tool', tool: update.title ?? 'tool', state: { status: 'running', input: {}, time: { start: turn.created } } };
@@ -56,6 +69,8 @@ export function acpMessages(session: AcpConversation, turn: AcpTurn): Array<{ in
       else tool.state = { status: 'running', input, time: { start: turn.created } };
     }
   }
+  const changed = parts.filter(part => part.type === 'tool' && ['file_write', 'file_edit', 'file_patch', 'openchamber_execute'].includes(part.tool)).at(-1);
+  if (turn.fileDiff && changed?.type === 'tool' && changed.state.status !== 'pending') changed.state.metadata = { ...changed.state.metadata, openchamberTurnDiff: turn.fileDiff };
   return [
     ...[{ id: turn.id, text: turn.text, files: turn.files, created: turn.created }, ...turn.followups].map(input => ({
       info: { id: input.id, sessionID: session.id, role: 'user' as const, time: { created: input.created } }, parts: [

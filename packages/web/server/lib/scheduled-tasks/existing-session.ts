@@ -18,6 +18,7 @@ export interface ExistingSessionDependencies {
   resolvePrimaryWorktreeRoot?: typeof resolvePrimaryWorktreeRoot | null;
   isSessionArchived?: (sessionID: string) => boolean | Promise<boolean>;
   emitTaskRunEvent?: (event: ExistingSessionTaskRunEvent) => void;
+  readSession?: (sessionID: string) => ReturnType<ReturnType<typeof OpenCode.make>['session']['get']>;
 }
 
 export interface ExistingSessionTaskRunEvent {
@@ -48,7 +49,7 @@ const hasReadableError = (value: unknown): value is {
 const isFiniteNumber = (value: unknown): value is number => Number.isFinite(value);
 const isTargetCandidate = (value: unknown): value is { sessionId?: unknown; directory?: unknown } => value !== null && value !== undefined;
 
-export const createExistingSessionTasks = ({ projectConfigRuntime, messageQueueRuntime, createClient, listProjects, chatsScope, resolvePrimaryWorktreeRoot, isSessionArchived, emitTaskRunEvent }: ExistingSessionDependencies) => {
+export const createExistingSessionTasks = ({ projectConfigRuntime, messageQueueRuntime, createClient, listProjects, chatsScope, resolvePrimaryWorktreeRoot, isSessionArchived, emitTaskRunEvent, readSession = sessionID => createClient('').session.get({ sessionID }) }: ExistingSessionDependencies) => {
   const admissions = new Set<string>();
 
   const ownsDirectory = async (project: SessionProject | undefined, directory: string) => {
@@ -67,7 +68,7 @@ export const createExistingSessionTasks = ({ projectConfigRuntime, messageQueueR
     if (await isSessionArchived?.(parsed.data)) throw new OpenChamberControlError('Scheduled target is archived', 409);
     let session;
     try {
-      session = await createClient('').session.get({ sessionID: parsed.data });
+      session = await readSession(parsed.data);
     } catch (error) {
       if (hasReadableError(error) && (error.name === 'NotFoundError' || error.status === 404 || error.statusCode === 404)) throw new OpenChamberControlError('Scheduled target not found', 404);
       throw error;

@@ -3,7 +3,7 @@ import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/proto
 import type { CallToolResult, ServerNotification, ServerRequest } from "@modelcontextprotocol/sdk/types.js";
 import { commandTools, type CommandArguments, type RuntimeResult, type CommandToolContext, type CommandToolName } from "./contracts.js";
 import { createMcpRuntime } from "../../agent-tool/mcp.js";
-import type { ResolveMcpContext } from "../../agent-tool/mcp-context.js";
+import { recordMcpCall, type ResolveMcpContext } from "../../agent-tool/mcp-context.js";
 
 export function createCommandMcpRuntime(
   execute: (tool: CommandToolName, input: CommandArguments, context: CommandToolContext) => Promise<RuntimeResult>,
@@ -24,8 +24,11 @@ function createCommandMcpServer(
       inputSchema: definition.input,
       outputSchema: definition.output,
     }, async (input: CommandArguments, extra: RequestHandlerExtra<ServerRequest, ServerNotification>): Promise<CallToolResult> => {
-      const result = await execute(name, input, resolveContext(extra));
-      return { structuredContent: result, content: [{ type: "text", text: JSON.stringify(result) }] };
+      const context = resolveContext(extra);
+      return recordMcpCall(context, "openchamber_commands", name, input, async () => {
+        const result = await execute(name, input, context);
+        return { structuredContent: result, content: [{ type: "text", text: JSON.stringify(result) }] };
+      });
     });
   }
   return server;

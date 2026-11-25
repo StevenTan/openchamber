@@ -2,7 +2,6 @@ import crypto from 'node:crypto';
 import type { Server } from 'node:http';
 import { createAgentToolRuntime, type AgentToolDependencies } from '../agent-tool/runtime.js';
 import { createOpenCodeToolPermissions } from './tool-permissions.js';
-import { createCodeModeFileActivity } from './code-mode.js';
 import { resolveOpenCodeMcpContext } from './mcp-context.js';
 import { materializeAgentToolPlugin, materializeCommandPlugin } from './agent-tool-plugin.js';
 import { materializeSearchPlugin } from '../agent-search/runtime.js';
@@ -10,7 +9,7 @@ import { isString } from '../event-stream/guards.js';
 import type { createOpenChamberControlService } from '../openchamber-control/service.js';
 import type { SessionClient } from '../openchamber-sessions/opencode-client-contract.js';
 
-type Options = Pick<AgentToolDependencies, 'getCommandEnvironment' | 'questionRuntime'> & {
+type Options = Pick<AgentToolDependencies, 'getCommandEnvironment' | 'questionRuntime' | 'turnDiffs'> & {
   instanceDir: string;
   control: Pick<ReturnType<typeof createOpenChamberControlService>, 'execute' | 'resolveSessionDirectory'>;
   client(): SessionClient;
@@ -26,8 +25,6 @@ export function createManagedAgentTools({ control, client, server, permissionOpt
   const runtime = createAgentToolRuntime({
     ...dependencies, crypto, permissions,
     resolveMcpContext: applicationContext ?? resolveOpenCodeMcpContext,
-    codeModeFileActivity: (phase, request, tool, input) => applicationDirectory?.((applicationContext ?? resolveOpenCodeMcpContext)(request).sessionID)
-      ? Promise.resolve({}) : createCodeModeFileActivity(permissionOptions)(phase, request, tool, input),
     executeAction: (...args) => control.execute(...args),
     resolveSessionDirectory: async sessionID => applicationDirectory?.(sessionID) ?? control.resolveSessionDirectory(sessionID),
     hasPendingInput: async (sessionID, signal) => applicationDirectory?.(sessionID) ? false : (await client().session.inbox.list({ sessionID }, { signal })).length > 0,

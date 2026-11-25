@@ -1509,11 +1509,13 @@ file on disk no longer matches, the write is refused with `409` and code
 
 ## Managed OpenCode config layer (managed-config-file.js)
 
-The turn-diff capture plugin is registered on every managed launch. It records
-file tools independently of Git tracking and serves historical patches through
-plugin RPC; `../turn-diffs/DOCUMENTATION.md` owns its persistence and lifecycle.
-External OpenCode instances need that plugin installed to provide recorded
-turn diffs. A client without it reports unavailable.
+The turn-diff adapter is registered on every managed launch. It supplies turn
+identity and lifecycle to the host's file diff store. Shared file MCP tools
+capture mutations independently of Git tracking;
+`../turn-diffs/DOCUMENTATION.md` owns persistence and lifecycle.
+Recorded turn diffs require an OpenChamber-managed backend and its shared file
+MCP service. A standalone OpenCode plugin installation does not provide this
+host storage connection.
 
 The managed command plugin is always registered alongside the session title
 plugin. It exposes `exec_command` and `write_stdin` and removes `shell` from the
@@ -1531,9 +1533,8 @@ parent. Native agent permissions and `experimental.subagent_depth` govern access
 and spawning.
 
 The managed Code Mode plugin configures discovery of the shared MCP `execute`
-tool and forwards original call identity, progress and attachments. The
-`code-mode.ts` adapter invokes the turn-diffs capture RPC for scripted file
-operations. Backend-specific tools retain direct entries;
+tool and forwards original call identity, progress and attachments. Shared file
+MCP calls capture direct and scripted mutations in the host. Backend-specific tools retain direct entries;
 `../agent-code-mode/DOCUMENTATION.md` owns the catalog contract.
 For direct render and image calls, the adapter supplies `openchamber/callID`
 metadata. `mcp-context.ts` resolves this original call id so page answers from

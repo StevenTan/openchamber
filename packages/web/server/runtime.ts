@@ -1,3 +1,5 @@
+import { createBackendMetadata } from './lib/agent-backends/metadata.js';
+import { createBackendModelCatalog } from './lib/agent-backends/model-catalog.js';
 import { installOpenCodeV2, supportsOpenCodeV2Install } from './lib/opencode/v2-install.js';
 import { describeOpenCodeCompatibility, readOpenCodeCliVersion, readExternalOpenCodeVersion } from './lib/opencode/compatibility.js';
 import 'reflect-metadata';
@@ -108,6 +110,7 @@ import { createTrackerSessionStatus } from './lib/trackers/session-status.js';
 import { sourceControlProviderDescriptors } from './lib/source-control/provider-descriptors.js';
 import { measureMemoryIndex } from './lib/session-knowledge/runtime.js';
 import { createManagedSessionKnowledgeRuntime } from './lib/session-knowledge/managed-runtime.js';
+import { createSessionInstructions } from './lib/session-knowledge/instructions.js';
 import { createSessionLeadServer } from './lib/session-lead/server.js';
 import { createMemoryDreaming } from './lib/agent-memory/dreaming.js';
 import { isAutoModel, JEV_BACKGROUND_TIMEOUT_MS } from './lib/routing/defaults.js';
@@ -203,7 +206,9 @@ import { createRelayService, relayBlockedByEnterprise } from './lib/relay/servic
 import { createRelayHostLock } from './lib/relay/host-lock.js';
 import { createRelayKeyStore } from './lib/relay/key-store.js';
 import { createManagedAgentTools } from './lib/opencode/managed-agent-tools.js';
-import { createAgentBackendHost } from './lib/agent-backends/host.js';
+import { createManagedAgentBackendHost } from './lib/agent-backends/host.js';
+import { createBackendSessionService } from './lib/agent-backends/session-service.js';
+import { createApplicationSessions } from './lib/agent-backends/sessions.js';
 import { registerAgentBackendRoutes } from './lib/agent-backends/routes.js';
 import { createQuestionRuntime, questionStoreDirectory } from './lib/agent-question/src/runtime.js';
 import { createBrowserControlBroker } from './lib/browser-control/broker.js';
@@ -217,7 +222,7 @@ import { openCodePluginDelivery } from './lib/guests/opencode-plugin.js';
 import { createLimitFailoverRuntime } from './lib/limit-failover/runtime.js';
 import { prepareInstanceDir } from './lib/opencode/instance-dir.js';
 import { createOpenChamberSessionService } from './lib/openchamber-sessions/routes.js';
-import { createSessionMetadataStore, createOpenCodeSessionMetadata } from './lib/openchamber-sessions/session-metadata-store.js';
+import { createOpenCodeSessionMetadata } from './lib/openchamber-sessions/session-metadata-store.js';
 import { createUnreadBaseline } from './lib/openchamber-sessions/unread-baseline.js';
 import { createTurnDurationRecorder } from './lib/openchamber-sessions/turn-duration.js';
 import { createOpenCodeClient } from './lib/openchamber-sessions/opencode-client.js';
@@ -239,7 +244,6 @@ import type { TunnelWiringDependencies } from './lib/tunnels/tunnel-wiring-runti
 import type { Request, Response } from './lib/shared/http-contracts.js';
 import type { StreamSocket } from './lib/event-stream/contracts.js';
 import type { ScheduledTaskEventClient } from './lib/scheduled-tasks/routes.js';
-import type { MetadataDecider, MetadataReadOptions, SessionMetadata } from './lib/openchamber-sessions/session-metadata-store.js';
 import { isBoolean, isRecord, isString } from './lib/shared/object-guards.js';
 import type { JsonValue } from './lib/shared/json-values.js';
 import type { ForwardEventPayload } from './lib/event-stream/contracts.js';
@@ -697,41 +701,16 @@ const broadcastPermissionUiEvent = <Payload>(payload: Payload) => {
   broadcastGlobalUiEvent(payload);
 };
 
-const sessionMetadataStore = createSessionMetadataStore({
+const { store: sessionMetadataStore, read: readStoredSessionMetadata, persist: persistSessionMetadataPatch, update: updateSessionMetadataWith } = createBackendMetadata({
   dataDir: OPENCHAMBER_DATA_DIR,
-  openCode: {
-    read: (...args) => createOpenCodeSessionMetadata({ buildOpenCodeUrl, getOpenCodeAuthHeaders }).read(...args),
-    write: (sessionID, metadata, options) => createOpenCodeSessionMetadata({ buildOpenCodeUrl, getOpenCodeAuthHeaders }).write(sessionID, metadata, options).then(() => {
-      if (sessionLineage.noteMetadata(sessionID, metadata)) permissionAutoAcceptRuntime.forgetSession(sessionID);
-    }),
+  backend: () => agentBackendHost.backend,
+  openCode: createOpenCodeSessionMetadata({ buildOpenCodeUrl: (...args) => buildOpenCodeUrl(...args), getOpenCodeAuthHeaders: () => getOpenCodeAuthHeaders() }),
+  onWrite: (sessionID, metadata) => {
+    if (sessionLineage.noteMetadata(sessionID, metadata)) permissionAutoAcceptRuntime.forgetSession(sessionID);
   },
+  publish: broadcastOpenChamberUiEvent,
+  notifyGoalChanged: (sessionID, directory, metadata) => sessionGoalRuntime.notifyGoalChanged(sessionID, directory, metadata),
 });
-
-const readStoredSessionMetadata = (sessionID: string | null, options?: MetadataReadOptions) => sessionMetadataStore.get(sessionID, options);
-
-const persistSessionMetadataPatch = async (sessionID: string, patch: SessionMetadata, { directory = '' }: { directory?: string | undefined } = {}) => {
-  const metadata = await sessionMetadataStore.setSessionMetadata(sessionID, patch, { directory });
-  broadcastOpenChamberUiEvent({
-    type: 'openchamber:session-metadata',
-    properties: { sessionID, metadata },
-  });
-  if (isRecord(patch.openchamber) && 'goal' in patch.openchamber) {
-    void Promise.resolve(sessionGoalRuntime.notifyGoalChanged(sessionID, directory, metadata))
-      .catch((error) => console.warn('[session-goal] could not arm after a goal change:', error?.message ?? error));
-  }
-  return metadata;
-};
-
-const updateSessionMetadataWith = async (sessionID: string, decide: MetadataDecider, { directory = '' }: { directory?: string | undefined } = {}) => {
-  const result = await sessionMetadataStore.updateSessionMetadata(sessionID, decide, { directory });
-  if (result.changed) {
-    broadcastOpenChamberUiEvent({
-      type: 'openchamber:session-metadata',
-      properties: { sessionID, metadata: result.metadata },
-    });
-  }
-  return result;
-};
 
 const sessionRuntime = createSessionRuntime({
   writeSseEvent,
@@ -1200,6 +1179,10 @@ const sessionLead = createSessionLeadServer({
   registerResult: (entry) => dispatchResultsRuntime.register(entry),
 });
 
+const sessionInstructions = createSessionInstructions(OPENCHAMBER_DATA_DIR, {
+  put: async (sessionID, directory, key, value) => { if (!sessionID.startsWith('ses_ag_')) await openCodeSessionClient(directory).experimental.session.instructions.entry.put({ sessionID, key, value }); },
+  remove: async (sessionID, directory, key) => { if (!sessionID.startsWith('ses_ag_')) await openCodeSessionClient(directory).experimental.session.instructions.entry.remove({ sessionID, key }); },
+});
 const sessionKnowledgeRuntime = createManagedSessionKnowledgeRuntime({
   isToolHost: () => !isExternalOpenCode && !ENV_SKIP_OPENCODE_START,
   readSettings: () => readSettingsFromDiskMigrated(),
@@ -1215,7 +1198,7 @@ const sessionKnowledgeRuntime = createManagedSessionKnowledgeRuntime({
   readPlaceholderBranch: readRenameableGeneratedBranch,
   readSessionMetadata: readStoredSessionMetadata,
   persistSessionMetadata: (sessionID, directory, patch) => persistSessionMetadataPatch(sessionID, patch, { directory }),
-  openCodeSessionClient,
+  instructionEntries: sessionInstructions,
 });
 
 const contextObligatoryRuntime = createContextObligatoryRuntime({
@@ -1327,6 +1310,7 @@ const autoReviewRuntime = createAutoReviewRuntime({
 autoReviewRuntime.start();
 
 const messageQueueRuntime = createMessageQueueRuntime({
+  backendForSession: sessionID => applicationSessionService.queueBackend(sessionID),
   globalEventHub: globalMessageStreamHub,
   buildOpenCodeUrl,
   getOpenCodeAuthHeaders,
@@ -1663,11 +1647,19 @@ const environmentRuntime = composeEnvironmentRuntime({
   readOpenCodeServiceEnv: () => readOpenCodeServiceEnv(OPENCODE_CONFIG_DIR),
   isEnterpriseMode: () => isEnterpriseMode(),
 });
-const agentBackendHost = createAgentBackendHost({
+const agentBackendHost = createManagedAgentBackendHost({
   dataDir: OPENCHAMBER_DATA_DIR, server: () => server, openCodeClient: openCodeSessionClient,
   tools: () => { if (!agentToolRuntime) throw new Error('Agent tools are unavailable'); return agentToolRuntime; },
   environment: () => overlayEnvironment({ ...process.env, PATH: buildAugmentedPath() }, environmentRuntime.forOpenCode()),
-  publish: event => broadcastOpenChamberUiEvent(event), hub: globalMessageStreamHub,
+  publish: broadcastOpenChamberUiEvent, hub: globalMessageStreamHub,
+  sessionStatus: messageQueueRuntime.sessionStatus,
+  initializePermission: permissionAutoAcceptRuntime.initializeSession,
+  syncKnowledge: sessionKnowledgeRuntime.sync,
+  readInstructions: sessionInstructions.read,
+  onUserInput: sessionID => {
+    openChamberControlService.userInput(sessionID);
+    agentToolRuntime?.observeCommandEvent({ type: 'openchamber.session.input', data: { sessionID } });
+  },
 });
 const staticRoutesRuntime = createStaticRoutesRuntime({
   fs,
@@ -1932,6 +1924,9 @@ const scheduledChatsScope = createChatsScope(OPENCHAMBER_CHATS_DIR, {
 });
 const scheduledWorktreeBridge = createUnregisteredScheduledWorktreeBridge();
 const scheduledTasksRuntime = createScheduledTasksRuntime({
+  antigravity: agentBackendHost.backend,
+  readSession: sessionID => createApplicationSessions({ openCode: async () => openCodeSessionClient(''), antigravity: agentBackendHost.backend }).get(sessionID),
+  waitApplicationCommands: async sessionID => { await agentToolRuntime?.waitCommands(sessionID); },
   projectConfigRuntime,
   chatsScope: scheduledChatsScope,
   readSessionMetadata: readStoredSessionMetadata,
@@ -2046,7 +2041,7 @@ const scheduledTaskService = createScheduledTaskService({
   scheduledTasksRuntime,
   chatsScope: scheduledChatsScope,
   resolvePrimaryWorktreeRoot,
-  readModelCatalog,
+  readModelCatalog: createBackendModelCatalog(agentBackendHost.backend, readModelCatalog),
 });
 const openChamberSessionService = createOpenChamberSessionService({
   onSessionArchived: (sessionID, archivedAt) => extensionSessionEvents.processPayload({
@@ -2178,7 +2173,10 @@ function executeServiceControl(action: string, input?: ControlInput, contextDire
   return openChamberControlService.execute(action, input, contextDirectory, options);
 }
 
+const applicationSessionService = createBackendSessionService(openChamberSessionService, agentBackendHost.backend, sessionKnowledgeRuntime.sync, scheduledChatsScope);
 const openChamberControlService = createOpenChamberControlService({
+  antigravity: agentBackendHost.backend,
+  replyToolPermission: async input => agentToolRuntime?.permissions.reply(input.sessionID, input.requestID, input.decision, input.message) ?? false,
   isHiddenSession: (sessionID, record) => hiddenSessions.has(sessionID, record),
   chatsScope: scheduledChatsScope,
   chatRoots: [path.join(OPENCHAMBER_USER_CONFIG_ROOT, 'chats'), OPENCHAMBER_CHATS_DIR],
@@ -2192,7 +2190,7 @@ const openChamberControlService = createOpenChamberControlService({
   getOpenCodeAuthHeaders,
   waitForOpenCodeReady,
   isOpenCodeDirectoryTrusted: (directory) => openCodeTrust.isTrusted(directory),
-  sessionService: openChamberSessionService,
+  sessionService: applicationSessionService,
   scheduledTaskService,
   browserControl: browserControlRouter,
   fileOpen: fileOpenRequester,
@@ -2997,7 +2995,7 @@ async function main(options: WebUiServerOptions = {}) {
     sessionKnowledgeRuntime,
     scheduledTasksRuntime,
     scheduledTaskService,
-    openChamberSessionService,
+    openChamberSessionService: applicationSessionService,
     openChamberControlService,
     waitForOpenCodeReady,
     emitSessionCreatedEvent,

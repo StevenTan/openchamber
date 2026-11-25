@@ -1,6 +1,5 @@
 import { linkedWorktreeOf } from '../openchamber-sessions/work-naming.js';
 import { createSessionKnowledgeRuntime } from './runtime.js';
-import type { createOpenCodeClient } from '../openchamber-sessions/opencode-client.js';
 import type { SessionKnowledgeDependencies } from './contracts.js';
 
 interface ToolSettings {
@@ -17,7 +16,7 @@ type ManagedKnowledgeDependencies = Pick<SessionKnowledgeDependencies,
   isAgentMemoryEnabled: () => Promise<boolean>;
   
   listWorktrees: (directory: string) => Promise<{ path: string }[]>;
-  openCodeSessionClient: (directory: string) => ReturnType<typeof createOpenCodeClient>;
+  instructionEntries: NonNullable<SessionKnowledgeDependencies['instructionEntries']>;
 };
 
 const SPACE_DIRECTORY = /^\/spaces\/[0-9a-f]{12}(?:\/|$)/;
@@ -28,7 +27,7 @@ export const createManagedSessionKnowledgeRuntime = ({
   isAgentMemoryEnabled,
   
   listWorktrees,
-  openCodeSessionClient,
+  instructionEntries,
   ...dependencies
 }: ManagedKnowledgeDependencies) => {
   const toolSettingOn = (key: keyof ToolSettings) => async () => {
@@ -48,11 +47,6 @@ export const createManagedSessionKnowledgeRuntime = ({
     isPageRenderingAvailable: toolSettingOn('agentRenderToolEnabled'),
     isSecretRequestAvailable: toolSettingOn('agentSecretToolEnabled'),
     
-    instructionEntries: {
-      put: (sessionID, directory, key, value) => openCodeSessionClient(directory)
-        .experimental.session.instructions.entry.put({ sessionID, key, value }),
-      remove: (sessionID, directory, key) => openCodeSessionClient(directory)
-        .experimental.session.instructions.entry.remove({ sessionID, key }),
-    },
+    instructionEntries,
   });
 };

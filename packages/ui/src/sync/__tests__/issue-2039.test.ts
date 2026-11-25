@@ -117,6 +117,7 @@ mock.module("@/stores/utils/safeStorage", () => ({
 }))
 
 mock.module("@/lib/opencode/client", () => ({
+  isOpencodeNotFound: () => false,
   opencodeClient: {
     getDirectory: () => null,
     getFilesystemHome: mock(async () => "/home/test"),
@@ -536,7 +537,7 @@ describe("issue 2039 draft auto-accept", () => {
     expect(permissionAutoAcceptCalls).toEqual([["ses_issue_2039", "auto"]])
   })
 
-  test("leaves the default to the host's server outside a space, and writes nothing for ask", async () => {
+  test("persists the default permission mode for project and space sessions", async () => {
     useUIStore.setState({ permissionDefaultMode: "auto" })
     useSessionUIStore.getState().openNewSessionDraft({ target: "project", directoryOverride: "/repo" })
     await materializeOpenDraftSession({ providerID: "provider", modelID: "model" })
@@ -547,7 +548,7 @@ describe("issue 2039 draft auto-accept", () => {
     await materializeOpenDraftSession({ providerID: "provider", modelID: "model" })
     await new Promise((resolve) => setTimeout(resolve, 0))
 
-    expect(permissionAutoAcceptCalls).toEqual([])
+    expect(permissionAutoAcceptCalls).toEqual([["ses_issue_2039", "auto"], ["ses_issue_2039", "ask"]])
   })
 
   test("a choice made in a space draft wins over the Settings default", async () => {

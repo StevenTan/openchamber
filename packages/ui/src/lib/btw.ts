@@ -1,6 +1,5 @@
 import { conversationClient } from "@/lib/agent/active"
 import { permissionModeForNewSession, type PermissionMode } from '@/stores/utils/permissionAutoAccept';
-import { isSpaceDirectory } from '@/lib/spaces/space-route';
 import { useUIStore } from '@/stores/useUIStore';
 import type { Message, Part, Session } from '@/lib/opencode/model';
 import { opencodeClient, type SkillMentions } from '@/lib/opencode/client';
@@ -208,17 +207,12 @@ export async function startBtwSession(input: StartBtwInput): Promise<Session> {
       }
       const permissionMode = permissionModeForNewSession(
         input.permissionMode,
-        isSpaceDirectory(sessionDirectory),
         useUIStore.getState().permissionDefaultMode,
       );
-      if (permissionMode !== undefined) {
-        const { usePermissionStore } = await import('@/stores/permissionStore');
-        if (getRuntimeKey() !== expectedRuntimeKey) throw new Error('runtime changed');
-        const write = usePermissionStore.getState().setSessionMode(forked.id, permissionMode);
-        if (input.permissionMode !== undefined) await write;
-        else await write.catch((error) => console.warn('Failed to apply the default permission mode to the btw fork:', error));
-        if (getRuntimeKey() !== expectedRuntimeKey) throw new Error('runtime changed');
-      }
+      const { usePermissionStore } = await import('@/stores/permissionStore');
+      if (getRuntimeKey() !== expectedRuntimeKey) throw new Error('runtime changed');
+      await usePermissionStore.getState().setSessionMode(forked.id, permissionMode);
+      if (getRuntimeKey() !== expectedRuntimeKey) throw new Error('runtime changed');
       const newestCloned = await conversationClient.getSessionMessages(forked.id, { limit: 1 }, sessionDirectory);
       const boundaryMessageID = newestCloned.items[newestCloned.items.length - 1]?.info.id ?? null;
 

@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useUIStore } from '@/stores/useUIStore';
 import { useRuntimeAPIs } from '@/hooks/useRuntimeAPIs';
-import { opencodeClient } from '@/lib/opencode/client';
+import { turnDiffClient } from '@/lib/agent/turn-diffs';
 import { openTurnFileDiffInEditor } from '../openTurnFileDiffInEditor';
 import { toast } from '@/components/ui';
 import { Icon } from '@/components/icon/Icon';
@@ -82,7 +82,7 @@ const InteractiveTurnChangedFilePills = React.memo(({ files, turnId }: { files: 
         if (runtime.runtime.isVSCode && editor && effectiveDirectory) {
             const sessionId = useSessionUIStore.getState().currentSessionId;
             if (!sessionId || !selectedTurnId) return;
-            void opencodeClient.getRecordedTurnDiff(sessionId, selectedTurnId, effectiveDirectory)
+            void turnDiffClient.read(sessionId, selectedTurnId, effectiveDirectory)
                 .then((record) => {
                     if (record.unavailable || record.error || !record.files) throw new Error(t('diffView.state.turnDiffUnavailable'));
                     return openTurnFileDiffInEditor({ directory: effectiveDirectory, editor, file, turnDiff: record.files });

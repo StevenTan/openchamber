@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { Schema } from 'effect';
 import type { Tool } from '@opencode/schema/tool';
 import { FILE_MCP_TOOLS } from './contracts.js';
+import { turnDiffReferenceSchema } from '@openchamber/sdk/agent-backends';
 
 type Invocation = Pick<Tool.Context, 'sessionID' | 'agent' | 'messageID' | 'id'>;
 interface Context {
@@ -12,7 +13,7 @@ interface Context {
 }
 const resultFiles = z.object({ files: z.array(z.object({
   file: z.string(), patch: z.string(), status: z.enum(['added', 'modified', 'deleted']), additions: z.number(), deletions: z.number(),
-})) });
+})), openchamberTurnDiff: turnDiffReferenceSchema });
 export default {
   id: 'openchamber-file-tools',
   async setup(ctx: Context) {
@@ -25,7 +26,7 @@ export default {
         const execute = tool.execute;
         tool.execute = async (input, context) => {
           const result = await execute(input, context);
-          result.metadata = { ...result.metadata, files: resultFiles.parse(result.output).files };
+          result.metadata = { ...result.metadata, ...resultFiles.parse(result.output) };
           return result;
         };
       });

@@ -52,6 +52,9 @@ conversations retain their stored backend.
   for context fill, window size and cache counters.
   Context readouts hide unknown Antigravity windows, and model catalogs expose
   limits only for models whose native turns have reported them.
+- Historical file patches use the shared host turn-diff endpoint. Antigravity
+  turn references project into the same tool metadata used by OpenCode's changed
+  file pills and per-turn diff view.
 
 ## Decisions
 

@@ -37,6 +37,9 @@ generic rendering.
   runtime-aware SDK transport. `turn-file-diffs.ts` validates patch records and
   lightweight tool references. Missing plugin/history and capture failures
   remain unavailable; a successful empty record means no net file changes.
+  References for the same turn select the highest revision when parallel tool
+  completion differs from transcript order. Shared UI history reads the host
+  endpoint; the RPC reader supports the VS Code route bridge.
 - A send that switches the session's agent first reads the folder's agent list.
   Sync also passes the agent when the session already sits on one the folder's
   loaded catalog lacks, so that session gets the same check.

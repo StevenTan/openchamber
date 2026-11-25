@@ -90,6 +90,17 @@ describe('projectTurnChangedFiles', () => {
         };
         expect(projectTurnChangedFiles([assistant('a', [task], 'stop')])).toBeUndefined();
     });
+
+    test('uses completed net statistics when parallel tools finish in reverse transcript order', () => {
+        const first = edit('one', 'a.ts');
+        const second = edit('two', 'b.ts');
+        if (first.state.status !== 'completed' || second.state.status !== 'completed') throw new Error('Expected settled tools');
+        first.state.metadata = { openchamberTurnDiff: { turnID: 'turn', revision: 2, files: [{ file: 'b.ts', status: 'modified', additions: 1, deletions: 1 }] } };
+        second.state.metadata = { openchamberTurnDiff: { turnID: 'turn', revision: 1 } };
+        expect(projectTurnChangedFiles([assistant('a', [first, second], 'stop')])).toEqual([
+            { file: 'b.ts', additions: 1, deletions: 1, turnId: 'turn' },
+        ]);
+    });
 });
 
 describe('projectTurnRecords changed files', () => {

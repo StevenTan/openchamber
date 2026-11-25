@@ -11,6 +11,9 @@ import type { AcpConversationEvent } from '@openchamber/sdk/agent-backends';
 import { createQuestionRuntime, createOpenCodeQuestionSession } from '../agent-question/src/runtime.js';
 import { createOpenCodeSessionArchive, type OpenCodeSessionArchive } from '../openchamber-sessions/session-archive.js';
 import { configureAntigravityQuotaReader } from '../quota/providers/antigravity/index.js';
+import { createTurnDiffRuntime } from '../turn-diffs/runtime.js';
+import { createToolActivity } from '../agent-tool/activity.js';
+import type { createManagedSessionKnowledgeRuntime } from '../session-knowledge/managed-runtime.js';
 
 interface Options {
   dataDir: string;
@@ -20,11 +23,18 @@ interface Options {
   publish(event: { type: 'openchamber:acp'; properties: AcpConversationEvent }): void;
   hub: Pick<GlobalMessageStreamHub, 'injectEvent' | 'subscribeEvent' | 'subscribeStatus'>;
   openCodeClient: Parameters<typeof createOpenCodeSessionArchive>[0]['clientFor'];
+  initializeSession(sessionID: string, directory: string): Promise<void>;
+  readInstructions(sessionID: string): Promise<Array<{ text: string }>>;
+  onUserInput(sessionID: string): void;
 }
 export function createAgentBackendHost(options: Options) {
   const identity = createBackendMcpIdentity();
+  const turnDiffs = createTurnDiffRuntime(options.dataDir, async (sessionID, reference) => {
+    if (backend.lookup(sessionID)) await backend.recordFileDiff(sessionID, reference);
+  });
   const backend = createAntigravityBackend({
     ...options,
+    turnDiffs,
     reassignSession: identity.reassign,
     publish: event => options.publish({ type: 'openchamber:acp', properties: event }),
     publishForm: (type, data, directory) => options.hub.injectEvent({ directory, spaceId: null, payload: { id: randomUUID(), created: Date.now(), type, data: z.record(z.string(), z.json()).parse(data), location: { directory } } }),
@@ -40,6 +50,11 @@ export function createAgentBackendHost(options: Options) {
     },
   });
   configureAntigravityQuotaReader(() => backend.quota());
+  const activity = createToolActivity({
+    dataDir: options.dataDir,
+    anchor: sessionID => ({ turnID: turnDiffs.current(sessionID)?.turnID, updateIndex: backend.lookup(sessionID)?.turns.at(-1)?.updates.length ?? 0 }),
+    changed: async (sessionID, call, turnID) => { if (backend.lookup(sessionID)) await backend.recordToolCall(sessionID, call, turnID); },
+  });
   const openCodeArchive = createOpenCodeSessionArchive({ clientFor: options.openCodeClient });
   const applicationDirectory = (sessionID: string) => backend.lookup(sessionID)?.directory;
   const unsubscribe = options.hub.subscribeEvent(event => {
@@ -48,7 +63,11 @@ export function createAgentBackendHost(options: Options) {
     if (sessionID?.startsWith('ses_ag_')) options.publish({ type: 'openchamber:acp', properties: { type: 'control', payload: event.payload, directory: event.directory } });
   });
   const toolOptions = {
-    applicationContext: (request: Parameters<typeof resolveOpenCodeMcpContext>[0]) => identity.resolve(request) ?? resolveOpenCodeMcpContext(request),
+    turnDiffs,
+    applicationContext: (request: Parameters<typeof resolveOpenCodeMcpContext>[0]) => {
+      const context = identity.resolve(request) ?? resolveOpenCodeMcpContext(request);
+      return { ...context, record: activity.record(context.sessionID, context.callID) };
+    },
     applicationDirectory,
     authorizeMcpRequest: (request: { headers: Record<string, string | string[] | undefined> }) => identity.authorize(request.headers),
   };
@@ -63,7 +82,7 @@ export function createAgentBackendHost(options: Options) {
       setArchived: (sessionID: string, archived: boolean) => archiveFor(sessionID).setArchived(sessionID, archived),
       readArchivedAt: (sessionID: string, readOptions?: Parameters<OpenCodeSessionArchive['readArchivedAt']>[1]) => archiveFor(sessionID).readArchivedAt(sessionID, readOptions),
     },
-    close: async () => { unsubscribe(); await backend.close(); },
+    close: async () => { unsubscribe(); await backend.close(); await turnDiffs.close(); },
     toolOptions,
     applicationPolicy,
     createTools(input: ToolOptions): AgentBackendTools {
@@ -81,6 +100,30 @@ export function createAgentBackendHost(options: Options) {
       return { questionRuntime, agentToolRuntime };
     },
   };
+}
+
+export function createManagedAgentBackendHost(options: Omit<Options, 'initializeSession' | 'readInstructions'> & {
+  initializePermission(sessionID: string): Promise<void>;
+  syncKnowledge: ReturnType<typeof createManagedSessionKnowledgeRuntime>['sync'];
+  readInstructions(sessionID: string): Promise<Array<{ text: string }>>;
+  sessionStatus(sessionID: string, type: 'idle' | 'busy'): void;
+}) {
+  const host = createAgentBackendHost({
+    ...options,
+    publish: event => {
+      options.publish(event);
+      if (event.properties.type === 'turn') options.sessionStatus(event.properties.sessionID, event.properties.turn.completed ? 'idle' : 'busy');
+    },
+    initializeSession: async (sessionID, directory) => {
+      await options.initializePermission(sessionID);
+      await options.syncKnowledge(sessionID, directory);
+    },
+    readInstructions: async sessionID => {
+      await options.syncKnowledge(sessionID, (await host.backend.get(sessionID)).directory);
+      return options.readInstructions(sessionID);
+    },
+  });
+  return host;
 }
 
 type ToolOptions = Pick<Parameters<typeof createManagedAgentTools>[0], 'instanceDir' | 'control' | 'client' | 'permissionOptions'>

@@ -174,6 +174,7 @@ export const createSecretRequests = ({ isEnabled, files, onWaitChange, hasUnread
       return { answer: { answered: false, reason: 'chat-sent-earlier' }, note: CHAT_SENT_EARLIER_NOTE };
     }
     const answer = await waits.wait({ sessionId, callId, title: label, directory, signal });
+    if (answer.reason === 'chat-sent') return { answer, note: SECRET_REQUEST_CLOSED_IN_CHAT_NOTE };
     const data: { file?: unknown } | undefined = answer.data == null ? undefined : Object(answer.data);
     const file = isText(data?.file) ? data.file : null;
     if (signal?.aborted) {
@@ -245,5 +246,5 @@ export const createSecretRequests = ({ isEnabled, files, onWaitChange, hasUnread
     throw new OpenChamberControlError(`Unsupported OpenChamber action: ${action}`, 400);
   };
 
-  return { execute, request, run, forget, answer, fields, forgetSaved, release: waits.release };
+  return { execute, request, run, forget, answer, fields, forgetSaved, release: waits.release, userInput: waits.userInput };
 };

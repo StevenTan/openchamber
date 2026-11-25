@@ -1,91 +1,128 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
+import express from 'express';
 import { pathToFileURL } from 'node:url';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { materializeTurnDiffPlugin } from './materialize.js';
+import { createTurnDiffRuntime } from './runtime.js';
+import { registerTurnDiffRoutes } from './routes.js';
+import { fileCallPaths } from '../agent-file/files.js';
 
 const cleanups = [];
-afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
+const nativeWriteFile = fs.writeFile.bind(fs);
+afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 
 const harness = async (storage = new Map(), directory) => {
   directory ??= await fs.mkdtemp(path.join(os.tmpdir(), 'turn-diff-test-'));
   cleanups.push(() => fs.rm(directory, { recursive: true, force: true }));
+  const dataDir = path.join(directory, '.host');
+  const runtime = createTurnDiffRuntime(dataDir, async () => {});
+  const app = express();
+  registerTurnDiffRoutes(app, express, runtime, req => req.headers.authorization === 'Bearer test');
+  const listener = await new Promise(resolve => { const server = app.listen(0, '127.0.0.1', () => resolve(server)); });
+  cleanups.push(async () => { await runtime.close(); await new Promise(resolve => listener.close(resolve)); });
+  vi.stubEnv('OPENCHAMBER_AGENT_TOOL_URL', `http://127.0.0.1:${listener.address().port}/api/openchamber/agent-tool`);
+  vi.stubEnv('OPENCHAMBER_AGENT_TOOL_TOKEN', 'test');
   const pluginDirectory = await materializeTurnDiffPlugin({ fsPromises: fs, path, instanceDir: directory });
   const { default: plugin } = await import(pathToFileURL(path.join(pluginDirectory, 'index.js')).href);
   const hooks = {}, handlers = {};
-  const mutations = new Map();
-  const tools = new Map(['write', 'edit', 'patch', 'file_write', 'file_edit', 'file_patch'].map(id => [id, {
-    id, execute: (_input, context) => mutations.get(context.id)(),
-  }]));
   let turnID = 'user-1', failWrite = false, context;
+  const write = vi.spyOn(fs, 'writeFile').mockImplementation(async (file, value, ...options) => {
+    if ((failWrite === true && String(file).endsWith('/user-1.json')) || (failWrite === 'checkpoint' && String(file).endsWith('/manifest.json') && !JSON.parse(value).dirty)) throw new Error('Storage unavailable');
+    return nativeWriteFile(file, value, ...options);
+  });
+  cleanups.push(async () => { write.mockRestore(); });
   const events = [];
   let wake;
   const ctx = {
     location: { directory },
-    tool: { hook: async (name, run) => { hooks[name] = run; }, transform: async run => run({
-      list: () => [...tools.values()], update: (id, change) => change(tools.get(id)),
-    }) },
+    tool: { hook: async (name, run) => { hooks[name] = run; } },
     session: { context: async () => context ?? [{ type: 'user', id: turnID }, { type: 'assistant', id: 'assistant' }], get: async () => ({}) },
     storage: {
-      get: async (key) => structuredClone(storage.get(key)),
-      set: async (key, value) => {
-        if ((failWrite === true && key.startsWith('turn:')) || (failWrite === 'checkpoint' && key.startsWith('active:') && !value.dirty)) throw new Error('Storage unavailable');
-        storage.set(key, structuredClone(value));
-      },
-      remove: async (key) => { storage.delete(key); },
+      remove: async key => { storage.delete(key); },
       scan: async ({ prefix }) => ({ entries: [...storage].filter(([key]) => key.startsWith(prefix)).map(([key, value]) => ({ key, value: structuredClone(value) })) }),
     },
     rpc: { register: async (_definition, methods) => Object.assign(handlers, methods) },
     event: { subscribe: async function* ({ signal }) {
       signal.addEventListener('abort', () => wake?.(), { once: true });
       while (!signal.aborted) {
-        if (!events.length) await new Promise((resolve) => { wake = resolve; });
+        if (!events.length) await new Promise(resolve => { wake = resolve; });
         while (events.length) { const { event, done } = events.shift(); yield event; done(); }
       }
     } },
   };
   const stop = await plugin.setup(ctx);
-  cleanups.push(async () => {
-    await stop();
-    for (const [key, value] of storage) if (key.startsWith('active:')) await fs.rm(value.temporaryDirectory, { recursive: true, force: true });
-  });
-  let callID = 0;
-  const tool = async (name, input, mutate, status = 'completed', identity = {}) => {
-    const event = { tool: name, input, id: `call-${++callID}`, messageID: 'assistant', sessionID: 'session', ...identity };
-    if (tools.has(name)) {
-      mutations.set(event.id, async () => { await mutate(); if (status !== 'completed') throw new Error('File operation failed'); return {}; });
-      const result = await tools.get(name).execute(input, event).catch(error => error);
-      return result.metadata?.openchamberTurnDiff;
-    }
+  cleanups.push(stop);
+  const isFile = name => ['write', 'edit', 'patch', 'file_write', 'file_edit', 'file_patch'].includes(name);
+  const eventFor = (name, identity = {}) => ({ tool: isFile(name) ? `file_${name.replace('file_', '')}` : name, messageID: 'assistant', sessionID: 'session', ...identity });
+  const capture = async (event, name, input) => {
     await hooks['execute.before'](event);
-    await mutate();
-    const result = {};
-    const settled = { ...event, status };
-    if (status === 'completed') settled.result = result;
-    else settled.error = result;
-    await hooks['execute.after'](settled);
-    return result.metadata?.openchamberTurnDiff;
+    if (isFile(name)) return runtime.before(event.sessionID, fileCallPaths({ name: name.replace('file_', ''), input }, directory));
   };
+  const unfinished = [];
   return {
-    directory, storage, stop, tool,
-    begin: (name, input, identity) => {
-      const event = { tool: name, input, messageID: 'assistant', sessionID: 'session', ...identity };
-      if (!tools.has(name)) return hooks['execute.before'](event);
-      return new Promise(resolve => {
-        mutations.set(event.id, () => { resolve(); return new Promise(() => {}); });
-        void tools.get(name).execute(input, event);
-      });
+    directory, storage, stop, runtime,
+    readHost: async (id = turnID, sessionID = 'session') => (await fetch(`http://127.0.0.1:${listener.address().port}/api/openchamber/turn-diffs?${new URLSearchParams({ sessionID, turnID: id })}`)).json(),
+    active: async (id = turnID, session = 'session') => JSON.parse(await fs.readFile(path.join(dataDir, 'turn-diffs', session, 'active', id, 'manifest.json'), 'utf8')),
+    entries: async () => {
+      const result = [];
+      const root = path.join(dataDir, 'turn-diffs', 'session');
+      for (const name of await fs.readdir(root).catch(() => [])) {
+        if (name === 'active') for (const id of await fs.readdir(path.join(root, name))) result.push(`active:session:${id}`);
+        else result.push(`turn:session:${name.replace(/\.json$/, '')}`);
+      }
+      return result;
+    },
+    tool: async (name, input, mutate, status = 'completed', identity = {}) => {
+      const event = eventFor(name, identity);
+      const token = await capture(event, name, input);
+      await mutate();
+      const reference = token ? await runtime.after(token) : undefined;
+      if (name === 'execute' || name === 'openchamber_execute') for (const pending of unfinished.splice(0)) await runtime.after(pending);
+      const result = reference ? { metadata: { openchamberTurnDiff: reference } } : {};
+      await hooks['execute.after']({ ...event, status, result, error: result });
+      return result.metadata?.openchamberTurnDiff;
+    },
+    begin: async (name, input, identity) => {
+      const token = await capture(eventFor(name, identity), name, input);
+      if (token) unfinished.push(token);
     },
     read: (id = turnID, sessionID = 'session') => handlers.read({ sessionID, turnID: id }),
-    turn: (id) => { turnID = id; },
-    context: (messages) => { context = messages; },
-    failWrite: (value) => { failWrite = value; },
-    event: (type, data = {}) => new Promise((done) => { events.push({ event: { type, data: { sessionID: 'session', ...data } }, done }); wake?.(); }),
+    turn: id => { turnID = id; },
+    context: messages => { context = messages; },
+    failWrite: value => { failWrite = value; },
+    event: async (type, data = {}) => {
+      if (type !== 'session.step.started') for (const pending of unfinished.splice(0)) await runtime.after(pending);
+      return new Promise(done => { events.push({ event: { type, data: { sessionID: 'session', ...data } }, done }); wake?.(); });
+    },
   };
 };
 
 describe('recorded turn file diffs', () => {
+  it('imports persisted plugin records and resumes their original disk baseline in host storage', async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'turn-diff-import-'));
+    const originals = path.join(directory, 'originals');
+    await fs.mkdir(originals);
+    await fs.writeFile(path.join(originals, 'empty'), '');
+    await fs.writeFile(path.join(originals, '0'), 'before\n');
+    const file = path.join(directory, 'code.txt');
+    await fs.writeFile(file, 'middle\n');
+    const storage = new Map([
+      ['turn:session:user-1', { version: 1, sessionID: 'session', turnID: 'user-1', revision: 1, files: [{ file: 'code.txt', status: 'modified', patch: 'saved patch', additions: 1, deletions: 1 }] }],
+      ['active:session:user-1', { sessionID: 'session', turnID: 'user-1', directory, temporaryDirectory: originals, revision: 1, dirty: false, files: { [file]: { original: path.join(originals, '0'), existed: true } } }],
+    ]);
+    const h = await harness(storage, directory);
+    expect(storage.size).toBe(0);
+    expect((await h.read()).files[0].patch).toBe('saved patch');
+    await fs.rm(originals, { recursive: true });
+    await h.tool('edit', { path: file }, () => fs.writeFile(file, 'after\n'));
+    expect((await h.read()).files[0].patch).toContain('-before\n+after');
+    await fs.writeFile(file, 'later workspace contents\n');
+    expect(await h.readHost()).toMatchObject({ directory, files: [{ patch: expect.stringContaining('-before\n+after') }] });
+    await h.event('session.execution.succeeded');
+    expect((await h.entries()).filter(key => key.startsWith('active:'))).toEqual([]);
+  });
   it.each([['write', 'edit'], ['file_write', 'file_edit']])('records relative and absolute %s/%s operations on one file under one baseline', async (write, edit) => {
     const h = await harness();
     const file = path.join(h.directory, 'code.txt');
@@ -202,7 +239,7 @@ describe('recorded turn file diffs', () => {
     await fs.writeFile(file, 'unrelated\n');
     expect((await h.read('user-1')).files[0].patch).toContain('-zero\n+one\n');
     expect((await h.read('user-2')).files[0].patch).toContain('-one\n+two\n');
-    expect([...h.storage.keys()].filter((key) => key.startsWith('active:'))).toEqual([]);
+    expect((await h.entries()).filter((key) => key.startsWith('active:'))).toEqual([]);
   });
 
   it('captures external files, empty additions, deletions and partial writes from failed patch calls', async () => {
@@ -212,12 +249,12 @@ describe('recorded turn file diffs', () => {
     const file = path.join(external, 'new.txt');
     await h.tool('write', { path: file }, () => fs.writeFile(file, ''));
     expect((await h.read()).files).toMatchObject([{ file, status: 'added', additions: 0, deletions: 0 }]);
-    await h.tool('patch', { patchText: `*** Begin Patch\n*** Update File: ${file}\n*** Delete File: missing\n*** End Patch` }, () => fs.writeFile(file, 'partial\n'), 'error');
+    await h.tool('patch', { patchText: `*** Begin Patch\n*** Update File: ${file}\n@@\n+partial\n*** Delete File: missing\n*** End Patch` }, () => fs.writeFile(file, 'partial\n'), 'error');
     expect((await h.read()).files[0].patch).toContain('+partial');
     await h.tool('patch', { patchText: `*** Begin Patch\n*** Delete File: ${file}\n*** End Patch` }, () => fs.unlink(file));
     expect((await h.read()).files).toEqual([]);
     await h.event('session.execution.interrupted', { reason: 'user' });
-    expect([...h.storage.keys()].some((key) => key.startsWith('active:'))).toBe(false);
+    expect((await h.entries()).some((key) => key.startsWith('active:'))).toBe(false);
   });
 
   it('preserves exact CRLF bytes and the missing final newline marker', async () => {
@@ -236,7 +273,7 @@ describe('recorded turn file diffs', () => {
     h.failWrite(true);
     expect(await h.tool('edit', { path: file }, () => fs.writeFile(file, 'two\n'))).toMatchObject({ error: 'Storage unavailable' });
     await h.event('session.execution.failed');
-    const active = h.storage.get('active:session:user-1');
+    const active = await h.active();
     expect(await fs.readFile(active.files[file].original, 'utf8')).toBe('zero\n');
     expect(active.dirty).toBe(true);
     h.failWrite(false);
@@ -260,7 +297,7 @@ describe('recorded turn file diffs', () => {
     expect(await h.tool('edit', { path: file }, () => fs.writeFile(file, 'after\n'))).toMatchObject({ error: 'Storage unavailable' });
     expect(await h.read()).toMatchObject({ unavailable: true });
     await h.event('session.execution.succeeded');
-    const active = h.storage.get('active:session:user-1');
+    const active = await h.active();
     expect(active.dirty).toBe(true);
     expect(await fs.readFile(active.files[file].original, 'utf8')).toBe('before\n');
   });
@@ -283,7 +320,7 @@ describe('recorded turn file diffs', () => {
     const file = path.join(h.directory, 'large.txt');
     await fs.writeFile(file, 'line\n'.repeat(6_000_000));
     await h.tool('edit', { path: file }, async () => {
-      const active = h.storage.get('active:session:user-1');
+      const active = await h.active();
       expect((await fs.stat(active.files[file].original)).size).toBe(30_000_000);
       const handle = await fs.open(file, 'r+');
       await handle.write('edit\n', 0, 'utf8');
@@ -300,18 +337,18 @@ describe('recorded turn file diffs', () => {
     const other = path.join(h.directory, 'other');
     await fs.writeFile(file, 'before\n');
     await fs.writeFile(other, 'other before\n');
-    await h.tool('patch', { patchText: '*** Begin Patch\n*** Update File: file\n*** Update File: other\n*** End Patch' }, async () => {
-      const active = h.storage.get('active:session:user-1');
+    await h.tool('patch', { patchText: '*** Begin Patch\n*** Update File: file\n@@\n-before\n+after\n*** Update File: other\n@@\n-other before\n+other after\n*** End Patch' }, async () => {
+      const active = await h.active();
       await fs.unlink(active.files[file].original);
       await fs.writeFile(file, 'after\n');
       await fs.writeFile(other, 'other after\n');
     });
     await h.event('session.execution.succeeded');
-    expect(h.storage.has('active:session:user-1')).toBe(true);
+    expect((await h.entries()).includes('active:session:user-1')).toBe(true);
     expect((await h.read()).files[0]).toMatchObject({ file: 'file', error: expect.any(String) });
     expect((await h.read()).files[1].patch).toContain('-other before\n+other after\n');
     await h.event('session.deleted');
-    expect([...h.storage.keys()]).toEqual([]);
+    expect(await h.entries()).toEqual([]);
   });
 
   it('scopes repeated provider call IDs to their session and assistant step', async () => {

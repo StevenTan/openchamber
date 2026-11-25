@@ -1,6 +1,6 @@
 import React from 'react';
 import { useI18n } from '@/lib/i18n';
-import { opencodeClient } from '@/lib/opencode/client';
+import { turnDiffClient } from '@/lib/agent/turn-diffs';
 import { latestTurnDiffReference, turnDiffReferences } from '@/lib/opencode/turn-file-diffs';
 import { useSessionMessagesSelector, useSessionStatus } from '@/sync/sync-context';
 import { projectTurnRecords } from '@/components/chat/lib/turns/projectTurnRecords';
@@ -28,7 +28,7 @@ export function useTurnFileDiffs(sessionId: string | null, directory: string | u
         const unavailable = t('diffView.state.turnDiffUnavailable');
         const read = async () => {
             if (!turnId || captureError) throw new Error(unavailable);
-            const record = await opencodeClient.getRecordedTurnDiff(sessionId, turnId, directory);
+            const record = await turnDiffClient.read(sessionId, turnId, directory);
             if (record.unavailable || record.error || !record.files) throw new Error(unavailable);
             return record.files;
         };

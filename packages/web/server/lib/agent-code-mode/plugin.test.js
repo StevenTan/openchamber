@@ -10,6 +10,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { Effect, Exit, Schema, Scope, Stream } from 'effect';
 import { materializeCodeModePlugin } from './runtime.js';
 import { createAgentToolRuntime } from '../agent-tool/runtime.js';
+import { createTurnDiffRuntime } from '../turn-diffs/runtime.js';
 import { resolveOpenCodeMcpContext } from '../opencode/mcp-context.js';
 import { createToolPermissions } from '../agent-tool/permissions.js';
 import { createOpenChamberControlService } from '../openchamber-control/service.js';
@@ -26,11 +27,12 @@ async function fixture({ pluginOptions, events = Stream.never, ...dependencies }
   const policy = createToolPermissions({ file: path.join(directory, 'permissions.json'),
     readPolicy: async () => ({ directory, projectDirectory: directory, rules: [{ action: '*', resource: '*', effect: 'allow' }, ...permissions] }), publish: () => {},
   });
-  const captured = [];
+  const turnDiffs = createTurnDiffRuntime(directory, async () => {});
+  await turnDiffs.begin({ sessionID: 'session', turnID: 'message', directory });
   let listener;
   const runtime = createAgentToolRuntime({ resolveMcpContext: resolveOpenCodeMcpContext, crypto,
     resolveSessionDirectory: async () => directory, getActivePort: () => listener.address().port, permissions: policy,
-    codeModeFileActivity: async (phase, request, tool, input) => { captured.push({ phase, source: request._meta?.['openchamber/source'], tool, input }); return {}; },
+    turnDiffs,
     ...dependencies,
   });
   const app = express();
@@ -78,7 +80,7 @@ async function fixture({ pluginOptions, events = Stream.never, ...dependencies }
     await sessionHooks.get(hook)(event);
     return event;
   };
-  return { directory, client, tools, permissions, policy, skills, request, toolHooks, run, invoke, sessionHooks, captured, progress, runtime, url: `http://127.0.0.1:${listener.address().port}/page` };
+  return { directory, client, tools, permissions, policy, skills, request, toolHooks, run, invoke, sessionHooks, turnDiffs, progress, runtime, url: `http://127.0.0.1:${listener.address().port}/page` };
 }
 
 it('discovers execute through MCP with the complete shared catalog and keeps backend tools direct', async () => {
@@ -106,8 +108,7 @@ it('runs shared MCP files and commands concurrently with structured output, prog
   expect(await fs.readFile(path.join(f.directory, 'probe.txt'), 'utf8')).toBe('MCP_BODY');
   expect(result.metadata.openchamberToolCalls).toMatchObject([{ tool: 'file_write', status: 'completed', metadata: { files: [{ file: 'probe.txt' }] } }, { tool: 'openchamber_commands_exec_command', status: 'completed' }]);
   expect(f.progress.some(update => update.toolCalls.some(call => call.status === 'running'))).toBe(true);
-  expect(f.captured.map(event => event.phase)).toEqual(['before', 'after']);
-  expect(f.captured[0].source).toMatchObject({ sessionID: 'session', messageID: 'message', directory: f.directory });
+  expect((await f.turnDiffs.read('session', 'message')).files).toMatchObject([{ file: 'probe.txt', status: 'added' }]);
   const image = 'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEUlEQVR4nGP4z8AARGDiPwMAHfAD/aAzCYkAAAAASUVORK5CYII=';
   await fs.writeFile(path.join(f.directory, 'image.png'), Buffer.from(image, 'base64'));
   const viewed = await f.run('return await tools.file.view_image({path:"image.png"});');

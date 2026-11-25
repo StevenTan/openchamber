@@ -18,8 +18,8 @@ Backend-specific tools and externally configured MCP servers keep direct entries
 
 The managed OpenCode adapter configures MCP discovery and supplies original
 session, message and call identity outside model arguments. It forwards live
-progress, structured results and images. The OpenCode adapter in
-`../opencode/code-mode.ts` connects file capture to the turn-diffs plugin RPC.
+progress, structured results and images. File MCP calls capture their changes
+through the host's shared turn-diffs runtime.
 
 The fetch extension adapts the upstream OpenCode implementation under this
 module's MIT license. Skill filtering uses the
@@ -50,8 +50,8 @@ module's MIT license. Skill filtering uses the
   `openchamberToolCalls` with inputs, outputs, errors and timing for shared UI
   projection. Each run owns its activity records.
 - Scripted file changes use the original outer call identity and the same
-  before/after snapshot capture as direct calls. The turn-diffs plugin attaches
-  the net change reference to the outer result.
+  before/after snapshot capture as direct calls. The backend adapter supplies
+  the turn's net change reference for transcript rendering.
 - Managed Web and Electron servers install the adapter. Hosted and Capacitor
   clients use their connected server. External OpenCode and VS Code own their
   plugin configuration.

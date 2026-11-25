@@ -1,3 +1,5 @@
+import type { ScheduledTasksDependencies, ScheduledTaskRunEvent } from './run-dependencies.js';
+export type { ScheduledTasksDependencies, ScheduledTaskRunEvent } from './run-dependencies.js';
 import { OpenCode } from '@opencode/client';
 import { DateTime } from 'luxon';
 import { CronExpressionParser } from 'cron-parser';
@@ -12,45 +14,13 @@ import { stat } from 'node:fs/promises';
 import { readProcessInstance as readProcessInstanceDefault } from './process-instance.js';
 import { AUTO_MODEL_REF, isAutoModel } from '../routing/defaults.js';
 import { controlErrorFields } from '../openchamber-control/error.js';
-import type { ExistingSessionDependencies, ExistingSessionTaskRunEvent } from './existing-session.js';
-import type { ScheduledTask, ScheduledTaskInput, ScheduledTaskStore, ScheduledWorktreeCleanup, ScheduledTaskStateResult } from '../projects/contracts.js';
-import type { ScheduledWorktree, ScheduledWorktreeBridge, RemoveScheduledWorktreeInput } from './worktree-bridge.js';
-import { readModelCatalog, type resolveSessionDefaults } from './session-defaults.js';
-import type { createRoutingRuntime } from '../routing/runtime.js';
-import type { SessionMetadata } from '../openchamber-sessions/session-metadata-store.js';
+import type { ExistingSessionDependencies } from './existing-session.js';
+import type { ScheduledTask, ScheduledTaskInput, ScheduledWorktreeCleanup, ScheduledTaskStateResult } from '../projects/contracts.js';
+import type { ScheduledWorktree, RemoveScheduledWorktreeInput } from './worktree-bridge.js';
+import { readModelCatalog } from './session-defaults.js';
 import { isString } from '../shared/object-guards.js';
-import type { createOpenCodeLifecycleRuntime } from '../opencode/lifecycle.js';
-import type { createPermissionAutoAcceptRuntime } from '../permission-auto-accept/runtime.js';
+import { createMessageId } from '../dispatch-results/runtime.js';
 
-export interface ScheduledTasksDependencies extends Omit<ExistingSessionDependencies, 'createClient' | 'messageQueueRuntime' | 'projectConfigRuntime'> {
-  projectConfigRuntime: ScheduledTaskStore;
-  messageQueueRuntime?: ExistingSessionDependencies['messageQueueRuntime'];
-  buildOpenCodeUrl: (route: string, query: string) => string | URL;
-  getOpenCodeAuthHeaders: () => Record<string, string>;
-  waitForOpenCodeReady?: ReturnType<typeof createOpenCodeLifecycleRuntime>['waitForOpenCodeReady'] | null;
-  emitTaskRunEvent?: (event: ScheduledTaskRunEvent) => void;
-  setSessionAutoAccept?: ReturnType<typeof createPermissionAutoAcceptRuntime>['setSessionPolicy'] | null;
-  sessionKnowledgeRuntime?: { sync: (sessionID: string, directory: string, prompt: string) => Promise<boolean> } | null;
-  persistSessionGoal?: Parameters<typeof createSessionGoal>[0]['persistSessionGoal'];
-  readSessionDefaults?: ((projectID: string, catalog: Awaited<ReturnType<typeof readModelCatalog>>) => Promise<ReturnType<typeof resolveSessionDefaults> | null>) | null;
-  resolveAutoSelection?: ReturnType<typeof createRoutingRuntime>['resolveAutoSelection'] | null;
-  readSessionMetadata: (sessionID: string, options: { signal: AbortSignal }) => Promise<SessionMetadata | null | undefined>;
-  readProcessInstance?: typeof readProcessInstanceDefault;
-  readWorktreeIdentity?: (directory: string) => Promise<string | null>;
-  cleanupPause?: (signal: AbortSignal) => Promise<void>;
-  createTaskWorktree?: ScheduledWorktreeBridge['create'];
-  removeTaskWorktree?: ScheduledWorktreeBridge['remove'] | null;
-  isGitRepository?: ScheduledWorktreeBridge['isGitRepository'] | null;
-  logger?: Pick<Console, 'warn' | 'info'>;
-  maxGlobalConcurrency?: number;
-  maxProjectConcurrency?: number;
-  maxRunDurationMs?: number;
-}
-
-export interface ScheduledTaskRunEvent extends ExistingSessionTaskRunEvent {
-  isolated?: boolean;
-  branch?: string | null;
-}
 
 interface RunContext {
   client: ReturnType<typeof OpenCode.make>;
@@ -404,6 +374,7 @@ export const createScheduledTasksRuntime = (deps: ScheduledTasksDependencies) =>
     const existingDependencies: ExistingSessionDependencies = {
       projectConfigRuntime, messageQueueRuntime,
       createClient: createScopedClient, listProjects, chatsScope,
+      ...deps.readSession && { readSession: deps.readSession },
     };
     if (resolvePrimaryWorktreeRoot !== undefined) existingDependencies.resolvePrimaryWorktreeRoot = resolvePrimaryWorktreeRoot;
     if (isSessionArchived !== undefined) existingDependencies.isSessionArchived = isSessionArchived;
@@ -422,6 +393,9 @@ export const createScheduledTasksRuntime = (deps: ScheduledTasksDependencies) =>
       };
     }
     try {
+      const requested = readSessionDefaults ? await readSessionDefaults(projectID, null) : null;
+      if (requested?.providerID === 'antigravity') return requested;
+      await waitForOpenCodeReady?.(10_000, 250);
       const defaults = readSessionDefaults ? await readSessionDefaults(projectID, await readModelCatalog(client)) : null;
       return {
         providerID: defaults?.providerID ?? null,
@@ -696,6 +670,12 @@ export const createScheduledTasksRuntime = (deps: ScheduledTasksDependencies) =>
     authHeaders: Record<string, string>; signal: AbortSignal;
   }) => {
     const { sessionID, worktreeDirectory, startedAt } = record;
+    if (sessionID.startsWith('ses_ag_') && deps.antigravity) {
+      await deps.antigravity.wait(sessionID, signal);
+      await deps.waitApplicationCommands?.(sessionID);
+      signal.throwIfAborted();
+      return await readWorktreeIdentity(worktreeDirectory) === record.directoryIdentity;
+    }
     const activityProbe = createSessionActivityProbe({
       buildOpenCodeUrl: (pathname) => new URL(pathname, baseUrl).toString(),
       getOpenCodeAuthHeaders: () => authHeaders,
@@ -746,7 +726,7 @@ export const createScheduledTasksRuntime = (deps: ScheduledTasksDependencies) =>
         const exists = await readWorktreeIdentity(record.worktreeDirectory) === record.directoryIdentity;
         let remove = record.phase === 'removing';
         if (exists) {
-          if (waitForOpenCodeReady) await waitForOpenCodeReady(10_000, 250);
+          if (!record.sessionID.startsWith('ses_ag_') && waitForOpenCodeReady) await waitForOpenCodeReady(10_000, 250);
           const baseUrl = openCodeOrigin();
           remove = await waitForSessionRun({
             client: createScopedClient(record.worktreeDirectory), record, baseUrl,
@@ -795,7 +775,10 @@ export const createScheduledTasksRuntime = (deps: ScheduledTasksDependencies) =>
       throw new Error('project path is unavailable');
     }
 
-    if (waitForOpenCodeReady) {
+    let selection = await resolveRunSelection(projectID, task, createScopedClient(projectPath));
+    const native = selection.providerID === 'antigravity' ? deps.antigravity : undefined;
+    if (native && task.execution.goalEnabled) throw new Error('This backend does not support goal mode');
+    if (!native && waitForOpenCodeReady) {
       await waitForOpenCodeReady(10_000, 250);
     }
 
@@ -847,7 +830,6 @@ export const createScheduledTasksRuntime = (deps: ScheduledTasksDependencies) =>
     const baseUrl = openCodeOrigin();
     const authHeaders = getOpenCodeAuthHeaders();
     const client = createScopedClient(runDirectory);
-    let selection = await resolveRunSelection(projectID, task, client);
     const autoRun = isAutoModel(selection);
 
     let sessionID;
@@ -870,7 +852,11 @@ export const createScheduledTasksRuntime = (deps: ScheduledTasksDependencies) =>
         sessionInput.model = model;
       }
       if (selection.agent) sessionInput.agent = selection.agent;
-      const session = await client.session.create(sessionInput);
+      const session = native ? await native.create(runDirectory, title) : await client.session.create(sessionInput);
+      if (native) {
+        await native.metadata(session.id, sessionInput.metadata ?? undefined);
+        await native.model(session.id, selection.modelID ?? '', selection.variant);
+      }
       sessionID = session?.id;
       if (!sessionID) {
         throw new Error('failed to create session');
@@ -943,7 +929,7 @@ export const createScheduledTasksRuntime = (deps: ScheduledTasksDependencies) =>
         selection = { ...selection, providerID: routed.model.providerID, modelID: routed.model.id };
       }
 
-      const scheduledCommand = await resolveScheduledCommand({ client, projectPath: runDirectory, task });
+      const scheduledCommand = native ? null : await resolveScheduledCommand({ client, projectPath: runDirectory, task });
 
       if (task.execution.goalEnabled) {
         const commandObjective = scheduledCommand
@@ -963,7 +949,10 @@ export const createScheduledTasksRuntime = (deps: ScheduledTasksDependencies) =>
         });
       }
 
-      if (scheduledCommand) {
+      if (native) {
+        await syncKnowledge(sessionID, runDirectory);
+        await native.send(sessionID, { id: createMessageId(Date.now()), text: expandSnippets(task.execution.prompt, runDirectory), files: [], context: [] }, 'synthetic');
+      } else if (scheduledCommand) {
         await runScheduledCommand({ client, sessionID, projectPath: runDirectory, command: scheduledCommand });
       } else {
         await runPrompt({ client, sessionID, projectPath: runDirectory, task });

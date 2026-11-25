@@ -420,6 +420,9 @@ export class TerminalManager {
   getSession(pid: number): ManagedSession | undefined {
     return this.sessions.get(pid);
   }
+  async wait() {
+    await Promise.all([...this.sessions.values()].map(session => session.closed));
+  }
   async forceTerminate(pid: number): Promise<"not_found" | "terminated"> {
     const session = this.sessions.get(pid);
     if (!session) return "not_found";

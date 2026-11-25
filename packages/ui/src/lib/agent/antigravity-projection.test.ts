@@ -5,6 +5,7 @@ import { partIds } from '../opencode/model';
 import { applyDirectoryEvent } from '../../sync/event-reducer';
 import { INITIAL_STATE, type State } from '../../sync/types';
 import { computeContextUsage, computeLastReplyCacheHit } from '../../components/chat/work-status/contextUsage';
+import { projectTurnChangedFiles } from '../../components/chat/lib/turns/projectTurnSummary';
 
 test('native context and cache counters feed the shared usage display', () => {
   const tokens = { input: 2536, output: 595, reasoning: 90, cache: { read: 15729, write: 0 } };
@@ -39,6 +40,21 @@ test('ACP tool patches retain completed output and the original response model',
   expect(assistant?.info.role === 'assistant' && assistant.info.modelID).toBe('first');
   expect(assistant?.parts[1]).toMatchObject({ type: 'tool', tool: 'openchamber_commands_exec_command', state: { status: 'completed', input: { cmd: 'pwd' }, output: '/project' } });
   expect(acpMessages(session, JSON.parse(JSON.stringify(turn)))).toEqual(acpMessages(session, turn));
+});
+
+test('ACP file activity carries the persisted turn diff reference through history projection', () => {
+  const turn: AcpTurn = { id: 'user', assistantID: 'assistant', modelID: 'model', text: 'Edit', files: [], created: 1, followups: [],
+    fileDiff: { turnID: 'user', revision: 2, files: [{ file: 'code.txt', status: 'modified', additions: 1, deletions: 1 }] },
+    toolCalls: [{ id: 'edit', callID: 'request', namespace: 'file', name: 'edit', input: { path: 'code.txt' }, started: 1, completed: 2, updateIndex: 0,
+      metadata: { files: [{ file: 'code.txt', patch: '@@ -1 +1 @@\n-before\n+after\n', additions: 1, deletions: 1, status: 'modified' }] },
+      result: { content: [{ type: 'text', text: 'Edited' }] } }],
+    updates: [{ sessionUpdate: 'tool_call', toolCallId: 'native', name: 'mcp_file_edit', title: 'Edit', status: 'completed', rawInput: { path: 'code.txt' } }],
+  };
+  const session: AcpConversation = { id: 'session', nativeID: 'native', title: 'Test', directory: '/project', created: 1, updated: 2, draft: false, config: [], turns: [turn] };
+  const projected = acpMessages(session, JSON.parse(JSON.stringify(turn)));
+  expect(projected[1].parts).toHaveLength(1);
+  expect(projected[1].parts[0]).toMatchObject({ tool: 'file_edit', callID: 'request', state: { output: 'Edited', metadata: { files: turn.toolCalls?.[0].metadata?.files, openchamberTurnDiff: turn.fileDiff } } });
+  expect(projectTurnChangedFiles([projected[1]])).toEqual([{ file: 'code.txt', additions: 1, deletions: 1, turnId: 'user' }]);
 });
 
 test('ACP user messages reconcile optimistic text and attachments in place', () => {

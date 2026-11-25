@@ -1,4 +1,7 @@
 import type { NewSessionResponse, SessionNotification, ContentBlock } from '@agentclientprotocol/sdk';
+import type { TurnDiffReference } from './turn-diffs.js';
+import type { z } from 'zod';
+export { recordedTurnDiffSchema, turnDiffReferenceSchema, type TurnDiffReference } from './turn-diffs.js';
 
 export interface AcpTokenUsage {
   input: number;
@@ -21,6 +24,22 @@ export interface AcpTurn {
   followups: Array<{ id: string; text: string; files: AcpTurn['files']; created: number }>;
   tokens?: AcpTokenUsage;
   context?: { used: number; limit: number };
+  fileDiff?: TurnDiffReference;
+  toolCalls?: AgentToolCall[];
+}
+
+export interface AgentToolCall {
+  id: string;
+  callID: string;
+  namespace: string;
+  name: string;
+  input: Record<string, z.infer<ReturnType<typeof z.json>> | undefined>;
+  started: number;
+  completed?: number;
+  updateIndex: number;
+  metadata?: Record<string, z.infer<ReturnType<typeof z.json>> | undefined>;
+  result?: { content: Array<{ type: string; text?: string | undefined; data?: string | undefined; mimeType?: string | undefined }>; structuredContent?: Record<string, z.infer<ReturnType<typeof z.json>> | undefined> | undefined; _meta?: Record<string, z.infer<ReturnType<typeof z.json>> | undefined> | undefined; isError?: boolean | undefined };
+  error?: string;
 }
 
 export interface AcpConversation {
@@ -35,6 +54,7 @@ export interface AcpConversation {
   turns: AcpTurn[];
   tokens?: AcpTokenUsage;
   archived?: number | null;
+  metadata?: Record<string, z.infer<ReturnType<typeof z.json>> | undefined> | undefined;
 }
 
 export type AcpConversationEvent =

@@ -9,6 +9,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { createAgentToolRuntime } from '../agent-tool/runtime.js';
 import { resolveOpenCodeMcpContext } from '../opencode/mcp-context.js';
 import plugin from './plugin.js';
+import { createTurnDiffRuntime } from '../turn-diffs/runtime.js';
 
 const cleanup = [];
 afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); });
@@ -17,7 +18,10 @@ async function fixture() {
   cleanup.push(() => fs.rm(directory, { recursive: true, force: true }));
   const approve = vi.fn(async () => {});
   let listener;
+  const turnDiffs = createTurnDiffRuntime(directory, async () => {});
+  await turnDiffs.begin({ sessionID: 'session', turnID: 'user-1', directory });
   const runtime = createAgentToolRuntime({ resolveMcpContext: resolveOpenCodeMcpContext, crypto,
+    turnDiffs,
     resolveSessionDirectory: async sessionID => sessionID === 'session' ? directory : null,
     getActivePort: () => listener.address().port,
     permissions: { session: async sessionID => {
@@ -53,7 +57,7 @@ async function fixture() {
   });
   for (const transform of transforms) transform({ remove: name => removed.push(name), update: (name, change) => change(registered.get(name)) });
   const invoke = (name, input) => registered.get(`file_${name}`).execute(input, { sessionID: 'session', agent: 'build', messageID: 'message', id: crypto.randomUUID() });
-  return { directory, client, invoke, approve, removed, registered, config };
+  return { directory, client, invoke, approve, removed, registered, config, turnDiffs };
 }
 
 it.each(['body', 'complete'])('discovers shared file tools, preserves edit previews and applies %s patches with recorded file diffs', async format => {
@@ -65,6 +69,7 @@ it.each(['body', 'complete'])('discovers shared file tools, preserves edit previ
   expect(tools.find(tool => tool.name === 'patch').inputSchema.properties.patchText.description).toContain('The tool supplies the outer');
   const created = await f.invoke('write', { path: 'src/code.txt', content: '\uFEFFbefore\r\nlast' });
   expect(created.metadata.files[0]).toMatchObject({ file: 'src/code.txt', status: 'added', additions: 2 });
+  expect(created.metadata.openchamberTurnDiff).toMatchObject({ turnID: 'user-1', files: [{ file: 'src/code.txt', status: 'added' }] });
   await f.invoke('edit', { path: 'src/code.txt', oldString: 'before\nlast', newString: 'after\nlast' });
   expect(await fs.readFile(path.join(f.directory, 'src/code.txt'), 'utf8')).toBe('\uFEFFafter\r\nlast');
   const body = '*** Update File: src/code.txt\n*** Move to: moved.txt\n@@\n-after\n+patched\n last\n*** Add File: disposable\n+hello\n*** Delete File: disposable';

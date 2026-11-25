@@ -3,14 +3,14 @@ import { OpenChamberControlError } from './error.js';
 import { isListedAsChild, listedSession } from './listed-session.js';
 import { isOperatorChildSession, sessionParentId } from '../session-lineage.js';
 import type { SessionInfo, SessionListInput } from '@opencode/client';
-import type { ControlClient } from './opencode-client.js';
+import type { ApplicationSessions } from '../agent-backends/sessions.js';
 import type { ControlInput, PublicSessionStatus } from './contracts.js';
 import type { ListedSession, ListedSessionRecord } from './listed-session.js';
 import type { createWorkMembership } from '../session-work/membership.js';
 import type { createOpenChamberSessionService } from '../openchamber-sessions/routes.js';
 
 type Mutable<Value> = { -readonly [Key in keyof Value]: Value[Key] };
-type Statuses = Awaited<ReturnType<ControlClient['session']['active']>>;
+type Statuses = Awaited<ReturnType<ApplicationSessions['active']>>;
 
 export const positiveInteger = <Fallback extends number | null>(value: ControlInput['limit'], fallback: Fallback, field: string) => {
   if (value === undefined || value === null) return fallback;
@@ -25,13 +25,13 @@ interface SessionListingDependencies {
   assertSingleScope: (input: ControlInput) => void;
   resolveReadDirectory: (input: ControlInput, contextDirectory: ControlInput['directory']) => Promise<string | null | undefined>;
   isSessionWorkEnabled: () => Promise<boolean>;
-  getClient: (directory?: string | null) => Promise<ControlClient>;
-  activeSessions: (client: ControlClient) => Promise<Statuses>;
+  applicationSessions: ApplicationSessions;
+  activeSessions: () => Promise<Statuses>;
   asPublicStatus: (statuses: Statuses, sessionID: string | undefined) => Promise<PublicSessionStatus>;
   withArchiveEntry: (session: SessionInfo) => Promise<ListedSessionRecord>;
   isHiddenSession: (id: string | null, record?: ListedSessionRecord) => boolean;
   workMembership: ReturnType<typeof createWorkMembership>;
-  assertSessionExists: (client: ControlClient, sessionID: string) => Promise<ListedSessionRecord>;
+  assertSessionExists: (sessionID: string) => Promise<ListedSessionRecord>;
   sessionService: Pick<ReturnType<typeof createOpenChamberSessionService>, 'archive'>;
 }
 
@@ -39,7 +39,7 @@ export const createSessionListing = ({
   assertSingleScope,
   resolveReadDirectory,
   isSessionWorkEnabled,
-  getClient,
+  applicationSessions,
   activeSessions,
   asPublicStatus,
   withArchiveEntry,
@@ -66,9 +66,8 @@ export const createSessionListing = ({
     const workEnabled = await isSessionWorkEnabled();
     if (inWork && !workEnabled) throw new OpenChamberControlError('In work is turned off in Settings', 409);
 
-    const client = await getClient(directory ?? '');
     const wantStatus = busy || mine || input.withStatus === true;
-    const statuses = wantStatus ? await activeSessions(client).catch(() => null) : null;
+    const statuses = wantStatus ? await activeSessions().catch(() => null) : null;
     if (busy && !statuses) throw new OpenChamberControlError('Could not read which sessions are running', 503);
     const runningCount = busy ? Object.keys(statuses ?? {}).length : 0;
 
@@ -84,7 +83,7 @@ export const createSessionListing = ({
       if (input.children !== true) listInput.parentID = null;
       if (filtered || terms.length > 0) listInput.limit = FILTERED_PAGE_SIZE;
       if (cursor) listInput.cursor = cursor;
-      const response = await client.session.list(listInput);
+      const response = await applicationSessions.list(listInput);
       const page = await Promise.all((Array.isArray(response?.data) ? response.data : []).map(withArchiveEntry));
       for (const record of page) {
         const id = asNonEmptyString(record?.id);
@@ -129,7 +128,7 @@ export const createSessionListing = ({
     if (!owner) throw new OpenChamberControlError('session.archive needs a calling session', 400);
     const sessionID = asNonEmptyString(input.sessionId);
     if (!sessionID) throw new OpenChamberControlError('sessionId is required', 400);
-    const session = await assertSessionExists(await getClient(), sessionID);
+    const session = await assertSessionExists(sessionID);
     if (!(isOperatorChildSession(session) && sessionParentId(session) === owner)) {
       throw new OpenChamberControlError(`${sessionID} is not a session you created with ownWork; only those can be archived here`, 403);
     }

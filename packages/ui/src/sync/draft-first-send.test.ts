@@ -88,6 +88,7 @@ let sendCalls: Array<{
   statusAtSend: SessionStatus | undefined
 }> = []
 let shellCalls: string[] = []
+let permissionWrites: string[] = []
 
 const sdk: SessionMessagePageSource = {
   getSessionMessages: async (): Promise<MessagePage> => {
@@ -166,7 +167,16 @@ test("a /btw fork on the main chat's agent and model keeps its own level from on
 })
 
 beforeAll(() => {
-  const refuse = async () => { throw new Error("network disabled in tests") }
+  const refuse: typeof fetch = async (input, init) => {
+    const pathname = new URL(String(input), "http://localhost").pathname
+    if (init?.method === "PUT" && pathname.startsWith("/api/permission-auto-accept/sessions/")) {
+      const sessionId = decodeURIComponent(pathname.split("/").at(-1)!)
+      const { mode, enabled } = JSON.parse(String(init.body))
+      permissionWrites.push(sessionId)
+      return Response.json({ sessions: { [sessionId]: enabled }, modes: { [sessionId]: mode } })
+    }
+    throw new Error("network disabled in tests")
+  }
   Object.defineProperty(globalThis, "fetch", { value: refuse, configurable: true, writable: true })
 })
 
@@ -181,6 +191,7 @@ beforeEach(() => {
   createSessionCalls = []
   sendCalls = []
   shellCalls = []
+  permissionWrites = []
   childStores = new ChildStoreManager()
   loader = new SessionMessageLoader(childStores, { sdk, runtimeKey: getRuntimeKey() })
   setActionRefs(childStores, () => DIRECTORY)
@@ -267,6 +278,7 @@ describe("the first message of a draft", () => {
 
     expect(store.getState().session.map((session) => session.id)).toContain(sessionId)
     expect(sendCalls).toHaveLength(1)
+    expect(permissionWrites).toEqual([sessionId])
     expect(sendCalls[0]).toMatchObject({ id: sessionId, text: "hello", model: undefined })
     // The line "Creating session…" is gone once the session exists; Send
     // waits until the prompt request has left.
@@ -412,11 +424,11 @@ describe("the first message of a draft", () => {
     const refuse = globalThis.fetch
     // The project sits in `app` inside its repository, so a session in the
     // worktree starts in `/repo-wt/app`; the folder belongs to the worktree.
-    Object.defineProperty(globalThis, "fetch", { configurable: true, writable: true, value: async (input: RequestInfo | URL) => {
+    Object.defineProperty(globalThis, "fetch", { configurable: true, writable: true, value: async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
       if (url.includes("/toplevel")) return Response.json({ root: DIRECTORY, prefix: "app" })
       if (url.includes("/validate-directory")) return Response.json({ valid: true, insideWorktreeRoot: true, resolvedWorktreeRoot: worktree, resolvedCwd: `${worktree}/app` })
-      return refuse(input)
+      return refuse(input, init)
     } })
     const previousFolders = useSessionFoldersStore.getState().foldersMap
     useSessionFoldersStore.setState({ foldersMap: { [worktree]: [{ id: "plans", name: "Plans", sessionIds: [], createdAt: 1 }] } })

@@ -1,12 +1,12 @@
+import type { MessageQueueOptions } from './options.js';
+export type { MessageQueueOptions } from './options.js';
 import fs from 'fs';
 import path from 'path';
 import { z } from 'zod';
 import { isRecord, isString } from '../shared/object-guards.js';
 import type { Application, Response as HttpResponse } from '../shared/http-contracts.js';
-import type { GlobalMessageStreamHub, GlobalStreamEvent } from '../event-stream/global-hub.js';
-import type { createSessionKnowledgeRuntime } from '../session-knowledge/runtime.js';
-import type { createRoutingRuntime } from '../routing/runtime.js';
-import type { ScheduledTaskProvenance, createExistingSessionTasks } from '../scheduled-tasks/existing-session.js';
+import type { GlobalStreamEvent } from '../event-stream/global-hub.js';
+import type { ScheduledTaskProvenance } from '../scheduled-tasks/existing-session.js';
 import type { ScheduledTaskInput, ScheduledTaskStatus } from '../projects/contracts.js';
 import type { RoutingModelRef } from '../routing/contracts.js';
 import { createMessageId } from '../dispatch-results/runtime.js';
@@ -90,28 +90,6 @@ export interface PublicQueuedItem extends Omit<QueuedItem, 'context' | 'syntheti
 export interface SessionQueue {
   directory: string;
   items: QueuedItem[];
-}
-
-export interface MessageQueueOptions {
-  globalEventHub: Pick<GlobalMessageStreamHub, 'subscribeEvent' | 'subscribeStatus'>;
-  buildOpenCodeUrl: (route: string, query: string) => string | URL;
-  getOpenCodeAuthHeaders: () => Record<string, string>;
-  sessionKnowledgeRuntime?: Pick<ReturnType<typeof createSessionKnowledgeRuntime>, 'sync'> | null;
-  broadcastGlobalUiEvent?: (event: { type: 'openchamber:message-queue.updated'; properties: { revision: number; session: MessageQueueSessionSnapshot } }) => void;
-  onPromptSent?: (sessionId: string) => void;
-  beforeScheduledTaskSend?: ReturnType<typeof createExistingSessionTasks>['beforeSend'];
-  validateScheduledTaskTarget?: ReturnType<typeof createExistingSessionTasks>['validateTarget'];
-  onScheduledTaskResult?: ReturnType<typeof createExistingSessionTasks>['result'];
-  resolveAutoSelection?: ReturnType<typeof createRoutingRuntime>['resolveAutoSelection'] | null;
-  persistSessionGoal?: Parameters<typeof createSessionGoal>[0]['persistSessionGoal'];
-  isDeliveryHeld?: (sessionId: string) => boolean;
-  deliveryHoldReady?: Promise<unknown>;
-  dataDir: string;
-  fetchImpl?: typeof fetch;
-  now?: () => number;
-  dispatchQuietMs?: number;
-  abortHoldMs?: number;
-  retryDelayMs?: (failures: number) => number;
 }
 
 export interface MessageQueueSessionSnapshot {
@@ -385,6 +363,7 @@ export function createMessageQueueRuntime({
   dispatchQuietMs = DISPATCH_QUIET_MS,
   abortHoldMs = ABORT_HOLD_MS,
   retryDelayMs = getQueuedSendRetryDelayMs,
+  backendForSession,
 }: MessageQueueOptions) {
   const filePath = path.join(dataDir, QUEUE_FILE_NAME);
 
@@ -544,6 +523,8 @@ export function createMessageQueueRuntime({
   }
 
   const isSessionIdle = async (sessionId: string, directory: string | undefined) => {
+    const backend = backendForSession?.(sessionId);
+    if (backend) return backend.isIdle();
     const body = asRecord(await openCodeFetch('/api/session/active').catch(() => null));
     const statuses = asRecord(body && 'data' in body ? body.data : body);
     if (!statuses) return null;
@@ -636,6 +617,8 @@ export function createMessageQueueRuntime({
   };
 
   const sendItem = async (sessionId: string, directory: string, item: QueuedItem) => {
+    const backend = backendForSession?.(sessionId);
+    if (backend) return backend.send(directory, item);
     const { providerID, modelID, variant } = item.sendConfig;
     let agent = item.sendConfig.agent;
     let model: QueueModel = { id: modelID, providerID };
@@ -1046,6 +1029,7 @@ export function createMessageQueueRuntime({
 
   return {
     load,
+    sessionStatus: (sessionID: string, type: 'idle' | 'busy') => processPayload({ type: 'session.status', properties: { sessionID, status: { type } } }),
     snapshot,
     sessionSnapshot,
     enqueue,

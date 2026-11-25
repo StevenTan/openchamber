@@ -5,7 +5,7 @@ import { createMcpRuntime } from '../agent-tool/mcp.js';
 import type { AgentToolInput, AgentToolPayload, ResultFields } from '../agent-tool/runtime.js';
 import type { ControlOptions } from '../openchamber-control/service.js';
 import { getPlaywrightToolDefinitions } from './playwright.js';
-import type { ResolveMcpContext } from '../agent-tool/mcp-context.js';
+import { recordMcpCall, type ResolveMcpContext } from '../agent-tool/mcp-context.js';
 import type { ToolPermissions } from '../agent-tool/permissions.js';
 
 const panelInput = z.object({ action: z.string(), parameters: z.record(z.string(), z.unknown()).optional() }).catchall(z.unknown());
@@ -28,31 +28,34 @@ export function createBrowserMcpRuntime(
     const server = new Server({ name: 'openchamber-browser', version: '1.0.0' }, { capabilities: { tools: {} } });
     server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools }));
     server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
-      const { sessionID, callID } = resolveContext(extra);
-      let input: AgentToolInput;
-      if (request.params.name === 'panel') {
-        const { action, parameters, ...flattened } = panelInput.parse(request.params.arguments);
-        input = { ...flattened, ...parameters, action };
-        if (input.submit === 'true') input.submit = true;
-        else if (input.submit === 'false') input.submit = false;
-      } else {
-        const { tabId, ...args } = request.params.arguments ?? {};
-        input = { action: 'browser.playwright', tool: `browser_${request.params.name}`, arguments: args, tabId };
-      }
-      const controller = new AbortController();
-      const signal = AbortSignal.any([extra.signal, controller.signal]);
-      const untrack = trackInflight(sessionID, controller);
-      try {
-        await (await permissions.session(sessionID)).assert({ action: 'openchamber_web', resources: ['*'], save: ['*'] }, signal);
-        const payload: AgentToolPayload = { tool: 'openchamber_web', input, sessionID, callID };
-        const result = await execute(payload, { signal });
-        signal.throwIfAborted();
-        if (request.params.name === 'panel') return { structuredContent: result, content: [{ type: 'text', text: JSON.stringify(result) }] };
-        if (!result.ok) throw new Error(result.error?.message);
-        return CallToolResultSchema.parse(result.data);
-      } finally {
-        untrack();
-      }
+      const context = resolveContext(extra);
+      return recordMcpCall(context, 'browser', request.params.name, request.params.arguments ?? {}, async () => {
+        const { sessionID, callID } = context;
+        let input: AgentToolInput;
+        if (request.params.name === 'panel') {
+          const { action, parameters, ...flattened } = panelInput.parse(request.params.arguments);
+          input = { ...flattened, ...parameters, action };
+          if (input.submit === 'true') input.submit = true;
+          else if (input.submit === 'false') input.submit = false;
+        } else {
+          const { tabId, ...args } = request.params.arguments ?? {};
+          input = { action: 'browser.playwright', tool: `browser_${request.params.name}`, arguments: args, tabId };
+        }
+        const controller = new AbortController();
+        const signal = AbortSignal.any([extra.signal, controller.signal]);
+        const untrack = trackInflight(sessionID, controller);
+        try {
+          await (await permissions.session(sessionID)).assert({ action: 'openchamber_web', resources: ['*'], save: ['*'] }, signal);
+          const payload: AgentToolPayload = { tool: 'openchamber_web', input, sessionID, callID };
+          const result = await execute(payload, { signal });
+          signal.throwIfAborted();
+          if (request.params.name === 'panel') return { structuredContent: { ...result }, content: [{ type: 'text', text: JSON.stringify(result) }] };
+          if (!result.ok) throw new Error(result.error?.message);
+          return CallToolResultSchema.parse(result.data);
+        } finally {
+          untrack();
+        }
+      });
     });
     return server;
   });

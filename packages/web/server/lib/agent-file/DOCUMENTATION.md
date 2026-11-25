@@ -5,8 +5,8 @@
 The file MCP service owns local writes, text replacement, multi-file patches and
 image attachments. Managed OpenCode discovers `file_write`, `file_edit`,
 `file_patch` and `file_view_image` as direct MCP tools. The shared permission service checks
-file access before execution; its OpenCode plugin supplies activity metadata. The turn-diffs plugin owns
-persisted turn patches; shared UI renders those records.
+file access before execution; its OpenCode plugin supplies activity metadata.
+The host's turn-diffs runtime owns persisted turn patches; shared UI renders those records.
 
 Web and Electron managed servers register the service. Hosted and Capacitor
 clients use their connected server. External OpenCode and VS Code manage their
@@ -30,7 +30,11 @@ own plugins.
   through command tools.
 - Text reading and file searches use command tools. Managed agents use shell
   commands such as `cat`, `sed` and `rg` for those operations.
-- Mutation results contain a message and file diffs. The OpenCode after-hook
+- The file service captures original bytes immediately before mutation and saves
+  the turn's net diff after execution settles, including partial writes on failure.
+  Direct and Code Mode calls share this boundary.
+- Mutation results contain a message, file diffs and an `openchamberTurnDiff`
+  reference. The OpenCode after-hook
   supplies their activity metadata. Image results contain the resolved path and
   MIME type, with PNG, JPEG, GIF or WebP bytes carried as MCP image content.
 

@@ -22,6 +22,7 @@ const reactBabel = { plugins: ['babel-plugin-react-compiler'] };
 
 const aliases = [
   { find: '@openchamber/sdk/schemas', replacement: path.resolve(__dirname, '../sdk/src/schemas.ts') },
+  { find: '@openchamber/sdk/agent-backends', replacement: path.resolve(__dirname, '../sdk/src/agent-backends.ts') },
   { find: '@openchamber/sdk', replacement: path.resolve(__dirname, '../sdk/src/index.ts') },
   { find: '@openchamber/ui', replacement: path.resolve(__dirname, '../ui/src') },
   { find: '@web', replacement: path.resolve(__dirname, './src') },

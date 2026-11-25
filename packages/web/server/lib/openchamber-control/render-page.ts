@@ -28,7 +28,7 @@ export interface AgentPromptInput {
 }
 export type PageAnswer =
   | { answered: true; summary: string; data: unknown; reason?: never; errors?: never }
-  | { answered: false; reason: 'declined'; summary?: never; data?: never; errors?: never }
+  | { answered: false; reason: 'declined' | 'chat-sent'; summary?: never; data?: never; errors?: never }
   | { answered: false; reason: 'ui-not-drawn'; errors: string[]; summary?: never; data?: never };
 export type PageWaitChange =
   | { type: 'waiting'; sessionId: string; callId: string; title: string; directory: string | null }
@@ -256,7 +256,13 @@ export const createPageAnswers = ({ onWaitChange = () => {} }: PageAnswersOption
     }
   };
 
-  return { wait, answer, release };
+  const userInput = (sessionId: string) => {
+    for (const [key, settle] of waiting) {
+      if (key.startsWith(pageKey(sessionId, ''))) settle({ answered: false, reason: 'chat-sent' });
+    }
+  };
+
+  return { wait, answer, release, userInput };
 };
 
 const OPERATOR_CHILD_REFUSAL = 'Nobody answers pages in this session: the user does not interact with it, and your final answer goes to the agent that started it. Show the page without awaitAnswer or answerLater, and write your question in plain text in your answer';
@@ -347,5 +353,6 @@ export const createRenderPageAction = ({ isEnabled, pageAnswers, hasUnreadChat, 
   if (answer.reason === 'declined') {
     return { title, answer, note: DECLINED_NOTE };
   }
+  if (answer.reason === 'chat-sent') return { title, answer, note: RENDER_PAGE_CLOSED_IN_CHAT_NOTE };
   return withHidden({ title, answer }, ANSWERED_NOTE);
 };

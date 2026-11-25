@@ -5,18 +5,12 @@ import { CallToolRequestSchema, CallToolResultSchema, ListToolsRequestSchema, ty
 import { Effect, Schema, type JsonSchema } from 'effect';
 import { z } from 'zod';
 import { createMcpRuntime } from '../agent-tool/mcp.js';
-import type { McpInvocation, ResolveMcpContext } from '../agent-tool/mcp-context.js';
+import type { ResolveMcpContext } from '../agent-tool/mcp-context.js';
 import type { ToolPermissions } from '../agent-tool/permissions.js';
 import { DIRECT_CONTROL_MCP_TOOLS } from '../agent-tool/control-mcp.js';
 import { scriptRuntime, scriptOutput, type ScriptTool, type ScriptCall } from './src/execution.js';
 import { fetchExtension } from './src/fetch.js';
-import {
-  OPENCHAMBER_WEB_ACTION_DEFINITIONS, OPENCHAMBER_MEMORY_ACTION_DEFINITIONS,
-  OPENCHAMBER_KNOWLEDGE_ACTION_DEFINITIONS, OPENCHAMBER_USAGE_ACTION_DEFINITIONS,
-  OPENCHAMBER_NOTIFY_ACTION_DEFINITIONS,
-  OPENCHAMBER_AGENT_TOOL_ACTION_DEFINITIONS, OPENCHAMBER_SCHEDULE_ACTION_DEFINITIONS,
-  OPENCHAMBER_TERMINAL_ACTION_DEFINITIONS,
-} from '../openchamber-control/actions.js';
+import { toolResultMetadata } from '../agent-tool/tool-metadata.js';
 
 export interface CodeModeSource {
   namespace: string;
@@ -24,47 +18,20 @@ export interface CodeModeSource {
   permission(name: string): string;
   enabled?(): boolean;
 }
-export type CodeModeFileActivity = (phase: 'before' | 'after', request: McpInvocation, tool: string, input: Schema.Json) => Promise<Schema.JsonObject>;
 
 const input = z.object({ code: z.string() });
 const json = Schema.decodeUnknownSync(Schema.Json);
 const object = Schema.decodeUnknownSync(Schema.JsonObject);
-const titles = Object.fromEntries([
-  ...OPENCHAMBER_WEB_ACTION_DEFINITIONS, ...OPENCHAMBER_MEMORY_ACTION_DEFINITIONS,
-  ...OPENCHAMBER_KNOWLEDGE_ACTION_DEFINITIONS, ...OPENCHAMBER_USAGE_ACTION_DEFINITIONS,
-  ...OPENCHAMBER_NOTIFY_ACTION_DEFINITIONS,
-  ...OPENCHAMBER_AGENT_TOOL_ACTION_DEFINITIONS, ...OPENCHAMBER_SCHEDULE_ACTION_DEFINITIONS,
-  ...OPENCHAMBER_TERMINAL_ACTION_DEFINITIONS,
-].map(({ action, title }) => [action, title]));
 
 function toolSchema({ properties, required, ...schema }: Tool['inputSchema']): JsonSchema.JsonSchema {
   return { ...schema, ...properties && { properties }, ...required && { required } };
 }
 
-function metadata(namespace: string, name: string, value: Schema.Json, args: Schema.Json): Schema.JsonObject {
-  if (namespace === 'file') return name === 'view_image' ? {} : object({ files: object(value).files });
-  if (namespace === 'request') return object({ questionID: object(value).question_id });
-  if (namespace === 'openchamber' || namespace === 'browser' && name === 'panel') {
-    const output = object(value);
-    const action = Schema.decodeUnknownSync(Schema.String)(output.action);
-    return object({ openchamber: { schemaVersion: 1, action, description: titles[action] ?? action, ok: output.ok } });
-  }
-  if (namespace === 'openchamber_commands') {
-    const output = object(value);
-    if (name === 'clock_sleep') return output;
-    if (name === 'store' || name === 'load') return {};
-    return object({ status: output.status, session_id: output.session_id, truncated: output.truncated,
-      ...output.status === 'completed' && { exit_code: output.exit_code },
-      ...name === 'exec_command' && { command: object(args).cmd } });
-  }
-  return {};
-}
 
 export function createCodeModeMcpRuntime(
   sources: readonly CodeModeSource[],
   resolveContext: ResolveMcpContext,
   permissions: ToolPermissions,
-  fileActivity: CodeModeFileActivity = async () => ({}),
 ) {
   return createMcpRuntime(async () => {
     const clients = await Promise.all(sources.map(async source => {
@@ -111,20 +78,11 @@ export function createCodeModeMcpRuntime(
       await policy.assert({ action: 'execute', resources: ['*'], save: ['*'] }, context.signal);
       const entries = (await inventory()).filter(entry => (entry.namespace !== 'openchamber' || !DIRECT_CONTROL_MCP_TOOLS.includes(entry.tool.name)) && !policy.denied(entry.permission(entry.tool.name), '*'));
       const tools = entries.map(entry => descriptor(entry, args => Effect.tryPromise({ try: async signal => {
-        const editing = entry.namespace === 'file' && entry.tool.name !== 'view_image';
-        const name = `${entry.namespace}_${entry.tool.name}`;
-        if (editing) await fileActivity('before', extra, name, args);
-        let capture: Schema.JsonObject = {};
-        let result;
-        try {
-          result = CallToolResultSchema.parse(await entry.client.callTool({ name: entry.tool.name, arguments: object(args), _meta: meta }, CallToolResultSchema, { signal, timeout: 43_200_000 }));
-        } finally {
-          if (editing) capture = await fileActivity('after', extra, name, args);
-        }
+        const result = CallToolResultSchema.parse(await entry.client.callTool({ name: entry.tool.name, arguments: object(args), _meta: meta }, CallToolResultSchema, { signal, timeout: 43_200_000 }));
         const text = result.content.filter(part => part.type === 'text').map(part => part.text).join('\n');
         if (result.isError) throw new Error(text);
         const value = json(result.structuredContent ?? (text || null));
-        return { value, text, metadata: { ...metadata(entry.namespace, entry.tool.name, value, args), ...capture },
+        return { value, text, metadata: toolResultMetadata(entry.namespace, entry.tool.name, value, args),
           files: result.content.filter(part => part.type === 'image').map(part => ({ type: 'file' as const, uri: `data:${part.mimeType};base64,${part.data}`, mime: part.mimeType })),
         };
       }, catch: error => error })));

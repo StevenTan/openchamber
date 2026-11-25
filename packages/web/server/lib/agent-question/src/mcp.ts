@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { createMcpRuntime } from '../../agent-tool/mcp.js';
 import { questionInput, questionTool } from './plugin.js';
 import type { createQuestionRuntime } from './runtime.js';
-import type { ResolveMcpContext } from '../../agent-tool/mcp-context.js';
+import { recordMcpCall, type ResolveMcpContext } from '../../agent-tool/mcp-context.js';
 import type { ToolPermissions } from '../../agent-tool/permissions.js';
 import type { Application, ExpressFactory, RequestHandler } from '../../shared/http-contracts.js';
 
@@ -14,15 +14,17 @@ export function createQuestionMcpRuntime(runtime: Pick<ReturnType<typeof createQ
     const server = new Server({ name: 'openchamber-questions', version: '1.0.0' }, { capabilities: { tools: {} } });
     server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [questionTool] }));
     server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
-      z.literal(questionTool.name).parse(request.params.name);
       const context = resolveContext(extra);
-      await (await permissions.session(context.sessionID)).assert({ action: 'question', resources: ['*'], save: ['*'] }, context.signal);
-      const result = await runtime.ask({
-        sessionID: context.sessionID,
-        callID: `${context.callID}:${randomUUID()}`,
-        input: questionInput.parse(request.params.arguments),
+      return recordMcpCall(context, 'request', request.params.name, request.params.arguments ?? {}, async () => {
+        z.literal(questionTool.name).parse(request.params.name);
+        await (await permissions.session(context.sessionID)).assert({ action: 'question', resources: ['*'], save: ['*'] }, context.signal);
+        const result = await runtime.ask({
+          sessionID: context.sessionID,
+          callID: `${context.callID}:${randomUUID()}`,
+          input: questionInput.parse(request.params.arguments),
+        });
+        return { structuredContent: result, content: [{ type: 'text', text: JSON.stringify(result) }] };
       });
-      return { structuredContent: result, content: [{ type: 'text', text: JSON.stringify(result) }] };
     });
     return server;
   });

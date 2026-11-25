@@ -19,9 +19,8 @@ export const nextPermissionMode = (mode: PermissionMode, safetyAvailable: boolea
 
 export const permissionModeForNewSession = (
   choice: PermissionMode | undefined,
-  inSpace: boolean,
   defaultMode: PermissionMode,
-): PermissionMode | undefined => choice ?? (inSpace && defaultMode !== "ask" ? defaultMode : undefined);
+): PermissionMode => choice ?? defaultMode;
 
 export type PermissionPolicySnapshot = {
   modes: PermissionModeMap;

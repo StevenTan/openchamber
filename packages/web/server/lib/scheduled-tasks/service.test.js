@@ -359,7 +359,7 @@ describe('scheduled-task service chats scope', () => {
       schedule: { kind: 'cron', cron: '0 9 * * *' },
       execution: { prompt: 'Run', providerID: 'p', modelID: 'm' },
     })).resolves.toHaveProperty('task');
-    expect(readModelCatalog).toHaveBeenCalledWith(chatsScope.root);
+    expect(readModelCatalog).toHaveBeenCalledWith(chatsScope.root, 'p');
     expect(projectConfigRuntime.upsertScheduledTask).toHaveBeenCalledWith(chatsScope.id, expect.anything());
   });
 
@@ -685,7 +685,7 @@ describe('scheduled-task model check', () => {
       ...task({ prompt: 'Run', providerID: 'p', modelID: 'm' }),
       targetSessionId: 'ses_target',
     })).resolves.toHaveProperty('task');
-    expect(readModelCatalog).toHaveBeenCalledWith('/worktree');
+    expect(readModelCatalog).toHaveBeenCalledWith('/worktree', 'p');
   });
 
   it('keeps a paused task with a stale target editable', async () => {
@@ -776,6 +776,6 @@ describe('scheduled-task model check', () => {
       targetSessionId: 'ses_target',
     });
     expect(validateTarget).toHaveBeenCalledOnce();
-    expect(readModelCatalog).toHaveBeenCalledWith('/worktree');
+    expect(readModelCatalog).toHaveBeenCalledWith('/worktree', 'p');
   });
 });

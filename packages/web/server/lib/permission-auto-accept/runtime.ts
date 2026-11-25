@@ -395,6 +395,7 @@ export function createPermissionAutoAcceptRuntime({
     snapshot,
     load,
     setSessionPolicy,
+    initializeSession: applyDefaultMode,
     resolveSessionMode,
     isSessionAutoAccepting,
     isPermissionAutoAnswered,

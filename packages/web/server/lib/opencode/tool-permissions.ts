@@ -20,9 +20,7 @@ export function createOpenCodeToolPermissions(options: Options) {
     baseUrl: options.buildOpenCodeUrl('/', '').replace(/\/$/, ''),
     headers: { ...options.getOpenCodeAuthHeaders(), ...directory && { 'x-opencode-directory': encodeURIComponent(directory) } },
   });
-  const runtime = createToolPermissions({
-    file: path.join(options.dataDir, 'tool-permissions.json'),
-    readPolicy: async sessionID => {
+  const readPolicy = async (sessionID: string): Promise<ToolPermissionPolicy> => {
       const application = options.applicationPolicy?.(sessionID);
       if (application) return application;
       const session = await client().session.get({ sessionID });
@@ -35,7 +33,10 @@ export function createOpenCodeToolPermissions(options: Options) {
         rules: [...agent.data.permissions, ...session.permissions ?? []],
         savedRules: saved.map(entry => ({ action: entry.action, resource: entry.resource, effect: 'allow' })),
       };
-    },
+  };
+  const runtime = createToolPermissions({
+    file: path.join(options.dataDir, 'tool-permissions.json'),
+    readPolicy,
     publish: (type, data, directory) => options.globalEventHub.injectEvent({ directory, spaceId: null,
       payload: { id: randomUUID(), created: Date.now(), type, data, location: { directory } },
     }),

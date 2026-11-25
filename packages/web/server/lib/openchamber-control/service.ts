@@ -1,3 +1,7 @@
+import { createModelSearch } from './model-search.js';
+import { z } from 'zod';
+import { createApplicationSessions } from '../agent-backends/sessions.js';
+import type { createAntigravityBackend } from '../agent-backends/antigravity.js';
 import { asNonEmptyString, isBoolean, isRecord } from '../shared/guards.js';
 import path from 'node:path';
 import nodeFsPromises from 'node:fs/promises';
@@ -6,7 +10,7 @@ import { OpenChamberControlError, asControlError, controlErrorFields } from './e
 import { OPENCHAMBER_ALL_ACTIONS, OPENCHAMBER_KNOWLEDGE_ACTIONS } from './actions.js';
 import { writeScreenshot } from './screenshots.js';
 import { createProjectKnowledgeActions } from './project-knowledge.js';
-import { createPageAnswers, createRenderPageAction, isAgentPrompt } from './render-page.js';
+import { createPageAnswers, createRenderPageAction } from './render-page.js';
 import { completeFormAnswer } from './form-answer.js';
 import { createImageGenerationAction } from './generate-image.js';
 import { createSecretRequests } from './secret-request.js';
@@ -19,7 +23,7 @@ import { createWorkMembership } from '../session-work/membership.js';
 import { createSessionListing, positiveInteger } from './session-listing.js';
 import { isPinnedMetadata, userStatePatch } from '../session-work/state.js';
 import { playwrightCallSchema } from '../browser-control/playwright.js';
-import type { SessionInfo, ModelInfo, PermissionReplyInput, SessionFormCancelInput, FormInfo } from '@opencode/client';
+import type { SessionInfo, PermissionReplyInput, SessionFormCancelInput, FormInfo } from '@opencode/client';
 import type { ControlClient } from './opencode-client.js';
 import type { FormValues } from './form-answer.js';
 import type { PageAnswerInput } from './render-page.js';
@@ -103,6 +107,8 @@ export interface ControlDependencies {
   sharePages?: Parameters<typeof createRenderPageAction>[0]['sharePages'];
   archiveStore?: { entry: (sessionID: string) => Promise<number | null | undefined> } | null;
   isOpenCodeDirectoryTrusted?: ((directory: string) => Promise<boolean>) | null;
+  antigravity?: ReturnType<typeof createAntigravityBackend>;
+  replyToolPermission?: (input: PermissionReplyInput) => Promise<boolean>;
   createClient?: (options: Parameters<typeof OpenCode.make>[0]) => ControlClient;
   imageFsPromises?: ImageGenerationDependencies['fsPromises'];
   loadQuota?: Parameters<typeof usageAction>[0]['loadQuota'] | null;
@@ -162,6 +168,7 @@ interface ControlTask {
   baseBranch?: string | null;
 }
 interface SessionPayload {
+  backendID?: string;
   directory?: string;
   projectId?: string;
   title?: string;
@@ -188,7 +195,6 @@ export interface SessionActionResult {
   baselineIdleRecordId?: string | null;
   lastAssistantMessage?: TextMessage | null;
 }
-interface RankPreferences { [rank: string]: string }
 type PermissionReply = Mutable<PermissionReplyInput>;
 type FormCancellation = Mutable<SessionFormCancelInput>;
 interface SessionCreateOptions { startedByExtension?: string; operatorParentId?: string | null }
@@ -199,7 +205,6 @@ const DEFAULT_WAIT_TIMEOUT_SECONDS = 600;
 const MAX_WAIT_TIMEOUT_SECONDS = 86_400;
 const WAIT_POLL_INTERVAL_MS = 500;
 const CONTROL_ACTIONS = new Set(OPENCHAMBER_ALL_ACTIONS);
-const PREFERENCE_BY_RANK: RankPreferences = { 2: 'favorite', 1: 'recent' };
 const SCHEDULE_TASK_ID_ACTIONS = new Set([
   'schedule.update',
   'schedule.run',
@@ -517,15 +522,15 @@ export const createOpenChamberControlService = (dependencies: ControlDependencie
     });
   };
 
+  const applicationSessions = createApplicationSessions({ openCode: getClient, antigravity: dependencies.antigravity });
+
   const workNamer = workNaming ? createWorkNamer({
     ...workNaming,
     getSession: async (sessionID) => {
-      const client = await getClient();
-      return client.session.get({ sessionID }).catch(() => null);
+      return applicationSessions.get(sessionID).catch(() => null);
     },
     renameSession: async (sessionID, title) => {
-      const client = await getClient((await resolveSessionDirectory(sessionID)) ?? '');
-      await client.session.update({ sessionID, title });
+      await applicationSessions.rename(sessionID, title);
     },
     createError: (message, status) => new OpenChamberControlError(message, status),
   }) : null;
@@ -574,16 +579,14 @@ export const createOpenChamberControlService = (dependencies: ControlDependencie
 
   const hasUnreadChat = async (sessionID: string) => {
     try {
-      const client = await getClient();
-      const items = await client.session.inbox.list({ sessionID });
-      return items.some((item) => item.type === 'user' && item.delivery === 'steer' && !isAgentPrompt(item.payload?.metadata));
+      return await applicationSessions.hasPendingInput(sessionID);
     } catch (error) {
       console.warn('[render.page] could not read the session inbox:', controlErrorFields(error)?.message ?? error);
       return false;
     }
   };
   const pageAnswers = createPageAnswers({ onWaitChange: onPageWaitChange });
-  const readSession = async (sessionID: string) => (await getClient()).session.get({ sessionID });
+  const readSession = applicationSessions.get;
   const renderPage = createRenderPageAction({ isEnabled: isRenderToolEnabled, pageAnswers, hasUnreadChat, readSession, laterPages, sharePages });
   const secretRequests = createSecretRequests({ isEnabled: isSecretToolEnabled, files: secretFiles, saved: savedSecrets, onWaitChange: onPageWaitChange, hasUnreadChat });
   const generateImage = createImageGenerationAction({
@@ -605,69 +608,10 @@ export const createOpenChamberControlService = (dependencies: ControlDependencie
     };
   };
 
-  const searchModels = async (input: ControlInput, contextDirectory: ControlInput['directory']) => {
-    const client = await getClient(asNonEmptyString(input.directory) || asNonEmptyString(contextDirectory) || '');
-    const [settings, catalog, providerList] = await Promise.all([
-      readSettingsFromDiskMigrated(),
-      client.model.list(),
-      client.provider.list(),
-    ]);
-    const providerNames = new Map(providerList.data.map((provider) => [provider.id, provider.name]));
-    const refKey = (ref: ControlSettings['recentModels']) => {
-      const fields: { providerID?: unknown; modelID?: unknown } | undefined = ref == null ? undefined : Object(ref);
-      return `${fields?.providerID}/${fields?.modelID}`;
-    };
-    const modelKey = (model: ModelInfo) => `${model.providerID}/${model.id}`;
-    const refs = (value: ControlSettings['hiddenModels']) => new Set((Array.isArray(value) ? value : []).map(refKey));
-    const hidden = refs(settings?.hiddenModels);
-    const rank = new Map([
-      ...[...refs(settings?.recentModels)].map((key) => [key, 1] as const),
-      ...[...refs(settings?.favoriteModels)].map((key) => [key, 2] as const),
-    ]);
-    const provider = asNonEmptyString(input.provider)?.toLowerCase();
-    const terms = (asNonEmptyString(input.query) ?? '').toLowerCase().split(/\s+/).filter(Boolean);
-    const candidates = catalog.data
-      .filter((model) => !hidden.has(modelKey(model)))
-      .filter((model) => !provider
-        || model.providerID.toLowerCase() === provider
-        || providerNames.get(model.providerID)?.toLowerCase() === provider)
-      .filter((model) => {
-        const text = `${modelKey(model)} ${model.name}`.toLowerCase();
-        return terms.every((term) => text.includes(term));
-      });
-    const familyOf = (model: ModelInfo) => `${model.providerID}/${model.family}`;
-    const newestOfFamily = new Map<string, number>();
-    for (const model of candidates) {
-      if (!model.family || rank.has(modelKey(model))) continue;
-      newestOfFamily.set(familyOf(model), Math.max(newestOfFamily.get(familyOf(model)) ?? 0, model.time.released));
-    }
-    const matching = candidates
-      .toSorted((left, right) => (rank.get(modelKey(right)) ?? 0) - (rank.get(modelKey(left)) ?? 0)
-        || left.providerID.localeCompare(right.providerID)
-        || right.time.released - left.time.released)
-      .filter((model) => input.all === true || !model.family || rank.has(modelKey(model))
-        || model.time.released >= Number(newestOfFamily.get(familyOf(model))));
-    const offset = isSafeInteger(input.offset) && input.offset > 0 ? input.offset : 0;
-    const limit = isSafeInteger(input.limit) && input.limit > 0 ? Math.min(input.limit, 100) : 10;
-    const page = matching.slice(offset, offset + limit);
-    return {
-      models: page.map((model) => ({
-        id: modelKey(model),
-        name: model.name,
-        provider: providerNames.get(model.providerID) ?? model.providerID,
-        preference: PREFERENCE_BY_RANK[String(rank.get(modelKey(model)))],
-        released: model.time.released,
-        variants: model.variants.map((variant) => variant.id),
-        cost: model.cost,
-        status: model.status,
-      })),
-      total: matching.length,
-      next: offset + limit < matching.length ? offset + limit : null,
-    };
-  };
+  const searchModels = createModelSearch({ getClient, readSettingsFromDiskMigrated, antigravity: dependencies.antigravity });
 
-  const activeSessions = async (client: ControlClient) => {
-    const statuses = await client.session.active();
+  const activeSessions = async () => {
+    const statuses = await applicationSessions.active();
     if (!isRecord(statuses)) {
       throw new OpenChamberControlError('Invalid session status response', 500);
     }
@@ -688,13 +632,13 @@ export const createOpenChamberControlService = (dependencies: ControlDependencie
     return await isWaitingForUser(sessionID) ? { type: 'waiting' } : { type: 'busy' };
   };
 
-  const sessionStatus = async (client: ControlClient, sessionID: string) => asPublicStatus(await activeSessions(client), sessionID);
+  const sessionStatus = async (sessionID: string) => asPublicStatus(await applicationSessions.active(sessionID), sessionID);
 
-  const assertSessionExists = async (client: ControlClient, sessionID: string) => {
+  const assertSessionExists = async (sessionID: string) => {
     try {
-      return await client.session.get({ sessionID });
+      return await applicationSessions.get(sessionID);
     } catch (error) {
-      if (controlErrorFields(error)?._tag === 'SessionNotFoundError' || controlErrorFields(error)?._tag === 'InvalidRequestError') {
+      if (controlErrorFields(error)?.status === 404 || controlErrorFields(error)?._tag === 'SessionNotFoundError' || controlErrorFields(error)?._tag === 'InvalidRequestError') {
         throw new OpenChamberControlError(`Session not found: ${sessionID}`, 404);
       }
       throw new OpenChamberControlError(
@@ -714,7 +658,7 @@ export const createOpenChamberControlService = (dependencies: ControlDependencie
     assertSingleScope,
     resolveReadDirectory,
     isSessionWorkEnabled,
-    getClient,
+    applicationSessions,
     activeSessions,
     asPublicStatus,
     withArchiveEntry,
@@ -729,7 +673,7 @@ export const createOpenChamberControlService = (dependencies: ControlDependencie
     if (!(await isSessionWorkEnabled())) throw new OpenChamberControlError('In work is turned off in Settings', 409);
     const sessionID = asNonEmptyString(input.sessionId) || asNonEmptyString(contextSessionId);
     if (!sessionID) throw new OpenChamberControlError('sessionId is required', 400);
-    const session = await withArchiveEntry(await assertSessionExists(await getClient(), sessionID));
+    const session = await withArchiveEntry(await assertSessionExists(sessionID));
     if (state === 'open' && !workMembership.canBeInWork(session)) {
       throw new OpenChamberControlError(`${sessionID} cannot be in work: subsessions, Chats, reviews, /btw questions and scheduled runs never are`, 400);
     }
@@ -745,14 +689,13 @@ export const createOpenChamberControlService = (dependencies: ControlDependencie
   };
 
   const MESSAGE_PAGE_LIMIT = 200;
-  const sessionMessages = async (client: ControlClient, sessionID: string, role: string, limit: number | undefined) => {
+  const sessionMessages = async (sessionID: string, role: string, limit: number | undefined) => {
     const fetchLimit = limit === undefined ? undefined : Math.max(100, limit * 4);
     const collected: MessageRecord[] = [];
     const seenCursors = new Set();
     let cursor;
     for (;;) {
-      const response = await client.message.list({
-        sessionID,
+      const response = await applicationSessions.messages(sessionID, {
         limit: fetchLimit ?? MESSAGE_PAGE_LIMIT,
         ...(cursor ? { cursor } : fetchLimit ? { order: 'desc' } : {}),
       });
@@ -768,19 +711,19 @@ export const createOpenChamberControlService = (dependencies: ControlDependencie
     return limit === undefined ? messages : messages.slice(-limit);
   };
 
-  const waitForIdle = async ({ client, sessionID, timeoutMs, requireActivity, baselineMessageID, startedAt, signal }: { client: ControlClient; sessionID: string; directory: string; timeoutMs: number; requireActivity: boolean; baselineMessageID?: string | undefined; startedAt: number; signal: AbortSignal | undefined }) => {
+  const waitForIdle = async ({ sessionID, timeoutMs, requireActivity, baselineMessageID, startedAt, signal }: { sessionID: string; directory: string; timeoutMs: number; requireActivity: boolean; baselineMessageID?: string | undefined; startedAt: number; signal: AbortSignal | undefined }) => {
     const deadline = now() + timeoutMs;
     let observedActivity = false;
     while (true) {
       if (signal?.aborted) throw new OpenChamberControlError('OpenChamber action was cancelled', 499);
-      const status = await sessionStatus(client, sessionID);
+      const status = await sessionStatus(sessionID);
       if (status.type === 'waiting') return status;
       if (status.type === 'busy') {
         observedActivity = true;
       } else if (!requireActivity || observedActivity) {
         return status;
       } else {
-        const messages = await sessionMessages(client, sessionID, 'assistant', 1);
+        const messages = await sessionMessages(sessionID, 'assistant', 1);
         const message = messages[0];
         if (message?.completedAt && (baselineMessageID ? message.id !== baselineMessageID : message.completedAt >= startedAt)) {
           return status;
@@ -796,20 +739,14 @@ export const createOpenChamberControlService = (dependencies: ControlDependencie
 
   const resolveSessionDirectory = async (sessionID: string) => {
     try {
-      const client = await getClient();
-      let detail: ControlSession | null = null;
-      try {
-        detail = await client.session.get({ sessionID }).catch(() => null);
-      } catch {
-        detail = null;
-      }
-      const direct = asNonEmptyString(detail?.location?.directory) || asNonEmptyString(detail?.directory);
+      const detail = await applicationSessions.get(sessionID).catch(() => null);
+      const direct = asNonEmptyString(detail?.location?.directory);
       if (direct) return direct;
 
       const seenCursors = new Set();
       let cursor;
       for (;;) {
-        const response = await client.session.list(cursor ? { cursor } : {});
+        const response = await applicationSessions.list(cursor ? { cursor } : {});
         const sessions = Array.isArray(response?.data) ? response.data : [];
         const session = sessions.find((item) => item?.id === sessionID);
         if (session) return asNonEmptyString(session?.location?.directory) || null;
@@ -841,9 +778,8 @@ export const createOpenChamberControlService = (dependencies: ControlDependencie
   };
 
   const stopSession = async (sessionID: string) => {
-    const client = await sessionClient(sessionID);
     try {
-      const result = await client.session.interrupt({ sessionID });
+      const result = await applicationSessions.interrupt(sessionID);
       return result?.interrupted === true;
     } catch (error) {
       throw asAnswerError(error);
@@ -851,6 +787,7 @@ export const createOpenChamberControlService = (dependencies: ControlDependencie
   };
 
   const answerPermission = async ({ sessionID, requestID, decision, message }: PermissionReplyInput) => {
+    if (await dependencies.replyToolPermission?.({ sessionID, requestID, decision, ...message && { message } })) return;
     const client = await sessionClient(sessionID);
     try {
       const reply: PermissionReply = { sessionID, requestID, decision };
@@ -862,22 +799,28 @@ export const createOpenChamberControlService = (dependencies: ControlDependencie
   };
 
   const answerForm = async ({ sessionID, formID, answer, message }: { sessionID: string; formID: string; answer?: FormValues | null; message?: string | undefined }) => {
-    const client = await sessionClient(sessionID);
+    const forms = sessionID.startsWith('ses_ag_') && dependencies.antigravity
+      ? dependencies.antigravity.questionSession.form : (await sessionClient(sessionID)).session.form;
     try {
       if (!answer) {
         const cancellation: FormCancellation = { sessionID, formID };
         if (message) cancellation.message = message;
-        await client.session.form.cancel(cancellation);
+        await forms.cancel(cancellation);
         return;
       }
-      const form = await client.session.form.get({ sessionID, formID });
-      await client.session.form.reply({ sessionID, formID, answer: completeFormAnswer(form?.fields, answer) });
+      const form = await forms.get({ sessionID, formID });
+      await forms.reply({ sessionID, formID, answer: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.array(z.string())])).parse(completeFormAnswer(form?.fields, answer)) });
     } catch (error) {
       throw asAnswerError(error);
     }
   };
 
   const dismissOpenForms = async (sessionID: string) => {
+    if (sessionID.startsWith('ses_ag_') && dependencies.antigravity) {
+      const session = await dependencies.antigravity.get(sessionID);
+      for (const form of session.forms.filter(form => form.state.status === 'pending')) await dependencies.antigravity.questionSession.form.cancel({ sessionID, formID: z.string().parse(form.id) });
+      return;
+    }
     const client = await sessionClient(sessionID);
     let forms: (FormInfo & { state?: { status?: string } })[];
     try {
@@ -955,6 +898,7 @@ export const createOpenChamberControlService = (dependencies: ControlDependencie
       if (resolvedSessionDirectory) directory = resolvedSessionDirectory;
     }
     const payload: SessionPayload = {};
+    if (parentSessionID?.startsWith('ses_ag_')) payload.backendID = 'antigravity';
     if (directory) payload.directory = directory;
     if (hasText(input.projectId)) payload.projectId = input.projectId.trim();
     if (hasText(input.title)) payload.title = input.title.trim();
@@ -1009,9 +953,7 @@ export const createOpenChamberControlService = (dependencies: ControlDependencie
       delete publicResult.baselineIdleRecordId;
       return publicResult;
     }
-    const client = await getClient(result.directory);
     const status = await waitForIdle({
-      client,
       sessionID: result.sessionId,
       directory: result.directory,
       timeoutMs: normalizeWaitTimeoutMs(input.timeout),
@@ -1024,7 +966,7 @@ export const createOpenChamberControlService = (dependencies: ControlDependencie
     delete publicResult.baselineAssistantMessageId;
     delete publicResult.baselineIdleRecordId;
     if (input.lastAssistant === true) {
-      publicResult.lastAssistantMessage = (await sessionMessages(client, result.sessionId, 'assistant', 1))[0] || null;
+      publicResult.lastAssistantMessage = (await sessionMessages(result.sessionId, 'assistant', 1))[0] || null;
     }
     return publicResult;
   };
@@ -1248,7 +1190,7 @@ export const createOpenChamberControlService = (dependencies: ControlDependencie
       }
       if (action === 'projects.list') return { projects: await projects() };
       if (action === 'models.list') return models();
-      if (action === 'models.search') return searchModels(input, contextDirectory);
+      if (action === 'models.search') return searchModels(input, contextDirectory, options.contextSessionId);
       if (action === 'schedule.status') return scheduledTaskService.status();
       if (action.startsWith('schedule.')) {
         const taskID = asNonEmptyString(input.taskId);
@@ -1379,11 +1321,10 @@ export const createOpenChamberControlService = (dependencies: ControlDependencie
         const scoped = asNonEmptyString(input.projectId) || asNonEmptyString(input.directory);
         const directory = (!scoped && await resolveSessionDirectory(sessionID))
           || await resolveReadDirectory(input, contextDirectory);
-        const client = await getClient(directory);
         if (!directory) throw new OpenChamberControlError('directory is required', 400);
         if (action === 'session.status') {
-          await assertSessionExists(client, sessionID);
-          return { sessionId: sessionID, directory, sessionStatus: await sessionStatus(client, sessionID) } satisfies SessionStatusResult;
+          await assertSessionExists(sessionID);
+          return { sessionId: sessionID, directory, sessionStatus: await sessionStatus(sessionID) } satisfies SessionStatusResult;
         }
         if (action === 'session.messages') {
           if (input.timeout !== undefined && input.wait !== true) throw new OpenChamberControlError('timeout requires wait', 400);
@@ -1392,12 +1333,12 @@ export const createOpenChamberControlService = (dependencies: ControlDependencie
           const last = input.last === true || input.lastAssistant === true;
           if (input.all === true && (last || input.limit !== undefined)) throw new OpenChamberControlError('all cannot be combined with last or limit', 400);
           if (last && input.limit !== undefined) throw new OpenChamberControlError('last cannot be combined with limit', 400);
-          await assertSessionExists(client, sessionID);
+          await assertSessionExists(sessionID);
           const currentStatus = input.wait === true
-            ? await waitForIdle({ client, sessionID, directory, timeoutMs: normalizeWaitTimeoutMs(input.timeout), requireActivity: false, startedAt: now(), signal: options.signal })
-            : await sessionStatus(client, sessionID);
+            ? await waitForIdle({ sessionID, directory, timeoutMs: normalizeWaitTimeoutMs(input.timeout), requireActivity: false, startedAt: now(), signal: options.signal })
+            : await sessionStatus(sessionID);
           const limit = input.all === true ? undefined : (last ? 1 : positiveInteger(input.limit, 10, 'limit'));
-          return { sessionId: sessionID, directory, role, sessionStatus: currentStatus, messages: await sessionMessages(client, sessionID, role, limit) } satisfies SessionMessagesResult;
+          return { sessionId: sessionID, directory, role, sessionStatus: currentStatus, messages: await sessionMessages(sessionID, role, limit) } satisfies SessionMessagesResult;
         }
       }
       throw new OpenChamberControlError(`Unsupported OpenChamber action: ${action || 'missing'}`, 400);
@@ -1420,6 +1361,7 @@ export const createOpenChamberControlService = (dependencies: ControlDependencie
   };
   return {
     execute,
+    userInput: (sessionID: string) => { pageAnswers.userInput(sessionID); secretRequests.userInput(sessionID); },
     resolveSessionDirectory,
     answerPage,
     answerSecret: secretRequests.answer,

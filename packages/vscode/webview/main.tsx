@@ -1,3 +1,4 @@
+import { jsonResponse, unsupportedWebRouteResponse, bridgeJsonRoute } from './api/local-responses';
 import { createVSCodeAPIs } from './api';
 import { createRemovalTombstones } from './inlineCommentRemovals';
 import { needsComposerDraft, resolveCommentTarget, type InlineCommentRecord } from './inlineCommentTarget';
@@ -326,23 +327,6 @@ const decodeBase64 = (value: string): ArrayBuffer => {
   return buffer;
 };
 
-const jsonResponse = (body: unknown, status = 200): Response => {
-  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
-};
-
-const unsupportedWebRouteResponse = (feature: string): Response => {
-  return jsonResponse({ error: `${feature} is not supported in VS Code` }, 501);
-};
-
-const bridgeJsonRoute = async (bridgeType: string, payload: unknown): Promise<Response> => {
-  try {
-    return jsonResponse(await sendBridgeMessage(bridgeType, payload), 200);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Request failed';
-    return jsonResponse({ error: message }, /must be|is required|session id/.test(message) ? 400 : 500);
-  }
-};
-
 const pluginConfigErrorStatus = (message: string): number => {
   const lower = message.toLowerCase();
   if (lower.includes('already exists')) return 409;
@@ -422,6 +406,10 @@ const handleLocalApiRequest = async (input: RequestInfo | URL, url: URL, init: R
 
   if (normalizedPathname.startsWith('/api/openchamber/tunnel/')) {
     return unsupportedWebRouteResponse('Remote tunnel settings');
+  }
+
+  if (normalizedPathname === '/api/openchamber/turn-diffs' && method === 'GET') {
+    return jsonResponse(await opencodeClient.getRecordedTurnDiff(url.searchParams.get('sessionID') ?? '', url.searchParams.get('turnID') ?? '', url.searchParams.get('directory')));
   }
 
   if (normalizedPathname === '/api/openchamber/sessions/archive' && method === 'POST') {

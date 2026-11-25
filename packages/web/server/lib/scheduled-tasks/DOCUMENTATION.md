@@ -31,6 +31,9 @@ Server-owned scheduled task runtime and routes for OpenChamber-only automation.
   newly due tasks, keeping recovery separate from new runs.
 - Named-model validation accepts either the catalog's display `id` or upstream
   `modelID` within the selected provider, matching session-route selection.
+- Run defaults are resolved before selecting a backend. Native model validation,
+  creation, prompt dispatch and completion use the selected backend. Shared
+  knowledge, approvals, queueing and worktree lifecycle belong to the host.
 
 ## Decisions
 

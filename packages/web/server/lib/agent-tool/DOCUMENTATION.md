@@ -25,8 +25,8 @@ Session control and browser operations are independently enabled:
   Their session, page execution and cancellation contract is owned by
   `../browser-control/DOCUMENTATION.md`.
 - `file_write`, `file_edit`, `file_patch` and `file_view_image` use the shared
-  file MCP service. The service owns file permission checks; its plugin supplies activity metadata.
-  execution and image attachments are described in `../agent-file/DOCUMENTATION.md`.
+  file MCP service. The service owns file permission checks and records activity
+  metadata. Execution and image attachments are described in `../agent-file/DOCUMENTATION.md`.
 - `openchamber_notify` — `notify.send`, a notification to the user through
   `lib/notifications/emit-route.js` (same limits and rate window as
   `POST /api/notifications/emit`). Off by default: enabled only while
@@ -44,9 +44,9 @@ Session control and browser operations are independently enabled:
   attributed to the session OpenCode reported, never to a payload field.
 - `openchamber_render` — `render.page`, a self-contained HTML page (`html`,
   `title`) the chat draws inline above the agent's answer, such as a chart or
-  table. The page travels in the call's input, which OpenCode stores and
-  syncs, so the server keeps no copy: `../openchamber-control/render-page.js`
-  only checks the input (`html` at most 200,000 characters so the callback
+  table. The host stores the page in the MCP activity record and projects it
+  into the conversation. `../openchamber-control/render-page.js`
+  checks the input (`html` at most 200,000 characters so the callback
   body stays under its 1 MB limit, `title` at most 120) and the setting.
   On by default: enabled while `agentRenderToolEnabled` is not `false`, and the
   control service refuses the action when it is, so a stale plugin cannot
@@ -494,12 +494,13 @@ names `openchamber_control`, `openchamber_schedule` and `openchamber_terminal`.
 Code Mode calls use `tools.openchamber.control`, `.schedule` and `.terminal`.
 It also exposes `render`, `image` and `secret` as direct tools
 `openchamber_render`, `openchamber_image` and `openchamber_secret`. These card tools are excluded from the script catalog.
-The managed OpenCode adapter supplies their original call ids, cancellation,
-page-answer metadata and chat-reply handling through its scoped MCP client.
+The calling backend supplies identity and cancellation. The shared MCP service
+records original call IDs and page-answer metadata. The host handles native
+user-input events; the OpenCode adapter forwards its prompt and inbox events.
 Control keeps the `openchamber` permission action, including configured rules
 and saved approvals. Its execution uses the control action allowlist.
-The shared permission runtime checks access before invocation. Managed OpenCode
-hooks attach activity metadata after completion. Execution uses the existing control service.
+The shared permission runtime checks access before invocation. Shared MCP
+handlers attach activity metadata after completion. Execution uses the existing control service.
 
 `mcp.ts` owns Streamable HTTP connection handling shared by the command, browser,
 question, file, control and Code Mode services. They use the same listener and callback authentication.

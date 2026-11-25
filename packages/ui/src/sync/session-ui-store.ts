@@ -959,11 +959,11 @@ const resolveDraftSessionDirectory = async (
   return resolved.directory
 }
 
-const finishDraftSession = (
+const finishDraftSession = async (
   draft: NewSessionDraftState,
   created: Session,
   requestedDirectory: string | null | undefined,
-): string | null => {
+): Promise<string | null> => {
   const isChatDraft = draft.target === "chat"
   const createdDirectory = normalizePath(created.directory ?? requestedDirectory ?? null)
 
@@ -988,16 +988,10 @@ const finishDraftSession = (
 
   const permissionMode = permissionModeForNewSession(
     draft.permissionMode,
-    isSpaceDirectory(createdDirectory),
     useUIStore.getState().permissionDefaultMode,
   )
-  if (permissionMode) {
-    void import("@/stores/permissionStore")
-      .then(({ usePermissionStore }) => usePermissionStore.getState().setSessionMode(created.id, permissionMode))
-      .catch((error) => {
-        console.warn("Failed to apply the draft permission mode to the new session:", error)
-      })
-  }
+  const { usePermissionStore } = await import("@/stores/permissionStore")
+  await usePermissionStore.getState().setSessionMode(created.id, permissionMode)
 
   fileDraftSessionInFolder(draft, created.id)
 
@@ -1083,7 +1077,7 @@ export async function materializeOpenDraftSession(
   assertRuntimeCurrent()
   useSessionUIStore.getState().closeNewSessionDraft()
 
-  const createdDirectory = finishDraftSession(draft, created, directory)
+  const createdDirectory = await finishDraftSession(draft, created, directory)
   const agent = saveDraftSessionSelection(created.id, selection)
 
   return {
@@ -1769,7 +1763,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
     if (capturedTarget && capturedTarget.runtimeKey !== getRuntimeKey()) {
       throw new Error("Message was not sent because the runtime changed.")
     }
-    return runAfterOpenCodeStartup(async () => {
+    const send = async () => {
       const draft = options?.draftSnapshot ?? get().newSessionDraft
       const trimmedAgent = typeof agent === "string" && agent.trim().length > 0 ? agent.trim() : undefined
       if (capturedRuntimeKey !== getRuntimeKey()) {
@@ -1859,7 +1853,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
             resolveSessionCreated(true)
             setPendingDraftSend(sessionId, { draftId: draft.draftId, sessionCreated: true })
             if (draft.workDraftId) void useSessionDraftsStore.getState().discard(draft.workDraftId, { final: true }).catch(() => undefined)
-            const createdDirectory = finishDraftSession(draft, created, createDirectory) ?? sessionDirectory
+            const createdDirectory = await finishDraftSession(draft, created, createDirectory) ?? sessionDirectory
             if (createdDirectory !== normalizePath(sessionDirectory)) {
               adoptSessionMove(sessionId, sessionDirectory, createdDirectory)
               if (get().currentSessionId === sessionId) get().setCurrentSession(sessionId, createdDirectory, { transition: "submitted-draft" })
@@ -2080,7 +2074,8 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
         if (isCurrentRuntimeInstance()) settleSentSelection?.()
       }
       void resumeAfterSend?.().catch(console.warn)
-    })
+    }
+    return providerID === 'antigravity' ? send() : runAfterOpenCodeStartup(send)
   },
 
   createSession: (title, directoryOverride, metadata, selection) =>

@@ -31,9 +31,12 @@ itself.
 
 ## How it reaches the agent
 
-The text lives in OpenCode as the session's instruction entries
-(`PUT`/`DELETE /api/experimental/session/:id/instructions/entries/:key`), one per
-source:
+The host stores one text file per source under
+`<data-dir>/session-instructions/<session-id>/`. The OpenCode adapter delivers
+these texts as instruction entries
+(`PUT`/`DELETE /api/experimental/session/:id/instructions/entries/:key`). The
+Antigravity adapter reads the current files before each prompt and includes
+them as text content ahead of the user's input.
 
 | Key | Holds |
 |---|---|
@@ -65,12 +68,11 @@ The extension reader runs in process and starts nothing, because every send
 waits on it. When the catalog cannot be read the extensions entry is left out,
 so the session keeps the one it holds.
 
-OpenCode does the rest. The first values go into the session's system prompt;
+For OpenCode, the first values go into the session's system prompt;
 a value that changed or went away is announced to the agent at its next step as
 a system message, and an unchanged write tells it nothing. Compaction keeps the
-current values, revert does not cut them, and a fork copies them. So OpenChamber
-keeps no record of what a session was told, and the knowledge is never a
-message in the transcript.
+current values, revert does not cut them, and a fork copies them. These entries
+are not messages in OpenCode's transcript.
 
 It used to be one. The block went in as a synthetic message ahead of the prompt,
 a signature in the session metadata recorded what was delivered, compaction

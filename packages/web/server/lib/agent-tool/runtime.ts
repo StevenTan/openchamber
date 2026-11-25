@@ -55,7 +55,8 @@ import { createFileMcpRuntime } from '../agent-file/mcp.js';
 import { createControlMcpRuntime, type ControlMcpTool } from './control-mcp.js';
 import type { ResolveMcpContext } from './mcp-context.js';
 import type { ToolPermissions } from './permissions.js';
-import type { CodeModeFileActivity } from '../agent-code-mode/mcp.js';
+import type { createTurnDiffRuntime } from '../turn-diffs/runtime.js';
+import { registerTurnDiffRoutes } from '../turn-diffs/routes.js';
 import { createAgentMcpServices } from './mcp-services.js';
 
 export interface ParameterSchema {
@@ -120,7 +121,7 @@ export interface AgentToolDependencies {
   questionRuntime: ReturnType<typeof createQuestionRuntime>;
   resolveMcpContext: ResolveMcpContext;
   permissions: ToolPermissions;
-  codeModeFileActivity?: CodeModeFileActivity;
+  turnDiffs: ReturnType<typeof createTurnDiffRuntime>;
   authorizeMcpRequest?: ((request: Pick<Request, 'headers'>) => boolean) | undefined;
 }
 
@@ -619,6 +620,7 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
   const registerRoutes = (app: Application, express: Pick<ExpressFactory, 'json'>) => {
     commandToolRuntime.registerRoutes(app, express);
     mcpServices.registerRoutes(app, express);
+    registerTurnDiffRoutes(app, express, dependencies.turnDiffs, authorize);
     app.post<AgentToolPayload>('/api/openchamber/agent-tool', express.json({ limit: '1mb' }), async (req, res) => {
       if (!authorize(req)) return res.status(401).json({ error: 'Unauthorized' });
       const controller = new AbortController();
@@ -660,9 +662,9 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
     outputSchema: { ...TOOL_OUTPUT_SCHEMA, type: 'object' },
   }, execute, trackInflight, resolveMcpContext, permissions);
   const questionMcp = createQuestionMcpRuntime(questionRuntime, resolveMcpContext, permissions);
-  const fileMcp = createFileMcpRuntime(permissions, resolveMcpContext);
+  const fileMcp = createFileMcpRuntime(permissions, resolveMcpContext, dependencies.turnDiffs);
   const controlMcp = createControlMcpRuntime(() => controlTools, execute, resolveMcpContext, trackInflight, { ...TOOL_OUTPUT_SCHEMA, type: 'object' }, permissions);
-  const mcpServices = createAgentMcpServices({ openchamber_commands: commandToolRuntime.mcp, file: fileMcp, browser: browserMcp, request: questionMcp, openchamber: controlMcp }, { resolveContext: resolveMcpContext, permissions, fileActivity: dependencies.codeModeFileActivity, browserEnabled: () => webEnabled, authorize: authorizeMcp });
+  const mcpServices = createAgentMcpServices({ openchamber_commands: commandToolRuntime.mcp, file: fileMcp, browser: browserMcp, request: questionMcp, openchamber: controlMcp }, { resolveContext: resolveMcpContext, permissions, browserEnabled: () => webEnabled, authorize: authorizeMcp });
 
   return {
     configureTools,
@@ -674,5 +676,6 @@ export const createAgentToolRuntime = (dependencies: AgentToolDependencies) => {
     abortSession,
     closeCommands: () => Promise.all([mcpServices.close(), commandToolRuntime.close()]),
     observeCommandEvent: commandToolRuntime.observeEvent,
+    waitCommands: commandToolRuntime.wait,
   };
 };

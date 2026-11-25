@@ -12,6 +12,7 @@ export default defineConfig({
       { find: 'bun:test', replacement: path.resolve(here, './test/bun-test-shim.ts') },
       { find: '@openchamber/sdk/schemas', replacement: path.resolve(here, '../sdk/src/schemas.ts') },
       { find: '@openchamber/sdk/ui', replacement: path.resolve(here, '../sdk/src/ui/index.ts') },
+      { find: '@openchamber/sdk/agent-backends', replacement: path.resolve(here, '../sdk/src/agent-backends.ts') },
       { find: '@openchamber/sdk', replacement: path.resolve(here, '../sdk/src/index.ts') },
       { find: '@openchamber/ui', replacement: path.resolve(here, '../ui/src') },
       { find: '@web', replacement: path.resolve(here, './src') },
