@@ -103,6 +103,19 @@ test('conversation HTTP normalizes both backends and adopts the prepared native 
   const standard = await request(`${root}${folder}`, 'POST', { backendID: 'opencode', title: 'Standard' });
   assert.equal(standard.backendID, 'opencode');
   assert.equal(standard.directory, directory);
+  const skillFile = path.join(directory, '.agents', 'skills', 'http-skill', 'SKILL.md');
+  await fs.mkdir(path.dirname(skillFile), { recursive: true });
+  await fs.writeFile(skillFile, '---\nname: http-skill\ndescription: HTTP skill\n---\nHTTP_SKILL_BODY');
+  for (const id of [created.id, standard.id]) {
+    assert.deepEqual(await request(`${root}/${id}/skills`, 'POST', { names: ['http-skill', 'missing-skill'] }), {
+      attached: [{ id: 'http-skill', name: 'http-skill' }], unresolved: ['missing-skill'],
+    });
+  }
+  await request(`${root}/${standard.id}/prompt`, 'POST', { id: 'msg_skill', text: 'Use the skill', files: [], context: [], agents: [], skills: [{ id: 'http-skill' }] });
+  const standardSkill = calls.findLast(call => call.path.endsWith('/synthetic'));
+  assert.ok(standardSkill.body.text.includes('HTTP_SKILL_BODY'));
+  assert.ok(standardSkill.body.text.includes(skillFile));
+  assert.equal(calls.findLast(call => call.path.endsWith('/prompt')).body.skills, undefined);
   const runtime = '/api/conversation-runtime';
   assert.deepEqual(await request(`${runtime}/location${folder}`), { directory, project: { id: 'project', directory, canonical: directory } });
   assert.equal(calls.at(-1).directory, encodeURIComponent(directory));
@@ -124,11 +137,13 @@ test('conversation HTTP normalizes both backends and adopts the prepared native 
   assert.equal(calls.findLast(call => call.path.endsWith('/message')).query.order, undefined);
   assert.equal((await request(`${root}/${standard.id}/message/msg_standard`)).info.role, 'user');
   const context = await request(`${root}/${created.id}/context`, 'POST', { text: 'Context: ' });
-  await request(`${root}/${created.id}/prompt`, 'POST', { id: 'msg_native', text: 'Hello', files: [], context, agents: [], skills: [] });
+  await request(`${root}/${created.id}/prompt`, 'POST', { id: 'msg_native', text: 'Hello', files: [], context, agents: [], skills: [{ id: 'http-skill' }] });
   await native.wait(created.id, new AbortController().signal);
   const history = await request(`${root}/${created.id}/message`);
   assert.deepEqual(history.items.map(item => item.info.role), ['assistant', 'user']);
-  assert.equal(history.items[0].parts[0].text, 'Context: Hello');
+  assert.ok(history.items[0].parts[0].text.startsWith('Context: Skill: http-skill'));
+  assert.ok(history.items[0].parts[0].text.includes('HTTP_SKILL_BODY'));
+  assert.ok(history.items[0].parts[0].text.includes(skillFile));
   assert.deepEqual(await request(`${root}/${created.id}/message/${history.items[0].info.id}`), history.items[0]);
   await native.send(created.id, { id: 'msg_working', text: 'working', files: [], context: [], agents: [], skills: [] });
   assert.deepEqual(await request(`${runtime}/statuses${folder}`), { [wire.id]: { type: 'busy' }, [created.id]: { type: 'busy' } });

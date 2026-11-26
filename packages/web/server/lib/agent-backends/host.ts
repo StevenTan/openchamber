@@ -27,6 +27,7 @@ import { registerConversationRoutes } from './conversation-routes.js';
 import { createConversationStream, type ConversationEventHub } from './conversation-stream.js';
 import { antigravityEvents } from './antigravity-events.js';
 import type { ForwardEventPayload } from '../event-stream/contracts.js';
+import { listConversationSkills, conversationSkillGuidance, registerSkillCatalogRoute } from './skills.js';
 
 interface Options {
   dataDir: string;
@@ -41,6 +42,7 @@ interface Options {
   onUserInput(sessionID: string, directory: string): void;
   openCodeMetadata: OpenCodeSessionMetadata;
   processForwardedEventPayload?: ForwardEventPayload;
+  skillDirectories?(): readonly string[];
 }
 export function createAgentBackendHost(options: Options) {
   const stream = createConversationStream(options.hub, options.processForwardedEventPayload);
@@ -51,6 +53,11 @@ export function createAgentBackendHost(options: Options) {
   });
   const backend = createAntigravityBackend({
     ...options,
+    readInstructions: async sessionID => {
+      const session = await backend.get(sessionID);
+      const skills = await listConversationSkills(session.directory, options.skillDirectories?.());
+      return [...await options.readInstructions(sessionID), { text: conversationSkillGuidance(skills) }];
+    },
     turnDiffs,
     reassignSession: identity.reassign,
     registerSession: (sessionID, previousID) => { if (previousID) owners.delete(previousID); owners.set(sessionID, 'antigravity'); },
@@ -90,10 +97,11 @@ export function createAgentBackendHost(options: Options) {
     const directory = applicationDirectory(sessionID);
     return directory ? { directory, projectDirectory: directory, rules: [] } : undefined;
   };
-  const conversations = { registry, client: options.openCodeClient, abortTools: (id: string) => options.tools().abortSession(id), permissions: { list: (directory?: string) => options.tools().permissions.list(directory) } };
+  const conversations = { registry, client: options.openCodeClient, abortTools: (id: string) => options.tools().abortSession(id), permissions: { list: (directory?: string) => options.tools().permissions.list(directory) }, skillDirectories: () => options.skillDirectories?.() ?? [] };
   return {
     backend, registry, stream,
     registerRoutes(app: Application) {
+      registerSkillCatalogRoute(app, express, { authorize: req => options.tools().authorizeRequest(req), directories: () => options.skillDirectories?.() ?? [] });
       stream.registerRoutes(app);
       registerAgentBackendRoutes(app, express, backend);
       registerConversationRoutes(app, express, { ...conversations, phase: 'native' });

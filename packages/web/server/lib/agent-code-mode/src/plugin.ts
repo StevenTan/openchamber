@@ -7,7 +7,7 @@ import type { AgentApi, EventApi, SessionApi } from '@opencode/client/effect/api
 import type { Agent } from '@opencode/schema/agent';
 import type { Session } from '@opencode/schema/session';
 import { Tool } from '@opencode/schema/tool';
-import { assertFileSkill, filterVirtualSkillGuidance, type SkillRegistry } from './skill-policy.js';
+import { assertFileSkill, type SkillRegistry } from './skill-policy.js';
 import { controlMcpInput } from '../../agent-tool/control-mcp.js';
 import { isAgentPrompt, RENDER_PAGE_CLOSED_IN_CHAT_NOTE } from '../../openchamber-control/render-page.js';
 import { OPENCHAMBER_RENDER_ACTION_DEFINITIONS, OPENCHAMBER_IMAGE_ACTION_DEFINITIONS, OPENCHAMBER_SECRET_ACTION_DEFINITIONS, resolveAgentToolAction } from '../../openchamber-control/actions.js';
@@ -138,18 +138,21 @@ export default {
       if (Option.isSome(decoded)) yield* assertFileSkill(ctx.skill, decoded.value.id);
     }));
     for (const name of ['context', 'compaction', 'generate'] as const) yield* ctx.session.hook(name, event => Effect.gen(function* () {
-      const [session, agent, skills] = yield* Effect.all([
-        ctx.session.get({ sessionID: event.sessionID }), ctx.agent.get({ agentID: event.agent }), ctx.skill.list(),
+      const [session, agent] = yield* Effect.all([
+        ctx.session.get({ sessionID: event.sessionID }), ctx.agent.get({ agentID: event.agent }),
       ], { concurrency: 'unbounded' });
-      filterVirtualSkillGuidance(event.system, skills.data, [...agent.data.permissions, ...session.permissions ?? []]);
-      if (skills.data.some(skill => skill.path.startsWith('skill://'))) event.messages.push({ role: 'system', content: [{ type: 'text', text:
-        'Use the current system skill directory for available skills; it supersedes historical skill catalog notices. Only file-backed skills are available through the skill tool.',
-      }] });
+      const rules = [...agent.data.permissions, ...session.permissions ?? []];
+      const guidance = yield* Effect.promise(async () => {
+        const response = await fetch(new URL('/api/openchamber/skills', endpoint), { method: 'POST', headers: { ...headers, 'content-type': 'application/json' }, body: JSON.stringify({ directory: ctx.location.directory, rules }) });
+        if (!response.ok) throw new Error(`Skill catalog request failed: ${response.status}`);
+        return Schema.decodeUnknownSync(Schema.Struct({ text: Schema.String }))(await response.json()).text;
+      });
       delete event.tools.execute;
+      delete event.tools.skill;
       for (const part of event.system) {
         const sources = part.metadata?.experimental?.instructions;
-        if (!sources?.some(source => source.key === 'core/codemode')) continue;
-        const instructions = sources.filter(source => source.key !== 'core/codemode');
+        if (!sources) continue;
+        const instructions = sources.filter(source => source.key !== 'core/codemode').map(source => source.key === 'core/skill-guidance' ? { ...source, text: guidance } : source);
         part.metadata = { ...part.metadata, experimental: { ...part.metadata?.experimental, instructions } };
         part.text = instructions.map(source => source.text).join('\n\n');
       }

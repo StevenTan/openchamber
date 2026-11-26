@@ -69,6 +69,7 @@ export const createManagedConfigRuntime = ({
   readPluginDenials = () => [],
 }: ManagedConfigDependencies) => {
   const filePath = path.join(instanceDir, MANAGED_CONFIG_FILE_NAME);
+  let skillDirectories: string[] = [];
 
   const ownsConfigFile = () => (env.OPENCODE_CONFIG ?? '').trim().length === 0;
 
@@ -132,6 +133,7 @@ export const createManagedConfigRuntime = ({
     await fsPromises.mkdir(opencodeSkill, { recursive: true });
     await fsPromises.copyFile(new URL('./opencode-skill.txt', import.meta.url), path.join(opencodeSkill, 'SKILL.md'));
     const skills = [authoring.skillsRoot, workspace.skillsRoot, ...await listExtensionSkillDirectories()];
+    skillDirectories = skills;
     const extensionPlugins = await listExtensionPluginDirectories();
     return { disabled, directories, extensionPlugins, policies: readPluginDenials(), skills, commands: { [EXTENSION_AUTHORING_COMMAND]: authoring.command } };
   };
@@ -182,5 +184,6 @@ export const createManagedConfigRuntime = ({
     ownsConfigFile,
     buildManagedChildEnv,
     refreshManagedConfigFile,
+    skillDirectories: () => skillDirectories,
   };
 };

@@ -1341,6 +1341,7 @@ headers }` or v1 `{ npm, options }`. The stored entry is always a
   - `getOpenCodeResolutionSnapshot(settings)`: returns configured/resolved OpenCode binary details plus effective managed-launch fields (`launchBinary`, `launchArgs`, `launchWrapperType`) when applicable.
 
 ## Public exports (skills.ts)
+- `discoverSkills(directory, { additionalDirectories, parsedFiles })` scans file-backed skills, including skill paths from every configuration layer and host-provided directories. Later directories retain the existing name precedence. The shared conversation skill catalog uses this discovery for both backends.
 - `getSkillSources(skillName, workingDirectory, discoveredSkill?, options?)`: returns the skill's Markdown metadata and instructions, source paths and scopes, and supporting files. Supporting files are included by default. `GET /api/config/skills` calls it once per skill with `{ includeSupportingFiles: false }`, which omits `md.supportingFiles` and skips walking supporting files.
 
 ## Public exports (skill-routes.ts)

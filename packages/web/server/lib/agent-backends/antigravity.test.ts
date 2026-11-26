@@ -207,6 +207,9 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
     } }),
   });
   cleanups.push(() => host.close());
+  const skillFile = path.join(directory, '.agents', 'skills', 'native-host-skill', 'SKILL.md');
+  await fs.mkdir(path.dirname(skillFile), { recursive: true });
+  await fs.writeFile(skillFile, '---\nname: native-host-skill\ndescription: NATIVE_HOST_SKILL\n---\nNative skill body');
   await host.archive.setArchived(session.id, true);
   const archivedAt = await host.archive.readArchivedAt(session.id);
   assert.ok(Number.isInteger(archivedAt));
@@ -225,6 +228,11 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
     { name: 'browser', path: '/api/openchamber/browser-tool/mcp' },
     { name: 'request', path: '/api/openchamber/async-question/mcp' },
   ]);
+  await host.backend.send(injected.id, { id: 'msg_skill_catalog', text: 'skill catalog', files: [], context: [] });
+  await host.backend.wait(injected.id, new AbortController().signal);
+  const skillText = injected.turns.at(-1)?.updates.flatMap(update => update.sessionUpdate === 'agent_message_chunk' && update.content.type === 'text' ? [update.content.text] : []).join('');
+  assert.ok(skillText?.includes(skillFile));
+  assert.ok(skillText?.includes('NATIVE_HOST_SKILL'));
   const reopened = make();
   cleanups.push(() => reopened.close());
   assert.deepEqual((await reopened.get(session.id)).turns, session.turns);

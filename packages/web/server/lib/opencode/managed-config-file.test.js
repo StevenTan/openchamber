@@ -80,6 +80,7 @@ describe('managed OpenCode config file', () => {
     expect(childEnv.OPENCODE_CONFIG).toBe(path.join(dataDir, MANAGED_CONFIG_FILE_NAME));
     expect(childEnv.OPENCODE_CONFIG_CONTENT).toBeUndefined();
     expect(childEnv.OPENCHAMBER_AGENT_TOOL_TOKEN).toBe('token');
+    expect(runtime.skillDirectories()).toEqual([path.join(dataDir, 'skills'), workspaceSkills(dataDir)]);
     expect(await readConfigFile()).toEqual({
       plugins: ['-opencode.browser', '-opencode-websearch', '-opencode.skill', '-opencode.tool.automation', path.join(dataDir, 'agent-tool', 'openchamber-agent-tool'), titleDirectory, codexAgentDirectory(dataDir), commandDirectory(dataDir), searchDirectory(dataDir), questionDirectory(dataDir), fileDirectory(dataDir), turnDiffDirectory(dataDir), quotaUsageDirectory(dataDir), codeModeDirectory(dataDir), workspaceDirectory(dataDir)],
       skills: [path.join(dataDir, 'skills'), workspaceSkills(dataDir)],

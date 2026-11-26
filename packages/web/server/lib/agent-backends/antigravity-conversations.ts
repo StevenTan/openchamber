@@ -52,7 +52,6 @@ export function createAntigravityConversations(backend: ReturnType<typeof create
     model: (id, model) => backend.model(id, model.id, model.variant),
     agent: async (_id, agent) => { if (agent !== 'antigravity') throw new OpenChamberControlError(`Unsupported Antigravity agent: ${agent}`, 400); },
     context: async (_id, input) => [input],
-    skills: async names => ({ attached: [], unresolved: [...names] }),
     prompt: (id, input) => backend.send(id, input),
     interrupt: id => backend.abort(id),
     catalog: async sessionID => acpCatalog(await (sessionID ? backend.get(sessionID) : backend.prepare(directory ?? os.homedir()))),

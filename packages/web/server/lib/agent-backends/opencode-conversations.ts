@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { projectSession, projectMessage, projectMessages, projectInboxMessage, projectAgent, projectProject, projectVcs, mergeConfigDocuments, configModelIdentifier } from '@openchamber/sdk/conversations/opencode';
 import { compact } from '@openchamber/sdk/conversations/identities';
 import type { ConversationApi, ConversationContextOptions } from './conversation-contract.js';
-import type { ConversationSkills } from '@openchamber/sdk/conversations/http';
 import { PART_SHELLS_HEADER } from '../opencode/message-shells.js';
 
 const cursor = (value: { previous?: string | null | undefined; next?: string | null | undefined }) => ({ ...value.previous != null && { previous: value.previous }, ...value.next != null && { next: value.next } });
@@ -34,19 +33,6 @@ export function createOpenCodeConversations({ client, directory }: ConversationC
     model: async (id, model) => { await client.session.switchModel({ sessionID: id, model: { id: model.id, providerID: model.providerID, ...model.variant != null && { variant: model.variant } } }); },
     agent: async (id, agent) => { await client.session.switchAgent({ sessionID: id, agent }); },
     context: async (id, input) => { await client.session.synthetic({ sessionID: id, ...input, resume: false }); return []; },
-    async skills(names) {
-      if (!names.length) return { attached: [], unresolved: [] };
-      let known;
-      try { known = (await client.skill.list()).data; }
-      catch (error) { console.warn('[conversations] Could not list skills:', error); return { attached: [], unresolved: [...names] }; }
-      const result: ConversationSkills = { attached: [], unresolved: [] };
-      for (const name of names) {
-        const match = known.find(skill => skill.name === name) ?? known.find(skill => skill.id === name);
-        if (!match) result.unresolved.push(name);
-        else if (!result.attached.some(skill => skill.id === match.id)) result.attached.push({ id: match.id, name });
-      }
-      return result;
-    },
     async prompt(id, input) {
       await client.session.prompt({ sessionID: id, id: input.id, text: input.text, files: input.files.length ? input.files.map(file => ({ uri: file.url, ...file.filename !== undefined && { name: file.filename } })) : undefined, agents: input.agents.length ? input.agents.map(agent => ({ name: agent.name, ...agent.mention !== undefined && { mention: agent.mention } })) : undefined, skills: input.skills.length ? input.skills : undefined, metadata: input.metadata, delivery: input.delivery });
       return input.id;

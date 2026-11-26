@@ -1,0 +1,43 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { listConversationSkills, conversationSkillGuidance, resolveConversationSkills, readConversationSkills } from './skills.js';
+
+test('file skills use configured roots and automatic invocation settings', async t => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'conversation-skills-'));
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const roots = path.join(directory, 'managed');
+  const write = async (root: string, name: string, description: string, flags = '') => {
+    const file = path.join(root, name, 'SKILL.md');
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    await fs.writeFile(file, `---\nname: ${name}\ndescription: ${description}\n${flags}---\nSKILL_BODY`);
+    return file;
+  };
+  const local = await write(path.join(directory, '.agents', 'skills'), 'oc-skill-test', 'PROJECT_DESCRIPTION');
+  await write(roots, 'oc-managed-test', 'MANAGED_DESCRIPTION');
+  await write(roots, 'oc-explicit-test', 'EXPLICIT_DESCRIPTION', 'disable-model-invocation: true\n');
+  await write(roots, 'oc-disabled-test', 'DISABLED_DESCRIPTION');
+  const configured = path.join(directory, 'configured-skills');
+  const configuredFile = await write(configured, 'oc-configured-test', 'CONFIGURED_DESCRIPTION');
+  await fs.writeFile(path.join(directory, 'opencode.json'), JSON.stringify({ skills: [configured], policies: [{ action: 'skill.use', resource: 'oc-disabled-test', effect: 'deny' }] }));
+  const override = path.join(directory, 'managed.json');
+  await fs.writeFile(override, JSON.stringify({ skills: [roots] }));
+  const previous = process.env.OPENCODE_CONFIG;
+  process.env.OPENCODE_CONFIG = override;
+  t.after(() => { if (previous === undefined) delete process.env.OPENCODE_CONFIG; else process.env.OPENCODE_CONFIG = previous; });
+  const skills = await listConversationSkills(directory, [roots]);
+  const guidance = conversationSkillGuidance(skills);
+  assert.ok(guidance.includes(local));
+  assert.ok(guidance.includes(configuredFile));
+  assert.ok(guidance.includes('MANAGED_DESCRIPTION'));
+  assert.ok(!guidance.includes('EXPLICIT_DESCRIPTION'));
+  assert.ok(!guidance.includes('DISABLED_DESCRIPTION'));
+  const selected = resolveConversationSkills(skills, ['oc-skill-test', 'oc-skill-test', 'oc-explicit-test', 'missing']);
+  assert.deepEqual(selected, { attached: [{ id: 'oc-skill-test', name: 'oc-skill-test' }, { id: 'oc-explicit-test', name: 'oc-explicit-test' }], unresolved: ['missing'] });
+  const context = await readConversationSkills(skills, selected.attached);
+  assert.ok(context[0]?.text.includes(local));
+  assert.ok(context[0]?.text.includes('SKILL_BODY'));
+  assert.ok(context[1]?.text.includes('EXPLICIT_DESCRIPTION'));
+});

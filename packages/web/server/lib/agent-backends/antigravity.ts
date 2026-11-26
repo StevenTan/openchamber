@@ -113,7 +113,8 @@ export function createAntigravityBackend(options: Options) {
       const command = await launch();
       const agentsDirectory = path.join(root, 'profile', 'config', 'agents', 'openchamber');
       await fs.mkdir(agentsDirectory, { recursive: true });
-      await fs.writeFile(path.join(agentsDirectory, 'agent.md'), '---\nname: openchamber\ndescription: OpenChamber assistant\nmainAgent: true\nexcludeDefaultComponents: true\ntools: []\ninheritMcp: true\n---\nUse the OpenChamber MCP tools to carry out the user’s request.\n');
+      const prompt = await fs.readFile(new URL('./antigravity-agent-prompt.txt', import.meta.url), 'utf8');
+      await fs.writeFile(path.join(agentsDirectory, 'agent.md'), '---\nname: openchamber\ndescription: OpenChamber assistant\nmainAgent: true\nexcludeDefaultComponents: true\ntools: []\ninheritMcp: true\nskills: []\n---\n' + prompt);
       process = spawn(command.binary, command.args, {
         env: command.env, cwd: command.cwd, stdio: ['pipe', 'pipe', 'pipe'],
       });

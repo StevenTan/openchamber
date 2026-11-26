@@ -1,7 +1,7 @@
 import type { OpenCodeClient } from '@opencode/client';
 import type { Agent, Provider } from '@openchamber/sdk/conversations/catalog';
 import type { Session, ModelSelection, Project, Vcs, SessionStatus } from '@openchamber/sdk/conversations/model';
-import type { ConversationContext, ConversationPrompt, ConversationSkills, CreateConversation, MessageListOptions, MessagePage, MessageRecord, ProviderCatalog, SessionListOptions, SessionPage } from '@openchamber/sdk/conversations/http';
+import type { ConversationContext, ConversationPrompt, CreateConversation, MessageListOptions, MessagePage, MessageRecord, ProviderCatalog, SessionListOptions, SessionPage } from '@openchamber/sdk/conversations/http';
 import type { FormRequest, FormValue, PermissionRequest } from '@openchamber/sdk/conversations/requests';
 import type { ConversationConfiguration, ConversationLocation } from '@openchamber/sdk/conversations/http';
 
@@ -22,7 +22,6 @@ export interface ConversationApi {
   model(id: string, model: ModelSelection): Promise<void>;
   agent(id: string, agent: string): Promise<void>;
   context(id: string, input: ConversationContext & { delivery?: 'steer' | 'queue' | undefined }): Promise<ConversationContext[]>;
-  skills(names: readonly string[]): Promise<ConversationSkills>;
   prompt(id: string, input: ConversationPrompt): Promise<string>;
   interrupt(id: string): Promise<void>;
   catalog(sessionID?: string, includeProviders?: boolean): Promise<ProviderCatalog>;

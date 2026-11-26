@@ -6,13 +6,13 @@ import {
   OPENCODE_CONFIG_DIR,
   SKILL_SCOPE,
   ensureDirs,
-  readConfig,
   getAncestors,
   findWorktreeRoot,
   isPlainObject,
 } from './config-files.js';
 import { parseMdFile, parseMdFileAsync, writeMdFile } from './markdown-files.js';
 import { isString } from '../shared/guards.js';
+import { configuredSkillPaths } from './skill-config.js';
 import type { MarkdownDocument } from './markdown-files.js';
 import type { DiscoveredSkill, SkillSupportingFile } from './skill-files.js';
 import {
@@ -69,7 +69,6 @@ export interface SkillSources {
 const hasMarkdownFields = (value: unknown): value is MarkdownFields => value != null;
 const hasSupportingFields = (value: unknown): value is { path?: unknown; content?: unknown; delete?: unknown } => value != null;
 const hasErrorCode = (value: unknown): value is { code?: unknown } => value != null;
-const hasSkillPaths = (value: unknown): value is { paths?: unknown } => value != null;
 const isMutableFrontmatter = (value: unknown): value is Record<string, unknown> =>
   value !== null && (typeof value === 'object' || typeof value === 'function');
 const isUnknownList = (value: unknown): value is readonly unknown[] => Array.isArray(value);
@@ -178,7 +177,7 @@ async function getSkillScope(skillName: string, workingDirectory: Directory): Pr
   return { scope: null, path: null, source: null };
 }
 
-async function discoverSkills(workingDirectory: Directory, { parsedFiles = new Map() }: Pick<SkillSourceOptions, 'parsedFiles'> = {}) {
+async function discoverSkills(workingDirectory: Directory, { parsedFiles = new Map(), additionalDirectories = [] }: Pick<SkillSourceOptions, 'parsedFiles'> & { additionalDirectories?: readonly string[] } = {}) {
   const skills = new Map<string, ListedSkill>();
 
   const walkedRoots = new Map<string, ReturnType<typeof walkSkillMdFiles>>();
@@ -233,17 +232,7 @@ async function discoverSkills(workingDirectory: Directory, { parsedFiles = new M
     }
   }
 
-  let configuredPaths: readonly unknown[] = [];
-  try {
-    const config = readConfig(workingDirectory);
-    const configured = config?.skills;
-    configuredPaths = isUnknownList(configured)
-      ? configured
-      : (hasSkillPaths(configured) && isUnknownList(configured.paths) ? configured.paths : []);
-  } catch {
-    configuredPaths = [];
-  }
-  for (const skillPath of configuredPaths) {
+  for (const skillPath of [...configuredSkillPaths(workingDirectory), ...additionalDirectories]) {
     if (!isString(skillPath) || !skillPath.trim()) continue;
     if (/^https?:\/\//i.test(skillPath.trim())) continue;
     const expanded = skillPath.startsWith('~/')

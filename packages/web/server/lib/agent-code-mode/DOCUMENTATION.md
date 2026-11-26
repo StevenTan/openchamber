@@ -58,10 +58,11 @@ module's MIT license. Skill filtering uses the
 
 ## Skill policy
 
-Managed agents use file-backed skills. Context, compaction and transient
-generation exclude virtual `skill://` guidance while preserving permissions and
-automatic-invocation settings. The skill tool rejects virtual entries using the
-current registry. Explicit user skill attachments remain user-provided context.
+Managed agents use the shared host skill discovery. Context, compaction and
+transient generation list file-backed skills with absolute paths, preserving
+permissions and automatic-invocation settings. Models read skills through shell
+commands. The native skill tool stays outside the model tool list. Explicit user
+skill attachments remain user-provided context.
 
 ## Decisions
 

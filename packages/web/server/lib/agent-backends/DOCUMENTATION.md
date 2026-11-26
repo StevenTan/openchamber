@@ -52,6 +52,11 @@ mobile clients use the host routes; the VS Code extension uses OpenCode.
   answers into the running turn. The latest prompt's completion ends that turn.
 - The custom main agent uses the supplied MCP servers. OpenChamber's MCP services
   perform approvals; ACP permission callbacks admit the call to those services.
+- The custom agent's system prompt is loaded from `antigravity-agent-prompt.txt`.
+  It describes OpenChamber's task, file, skill, background-command and interaction
+  behavior. Current tool definitions supply invocation names and schemas. Native
+  default prompt components remain excluded. The server build copies the prompt
+  as a runtime text asset.
 - Each native session receives an opaque MCP credential. HTTP headers identify
   direct calls, and Code Mode forwards that credential in nested request metadata.
   Model arguments cannot choose the conversation identity.
@@ -84,6 +89,15 @@ mobile clients use the host routes; the VS Code extension uses OpenCode.
   instruction entries; Antigravity receives their current text with each prompt.
   A user's direct message settles pending page and secret cards. Synthetic queue
   and scheduler messages leave those cards waiting.
+- File-backed skills use the host's filesystem discovery and configured skill
+  directories for both backends. Models receive names, descriptions and absolute
+  `SKILL.md` paths, and read matching skills through shell commands. Skill
+  switches and automatic-invocation settings filter that catalog. Explicit skill
+  selections attach the file content and directory as conversation context.
+  Antigravity uses an empty native skill list with default customizations
+  disabled; the OpenCode hook supplies the shared catalog in its system context.
+  The hook reads `/api/openchamber/skills` with the managed tool credential, so
+  filesystem discovery and generated skill directories stay in the host process.
 
 ## Boundaries
 

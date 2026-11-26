@@ -4,6 +4,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import express from 'express';
+import { registerSkillCatalogRoute } from '../agent-backends/skills.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -36,6 +37,8 @@ async function fixture({ pluginOptions, events = Stream.never, ...dependencies }
     ...dependencies,
   });
   const app = express();
+  const skillDirectories = [];
+  registerSkillCatalogRoute(app, express, { authorize: runtime.authorizeRequest, directories: () => skillDirectories });
   if (pluginOptions) runtime.configureTools(pluginOptions);
   app.get('/page', (_req, res) => res.send('FETCH_BODY'));
   runtime.registerRoutes(app, express);
@@ -80,7 +83,7 @@ async function fixture({ pluginOptions, events = Stream.never, ...dependencies }
     await sessionHooks.get(hook)(event);
     return event;
   };
-  return { directory, client, tools, permissions, policy, skills, request, toolHooks, run, invoke, sessionHooks, turnDiffs, progress, runtime, url: `http://127.0.0.1:${listener.address().port}/page` };
+  return { directory, client, tools, permissions, policy, skills, skillDirectories, request, toolHooks, run, invoke, sessionHooks, turnDiffs, progress, runtime, url: `http://127.0.0.1:${listener.address().port}/page` };
 }
 
 it('discovers execute through MCP with the complete shared catalog and keeps backend tools direct', async () => {
@@ -162,17 +165,29 @@ it('enforces shared permissions and schema constraints and preserves fetch', asy
   expect((await f.run(`return await fetch(${JSON.stringify(f.url)});`)).output.ok).toBe(false);
 });
 
-it('keeps virtual skill filtering and file skill loads on backend context hooks', async () => {
+it('lists file-backed skills with their paths on backend context hooks', async () => {
   const f = await fixture();
+  const skillFile = path.join(f.directory, '.agents', 'skills', 'local', 'SKILL.md');
+  await fs.mkdir(path.dirname(skillFile), { recursive: true });
+  await fs.writeFile(skillFile, '---\nname: local\ndescription: LOCAL_DESCRIPTION\n---\nLOCAL_BODY');
+  const managed = path.join(f.directory, 'managed-skills');
+  const managedFile = path.join(managed, 'managed', 'SKILL.md');
+  await fs.mkdir(path.dirname(managedFile), { recursive: true });
+  await fs.writeFile(managedFile, '---\nname: managed\ndescription: MANAGED_DESCRIPTION\n---\nManaged body');
+  f.skillDirectories.push(managed);
   f.skills.push({ id: 'virtual', name: 'Virtual', description: 'VIRTUAL_BODY', path: 'skill://virtual/SKILL.md', content: 'BODY' },
     { id: 'local', name: 'Local', description: 'LOCAL_DESCRIPTION', path: '/skills/local/SKILL.md', content: 'BODY' });
   for (const name of ['context', 'compaction', 'generate']) {
     const event = await f.request(name);
     expect(JSON.stringify(event.system)).not.toContain('VIRTUAL_BODY');
     expect(JSON.stringify(event.system)).toContain('LOCAL_DESCRIPTION');
+    expect(JSON.stringify(event.system)).toContain(skillFile);
+    expect(JSON.stringify(event.system)).toContain(managedFile);
+    expect(JSON.stringify(event.system)).toContain('shell command');
   }
   await expect(f.toolHooks.get('execute.before')({ tool: 'skill', input: { id: 'virtual' } })).rejects.toThrow("Virtual skill 'virtual' is disabled");
   await expect(f.toolHooks.get('execute.before')({ tool: 'skill', input: { id: 'local' } })).resolves.toBeUndefined();
+  expect((await fetch(new URL('/api/openchamber/skills', f.url), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ directory: f.directory, rules: [] }) })).status).toBe(401);
 });
 
 const createPageWaitSignals = () => {

@@ -1655,7 +1655,7 @@ const agentBackendHost = createManagedAgentBackendHost({
   sessionStatus: messageQueueRuntime.sessionStatus,
   initializePermission: permissionAutoAcceptRuntime.initializeSession,
   syncKnowledge: sessionKnowledgeRuntime.sync,
-  readInstructions: sessionInstructions.read,
+  readInstructions: sessionInstructions.read, skillDirectories: () => managedConfigRuntime?.skillDirectories() ?? [],
   onUserInput: createNativeWorkInput(sessionID => openChamberControlService.userInput(sessionID), event => agentToolRuntime?.observeCommandEvent(event), sessionWorkRuntime.onUserMessage),
 });
 const staticRoutesRuntime = createStaticRoutesRuntime({
