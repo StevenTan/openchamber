@@ -95,12 +95,12 @@ function turn(messages: ChatMessageEntry[]): TurnRecord {
 function TurnRows({ record, retired, expanded, onToggle, renderMessage }: {
     record: TurnRecord;
     retired: boolean;
-    expanded: boolean;
-    onToggle: () => void;
+    expanded: boolean | undefined;
+    onToggle: (expanded: boolean) => void;
     renderMessage: (message: ChatMessageEntry) => React.ReactNode;
 }) {
     const rows = buildTimelineRows([{ kind: 'turn', key: 'turn', turn: record, isLastTurn: true, hasLaterAssistant: retired }], {
-        collapsedActivity: true, expandedTurns: new Map([[record.turnId, expanded]]), showReasoningTraces: true,
+        collapsedActivity: true, expandedTurns: expanded === undefined ? new Map() : new Map([[record.turnId, expanded]]), showReasoningTraces: true,
     }, []);
     const finalMessageId = rows.find((row) => row.kind === 'turn-fold')?.finalMessageId;
     const { hoistedPages, finalContext } = useTurnFoldContexts(record, retired, expanded, finalMessageId);
@@ -142,7 +142,7 @@ function Harness({ record, retired = false, changedFiles, isLatestTurn = true, h
     onCopyMessage?: (messageId: string) => boolean;
     onCopyTurn?: () => Promise<boolean>;
 }) {
-    const [expanded, setExpanded] = React.useState(false);
+    const [expanded, setExpanded] = React.useState<boolean | undefined>(undefined);
     const renderMessage = (message: ChatMessageEntry) => (
         <div key={message.info.id} data-fixture-message={message.info.id}>
             {message.info.id === holdingMessageId ? <ActivityHoldProbe /> : null}
@@ -168,7 +168,7 @@ function Harness({ record, retired = false, changedFiles, isLatestTurn = true, h
             <SyncProvider backend={createOpenCodeBackend(sdk)} directory="/project">
                 <I18nProvider>
                     <TurnRows record={record} retired={retired} expanded={expanded}
-                        onToggle={() => setExpanded((value) => !value)} renderMessage={renderMessage} />
+                        onToggle={setExpanded} renderMessage={renderMessage} />
                 </I18nProvider>
             </SyncProvider>
         </ThemeSystemContext.Provider>
@@ -224,8 +224,14 @@ describe('live Activity with the real message body', () => {
         await act(async () => root.render(<Harness record={turn([progress])} />));
         expect(container.textContent).toContain('Checking the source');
         // The header shows from the first step, folded to the latest rows.
-        expect(container.querySelector('button[aria-controls]')?.getAttribute('aria-expanded')).toBe('false');
+        expect(container.querySelector('button[aria-controls]')?.getAttribute('aria-expanded')).toBe('true');
         expect(container.textContent).toContain('Activity');
+        const runningHeader = container.querySelector<HTMLButtonElement>('button[aria-controls]');
+        await act(async () => runningHeader?.click());
+        expect(runningHeader?.getAttribute('aria-expanded')).toBe('false');
+        expect(container.textContent).not.toContain('Checking the source');
+        await act(async () => root.render(<Harness record={turn([{ ...progress, parts: [...progress.parts, text('more', 'Still checking')] }])} />));
+        expect(container.textContent).not.toContain('Still checking');
         const final = assistant('final', [text('final-text', 'The final answer')], 'stop');
         await act(async () => root.render(<Harness record={turn([progress, final])} />));
         expect(container.textContent).toContain('The final answer');
@@ -363,6 +369,9 @@ describe('live Activity with the real message body', () => {
         expect(html.indexOf('Building layout B')).toBeGreaterThan(html.indexOf('title="Pick a layout"'));
         expect(html.indexOf('Looking around')).toBeLessThan(html.indexOf('title="Pick a layout"'));
         expect(container.querySelectorAll('iframe')).toHaveLength(1);
+        await act(async () => container.querySelector<HTMLButtonElement>('button[aria-controls]')?.click());
+        expect(container.textContent).not.toContain('Looking around');
+        expect(container.textContent).not.toContain('Building layout B');
     });
 
     test('keeps a page that waits for the user\'s answer in view while its call runs', async () => {

@@ -7,7 +7,7 @@ export type RenderEntry = TimelineEntry;
 export type RenderRow = TimelineRowRecord;
 export type TurnEntry = Extract<RenderEntry, { kind: 'turn' }>;
 
-export type ToggleTurnActivity = (turnId: string) => void;
+export type ToggleTurnActivity = (turnId: string, expanded: boolean) => void;
 
 export type RetryOverlay = {
     sessionId: string;

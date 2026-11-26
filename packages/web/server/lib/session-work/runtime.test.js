@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mergeMetadataPatch } from '../openchamber-sessions/session-metadata-store.js';
 import { decideAssist, decideWrapUp } from './questions.js';
 import { createSessionWorkRuntime } from './runtime.js';
+import { createNativeWorkInput } from './native-input.js';
 import { createSessionLineage } from '../session-lineage.js';
 
 const ENDPOINT = { url: 'https://jev.test', model: 'jev', headers: {} };
@@ -44,6 +45,7 @@ const makeRuntime = ({
   isWorktreePinned = async () => false,
   doneHintDelayMs = DONE_HINT_DELAY_MS,
   activityProbe = null,
+  readSession,
 } = {}) => {
   const records = new Map([['ses_1', metadata]]);
   const written = Promise.withResolvers();
@@ -78,6 +80,7 @@ const makeRuntime = ({
     openRetryDelaysMs: OPEN_RETRY_DELAYS_MS,
     doneHintDelayMs,
     activityProbe,
+    readSession,
   });
   return { runtime, jev, readMetadata, updateMetadata, records, written: written.promise };
 };
@@ -128,6 +131,20 @@ describe('session work runtime: a message was sent', () => {
 
     expect(jev.ask).not.toHaveBeenCalled();
     expect(records.get('ses_1')).toMatchObject({ openchamber: { work: { state: 'open', openedBy: 'auto' } } });
+  });
+
+  it('tracks a native user input using its backend session record', async () => {
+    const readSession = vi.fn(async id => ({ id, directory: '/repo', time: { created: 1, updated: 2 } }));
+    const fetch = vi.fn(() => { throw new Error('Native work membership does not read OpenCode'); });
+    vi.stubGlobal('fetch', fetch);
+    const { runtime, records, written } = makeRuntime({ readSession });
+    const userInput = createNativeWorkInput(() => {}, () => {}, runtime.onUserMessage);
+    userInput('ses_ag_native', '/repo');
+    await written;
+    expect(records.get('ses_ag_native')).toMatchObject({ openchamber: { work: { state: 'open', openedBy: 'auto' } } });
+    expect(readSession).toHaveBeenCalledWith('ses_ag_native');
+    expect(fetch).not.toHaveBeenCalled();
+    runtime.stop();
   });
 
   it('opens nothing in a pinned session or in a session of a pinned worktree', async () => {

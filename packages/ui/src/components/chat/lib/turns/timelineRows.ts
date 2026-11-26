@@ -41,6 +41,8 @@ export type TimelineRowsOptions = {
     collapsedActivity: boolean;
     expandedTurns: ReadonlyMap<string, boolean>;
     showReasoningTraces: boolean;
+    liveActivityTurnId?: string;
+    livePageMessageId?: string;
 };
 
 const isMessageCompleted = (message: ChatMessageEntry): boolean => (
@@ -72,7 +74,7 @@ const sliceKey = (cut: TextCut) => `${cut.partId}:${cut.offset}`;
 
 const turnRows = (entry: TurnEntry, options: TimelineRowsOptions): TimelineRow[] => {
     const { turn } = entry;
-    const underFold = options.collapsedActivity && hasLiveActivity(turn, options.showReasoningTraces);
+    const underFold = options.collapsedActivity && (options.liveActivityTurnId === turn.turnId || hasLiveActivity(turn, options.showReasoningTraces));
     const finalMessage = underFold ? getLiveFinalMessage(turn.assistantMessages) : undefined;
     const fields = { entry, underFold, finalMessageId: finalMessage?.info.id, gapBelow: false };
     const rows: TimelineRow[] = [{ kind: 'turn-head', key: entry.key, ...fields }];
@@ -102,11 +104,11 @@ const turnRows = (entry: TurnEntry, options: TimelineRowsOptions): TimelineRow[]
         const activityMessages = finalMessage ? turn.assistantMessages.filter((message) => message !== finalMessage) : turn.assistantMessages;
         rows.push({ kind: 'turn-fold', key: `fold:${turn.turnId}`, ...fields });
         if (options.expandedTurns.get(turn.turnId) === true) {
-            const pages = finalMessage ? [] : getShownPages(turn.assistantMessages);
-            const lastPageMessageId = pages[pages.length - 1]?.messageID;
+            const livePageMessageId = options.liveActivityTurnId === turn.turnId ? options.livePageMessageId : undefined;
+            const lastPageMessageId = finalMessage ? undefined : livePageMessageId ?? getShownPages(turn.assistantMessages).at(-1)?.messageID;
             const split = lastPageMessageId ? activityMessages.findIndex((message) => message.info.id === lastPageMessageId) + 1 : 0;
             activityMessages.slice(0, split > 0 ? split : activityMessages.length).forEach((message) => addMessage(message));
-            if (pages.length > 0) rows.push({ kind: 'turn-pages', key: `pages:${turn.turnId}`, ...fields });
+            if (lastPageMessageId) rows.push({ kind: 'turn-pages', key: `pages:${turn.turnId}`, ...fields });
             if (split > 0) activityMessages.slice(split).forEach((message) => addMessage(message));
         }
         if (finalMessage) addMessage(finalMessage, true);

@@ -158,6 +158,7 @@ import { registerReceivedPageRoutes, registerSharePageRoutes } from './lib/share
 import { createRoutingRuntime } from './lib/routing/runtime.js';
 import { createJevClient } from './lib/routing/jev.js';
 import { createSessionWorkRuntime } from './lib/session-work/runtime.js';
+import { createNativeWorkInput, readNativeWorkSession } from './lib/session-work/native-input.js';
 import { createSessionLineage } from './lib/session-lineage.js';
 import { createGracefulShutdownRuntime } from './lib/server-frame/shutdown-runtime.js';
 import { beginGuestServiceHost, beginGuestServiceShutdown, getServiceStatus, holdGuestService, onGuestServiceEnded, proxyGuestServiceRequest, stopAllGuestServices } from './lib/guests/service.js';
@@ -1266,6 +1267,7 @@ const sessionWorkRuntime = createSessionWorkRuntime({
   chatRoots: [path.join(OPENCHAMBER_USER_CONFIG_ROOT, 'chats'), OPENCHAMBER_CHATS_DIR],
   lineage: sessionLineage,
   activityProbe: createSessionActivityProbe({ buildOpenCodeUrl, getOpenCodeAuthHeaders, timeoutMs: 2_000 }),
+  readSession: sessionID => readNativeWorkSession(agentBackendHost.registry, sessionID, async () => openCodeSessionClient('')),
 });
 
 const spacePermissionDefaultFile = process.env.OPENCHAMBER_SPACE_PERMISSION_DEFAULT_FILE;
@@ -1654,10 +1656,7 @@ const agentBackendHost = createManagedAgentBackendHost({
   initializePermission: permissionAutoAcceptRuntime.initializeSession,
   syncKnowledge: sessionKnowledgeRuntime.sync,
   readInstructions: sessionInstructions.read,
-  onUserInput: sessionID => {
-    openChamberControlService.userInput(sessionID);
-    agentToolRuntime?.observeCommandEvent({ type: 'openchamber.session.input', data: { sessionID } });
-  },
+  onUserInput: createNativeWorkInput(sessionID => openChamberControlService.userInput(sessionID), event => agentToolRuntime?.observeCommandEvent(event), sessionWorkRuntime.onUserMessage),
 });
 const staticRoutesRuntime = createStaticRoutesRuntime({
   fs,

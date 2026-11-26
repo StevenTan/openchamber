@@ -20,6 +20,8 @@ Small Model is worth waking.
   shows.
 - `runtime.ts` — `createSessionWorkRuntime`: `processPayload` (a sent message,
   a turn start), `evaluateTurnEnd` (called by session assist), `stop`.
+- `native-input.ts` — native session reads and user input delivery to work
+  tracking, control requests and command observers.
 
 ## State
 
@@ -96,6 +98,9 @@ used for warning text.
 
 - A sent message only opens. This runtime never writes `done`; only the user
   closes, in the app or through an agent they asked.
+- Managed native backends report user input through `onUserMessage`. The host
+  supplies their session records through the owning adapter; work metadata uses
+  the same host store and membership rules as OpenCode sessions.
 - A message reopens a closed session only when it was sent after the user
   closed it (`openPatch` compares the message's `time.created` with `doneAt`).
 - Track (`userStatePatch` with `open`) and Done drop Jev's hint; Done keeps

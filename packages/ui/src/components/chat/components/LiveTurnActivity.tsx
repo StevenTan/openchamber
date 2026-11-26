@@ -31,9 +31,9 @@ const NO_MESSAGES: ChatMessageEntry[] = [];
 interface TurnFoldProps {
     turn: TurnRecord;
     hasLaterAssistant: boolean;
-    expanded: boolean;
+    expanded: boolean | undefined;
     finalMessageId: string | undefined;
-    onToggle: () => void;
+    onToggle: (expanded: boolean) => void;
     renderMessage: (message: ChatMessageEntry) => React.ReactNode;
 }
 
@@ -71,8 +71,8 @@ export function TurnFold({ turn, hasLaterAssistant, expanded, finalMessageId, on
     const rowsRef = React.useRef<HTMLDivElement>(null);
     const previewFloorRef = React.useRef<HTMLDivElement>(null);
     const previewRef = React.useRef<HTMLDivElement>(null);
-    useActivityRowGlide(rowsRef, hiddenRows, !settled && !expanded);
-    useLiveRowsFloor(previewFloorRef, previewRef, !expanded && (held || !settled));
+    useActivityRowGlide(rowsRef, hiddenRows, !settled && isExpanded && !expanded);
+    useLiveRowsFloor(previewFloorRef, previewRef, !expanded && isExpanded);
     const livePageMessageId = !finalMessage && pages.length > 0 ? pages[pages.length - 1]?.messageID : undefined;
     const pageMessageIdRef = React.useRef(livePageMessageId);
     if (!held) pageMessageIdRef.current = livePageMessageId;
@@ -108,7 +108,7 @@ export function TurnFold({ turn, hasLaterAssistant, expanded, finalMessageId, on
         <>
             <Icon name="stack" className="size-3.5 shrink-0 text-[var(--tools-icon)]" />
             <span className="shrink-0 font-semibold text-[var(--tools-title)]">{t('chat.liveActivity.title')}</span>
-            <DisclosureChevron expanded={expanded} className="size-3 shrink-0" />
+            <DisclosureChevron expanded={autoExpanded} className="size-3 shrink-0" />
             {fileLabel ? (
                 <span className="flex min-w-0 items-center gap-1 typography-meta @min-[560px]:shrink-0">
                     <span className="truncate">{fileLabel}</span>
@@ -124,9 +124,9 @@ export function TurnFold({ turn, hasLaterAssistant, expanded, finalMessageId, on
         </>
     );
     const handleToggle = React.useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
-        if (!expanded) dispatchRowExpand(event.currentTarget);
-        animateActivityDisclosure(event.currentTarget, onToggle);
-    }, [expanded, onToggle]);
+        if (!autoExpanded) dispatchRowExpand(event.currentTarget);
+        animateActivityDisclosure(event.currentTarget, () => onToggle(!autoExpanded));
+    }, [autoExpanded, onToggle]);
     const headerClass = 'w-full justify-start normal-case !ps-px !pe-2 text-[var(--tools-description)] hover:!bg-transparent active:!bg-transparent';
     const contentId = foldContentId(turn.turnId);
     return (
@@ -134,7 +134,7 @@ export function TurnFold({ turn, hasLaterAssistant, expanded, finalMessageId, on
             <div className="chat-message-column @container">
                 <div className="mt-1">
                     <Button variant="ghost" size="sm" className={headerClass} onClick={handleToggle}
-                        aria-expanded={expanded} aria-controls={finalMessage ? `${contentId} ${finalActivityContentId(turn.turnId)}` : contentId}>
+                        aria-expanded={autoExpanded} aria-controls={finalMessage ? `${contentId} ${finalActivityContentId(turn.turnId)}` : contentId}>
                         {label}
                     </Button>
                 </div>
@@ -154,11 +154,13 @@ export function TurnFold({ turn, hasLaterAssistant, expanded, finalMessageId, on
                             </LiveActivityCollapse>
                             {pagesShown ? <TurnPages pages={pages} /> : null}
                             {messagesBelowPages.length > 0 ? (
-                                <ActivityRowSkipContext.Provider value={rowSkip}>
-                                    {messagesBelowPages.map((message) => (
-                                        <React.Fragment key={message.info.id}>{renderMessage(message)}</React.Fragment>
-                                    ))}
-                                </ActivityRowSkipContext.Provider>
+                                <LiveActivityCollapse expanded={isExpanded || expanded === undefined}>
+                                    <ActivityRowSkipContext.Provider value={rowSkip}>
+                                        {messagesBelowPages.map((message) => (
+                                            <React.Fragment key={message.info.id}>{renderMessage(message)}</React.Fragment>
+                                        ))}
+                                    </ActivityRowSkipContext.Provider>
+                                </LiveActivityCollapse>
                             ) : null}
                         </div>
                     </div>

@@ -30,11 +30,11 @@ export const TurnRow = React.memo(({
         isLastTurn: entry.isLastTurn,
         nextEntryFirstMessage: entry.nextEntryFirstMessage,
     });
-    const isActivityExpanded = turnExpansion.get(turn.turnId) === true;
+    const isActivityExpanded = turnExpansion.get(turn.turnId);
     const hasLaterAssistant = entry.hasLaterAssistant === true;
     const foldContexts = useTurnFoldContexts(turn, hasLaterAssistant, isActivityExpanded, row.finalMessageId);
-    const handleToggleActivity = React.useCallback(() => {
-        onToggleTurnActivity(turn.turnId);
+    const handleToggleActivity = React.useCallback((expanded: boolean) => {
+        onToggleTurnActivity(turn.turnId, expanded);
     }, [onToggleTurnActivity, turn.turnId]);
 
     if (row.kind === 'turn-head') {

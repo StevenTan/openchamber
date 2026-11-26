@@ -31,9 +31,8 @@ export const useTurnExpansion = (activityRenderMode: string) => {
         setTurnExpansion(readTurnExpansionCache(activityRenderMode));
     }, [activityRenderMode]);
 
-    const toggleTurnActivity = React.useCallback((turnId: string) => {
+    const toggleTurnActivity = React.useCallback((turnId: string, expanded: boolean) => {
         setTurnExpansion((previous) => {
-            const expanded = previous.get(turnId) !== true;
             writeTurnExpansionCache(turnId, expanded);
             return new Map(previous).set(turnId, expanded);
         });

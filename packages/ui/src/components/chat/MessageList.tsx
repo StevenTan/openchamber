@@ -89,15 +89,15 @@ const MessageList = React.forwardRef<MessageListHandle, MessageListProps>(({
         directory,
         retryOverlay,
     );
+    const [liveTail] = React.useState(createLiveTailStore);
     const { projection, allEntries, trailingStreamingEntry, rows, stickyRowIndices } = useTimelineRows(sessionKey, displayMessages, {
         showTurnChangedFiles,
         showReasoningTraces,
         stickyUserHeader,
         defaultActivityExpanded,
         turnExpansion,
+        liveTail,
     });
-
-    const [liveTail] = React.useState(createLiveTailStore);
     const {
         listRef,
         handleRegisterList,

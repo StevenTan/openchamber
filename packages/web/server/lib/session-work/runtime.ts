@@ -41,6 +41,7 @@ export interface SessionWorkOptions {
   now?: () => number;
   openRetryDelaysMs?: number[];
   doneHintDelayMs?: number;
+  readSession?: (sessionId: string) => Promise<Session | undefined>;
 }
 
 interface OpenRequest {
@@ -144,6 +145,7 @@ export function createSessionWorkRuntime({
   now = Date.now,
   openRetryDelaysMs = OPEN_RETRY_DELAYS_MS,
   doneHintDelayMs = DONE_HINT_DELAY_MS,
+  readSession,
 }: SessionWorkOptions) {
   const { canBeInWork } = createWorkMembership({ chatRoots });
   let stopped = false;
@@ -181,7 +183,8 @@ export function createSessionWorkRuntime({
   );
 
   const workSession = async (client: Client, sessionId: string, signal: AbortSignal) => {
-    const session: Session = await client.session.get({ sessionID: sessionId }, { signal });
+    const session: Session = await readSession?.(sessionId)
+      ?? await client.session.get({ sessionID: sessionId }, { signal });
     if (session?.id === sessionId) lineage?.remember(sessionId, sessionParentId(session));
     return session?.id === sessionId && canBeInWork(session) ? session : null;
   };
@@ -416,5 +419,5 @@ export function createSessionWorkRuntime({
     turnGenerations.clear();
   };
 
-  return { processPayload, evaluateTurnEnd, stop };
+  return { processPayload, onUserMessage, evaluateTurnEnd, stop };
 }

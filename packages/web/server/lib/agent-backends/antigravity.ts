@@ -26,7 +26,7 @@ interface Options {
   reassignSession(from: string, to: string): void;
   initializeSession(sessionID: string, directory: string): Promise<void>;
   readInstructions(sessionID: string): Promise<Array<{ text: string }>>;
-  onUserInput?(sessionID: string): void;
+  onUserInput?(sessionID: string, directory: string): void;
   publish(event: AcpConversationEvent): void;
   registerSession?(sessionID: string, previousID?: string): void;
   publishForm(type: 'form.created' | 'form.replied' | 'form.cancelled', data: { form?: Parameters<QuestionSessionApi['form']['create']>[0]; id?: string; sessionID?: string; answer?: Parameters<QuestionSessionApi['form']['reply']>[0]['answer'] }, directory: string): void;
@@ -172,7 +172,7 @@ export function createAntigravityBackend(options: Options) {
   const send = async (sessionID: string, input: AcpSend, source: 'user' | 'synthetic' = 'user') => {
     const session = await get(sessionID);
     return withSession(session, async acp => {
-      if (source === 'user') options.onUserInput?.(sessionID);
+      if (source === 'user') options.onUserInput?.(sessionID, session.directory);
       let turn = active.get(sessionID);
       if (turn) turn.followups.push({ id: input.id, text: input.text, files: input.files, created: Date.now() });
       else {

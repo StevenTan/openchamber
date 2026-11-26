@@ -1,7 +1,7 @@
 import React from 'react';
 
 import { turnHeaderCanStick } from '../lib/turns/stickyPrompt';
-import { getTurnsWithLaterAssistant } from '../lib/turns/liveActivity';
+import { getShownPages, getTurnsWithLaterAssistant, hasLiveActivity } from '../lib/turns/liveActivity';
 import type { ChatMessageEntry } from '../lib/turns/types';
 import { useTurnRecords } from '../hooks/useTurnRecords';
 import { buildHistoryEntries, findFirstVisibleMessageId } from '../lib/turns/timelineEntries';
@@ -9,6 +9,7 @@ import { buildTimelineRows } from '../lib/turns/timelineRows';
 import { streamPerfCount, streamPerfMeasure } from '@/stores/utils/streamDebug';
 import { EMPTY_STATIC_ENTRY_MESSAGES, EMPTY_UNGROUPED_MESSAGE_IDS } from './emptyCollections';
 import type { RenderEntry, RenderRow } from './types';
+import type { LiveTailStore } from './liveTailStore';
 
 export const useTimelineRows = (
     sessionKey: string,
@@ -19,9 +20,10 @@ export const useTimelineRows = (
         stickyUserHeader: boolean;
         defaultActivityExpanded: boolean;
         turnExpansion: Map<string, boolean>;
+        liveTail: LiveTailStore;
     },
 ) => {
-    const { showTurnChangedFiles, showReasoningTraces, stickyUserHeader, defaultActivityExpanded, turnExpansion } = options;
+    const { showTurnChangedFiles, showReasoningTraces, stickyUserHeader, defaultActivityExpanded, turnExpansion, liveTail } = options;
     const { projection, staticTurns, streamingTurn } = useTurnRecords(displayMessages, {
         sessionKey,
         showTurnChangedFiles,
@@ -93,16 +95,28 @@ export const useTimelineRows = (
         return trailingStreamingEntry ? [...historyEntries, trailingStreamingEntry] : historyEntries;
     }, [historyEntries, trailingStreamingEntry]);
 
+    const liveActivityTurnId = React.useSyncExternalStore(liveTail.subscribe, () => {
+        const entry = liveTail.get();
+        return entry?.key === trailingStreamingEntry?.key && entry?.kind === 'turn' && hasLiveActivity(entry.turn, showReasoningTraces)
+            ? entry.turn.turnId : undefined;
+    });
+    const livePageMessageId = React.useSyncExternalStore(liveTail.subscribe, () => {
+        const entry = liveTail.get();
+        return entry?.key === trailingStreamingEntry?.key && entry?.kind === 'turn'
+            ? getShownPages(entry.turn.assistantMessages).at(-1)?.messageID : undefined;
+    });
     const previousRowsRef = React.useRef<RenderRow[]>([]);
     const rows = React.useMemo(() => streamPerfMeasure('ui.message_list.render_rows_ms', () => {
         const next = buildTimelineRows(allEntries, {
             collapsedActivity: !defaultActivityExpanded,
             expandedTurns: turnExpansion,
             showReasoningTraces,
+            liveActivityTurnId,
+            livePageMessageId,
         }, previousRowsRef.current);
         previousRowsRef.current = next;
         return next;
-    }), [allEntries, defaultActivityExpanded, showReasoningTraces, turnExpansion]);
+    }), [allEntries, defaultActivityExpanded, showReasoningTraces, turnExpansion, liveActivityTurnId, livePageMessageId]);
 
     const stickyRowIndices = React.useMemo(() => {
         if (!stickyUserHeader) return undefined;

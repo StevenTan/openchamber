@@ -52,11 +52,12 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
   const instructions = createSessionInstructions(directory, { put: async () => {}, remove: async () => {} });
   const identity = createBackendMcpIdentity();
   let userInputs = 0;
+  let userInputDirectory: string | undefined;
   const owners = new Map<string, BackendID>();
   const turnDiffs = createTurnDiffRuntime(directory, async (id, reference) => backend.recordFileDiff(id, reference));
   const make = () => createAntigravityBackend({ dataDir: directory, initializeSession: async () => {},
       registerSession: (id, previous) => { if (previous) owners.delete(previous); owners.set(id, 'antigravity'); },
-      onUserInput: () => { userInputs++; }, readInstructions: instructions.read, turnDiffs, environment: () => process.env, mcpServers: id => { identity.token(id); return []; }, reassignSession: identity.reassign, publish, publishForm: () => {} });
+      onUserInput: (_id, inputDirectory) => { userInputs++; userInputDirectory = inputDirectory; }, readInstructions: instructions.read, turnDiffs, environment: () => process.env, mcpServers: id => { identity.token(id); return []; }, reassignSession: identity.reassign, publish, publishForm: () => {} });
   const backend = make();
   cleanups.push(() => backend.close());
   await backend.configure({ binary: executable });
@@ -156,6 +157,7 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
   await service.send(session.id, { prompt: 'User follow-up' });
   await backend.wait(session.id, new AbortController().signal);
   assert.equal(userInputs, beforeInput + 1);
+  assert.equal(userInputDirectory, directory);
   const sessions = createApplicationSessions({ openCode: async () => { throw new Error('OpenCode is unavailable'); }, registry });
   await registry.forSession(session.id).question(() => { throw new Error('OpenCode is unavailable'); }).get({ sessionID: session.id });
   assert.equal((await sessions.get(session.id)).id, session.id);

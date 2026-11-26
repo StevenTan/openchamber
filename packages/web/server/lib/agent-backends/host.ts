@@ -38,7 +38,7 @@ interface Options {
   openCodeClient(directory?: string, requestFetch?: typeof fetch): OpenCodeClient;
   initializeSession(sessionID: string, directory: string): Promise<void>;
   readInstructions(sessionID: string): Promise<Array<{ text: string }>>;
-  onUserInput(sessionID: string): void;
+  onUserInput(sessionID: string, directory: string): void;
   openCodeMetadata: OpenCodeSessionMetadata;
   processForwardedEventPayload?: ForwardEventPayload;
 }
