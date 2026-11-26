@@ -1,0 +1,34 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { readProjectRules } from './project-rules.js';
+
+test('project rules retain repository and directory scope with current file contents', async t => {
+  const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'project-rules-'));
+  t.after(() => fs.rm(outside, { recursive: true, force: true }));
+  const root = path.join(outside, 'repo');
+  const directory = path.join(root, 'src');
+  await fs.mkdir(path.join(root, '.git'), { recursive: true });
+  await fs.mkdir(directory);
+  await fs.writeFile(path.join(outside, 'AGENTS.md'), 'OUTSIDE_REPOSITORY');
+  await fs.writeFile(path.join(root, 'AGENTS.md'), 'ROOT_AGENT_RULE');
+  await fs.writeFile(path.join(root, 'GEMINI.md'), 'ROOT_GEMINI_RULE');
+  await fs.writeFile(path.join(directory, 'AGENTS.md'), 'DIRECTORY_AGENT_RULE');
+  const rules = await readProjectRules(directory);
+  assert.equal(rules.length, 3);
+  assert.ok(rules[0]?.text.includes('ROOT_AGENT_RULE'));
+  assert.ok(rules[1]?.text.includes('ROOT_GEMINI_RULE'));
+  assert.ok(rules[2]?.text.includes('DIRECTORY_AGENT_RULE'));
+  assert.ok(rules[0]?.text.includes(`Applies to: ${root}`));
+  assert.ok(rules[2]?.text.includes(`Applies to: ${directory}`));
+  assert.ok(!rules.some(rule => rule.text.includes('OUTSIDE_REPOSITORY')));
+  await fs.writeFile(path.join(directory, 'AGENTS.md'), 'UPDATED_DIRECTORY_RULE');
+  assert.ok((await readProjectRules(directory))[2]?.text.includes('UPDATED_DIRECTORY_RULE'));
+  const plain = path.join(outside, 'plain');
+  await fs.mkdir(plain);
+  assert.deepEqual(await readProjectRules(plain), []);
+  await fs.writeFile(path.join(plain, 'GEMINI.md'), 'PLAIN_DIRECTORY_RULE');
+  assert.ok((await readProjectRules(plain))[0]?.text.includes('PLAIN_DIRECTORY_RULE'));
+});

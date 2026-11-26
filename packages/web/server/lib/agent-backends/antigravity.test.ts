@@ -233,6 +233,14 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
   const skillText = injected.turns.at(-1)?.updates.flatMap(update => update.sessionUpdate === 'agent_message_chunk' && update.content.type === 'text' ? [update.content.text] : []).join('');
   assert.ok(skillText?.includes(skillFile));
   assert.ok(skillText?.includes('NATIVE_HOST_SKILL'));
+  await fs.writeFile(path.join(directory, 'AGENTS.md'), 'NATIVE_HOST_AGENT_RULE');
+  await fs.writeFile(path.join(directory, 'GEMINI.md'), 'NATIVE_HOST_GEMINI_RULE');
+  await host.backend.send(injected.id, { id: 'msg_project_rules', text: 'project rules', files: [], context: [] });
+  await host.backend.wait(injected.id, new AbortController().signal);
+  const ruleText = injected.turns.at(-1)?.updates.flatMap(update => update.sessionUpdate === 'agent_message_chunk' && update.content.type === 'text' ? [update.content.text] : []).join('');
+  assert.ok(ruleText?.includes('NATIVE_HOST_AGENT_RULE'));
+  assert.ok(ruleText?.includes('NATIVE_HOST_GEMINI_RULE'));
+  assert.ok(ruleText?.includes(path.join(directory, 'AGENTS.md')));
   const reopened = make();
   cleanups.push(() => reopened.close());
   assert.deepEqual((await reopened.get(session.id)).turns, session.turns);

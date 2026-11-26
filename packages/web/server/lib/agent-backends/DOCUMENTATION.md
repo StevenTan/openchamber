@@ -89,6 +89,11 @@ mobile clients use the host routes; the VS Code extension uses OpenCode.
   instruction entries; Antigravity receives their current text with each prompt.
   A user's direct message settles pending page and secret cards. Synthetic queue
   and scheduler messages leave those cards waiting.
+- Antigravity receives project `AGENTS.md` and `GEMINI.md` contents with each
+  prompt, ordered from the repository root to the session directory. Without a
+  repository, only the session directory is read. Entries identify the source
+  path and directory scope. The host owns this injection because the custom
+  agent excludes default prompt components. OpenCode loads its rules natively.
 - File-backed skills use the host's filesystem discovery and configured skill
   directories for both backends. Models receive names, descriptions and absolute
   `SKILL.md` paths, and read matching skills through shell commands. Skill

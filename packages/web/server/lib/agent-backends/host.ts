@@ -28,6 +28,7 @@ import { createConversationStream, type ConversationEventHub } from './conversat
 import { antigravityEvents } from './antigravity-events.js';
 import type { ForwardEventPayload } from '../event-stream/contracts.js';
 import { listConversationSkills, conversationSkillGuidance, registerSkillCatalogRoute } from './skills.js';
+import { readProjectRules } from './project-rules.js';
 
 interface Options {
   dataDir: string;
@@ -56,7 +57,7 @@ export function createAgentBackendHost(options: Options) {
     readInstructions: async sessionID => {
       const session = await backend.get(sessionID);
       const skills = await listConversationSkills(session.directory, options.skillDirectories?.());
-      return [...await options.readInstructions(sessionID), { text: conversationSkillGuidance(skills) }];
+      return [...await options.readInstructions(sessionID), ...await readProjectRules(session.directory), { text: conversationSkillGuidance(skills) }];
     },
     turnDiffs,
     reassignSession: identity.reassign,
