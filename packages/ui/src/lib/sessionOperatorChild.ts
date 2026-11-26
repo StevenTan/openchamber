@@ -1,20 +1,13 @@
 import { z } from 'zod';
 
-import { parseMetadata } from '@/lib/metadataParse';
+import { operatorChildParentId } from '@openchamber/sdk/conversations/operator-child';
+export { operatorChildParentId } from '@openchamber/sdk/conversations/operator-child';
 import type { Metadata, PermissionRuleset, Session } from '@/lib/opencode/model';
 import { withSessionWorkState } from '@/lib/sessionWorkMetadata';
-
-const operatorChildLinkSchema = z.object({
-  openchamber: z.object({ kind: z.literal('operator-child'), parentID: z.string().min(1) }),
-});
 
 const OPERATOR_CHILD_DENIED_TOOLS = new Set(['question', 'openchamber_secret']);
 
 const openchamberSchema = z.object({ openchamber: z.record(z.string(), z.json()) });
-
-export const operatorChildParentId = (metadata: Metadata | undefined): string | undefined => (
-  parseMetadata(operatorChildLinkSchema, metadata).data?.openchamber.parentID
-);
 
 export const isOperatorChildSession = (session: Session | null | undefined): boolean => (
   operatorChildParentId(session?.metadata) !== undefined

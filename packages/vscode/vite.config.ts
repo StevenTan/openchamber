@@ -19,6 +19,7 @@ export default defineConfig(({ mode }) => ({
     alias: [
       { find: '@openchamber/sdk/schemas', replacement: path.resolve(__dirname, '../sdk/src/schemas.ts') },
       { find: '@openchamber/sdk/agent-backends', replacement: path.resolve(__dirname, '../sdk/src/agent-backends.ts') },
+      { find: /^@openchamber\/sdk\/conversations\/(.*)$/, replacement: path.resolve(__dirname, '../sdk/src/conversations/$1.ts') },
       { find: '@openchamber/sdk', replacement: path.resolve(__dirname, '../sdk/src/index.ts') },
       { find: '@openchamber/ui', replacement: path.resolve(__dirname, '../ui/src') },
       { find: '@vscode', replacement: path.resolve(__dirname, './webview') },

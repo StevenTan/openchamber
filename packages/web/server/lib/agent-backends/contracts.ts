@@ -9,6 +9,7 @@ import type { createScheduledTaskService } from '../scheduled-tasks/service.js';
 import type { QuestionSessionApi } from '../agent-question/src/runtime.js';
 import type { SessionClient } from '../openchamber-sessions/opencode-client-contract.js';
 import type { FormField } from '../openchamber-control/form-answer.js';
+import type { ConversationApi, ConversationContextOptions } from './conversation-contract.js';
 
 export type BackendID = 'opencode' | 'antigravity';
 export type SessionClientFactory = (directory?: string | null) => Promise<ControlClient>;
@@ -52,4 +53,5 @@ export interface BackendAdapter {
   modelCatalog(readOpenCode: ModelCatalogReader): ModelCatalogReader;
   question(client: () => SessionClient): QuestionSessionApi;
   models(client: (directory: string) => Promise<ControlClient>, directory: string, sessionID?: string | null): Promise<{ models: readonly CatalogModel[]; providers: Map<string, string> }>;
+  conversations(options: ConversationContextOptions): ConversationApi;
 }

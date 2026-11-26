@@ -1,12 +1,11 @@
 import type { ContextPartMetadata } from '@/lib/messages/contextParts';
 import type { SpaceMark } from '@/lib/spaces/spaces-store';
-import type { Agent, Model, Provider } from './catalog';
+import type { Agent } from './catalog';
 import type { FormValue } from './requests';
 import type { Message, Metadata, ModelSelection, Part, Session, SyntheticMessage, UserMessage } from './model';
+import type { MessagePage, ProviderCatalog, SessionPage as ConversationPage } from '@openchamber/sdk/conversations/http';
 
-export type SessionPage = {
-  sessions: Session[];
-  cursor: { previous?: string; next?: string };
+export type SessionPage = ConversationPage & {
   spaces?: SpaceMark[];
 };
 
@@ -20,13 +19,8 @@ export type SessionListOptions = {
   parentID?: string | null;
 };
 
-export type MessagePage = {
-  items: Array<{ info: Message; parts: Part[] }>;
-  cursor: { previous?: string; next?: string };
-};
-
 export type PendingInboxMessage = { info: UserMessage | SyntheticMessage; parts: Part[] | null };
-export type ProviderCatalog = { providers: Provider[]; models: Model[]; default?: ModelSelection };
+export type { MessagePage, ProviderCatalog } from '@openchamber/sdk/conversations/http';
 export type SkillMentions = { names: readonly string[]; instructionFor: (names: readonly string[]) => string | null };
 export type SyntheticContextInput = { id?: string; text: string; metadata?: ContextPartMetadata; description?: string };
 export type SendMessageInput = {

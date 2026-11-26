@@ -11,6 +11,7 @@ import { z } from 'zod';
 import type { SessionInfo } from '@opencode/client';
 import type { AcpConversation } from '@openchamber/sdk/agent-backends';
 import type { BackendAdapter, DispatchContext } from './contracts.js';
+import { createAntigravityConversations } from './antigravity-conversations.js';
 
 const nativeSessionInfo = (session: AcpConversation): SessionInfo => {
   const model = session.config.find(option => option.category === 'model' && option.type === 'select');
@@ -121,6 +122,7 @@ export function createAntigravityAdapter(backend: ReturnType<typeof createAntigr
       return model?.type === 'select' ? model.options.flatMap(option => 'group' in option ? option.options : [option]).map(option => ({ providerID: 'antigravity', id: option.value })) : [];
     },
     question: () => backend.questionSession,
+    conversations: options => createAntigravityConversations(backend, options.directory),
     async models(_client, directory, sessionID) {
       const session = await (sessionID ? backend.get(sessionID) : backend.prepare(directory));
       const model = session.config.find(option => option.category === 'model' && option.type === 'select');

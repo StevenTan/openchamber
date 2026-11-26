@@ -22,6 +22,7 @@
       "node"
     ],
     "paths": {
+      "@openchamber/sdk/conversations/*": ["../sdk/src/conversations/*.ts"],
       "@openchamber/sdk": [
         "../sdk/src/index.ts"
       ],

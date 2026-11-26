@@ -5,13 +5,13 @@
 This module owns the application conversation model, conversation operations and
 normalized event subscription and runtime contracts. `active.ts` dispatches
 conversation operations through the backend registry. `../agentBackends.ts`
-registers the application's backend factories. The application backend combines
-conversation lists, pending requests and live events from both backends.
-The OpenCode adapter owns SDK calls, native event decoding
-and transport in `../opencode`. Sync owns transcript membership and store writes.
-The Antigravity adapter uses the host ACP routes and OpenChamber event channel.
-Its native model catalog and records are projected into the same conversation
-and sync contracts. New-conversation drafts select their backend; existing
+registers the application's backend factories. Managed clients share the host's
+conversation HTTP API for creation, history, sends, selection and interruption.
+The host selects the recorded owner and returns the shared conversation model,
+including the combined session list and model catalogs. VS Code uses the direct
+OpenCode SDK client. Pending requests and live events retain their backend
+transports. Sync owns transcript membership and store writes.
+New-conversation drafts select their backend; existing
 conversations retain their stored backend.
 
 ## Invariants

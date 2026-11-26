@@ -13,6 +13,13 @@ mobile clients use the host routes; the VS Code extension uses OpenCode.
 
 ## Contracts
 
+- `/api/conversations` and `/api/conversation-catalog` expose shared conversation,
+  message, part and catalog records. The registry selects the recorded session
+  owner before dispatch. OpenCode requests pass through its readiness, workspace
+  and trust middleware; native requests use the Antigravity adapter.
+- Both adapters use the SDK's shared projections for HTTP records and the UI's
+  event contracts. OpenCode transport retains owned-state overlays, hidden-session
+  filtering, space routing and message-part shells.
 - A prepared native session belongs to a draft and becomes the first conversation
   when sent. Its ACP configuration supplies the model and thinking-level catalog.
 - The host registry selects an adapter from the recorded session owner. Native

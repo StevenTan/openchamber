@@ -209,7 +209,6 @@ import { createManagedAgentTools } from './lib/opencode/managed-agent-tools.js';
 import { createManagedAgentBackendHost } from './lib/agent-backends/host.js';
 import { createBackendSessionService } from './lib/agent-backends/session-service.js';
 import { createApplicationSessions } from './lib/agent-backends/sessions.js';
-import { registerAgentBackendRoutes } from './lib/agent-backends/routes.js';
 import { createQuestionRuntime, questionStoreDirectory } from './lib/agent-question/src/runtime.js';
 import { createBrowserControlBroker } from './lib/browser-control/broker.js';
 import { createBrowserClientEvents } from './lib/browser-control/client-events.js';
@@ -1625,6 +1624,7 @@ const serverUtilsRuntime = createServerUtilsRuntime({
     }
     return snapshot.PATH;
   },
+  registerConversations: (...args) => agentBackendHost.registerConversations(...args),
 });
 
 const setOpenCodePort: typeof serverUtilsRuntime.setOpenCodePort = (...args) => serverUtilsRuntime.setOpenCodePort(...args);
@@ -2786,7 +2786,7 @@ async function main(options: WebUiServerOptions = {}) {
   app.use(spaceArchive.guard);
   app.use((req, res, next) => (spacesHost ? spacesHost.middleware(req, res, next) : next()));
   agentToolRuntime.registerQuestionFormRoutes(app, express);
-  registerAgentBackendRoutes(app, express, agentBackendHost.backend, agentToolRuntime);
+  agentBackendHost.registerRoutes(app);
   server.prependListener('upgrade', (...args) => { spacesHost?.upgradeHandler(...args); });
   const startSpacesHost = (host: NonNullable<typeof spacesHost>) => {
     host.prepareUpgrades({ uiAuthController, isRequestOriginAllowed });

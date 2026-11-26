@@ -20,6 +20,11 @@ import { createAntigravityAdapter } from './antigravity-adapter.js';
 import type { BackendID } from './contracts.js';
 import type { OpenCodeSessionMetadata } from '../openchamber-sessions/session-metadata-store.js';
 import { AGENT_MCP_SERVERS } from '../agent-tool/catalog.js';
+import express from 'express';
+import type { OpenCodeClient } from '@opencode/client';
+import type { Application } from '../shared/http-contracts.js';
+import { registerAgentBackendRoutes } from './routes.js';
+import { registerConversationRoutes } from './conversation-routes.js';
 
 interface Options {
   dataDir: string;
@@ -28,7 +33,7 @@ interface Options {
   environment(): NodeJS.ProcessEnv;
   publish(event: { type: 'openchamber:acp'; properties: AcpConversationEvent }): void;
   hub: Pick<GlobalMessageStreamHub, 'injectEvent' | 'subscribeEvent' | 'subscribeStatus'>;
-  openCodeClient: Parameters<typeof createOpenCodeSessionArchive>[0]['clientFor'];
+  openCodeClient(directory?: string, requestFetch?: typeof fetch): OpenCodeClient;
   initializeSession(sessionID: string, directory: string): Promise<void>;
   readInstructions(sessionID: string): Promise<Array<{ text: string }>>;
   onUserInput(sessionID: string): void;
@@ -81,8 +86,16 @@ export function createAgentBackendHost(options: Options) {
     const directory = applicationDirectory(sessionID);
     return directory ? { directory, projectDirectory: directory, rules: [] } : undefined;
   };
+  const conversations = { registry, client: options.openCodeClient, abortTools: (id: string) => options.tools().abortSession(id) };
   return {
     backend, registry,
+    registerRoutes(app: Application) {
+      registerAgentBackendRoutes(app, express, backend, options.tools());
+      registerConversationRoutes(app, express, { ...conversations, phase: 'native' });
+    },
+    registerConversations(app: Application, requestFetch: typeof fetch) {
+      registerConversationRoutes(app, express, { ...conversations, phase: 'opencode', fetch: requestFetch });
+    },
     archive: {
       setArchived: async (sessionID: string, archived: boolean) => { await registry.ready; return registry.forSession(sessionID).archive.setArchived(sessionID, archived); },
       readArchivedAt: async (sessionID: string, readOptions?: Parameters<OpenCodeSessionArchive['readArchivedAt']>[1]) => { await registry.ready; return registry.forSession(sessionID).archive.readArchivedAt(sessionID, readOptions); },

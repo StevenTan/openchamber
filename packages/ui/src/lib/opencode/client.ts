@@ -1,3 +1,6 @@
+import { STATUS_BY_TAG } from '@openchamber/sdk/conversations/errors'
+import { sendConversationMessage } from '../agent/send-message'
+import { normalizeFilePart } from '../agent/files'
 import { OpencodeApiError } from "./api-error"
 
 import { AgentUnavailableError } from "./agent-unavailable-error"
@@ -13,7 +16,7 @@ import type {
 import { z } from "zod"
 import type { FilesAPI } from "../api/types"
 import { getDesktopHomeDirectory } from "../desktop"
-import { isAmbiguousTransportFailure, isDefiniteTransportFailure, markAmbiguousTransportFailure, markDefiniteTransportFailure } from "@/lib/relay/transport-error"
+import { isAmbiguousTransportFailure, markAmbiguousTransportFailure, markDefiniteTransportFailure } from "@/lib/relay/transport-error"
 import { FilesystemError, parseFilesystemErrorReason } from "@/lib/api/files-errors"
 import { getRuntimeUrlResolver } from "@/lib/runtime-url"
 import { runtimeFetch } from "@/lib/runtime-fetch"
@@ -25,7 +28,6 @@ import { getSpaceMark } from "@/lib/spaces/spaces-store"
 import { captureRuntimeInstance, getRuntimeKey } from "@/lib/runtime-switch"
 import { getRegisteredRuntimeAPIs } from "@/contexts/runtimeAPIRegistry"
 import { markStartupTrace } from "@/lib/startupTrace"
-import { assertProviderCircuitClosed, recordProviderError, recordProviderSuccess } from "./provider-tracker"
 import { normalizePath } from "@/lib/pathNormalization"
 import { PART_SHELLS_HEADER, PART_SHELLS_VERSION } from "./toolContentShells"
 import { isAutoModel } from "@/lib/routing/autoModel"
@@ -85,32 +87,6 @@ const SHELL_OUTPUT_TAIL_BYTES = 64 * 1024
 const OPENS_LOCATION = /\/api\/(?:agent|provider|config)$/
 
 
-// external: https://github.com/anomalyco/opencode/tree/v2.3.0/packages/client The generated client throws declared tagged error bodies without their HTTP status.
-const STATUS_BY_TAG = new Map<string, number>([
-  ["InvalidRequestError", 400],
-  ["InvalidCursorError", 400],
-  ["FormInvalidAnswerError", 400],
-  ["UnauthorizedError", 401],
-  ["ForbiddenError", 403],
-  ["SessionNotFoundError", 404],
-  ["MessageNotFoundError", 404],
-  ["PermissionNotFoundError", 404],
-  ["FormNotFoundError", 404],
-  ["AgentNotFoundError", 404],
-  ["CommandNotFoundError", 404],
-  ["SkillNotFoundError", 404],
-  ["ProviderNotFoundError", 404],
-  ["McpServerNotFoundError", 404],
-  ["ProjectNotFoundError", 404],
-  ["FileNotFoundError", 404],
-  ["PtyNotFoundError", 404],
-  ["ShellNotFoundError", 404],
-  ["ConflictError", 409],
-  ["SessionBusyError", 409],
-  ["FormAlreadySettledError", 409],
-  ["ServiceUnavailableError", 503],
-  ["UnknownError", 500],
-])
 
 type OpencodeHealthProbe = "healthy" | "unhealthy" | "unreachable"
 
@@ -178,9 +154,6 @@ export function normalizeOpencodeError(operation: string, error: unknown): Openc
 }
 
 type SkillAttachmentRef = { id: string; name: string }
-
-const isSkillNotFound = (error: OpencodeApiError): boolean =>
-  error.tag === "InvalidRequestError" && error.detail.startsWith("Skill not found")
 
 export const isOpencodeNotFound = (error: unknown): boolean =>
   error instanceof OpencodeApiError && error.status === 404
@@ -277,7 +250,7 @@ const requestMethodOf = (input: string | URL | Request, init?: RequestInit): str
   String(init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase()
 )
 
-export const createRuntimeOpencodeClient = (config: RuntimeOpencodeClientConfig): OpenCodeClient => {
+export const createRuntimeConversationFetch = (config: RuntimeOpencodeClientConfig): typeof fetch => {
   const requestTimeoutMs = config.requestTimeoutMs ?? OPENCODE_REQUEST_TIMEOUT_MS
   const send = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const url = requestUrlOf(input)
@@ -337,10 +310,7 @@ export const createRuntimeOpencodeClient = (config: RuntimeOpencodeClientConfig)
       else signal.addEventListener("abort", cleanup, { once: true })
     }
   }
-  return OpenCode.make({
-    baseUrl: toOpencodeClientRoot(config.baseUrl),
-    headers: config.directory ? { [OPENCODE_DIRECTORY_HEADER]: encodeURIComponent(toOpenCodeDirectory(config.directory)) } : undefined,
-    fetch: async (input: string | URL | Request, init?: RequestInit) => {
+  return async (input: string | URL | Request, init?: RequestInit) => {
       const retryInput = input instanceof Request ? input.clone() : input
       const response = await send(input, init)
       if (response.ok && config.directory && OPENS_LOCATION.test(requestUrlOf(input).pathname)) {
@@ -348,14 +318,19 @@ export const createRuntimeOpencodeClient = (config: RuntimeOpencodeClientConfig)
       }
       const directory = await openCodeTrustRefusalDirectory(response)
       if (!directory) return response
-      const deliberate = isDeliberateOpenCodeRequest(requestMethodOf(input, init), requestUrlOf(input).pathname)
+      const deliberate = isDeliberateOpenCodeRequest(requestMethodOf(input, init), requestUrlOf(input).pathname.replace(/^\/api\/conversations(?=\/|$)/, "/api/session"))
       const trusted = await requestOpenCodeTrust(directory, { deliberate, alias: config.directory })
       if (!trusted) return response
       void response.body?.cancel().catch(() => undefined)
       return send(retryInput, init)
-    },
-  })
+  }
 }
+
+export const createRuntimeOpencodeClient = (config: RuntimeOpencodeClientConfig): OpenCodeClient => OpenCode.make({
+  baseUrl: toOpencodeClientRoot(config.baseUrl),
+  headers: config.directory ? { [OPENCODE_DIRECTORY_HEADER]: encodeURIComponent(toOpenCodeDirectory(config.directory)) } : undefined,
+  fetch: createRuntimeConversationFetch(config),
+})
 
 
 type FilesystemEntry = {
@@ -1022,113 +997,8 @@ class OpencodeService implements ConversationClient {
     return { info: projected.message, parts: projected.parts }
   }
 
-  private shouldNormalizeToTextPlain(mime: string): boolean {
-    if (!mime) return false
-
-    const lowerMime = mime.toLowerCase()
-
-    if (lowerMime.startsWith("text/") && lowerMime !== "text/plain") {
-      return true
-    }
-
-    const textBasedTypes = [
-      "application/json",
-      "application/xml",
-      "application/javascript",
-      "application/typescript",
-      "application/x-yaml",
-      "application/yaml",
-      "application/toml",
-      "application/x-sh",
-      "application/x-shellscript",
-      "application/octet-stream",
-      "image/svg+xml",
-    ]
-
-    return textBasedTypes.includes(lowerMime)
-  }
-
-  private isHeicMime(mime: string): boolean {
-    if (!mime) return false
-    const lowerMime = mime.toLowerCase()
-    return lowerMime === "image/heic" || lowerMime === "image/heif"
-  }
-
-  private async convertHeicToJpeg(file: { mime: string; filename?: string; url: string }): Promise<{ mime: string; filename?: string; url: string }> {
-    try {
-      const heic2any = (await import("heic2any")).default
-
-      const commaIndex = file.url.indexOf(",")
-      if (commaIndex === -1) return file
-
-      const base64Data = file.url.substring(commaIndex + 1)
-      const binaryString = atob(base64Data)
-      const bytes = new Uint8Array(binaryString.length)
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i)
-      }
-      const heicBlob = new Blob([bytes], { type: file.mime })
-
-      const jpegBlob = (await heic2any({
-        blob: heicBlob,
-        toType: "image/jpeg",
-        quality: 0.9,
-      })) as Blob
-
-      const jpegDataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve(reader.result as string)
-        reader.onerror = reject
-        reader.readAsDataURL(jpegBlob)
-      })
-
-      let newFilename = file.filename
-      if (newFilename) {
-        newFilename = newFilename.replace(/\.heic$/i, ".jpg").replace(/\.heif$/i, ".jpg")
-      }
-
-      return {
-        mime: "image/jpeg",
-        filename: newFilename,
-        url: jpegDataUrl,
-      }
-    } catch (error) {
-      console.warn("Failed to convert HEIC to JPEG:", error)
-      return file
-    }
-  }
-
-  private async normalizeFilePart(file: { mime: string; filename?: string; url: string }): Promise<{ mime: string; filename?: string; url: string }> {
-    if (this.isHeicMime(file.mime)) {
-      return this.convertHeicToJpeg(file)
-    }
-
-    if (!this.shouldNormalizeToTextPlain(file.mime)) {
-      return file
-    }
-
-    let normalizedUrl = file.url
-
-    if (file.url.startsWith("data:")) {
-      const commaIndex = file.url.indexOf(",")
-      if (commaIndex !== -1) {
-        const meta = file.url.substring(5, commaIndex)
-        const content = file.url.substring(commaIndex)
-
-        const newMeta = meta.replace(/^[^;,]+/, "text/plain")
-        normalizedUrl = `data:${newMeta}${content}`
-      }
-    }
-
-    return {
-      mime: "text/plain",
-      filename: file.filename,
-      url: normalizedUrl,
-    }
-  }
-
   private async toPromptFile(file: FileInputLite): Promise<{ uri: string; name?: string }> {
-    const normalized = await this.normalizeFilePart(file)
+    const normalized = await normalizeFilePart(file)
     return { uri: normalized.url, name: normalized.filename }
   }
 
@@ -1166,88 +1036,22 @@ class OpencodeService implements ConversationClient {
   }
 
   async sendMessage(params: SendMessageInput): Promise<string> {
-    this.assertRuntimeUnchanged(params.runtimeKey)
-
-    const context = (params.context ?? [])
-      .filter((item) => item.text.trim())
-      .map((item) => ({ ...item, id: item.id ?? ascendingId("msg") }))
-    const messageId = params.messageId ?? ascendingId("msg")
-    const files = await Promise.all((params.files ?? []).map((file) => this.toPromptFile(file)))
-    const agents = (params.agentMentions ?? [])
-      .filter((mention) => !!mention?.name)
-      .map((mention) => ({
-        name: mention.name,
-        mention: mention.source ? { start: mention.source.start, end: mention.source.end, text: mention.source.value } : undefined,
-      }))
-
-    if (!params.text.trim() && files.length === 0 && (params.context?.length ?? 0) === 0) {
-      throw new Error("Message must have at least one part (text or file)")
-    }
-
-    assertProviderCircuitClosed(params.providerID)
-
-    let commitRevert = params.commitRevert
-    const admitSynthetic = async (item: SyntheticContextInput) => {
-      this.assertRuntimeUnchanged(params.runtimeKey)
-      if (commitRevert) {
-        await commitRevert()
-        commitRevert = undefined
-        this.assertRuntimeUnchanged(params.runtimeKey)
-      }
-      await call("session.synthetic", () =>
-        this.clientFor(params.directory).session.synthetic({
-          sessionID: params.id,
-          id: item.id,
-          text: item.text,
-          description: item.description,
-          metadata: item.metadata ? toJsonRecord(item.metadata) : undefined,
-          delivery: params.delivery,
-          resume: false,
-        }),
-      )
-    }
-    const prompt = (skills: readonly SkillAttachmentRef[]) => {
-      this.assertRuntimeUnchanged(params.runtimeKey)
-      params.beforeSend?.()
-      return call("session.prompt", () =>
-        this.clientFor(params.directory).session.prompt({
-          sessionID: params.id,
-          id: messageId,
-          text: params.text,
-          files: files.length > 0 ? files : undefined,
-          agents: agents.length > 0 ? agents : undefined,
-          skills: skills.length > 0 ? skills.map((skill) => ({ id: skill.id })) : undefined,
-          metadata: params.metadata,
-          delivery: params.delivery,
-        }),
-      )
-    }
-
-    try {
-      await this.applySendSelection(params.id, { model: params.model, agent: params.agent }, params.directory, params.runtimeKey)
-      const skills = await this.resolveSkillMentions(params.skills?.names ?? [], params.directory)
-      const unresolvedInstruction = params.skills?.instructionFor(skills.unresolved) ?? null
-      for (const item of context) {
-        await admitSynthetic(item)
-      }
-      if (unresolvedInstruction) await admitSynthetic({ text: unresolvedInstruction })
-      try {
-        await prompt(skills.attached)
-      } catch (error) {
-        if (skills.attached.length === 0 || !(error instanceof OpencodeApiError) || !isSkillNotFound(error)) throw error
-        const instruction = params.skills?.instructionFor(skills.attached.map((skill) => skill.name)) ?? null
-        if (instruction) await admitSynthetic({ text: instruction })
-        await prompt([])
-      }
-    } catch (error) {
-      if (!(error instanceof AgentUnavailableError) && !(error instanceof Error && isDefiniteTransportFailure(error))) {
-        recordProviderError(params.providerID, error instanceof OpencodeApiError ? error.status : undefined)
-      }
-      throw error
-    }
-
-    recordProviderSuccess(params.providerID)
-    return messageId
+    return sendConversationMessage(params, {
+      assertCurrent: () => this.assertRuntimeUnchanged(params.runtimeKey),
+      select: () => this.applySendSelection(params.id, { model: params.model, agent: params.agent }, params.directory, params.runtimeKey),
+      skills: names => this.resolveSkillMentions(names, params.directory),
+      context: async item => {
+        await call("session.synthetic", () => this.clientFor(params.directory).session.synthetic({ sessionID: params.id, ...item, metadata: item.metadata, delivery: params.delivery, resume: false }))
+        return []
+      },
+      prompt: async input => { await call("session.prompt", () => this.clientFor(params.directory).session.prompt({
+        sessionID: params.id, id: input.id, text: input.text,
+        files: input.files.length ? input.files.map(file => ({ uri: file.url, name: file.filename })) : undefined,
+        agents: input.agents.length ? input.agents : undefined,
+        skills: input.skills.length ? input.skills : undefined,
+        metadata: input.metadata, delivery: input.delivery,
+      })) },
+    })
   }
 
   async sendCommand(params: {

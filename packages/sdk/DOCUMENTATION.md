@@ -4,6 +4,10 @@ The separate `@openchamber/sdk/agent-backends` entry point supplies the host ACP
 conversation wire types for web, desktop and mobile clients. These records are
 independent of the guest panel protocol.
 
+The `@openchamber/sdk/conversations/*` entries own shared conversation, message,
+catalog and interaction types. The Antigravity projection supplies identical
+message identities and parts for stored history and live UI updates.
+
 Public author pages live in `packages/docs/content/docs/sdk.mdx`, `sdk/host.mdx`, `sdk/ui.mdx`, and `sdk/example.mdx`; the user page is `extensions.mdx`. Each has a copy under every locale folder.
 
 ## Purpose

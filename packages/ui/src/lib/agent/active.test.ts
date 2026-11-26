@@ -67,7 +67,7 @@ describe('conversation backend routing', () => {
       },
     }
     registerAgentBackend('history', () => history)
-    const standard = { ...backend, client: { ...backend.client, listSessionsPage: async () => ({ sessions: [], cursor: {} }) } }
+    const standard = { ...backend, client: { ...backend.client, listSessionsPage: async () => ({ sessions: [session], cursor: {} }) } }
     registerAgentBackend('application', () => createApplicationBackend(standard, { ...history, client: { ...history.client, listSessions: async () => [session] } }))
     await conversationClient.listSessionsPage()
     await conversationClient.sendMessage({ id: session.id, providerID: 'provider', text: 'Continue' })

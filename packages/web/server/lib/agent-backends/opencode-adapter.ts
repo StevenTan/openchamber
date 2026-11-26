@@ -1,6 +1,7 @@
 import { isAgentPrompt } from '../openchamber-control/render-page.js';
 import type { BackendAdapter, SessionClientFactory, SessionReader } from './contracts.js';
 import { createOpenCodeQuestionSession } from '../agent-question/src/runtime.js';
+import { createOpenCodeConversations } from './opencode-conversations.js';
 
 export const readOpenCodeModels: BackendAdapter['models'] = async (clientFor, directory) => {
   const client = await clientFor(directory);
@@ -27,5 +28,6 @@ export function createOpenCodeAdapter(archive: BackendAdapter['archive'], metada
     modelCatalog: readOpenCode => directory => readOpenCode(directory),
     question: client => createOpenCodeQuestionSession(client().session),
     models: readOpenCodeModels,
+    conversations: createOpenCodeConversations,
   };
 }

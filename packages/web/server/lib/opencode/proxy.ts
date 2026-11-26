@@ -1,3 +1,6 @@
+import { sanitizeSessionListPayload, sessionListRecords, withoutRetiredMetadataKeys } from './session-list.js';
+export { sanitizeSessionListItem } from './session-list.js';
+export type { SessionRevertMarker, SanitizedSessionListItem } from './session-list.js';
 import http from 'node:http';
 import https from 'node:https';
 
@@ -55,6 +58,7 @@ export interface OpenCodeProxyDependencies {
   hiddenSessions?: ReturnType<typeof createHiddenSessionRegistry> | null;
   openCodeTrust?: OpenCodeTrust | null;
   mcpOAuthSignIn?: ReturnType<typeof createMcpOAuthSignIn> | null;
+  registerConversations?: ((app: Application, requestFetch: typeof fetch) => void) | undefined;
 }
 
 interface ErrorFields {
@@ -62,29 +66,6 @@ interface ErrorFields {
   code?: unknown;
   message?: unknown;
   cause?: unknown;
-}
-
-export interface SessionRevertMarker {
-  messageID?: string;
-  partID?: string;
-}
-
-export interface SanitizedSessionListItem {
-  id?: unknown;
-  parentID?: unknown;
-  projectID?: unknown;
-  location?: unknown;
-  subpath?: unknown;
-  title?: unknown;
-  agent?: unknown;
-  model?: unknown;
-  cost?: unknown;
-  tokens?: unknown;
-  outcome?: unknown;
-  time?: unknown;
-  metadata?: unknown;
-  fork?: unknown;
-  revert?: SessionRevertMarker;
 }
 
 const hasErrorFields = (value: unknown): value is ErrorFields => value != null;
@@ -334,82 +315,6 @@ export const createSseBoundaryTracker = () => {
       return tail.length === 0 || tail.endsWith('\n\n');
     },
   };
-};
-
-const SESSION_LIST_ALLOWED_FIELDS = [
-  'id',
-  'parentID',
-  'projectID',
-  'location',
-  'subpath',
-  'title',
-  'agent',
-  'model',
-  'cost',
-  'tokens',
-  'outcome',
-  'time',
-  'metadata',
-  'fork',
-] as const;
-
-const RETIRED_SESSION_METADATA_KEYS = ['knowledge_context_delivered'];
-
-const withoutRetiredMetadataKeys = <Metadata>(metadata: Metadata) => {
-  const openchamber = hasMetadataFields(metadata) ? metadata.openchamber : undefined;
-  if (!isObject(openchamber) || !RETIRED_SESSION_METADATA_KEYS.some((key) => key in openchamber)) return metadata;
-  const kept = { ...openchamber };
-  for (const key of RETIRED_SESSION_METADATA_KEYS) delete kept[key];
-  return { ...metadata, openchamber: kept };
-};
-
-const hasMetadataFields = (value: unknown): value is { openchamber?: unknown } => value != null;
-
-export const sanitizeSessionListItem = <Session>(session: Session) => {
-  if (!isObject(session) || Array.isArray(session)) {
-    return session;
-  }
-
-  const sanitized: SanitizedSessionListItem = {};
-  for (const key of SESSION_LIST_ALLOWED_FIELDS) {
-    if (key in session) {
-      sanitized[key] = session[key];
-    }
-  }
-
-  if ('metadata' in sanitized) sanitized.metadata = withoutRetiredMetadataKeys(sanitized.metadata);
-
-  const revert = session.revert;
-  if (isObject(revert) && !Array.isArray(revert)) {
-    const revertMarker: SessionRevertMarker = {};
-    if (isString(revert.messageID)) {
-      revertMarker.messageID = revert.messageID;
-    }
-    if (isString(revert.partID)) {
-      revertMarker.partID = revert.partID;
-    }
-    if (Object.keys(revertMarker).length > 0) {
-      sanitized.revert = revertMarker;
-    }
-  }
-
-  return sanitized;
-};
-
-const sanitizeSessionListPayload = <Payload>(payload: Payload) => {
-  if (Array.isArray(payload)) {
-    return payload.map((session) => sanitizeSessionListItem(session));
-  }
-  if (isObject(payload) && Array.isArray(payload.data)) {
-    return { ...payload, data: payload.data.map((session) => sanitizeSessionListItem(session)) };
-  }
-  return payload;
-};
-
-const sessionListRecords = <Payload>(payload: Payload): unknown[] | null => {
-  if (Array.isArray(payload)) return payload;
-  if (isObject(payload) && Array.isArray(payload.data)) return payload.data;
-  return null;
 };
 
 export const registerOpenCodeProxy = (app: Application, deps: OpenCodeProxyDependencies) => {
@@ -966,6 +871,7 @@ export const registerOpenCodeProxy = (app: Application, deps: OpenCodeProxyDepen
     );
   };
   const classifyReadinessRoute = (requestPath: string) => {
+    requestPath = requestPath.replace(/^\/conversations(?=\/|$)/, '/session');
     if (/^\/session\/[^/]+\/message(?:\/|$)/.test(requestPath)) return 'session-messages';
     if (requestPath === '/session' || requestPath.startsWith('/session/')) return 'session';
     if (requestPath === '/event') return 'events';
@@ -1080,7 +986,7 @@ export const registerOpenCodeProxy = (app: Application, deps: OpenCodeProxyDepen
         const failed = statuses.find((status) => status.status === 'failed');
         if (failed) {
           const pathname = new URL(req.originalUrl || req.url, 'http://localhost').pathname;
-          if (isGlobalRead(req.method || '', pathname)) return next();
+          if (isGlobalRead(req.method || '', pathname.replace(/^\/api\/conversations(?=\/|$)/, '/api/session'))) return next();
           return res.status(503).json({ error: failed.error || 'Worktree bootstrap failed' });
         }
         if (statuses.every((status) => status.status === 'ready' || status.phase === 'git-ready' || status.phase === 'setup-ready')) {
@@ -1101,7 +1007,7 @@ export const registerOpenCodeProxy = (app: Application, deps: OpenCodeProxyDepen
       try {
         const refusal = await openCodeTrust.refusalFor({
           method: req.method || '',
-          path: req.originalUrl || req.url,
+          path: (req.originalUrl || req.url).replace(/^\/api\/conversations(?=\/|\?|$)/, '/api/session'),
           headers: req.headers,
           resolveSessionDirectory,
           readBody: () => readBody(req, res),
@@ -1113,6 +1019,36 @@ export const registerOpenCodeProxy = (app: Application, deps: OpenCodeProxyDepen
       }
     });
   }
+
+  const conversationFetch: typeof fetch = async (input, init) => {
+    const { body, ...requestInit } = init ?? {};
+    const request = new globalThis.Request(input, { ...requestInit, ...body !== undefined && { body } });
+    request.headers.set('accept-encoding', 'identity');
+    const response = await fetch(request);
+    const url = new URL(request.url);
+    if (!response.ok || request.method !== 'GET') return response;
+    let payload: unknown;
+    if (url.pathname === '/api/session') {
+      payload = await response.json();
+      const visible = hiddenSessions ? hiddenSessions.filterSessionList(payload) : payload;
+      payload = await overlayOwnedStateOnList(sanitizeSessionListPayload(visible));
+      if (mergeSpaceSessionList && !url.searchParams.get('cursor') && !url.searchParams.get('directory') && !request.headers.get('x-opencode-directory')) payload = await mergeSpaceSessionList(payload);
+    } else if (/^\/api\/session\/[^/]+$/.test(url.pathname)) {
+      const record: unknown = await response.json();
+      const session = isObject(record) && isObject(record.data) ? record.data : record;
+      const owned = await readOwnedState();
+      const overlaid = overlaySession(session, owned);
+      payload = isObject(record) && isObject(record.data) ? { ...record, data: overlaid } : overlaid;
+    } else if (/^\/api\/session\/[^/]+\/message$/.test(url.pathname)) {
+      const keepWhole = parsePartShellsHeader(request.headers.get(PART_SHELLS_HEADER) ?? undefined);
+      if (!keepWhole) return response;
+      payload = shellMessagePage(await response.json(), keepWhole);
+    } else return response;
+    const headers = new Headers(response.headers);
+    headers.delete('content-length');
+    return new globalThis.Response(JSON.stringify(payload), { status: response.status, headers });
+  };
+  deps.registerConversations?.(app, conversationFetch);
 
   app.get('/api/session', (req, res, next) => {
     return forwardSanitizedSessionListRequest(req, res, next);

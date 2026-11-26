@@ -70,14 +70,7 @@ export type PermissionReply = "once" | "always" | "reject"
 
 
 
-export const partIds = {
-  text: (messageID: string, ordinal: number) => `${messageID}:text:${ordinal}`,
-  reasoning: (messageID: string, ordinal: number) => `${messageID}:reasoning:${ordinal}`,
-  tool: (callID: string) => callID,
-  userText: (messageID: string) => `${messageID}:text:0`,
-  userFile: (messageID: string, index: number) => `${messageID}:file:${index}`,
-  userAgent: (messageID: string, index: number) => `${messageID}:agent:${index}`,
-} as const
+export { partIds } from '@openchamber/sdk/conversations/identities'
 
 export const isFinalToolStatus = (status: string): boolean => status === "completed" || status === "error"
 

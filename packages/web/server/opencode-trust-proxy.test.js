@@ -23,6 +23,7 @@ describe('OpenCode proxy folder trust', () => {
   let plain;
   let upstreamHits;
   let upstreamBodies;
+  let bootstrapStatus;
 
   beforeEach(async () => {
     root = await realpath(await mkdtemp(path.join(os.tmpdir(), 'opencode-trust-proxy-')));
@@ -33,6 +34,7 @@ describe('OpenCode proxy folder trust', () => {
     await mkdir(path.join(plain, 'sub'), { recursive: true });
     upstreamHits = [];
     upstreamBodies = [];
+    bootstrapStatus = { status: 'ready' };
 
     const upstream = express();
     upstream.get('/api/session/:id', (req, res) => {
@@ -61,9 +63,13 @@ describe('OpenCode proxy folder trust', () => {
       getOpenCodeAuthHeaders: () => ({}),
       buildOpenCodeUrl: (requestPath) => `http://127.0.0.1:${upstreamPort}${requestPath}`,
       ensureOpenCodeApiPrefix: () => {},
-      readWorktreeBootstrapStatus: async () => ({ status: 'ready' }),
+      readWorktreeBootstrapStatus: async () => bootstrapStatus,
       waitForWorktreeRemovalToSettle: async () => {},
       openCodeTrust: createOpenCodeTrust({ storePath: path.join(root, 'opencode-trust.json'), homeDirectory: path.join(root, 'home') }),
+      registerConversations: app => {
+        app.get('/api/conversations/:id/message', (_req, res) => res.json({ items: [], cursor: {} }));
+        app.post('/api/conversations/:id/prompt', (_req, res) => res.json({ accepted: true }));
+      },
     });
     proxyServer = await listen(app);
     base = `http://127.0.0.1:${proxyServer.address().port}`;
@@ -147,6 +153,16 @@ describe('OpenCode proxy folder trust', () => {
 
   it('serves the session list of an untrusted folder', async () => {
     expect((await fetch(`${base}/api/session?limit=5`, { headers: scoped() })).status).toBe(200);
+  });
+
+  it('serves conversation history after workspace bootstrap fails while refusing prompts', async () => {
+    bootstrapStatus = { status: 'failed', error: 'Setup failed' };
+    const history = await fetch(`${base}/api/conversations/ses_repo/message`, { headers: scoped() });
+    expect(history.status).toBe(200);
+    expect(await history.json()).toEqual({ items: [], cursor: {} });
+    const prompt = await fetch(`${base}/api/conversations/ses_repo/prompt`, { method: 'POST', headers: scoped() });
+    expect(prompt.status).toBe(503);
+    expect(await prompt.json()).toEqual({ error: 'Setup failed' });
   });
 
   const move = (sessionID, directory) => fetch(`${base}/api/session/${sessionID}/move`, {

@@ -28,6 +28,10 @@
     "./schemas": {
       "types": "./dist/schemas.d.ts",
       "default": "./dist/schemas.js"
+    },
+    "./conversations/*": {
+      "types": "./dist/conversations/*.d.ts",
+      "default": "./dist/conversations/*.js"
     }
   },
   "bin": {
@@ -57,6 +61,7 @@
   ],
   "dependencies": {
     "@agentclientprotocol/sdk": "1.6.0",
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "@opencode/client": "2.3.2"
   }
 }
