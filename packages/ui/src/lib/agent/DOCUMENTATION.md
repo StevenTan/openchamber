@@ -14,6 +14,11 @@ stream. Pending permission and form lists use `/api/conversation-requests`, and
 replies and cancellation use `/api/conversations/:id`. The host aggregates the
 directory's pending cards and dispatches replies to their owner. Sync owns
 transcript membership and store writes.
+Managed runtime reads use `/api/conversation-runtime` for location, defaults,
+projects, VCS and the combined active-session snapshot. Adapters interpret native
+configuration and project records on the host. Directory bootstrap still
+publishes each successful field independently. An unavailable status snapshot
+preserves the held live state.
 New-conversation drafts select their backend; existing
 conversations retain their stored backend.
 

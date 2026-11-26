@@ -3,6 +3,7 @@ import type { ConversationApi } from './conversation-contract.js';
 import type { createAntigravityBackend } from './antigravity.js';
 import { OpenChamberControlError } from '../openchamber-control/error.js';
 import os from 'node:os';
+import fs from 'node:fs/promises';
 import { z } from 'zod';
 import type { SessionApi } from '@opencode/client/promise/api';
 import type { FormField, FormRequest } from '@openchamber/sdk/conversations/requests';
@@ -62,5 +63,13 @@ export function createAntigravityConversations(backend: ReturnType<typeof create
     replyPermission: async () => { throw new OpenChamberControlError('Permission request not found', 404); },
     replyForm: (sessionID, formID, answer) => backend.questionSession.form.reply({ sessionID, formID, answer }),
     cancelForm: (sessionID, formID) => backend.questionSession.form.cancel({ sessionID, formID }),
+    async location() {
+      const folder = directory ?? os.homedir();
+      return { directory: folder, project: { id: folder, directory: folder, canonical: await fs.realpath(folder) } };
+    },
+    configuration: async () => ({ defaultAgent: 'antigravity' }),
+    projects: async () => [...new Set((await backend.list()).map(session => session.directory))].map(folder => ({ id: folder, worktree: folder, time: { created: 0, updated: 0 }, sandboxes: [] })),
+    vcs: async () => ({}),
+    statuses: async () => backend.statuses(),
   };
 }

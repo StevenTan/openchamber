@@ -22,6 +22,7 @@ const requestRoot = '/api/conversation-requests';
 const permissionReply = z.object({ decision: z.enum(['once', 'always', 'reject']), message: z.string().optional() });
 const formReply = z.object({ answer: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.array(z.string())])) });
 const formCancel = z.object({ message: z.string().optional() });
+const runtimeRoot = '/api/conversation-runtime';
 
 type ConversationRequest = Request<unknown, { id: string; messageID: string; requestID: string; formID: string }>;
 type ConversationResponse = Exclude<Awaited<ReturnType<ConversationApi[keyof ConversationApi]>>, void> | boolean | null | { id: string };
@@ -108,6 +109,15 @@ export function registerConversationRoutes(app: Application, express: Pick<Expre
   router.delete(`${sessionRoot}/:id/form/:formID`, express.json({ limit: '1mb' }), handle(async (api, req) => {
     await api.cancelForm(req.params.id, req.params.formID, formCancel.parse(req.body ?? {}).message);
     return true;
+  }));
+  router.get(`${runtimeRoot}/location`, handle(api => api.location()));
+  router.get(`${runtimeRoot}/configuration`, handle(api => api.configuration()));
+  router.get(`${runtimeRoot}/projects`, handle(api => api.projects()));
+  router.get(`${runtimeRoot}/vcs`, handle(api => api.vcs()));
+  router.get(`${runtimeRoot}/statuses`, handle(async (api, req) => {
+    const directory = z.string().optional().parse(req.query.directory);
+    const additional = await Promise.all(options.registry.additional.map(adapter => adapter.conversations({ client: options.client(), directory }).statuses()));
+    return Object.assign(await api.statuses(), ...additional);
   }));
   app.use(router);
 }

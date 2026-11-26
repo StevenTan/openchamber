@@ -84,7 +84,7 @@ const DEFAULT_BASE_URL = import.meta.env.VITE_OPENCODE_URL || "/api"
 const CONFIG_CACHE_TTL_MS = 10_000
 const OPENCODE_HEALTH_TIMEOUT_MS = 4_000
 const SHELL_OUTPUT_TAIL_BYTES = 64 * 1024
-const OPENS_LOCATION = /\/api\/(?:agent|provider|config)$/
+const OPENS_LOCATION = /\/api\/(?:agent|provider|config|conversation-runtime\/configuration)$/
 
 
 

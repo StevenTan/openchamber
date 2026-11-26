@@ -22,6 +22,11 @@ mobile clients use the host routes; the VS Code extension uses OpenCode.
   native requests through the owning adapter. Host-owned tool permissions and
   asynchronous questions use their existing approval and answer-delivery runtimes
   before adapter dispatch.
+- `/api/conversation-runtime` serves location, conversation defaults, projects,
+  VCS and active-session snapshots. Adapters project their native records, and
+  the host aggregates active sessions across backends. Failed reads return an
+  HTTP error. OpenCode's active-session read starts no directory
+  location; configuration, location and VCS reads retain folder trust checks.
 - Both adapters use the SDK's shared projections for HTTP records and the UI's
   event contracts. OpenCode transport retains owned-state overlays, hidden-session
   filtering, space routing and message-part shells.

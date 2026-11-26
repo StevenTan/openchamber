@@ -22,6 +22,7 @@ const SEED_PROJECT_TIMEOUT_MS = 2000;
 const GLOBAL_READS = [
   /^\/api\/session$/,
   /^\/api\/session\/active$/,
+  /^\/api\/conversation-runtime\/statuses$/,
   /^\/api\/experimental\/session\/stats$/,
   /^\/api\/session\/[^/]+$/,
   /^\/api\/session\/[^/]+\/message(?:\/[^/]+)?$/,

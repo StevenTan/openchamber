@@ -1,11 +1,9 @@
 import { createConversationEventSource } from './http-events';
 import { OpencodeApiError } from '../opencode/api-error';
 import { runtimeFetch } from '../runtime-fetch';
-import type { AcpConversation } from '@openchamber/sdk/agent-backends';
 import type { AgentBackend } from './backend';
 import { createConversationHttpClient } from './http-client';
-import type { AgentRuntime, DirectoryAvailability, ConversationLocation } from './runtime';
-import { acpSession } from './antigravity-projection';
+import type { AgentRuntime, DirectoryAvailability } from './runtime';
 
 const base = '/api/agent/antigravity';
 class BackendApiError extends Error {
@@ -20,10 +18,6 @@ export async function antigravityRequest<T>(route: string, method = 'GET', body?
 
 export function createAntigravityAdapter(events = createConversationEventSource()): AgentBackend {
   let directory: string | undefined;
-  const list = async (folder?: string | null) => {
-    const result = await antigravityRequest<AcpConversation[]>(`/sessions${folder ? `?directory=${encodeURIComponent(folder)}` : ''}`);
-    return result.map(acpSession);
-  };
   const runtime: AgentRuntime = {
     checkHealth: async () => (await runtimeFetch('/health')).ok,
     probeHealth: async () => (await runtimeFetch('/health')).ok ? 'healthy' : 'unhealthy',
@@ -34,13 +28,13 @@ export function createAntigravityAdapter(events = createConversationEventSource(
     isNotFoundError: error => (error instanceof BackendApiError || error instanceof OpencodeApiError) && error.status === 404,
     reconnectToRuntimeBaseUrl: () => {},
     prepare: () => {}, releaseLocation: async () => {},
-    getLocation: folder => antigravityRequest<ConversationLocation>(`/location${folder ?? directory ? `?directory=${encodeURIComponent(folder ?? directory ?? '')}` : ''}`),
+    getLocation: folder => client.getLocation(folder),
     getFilesystemHome: () => antigravityRequest<string>('/home'),
     clearConfigurationCache: () => {},
-    getConfiguration: async () => ({ defaultAgent: 'antigravity' }),
-    listProjects: async () => [...new Set((await list()).map(session => session.directory))].map(folder => ({ id: folder, worktree: folder, time: { created: 0, updated: 0 }, sandboxes: [] })),
-    getVcs: async () => ({}),
-    getActiveSessionStatuses: () => antigravityRequest('/statuses'),
+    getConfiguration: folder => client.getConfiguration(folder),
+    listProjects: () => client.listProjects(),
+    getVcs: folder => client.getVcs(folder),
+    getActiveSessionStatuses: folder => client.getActiveSessionStatuses(folder),
     listPendingForms: options => client.listPendingForms(options),
     listPendingPermissions: options => client.listPendingPermissions(options),
     listRunningShells: async folder => ({ directory: folder, shells: [] }),

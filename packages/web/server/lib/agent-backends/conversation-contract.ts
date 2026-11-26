@@ -1,8 +1,9 @@
 import type { OpenCodeClient } from '@opencode/client';
 import type { Agent, Provider } from '@openchamber/sdk/conversations/catalog';
-import type { Session, ModelSelection } from '@openchamber/sdk/conversations/model';
+import type { Session, ModelSelection, Project, Vcs, SessionStatus } from '@openchamber/sdk/conversations/model';
 import type { ConversationContext, ConversationPrompt, ConversationSkills, CreateConversation, MessageListOptions, MessagePage, MessageRecord, ProviderCatalog, SessionListOptions, SessionPage } from '@openchamber/sdk/conversations/http';
 import type { FormRequest, FormValue, PermissionRequest } from '@openchamber/sdk/conversations/requests';
+import type { ConversationConfiguration, ConversationLocation } from '@openchamber/sdk/conversations/http';
 
 export interface ConversationContextOptions {
   client: OpenCodeClient;
@@ -32,4 +33,9 @@ export interface ConversationApi {
   replyPermission(id: string, requestID: string, decision: 'once' | 'always' | 'reject', message?: string): Promise<void>;
   replyForm(id: string, formID: string, answer: Record<string, FormValue>): Promise<void>;
   cancelForm(id: string, formID: string, message?: string): Promise<void>;
+  location(): Promise<ConversationLocation>;
+  configuration(): Promise<ConversationConfiguration>;
+  projects(): Promise<Project[]>;
+  vcs(): Promise<Vcs>;
+  statuses(): Promise<Record<string, SessionStatus>>;
 }

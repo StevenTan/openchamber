@@ -10,7 +10,16 @@ const standard = createOpenCodeBackend()
 const events = createConversationEventSource()
 const antigravity = createAntigravityAdapter(events)
 const client = createConversationHttpClient('opencode', standard.runtime)
-const opencode = { ...standard, events, client, runtime: { ...standard.runtime, listPendingForms: client.listPendingForms, listPendingPermissions: client.listPendingPermissions } }
+const opencode = { ...standard, events, client, runtime: {
+  ...standard.runtime,
+  listPendingForms: client.listPendingForms,
+  listPendingPermissions: client.listPendingPermissions,
+  getLocation: client.getLocation,
+  getConfiguration: client.getConfiguration,
+  listProjects: client.listProjects,
+  getVcs: client.getVcs,
+  getActiveSessionStatuses: client.getActiveSessionStatuses,
+} }
 registerAgentBackend('opencode', () => isVSCodeRuntime() ? standard : opencode)
 registerAgentBackend('antigravity', () => antigravity)
 registerAgentBackend('application', () => isVSCodeRuntime() ? standard : { ...createApplicationBackend(opencode, antigravity), client: opencode.client })

@@ -19,9 +19,11 @@ import type { FormRequest, PermissionRequest, FormValue } from './requests'
 
 const root = '/api/conversations'
 const catalogRoot = '/api/conversation-catalog'
+const runtimeRoot = '/api/conversation-runtime'
+type RuntimeClient = Pick<AgentRuntime, 'listPendingForms' | 'listPendingPermissions' | 'getLocation' | 'getConfiguration' | 'listProjects' | 'getVcs' | 'getActiveSessionStatuses'>
 type ConversationBody = CreateConversation | ModelSelection | ConversationContext | ConversationPrompt | { title: string } | { agent: string } | { names: readonly string[] } | { decision: 'once' | 'always' | 'reject'; message?: string } | { answer: Record<string, FormValue> } | { message?: string }
 
-export function createConversationHttpClient(backendID: string, runtime: AgentRuntime): ConversationClient & Pick<AgentRuntime, 'listPendingForms' | 'listPendingPermissions'> {
+export function createConversationHttpClient(backendID: string, runtime: AgentRuntime): ConversationClient & RuntimeClient {
   const catalogs = new Map<string, Promise<ProviderCatalog>>()
   const agents = new Map<string, Promise<Agent[]>>()
   const directoryOf = (directory?: string | null) => normalizePath(directory) ?? runtime.getDirectory()
@@ -63,7 +65,7 @@ export function createConversationHttpClient(backendID: string, runtime: AgentRu
     const lists = await Promise.all(directories.map(directory => request<T[]>(`/api/conversation-requests/${kind}`, directory)))
     return [...new Map(lists.flat().map(item => [item.id, item])).values()]
   }
-  const client: ConversationClient & Pick<AgentRuntime, 'listPendingForms' | 'listPendingPermissions'> = {
+  const client: ConversationClient & RuntimeClient = {
     listSessionsPage: (options = {}) => request(root, options.global ? undefined : directoryOf(options.directory), 'GET', undefined, { global: options.global || undefined, limit: options.limit, order: options.order, search: options.search, cursor: options.cursor, parentID: options.parentID }),
     listSessions: async directory => (await client.listSessionsPage({ directory })).sessions,
     createSession: (params, directory) => request(root, directoryOf(directory), 'POST', { ...params, backendID: params?.backendID ?? backendID, model: params?.model && !isAutoModel(params.model.providerID, params.model.id) ? params.model : undefined }),
@@ -147,6 +149,11 @@ export function createConversationHttpClient(backendID: string, runtime: AgentRu
     },
     listPendingForms: options => pending<FormRequest>('forms', options),
     listPendingPermissions: options => pending<PermissionRequest>('permissions', options),
+    getLocation: directory => request(`${runtimeRoot}/location`, directoryOf(directory), 'GET', undefined, { backendID }),
+    getConfiguration: directory => request(`${runtimeRoot}/configuration`, directoryOf(directory), 'GET', undefined, { backendID }),
+    listProjects: () => request(`${runtimeRoot}/projects`, directoryOf(), 'GET', undefined, { backendID }),
+    getVcs: directory => request(`${runtimeRoot}/vcs`, directoryOf(directory), 'GET', undefined, { backendID }),
+    getActiveSessionStatuses: directory => request<Awaited<ReturnType<AgentRuntime['getActiveSessionStatuses']>>>(`${runtimeRoot}/statuses`, normalizePath(directory) ?? undefined).catch(() => null),
   }
   return client
 }

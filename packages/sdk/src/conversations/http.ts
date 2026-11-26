@@ -16,3 +16,5 @@ export type ConversationPrompt = {
 export type ConversationSkills = { attached: Array<{ id: string; name: string }>; unresolved: string[] };
 export type SessionListOptions = { directory?: string | undefined | null; global?: boolean | undefined; limit?: number | undefined; order?: 'asc' | 'desc' | undefined; search?: string | undefined; cursor?: string | undefined; parentID?: string | undefined | null };
 export type MessageListOptions = { limit?: number | undefined; cursor?: string | undefined; order?: 'asc' | 'desc' | undefined; partShells?: boolean | undefined };
+export type ConversationConfiguration = { defaultAgent?: string | undefined; defaultModel?: string | undefined };
+export type ConversationLocation = { directory: string; project: { id: string; directory: string; canonical: string } };

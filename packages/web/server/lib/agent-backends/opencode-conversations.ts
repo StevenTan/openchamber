@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { projectSession, projectMessage, projectMessages, projectInboxMessage, projectAgent } from '@openchamber/sdk/conversations/opencode';
+import { projectSession, projectMessage, projectMessages, projectInboxMessage, projectAgent, projectProject, projectVcs, mergeConfigDocuments, configModelIdentifier } from '@openchamber/sdk/conversations/opencode';
+import { compact } from '@openchamber/sdk/conversations/identities';
 import type { ConversationApi, ConversationContextOptions } from './conversation-contract.js';
 import type { ConversationSkills } from '@openchamber/sdk/conversations/http';
 import { PART_SHELLS_HEADER } from '../opencode/message-shells.js';
@@ -62,5 +63,16 @@ export function createOpenCodeConversations({ client, directory }: ConversationC
     replyPermission: async (sessionID, requestID, decision, message) => { await client.permission.reply({ sessionID, requestID, decision, message }); },
     replyForm: async (sessionID, formID, answer) => { await client.session.form.reply({ sessionID, formID, answer }); },
     cancelForm: async (sessionID, formID, message) => { await client.session.form.cancel({ sessionID, formID, message }); },
+    location: () => client.location.get(),
+    async configuration() {
+      const config = mergeConfigDocuments(await client.config.get());
+      return compact({ defaultAgent: config.default_agent, defaultModel: configModelIdentifier(config.model) });
+    },
+    projects: async () => (await client.project.list()).map(projectProject),
+    vcs: async () => projectVcs((await client.vcs.get()).data),
+    async statuses() {
+      const active = z.record(z.string().min(1), z.object({ type: z.literal('running') })).parse(await client.session.active());
+      return Object.fromEntries(Object.keys(active).map(id => [id, { type: 'busy' as const }]));
+    },
   };
 }

@@ -321,6 +321,7 @@ describe('createOpenCodeTrust', () => {
     const trust = makeTrust();
     const headers = { 'x-opencode-directory': encodeURIComponent(repo) };
     expect(await trust.refusalFor({ method: 'GET', path: '/api/session?limit=50', headers })).toBeNull();
+    expect(await trust.refusalFor({ method: 'GET', path: '/api/conversation-runtime/statuses?directory=' + encodeURIComponent(repo), headers })).toBeNull();
     expect(await trust.refusalFor({ method: 'GET', path: '/api/session/ses_1/message', headers })).toBeNull();
     expect(await trust.refusalFor({ method: 'DELETE', path: '/api/debug/location', headers })).toBeNull();
 

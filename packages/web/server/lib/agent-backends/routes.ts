@@ -19,13 +19,7 @@ export function registerAgentBackendRoutes(app: Application, express: Pick<Expre
   app.post(`${base}/logout`, async (_req, res) => res.json(await backend.logout()));
   app.get(`${base}/sessions`, async (req, res) => res.json(await backend.list(z.string().optional().parse(req.query.directory))));
   app.get<unknown, { id: string }>(`${base}/sessions/:id`, async (req, res) => res.json(await backend.get(req.params.id)));
-  app.get(`${base}/statuses`, (_req, res) => res.json(backend.statuses()));
   app.get(`${base}/home`, (_req, res) => res.json(os.homedir()));
-  app.get(`${base}/location`, async (req, res) => {
-    const directory = z.string().optional().parse(req.query.directory) || os.homedir();
-    const canonical = await fs.realpath(directory);
-    res.json({ directory, project: { id: directory, directory, canonical } });
-  });
   app.get(`${base}/directory`, async (req, res) => {
     const { directory } = directoryInput.parse(req.query);
     try { res.json({ availability: (await fs.stat(directory)).isDirectory() ? 'available' : 'missing' }); }

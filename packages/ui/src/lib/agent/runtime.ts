@@ -1,10 +1,10 @@
 import type { FormRequest, PermissionRequest } from './requests'
 import type { Project, RunningImageJob, RunningShell, SessionStatus, Vcs } from './model'
+import type { ConversationConfiguration, ConversationLocation } from '@openchamber/sdk/conversations/http'
 
 export type BackendHealth = 'healthy' | 'unhealthy' | 'unreachable'
 export type DirectoryAvailability = 'available' | 'missing' | 'unknown'
-export type ConversationConfiguration = { defaultAgent?: string; defaultModel?: string }
-export type ConversationLocation = { directory: string; project: { id: string; directory: string; canonical: string } }
+export type { ConversationConfiguration } from '@openchamber/sdk/conversations/http'
 
 export interface AgentRuntime {
   checkHealth(): Promise<boolean>

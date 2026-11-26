@@ -48,10 +48,16 @@ test('conversation HTTP normalizes both backends and adopts the prepared native 
   const upstreamForm = { id: 'frm_native', sessionID: wire.id, title: 'Choose', fields: [{ key: 'color', type: 'string' }], state: { status: 'pending' } };
   const upstreamPermission = { id: 'per_native', sessionID: wire.id, action: 'shell', resources: ['pwd'] };
   let pendingFailure = false;
+  let statusFailure = false;
   const upstream = express();
   upstream.use(express.json());
   upstream.use((req, res) => {
     calls.push({ path: req.path, query: req.query, body: req.body, directory: req.get('x-opencode-directory') });
+    if (req.path === '/api/session/active') return statusFailure ? res.status(503).json({ _tag: 'ServiceUnavailableError', message: 'Statuses unavailable' }) : res.json({ data: { [wire.id]: { type: 'running' } } });
+    if (req.path === '/api/location') return res.json({ directory, project: { id: 'project', directory, canonical: directory } });
+    if (req.path === '/api/config') return res.json([{ type: 'document', info: { default_agent: 'build', model: 'codex/gpt' } }, { type: 'document', info: { default_agent: 'codex' } }]);
+    if (req.path === '/api/project') return res.json([{ id: 'project', canonical: directory, time: { created: 1, updated: 2 }, sandboxes: [] }]);
+    if (req.path === '/api/vcs') return res.json({ location: { directory }, data: { branch: { current: 'main', default: 'main' } } });
     if (req.path === '/api/form' || req.path === '/api/permission/request') {
       if (pendingFailure) return res.status(503).json({ _tag: 'ServiceUnavailableError', message: 'Pending requests unavailable' });
       return res.json({ location: { directory }, data: req.path === '/api/form' ? [upstreamForm] : [upstreamPermission] });
@@ -97,6 +103,16 @@ test('conversation HTTP normalizes both backends and adopts the prepared native 
   const standard = await request(`${root}${folder}`, 'POST', { backendID: 'opencode', title: 'Standard' });
   assert.equal(standard.backendID, 'opencode');
   assert.equal(standard.directory, directory);
+  const runtime = '/api/conversation-runtime';
+  assert.deepEqual(await request(`${runtime}/location${folder}`), { directory, project: { id: 'project', directory, canonical: directory } });
+  assert.equal(calls.at(-1).directory, encodeURIComponent(directory));
+  assert.deepEqual(await request(`${runtime}/configuration${folder}`), { defaultAgent: 'codex', defaultModel: 'codex/gpt' });
+  assert.deepEqual(await request(`${runtime}/projects${folder}`), [{ id: 'project', worktree: directory, time: { created: 1, updated: 2 }, sandboxes: [] }]);
+  assert.deepEqual(await request(`${runtime}/vcs${folder}`), { branch: 'main', defaultBranch: 'main' });
+  assert.deepEqual(await request(`${runtime}/configuration${folder}&backendID=antigravity`), { defaultAgent: 'antigravity' });
+  assert.deepEqual(await request(`${runtime}/location${folder}&backendID=antigravity`), { directory, project: { id: directory, directory, canonical: await fs.realpath(directory) } });
+  assert.deepEqual(await request(`${runtime}/projects?backendID=antigravity`), [{ id: directory, worktree: directory, time: { created: 0, updated: 0 }, sandboxes: [] }]);
+  assert.deepEqual(await request(`${runtime}/vcs${folder}&backendID=antigravity`), {});
   const all = await request(`${root}?global=true`);
   assert.deepEqual(all.sessions.map(session => session.backendID), ['opencode', 'antigravity']);
   assert.equal(all.cursor.next, 'next-page');
@@ -114,6 +130,14 @@ test('conversation HTTP normalizes both backends and adopts the prepared native 
   assert.deepEqual(history.items.map(item => item.info.role), ['assistant', 'user']);
   assert.equal(history.items[0].parts[0].text, 'Context: Hello');
   assert.deepEqual(await request(`${root}/${created.id}/message/${history.items[0].info.id}`), history.items[0]);
+  await native.send(created.id, { id: 'msg_working', text: 'working', files: [], context: [], agents: [], skills: [] });
+  assert.deepEqual(await request(`${runtime}/statuses${folder}`), { [wire.id]: { type: 'busy' }, [created.id]: { type: 'busy' } });
+  statusFailure = true;
+  assert.equal((await fetch(`${base}${runtime}/statuses${folder}`)).ok, false);
+  statusFailure = false;
+  await native.abort(created.id);
+  await native.wait(created.id, new AbortController().signal);
+  assert.deepEqual(await request(`${runtime}/statuses${folder}`), { [wire.id]: { type: 'busy' } });
   await request(`${root}/${created.id}`, 'PATCH', { title: 'Renamed' });
   assert.equal((await request(`${root}/${created.id}`)).title, 'Renamed');
   await request(`${root}/${created.id}/interrupt`, 'POST');
