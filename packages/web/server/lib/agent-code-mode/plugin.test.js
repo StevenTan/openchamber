@@ -12,6 +12,7 @@ import { Effect, Exit, Schema, Scope, Stream } from 'effect';
 import { materializeCodeModePlugin } from './runtime.js';
 import { createAgentToolRuntime } from '../agent-tool/runtime.js';
 import { createTurnDiffRuntime } from '../turn-diffs/runtime.js';
+import { createConversationStorage } from '../agent-backends/conversation-storage.js';
 import { resolveOpenCodeMcpContext } from '../opencode/mcp-context.js';
 import { createToolPermissions } from '../agent-tool/permissions.js';
 import { createOpenChamberControlService } from '../openchamber-control/service.js';
@@ -28,7 +29,10 @@ async function fixture({ pluginOptions, events = Stream.never, ...dependencies }
   const policy = createToolPermissions({ file: path.join(directory, 'permissions.json'),
     readPolicy: async () => ({ directory, projectDirectory: directory, rules: [{ action: '*', resource: '*', effect: 'allow' }, ...permissions] }), publish: () => {},
   });
-  const turnDiffs = createTurnDiffRuntime(directory, async () => {});
+  const history = createConversationStorage(directory);
+  cleanup.push(async () => history.close());
+  const turnDiffs = createTurnDiffRuntime(directory, async () => {}, history);
+  cleanup.push(() => turnDiffs.close());
   await turnDiffs.begin({ sessionID: 'session', turnID: 'message', directory });
   let listener;
   const runtime = createAgentToolRuntime({ resolveMcpContext: resolveOpenCodeMcpContext, crypto,

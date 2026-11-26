@@ -6,11 +6,14 @@ The OpenChamber host captures shared file MCP changes and persists turn patches.
 Backend adapters supply session and turn identities. Shared UI reads
 `/api/openchamber/turn-diffs` and owns selection and rendering.
 
-Records live at `<dataDir>/turn-diffs/<sessionID>/<turnID>.json`. The data directory
+Records live in the `turn_diffs` table of
+`<dataDir>/conversations/sessions/<sessionID>.sqlite`. The data directory
 defaults to `~/.config/openchamber` and follows `OPENCHAMBER_DATA_DIR`. Active
-manifests and original bytes live under the session's `active/<turnID>` directory
+manifests and original bytes live under
+`<dataDir>/turn-diffs/<sessionID>/active/<turnID>`
 on the server host. The managed OpenCode plugin imports its existing records and
 baselines into this store and deletes the imported plugin keys after success.
+The conversation storage converts existing host JSON records at startup.
 Recording requires an OpenChamber-managed backend. Standalone OpenCode and
 VS Code plugin installations do not establish this host connection.
 

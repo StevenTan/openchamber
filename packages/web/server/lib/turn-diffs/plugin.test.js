@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { materializeTurnDiffPlugin } from './materialize.js';
 import { createTurnDiffRuntime } from './runtime.js';
+import { createConversationStorage } from '../agent-backends/conversation-storage.js';
 import { registerTurnDiffRoutes } from './routes.js';
 import { fileCallPaths } from '../agent-file/files.js';
 
@@ -17,7 +18,9 @@ const harness = async (storage = new Map(), directory) => {
   directory ??= await fs.mkdtemp(path.join(os.tmpdir(), 'turn-diff-test-'));
   cleanups.push(() => fs.rm(directory, { recursive: true, force: true }));
   const dataDir = path.join(directory, '.host');
-  const runtime = createTurnDiffRuntime(dataDir, async () => {});
+  const history = createConversationStorage(dataDir);
+  cleanups.push(async () => history.close());
+  const runtime = createTurnDiffRuntime(dataDir, async () => {}, history);
   const app = express();
   registerTurnDiffRoutes(app, express, runtime, req => req.headers.authorization === 'Bearer test');
   const listener = await new Promise(resolve => { const server = app.listen(0, '127.0.0.1', () => resolve(server)); });
@@ -29,8 +32,13 @@ const harness = async (storage = new Map(), directory) => {
   const hooks = {}, handlers = {};
   let turnID = 'user-1', failWrite = false, context;
   const write = vi.spyOn(fs, 'writeFile').mockImplementation(async (file, value, ...options) => {
-    if ((failWrite === true && String(file).endsWith('/user-1.json')) || (failWrite === 'checkpoint' && String(file).endsWith('/manifest.json') && !JSON.parse(value).dirty)) throw new Error('Storage unavailable');
+    if (failWrite === 'checkpoint' && String(file).endsWith('/manifest.json') && !JSON.parse(value).dirty) throw new Error('Storage unavailable');
     return nativeWriteFile(file, value, ...options);
+  });
+  const saveDiff = history.saveDiff.bind(history);
+  vi.spyOn(history, 'saveDiff').mockImplementation(record => {
+    if (failWrite === true && record.turnID === 'user-1') throw new Error('Storage unavailable');
+    saveDiff(record);
   });
   cleanups.push(async () => { write.mockRestore(); });
   const events = [];
@@ -66,11 +74,10 @@ const harness = async (storage = new Map(), directory) => {
     readHost: async (id = turnID, sessionID = 'session') => (await fetch(`http://127.0.0.1:${listener.address().port}/api/openchamber/turn-diffs?${new URLSearchParams({ sessionID, turnID: id })}`)).json(),
     active: async (id = turnID, session = 'session') => JSON.parse(await fs.readFile(path.join(dataDir, 'turn-diffs', session, 'active', id, 'manifest.json'), 'utf8')),
     entries: async () => {
-      const result = [];
+      const result = history.readSession('session', db => db.all('SELECT turn_id FROM turn_diffs').map(row => `turn:session:${row.turn_id}`)) ?? [];
       const root = path.join(dataDir, 'turn-diffs', 'session');
       for (const name of await fs.readdir(root).catch(() => [])) {
         if (name === 'active') for (const id of await fs.readdir(path.join(root, name))) result.push(`active:session:${id}`);
-        else result.push(`turn:session:${name.replace(/\.json$/, '')}`);
       }
       return result;
     },

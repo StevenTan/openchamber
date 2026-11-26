@@ -10,6 +10,9 @@ message identities and parts for stored history and live UI updates. Shared
 event entries also own wire projection, shell and space event shapes, and the
 managed stream envelope. Host stream timestamps use the host clock; clients
 translate turn start times with the envelope's current `hostNow` value.
+`conversations/message-updates` applies message patches and tool transitions for
+both host history and UI state. The UI controls which tool results stay loaded;
+the host retains complete results for exact message reads.
 
 Public author pages live in `packages/docs/content/docs/sdk.mdx`, `sdk/host.mdx`, `sdk/ui.mdx`, and `sdk/example.mdx`; the user page is `extensions.mdx`. Each has a copy under every locale folder.
 

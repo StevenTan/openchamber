@@ -16,6 +16,8 @@ import { createToolPermissions } from '../agent-tool/permissions.js';
 import { registerToolPermissionRoutes } from '../agent-tool/permission-routes.js';
 import { createQuestionRuntime } from '../agent-question/src/runtime.js';
 import { registerQuestionFormRoutes } from '../agent-question/src/mcp.js';
+import { createConversationStorage } from './conversation-storage.js';
+import { createOpenCodeHistory } from './opencode-history.js';
 
 test('conversation HTTP normalizes both backends and adopts the prepared native session', async t => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'conversation-http-'));
@@ -23,7 +25,9 @@ test('conversation HTTP normalizes both backends and adopts the prepared native 
   const owners = new Map();
   const delivered = Promise.withResolvers();
   const cancellation = Promise.withResolvers();
+  const storage = createConversationStorage(directory);
   const native = createAntigravityBackend({
+    storage,
     dataDir: directory, initializeSession: async () => {}, readInstructions: async () => [],
     environment: () => process.env, mcpServers: () => [], reassignSession: () => {},
     publish: event => {
@@ -32,7 +36,7 @@ test('conversation HTTP normalizes both backends and adopts the prepared native 
       if (event.turn.text.includes('cancelled')) cancellation.resolve(event.turn.text);
     }, publishForm: () => {},
     registerSession: (id, previous) => { owners.delete(previous); owners.set(id, 'antigravity'); },
-    turnDiffs: createTurnDiffRuntime(directory, async () => {}),
+    turnDiffs: createTurnDiffRuntime(directory, async () => {}, storage),
   });
   t.after(() => native.close());
   const executable = path.join(directory, 'agy');
@@ -65,7 +69,7 @@ test('conversation HTTP normalizes both backends and adopts the prepared native 
     if (req.path.includes('/form/') || req.path.includes('/permission/')) return res.status(204).end();
     if (req.path.endsWith('/missing')) return res.status(404).json({ _tag: 'SessionNotFoundError', message: 'Missing' });
     if (req.path === '/api/session' && req.method === 'GET') return res.json(req.query.cursor ? { data: [{ ...wire, id: 'ses_standard_next' }], cursor: {} } : { data: [wire], cursor: { next: 'next-page' } });
-    if (req.path.endsWith('/message') && req.method === 'GET') return res.json({ data: [user], cursor: { next: 'more' } });
+    if (req.path.endsWith('/message') && req.method === 'GET') return res.json(req.query.cursor ? { data: [], cursor: {} } : { data: [user], cursor: { next: 'more' } });
     if (req.path.endsWith('/message/msg_standard')) return res.json({ data: user });
     if (req.method === 'DELETE') return res.status(204).end();
     return res.json({ data: wire });
@@ -73,7 +77,9 @@ test('conversation HTTP normalizes both backends and adopts the prepared native 
   const upstreamServer = upstream.listen(0, '127.0.0.1');
   await new Promise(resolve => upstreamServer.once('listening', resolve));
   t.after(() => new Promise(resolve => upstreamServer.close(resolve)));
-  const registry = createBackendRegistry({ opencode: createOpenCodeAdapter({}, {}), antigravity: createAntigravityAdapter(native) }, owners, Promise.resolve());
+  const openCodeHistory = createOpenCodeHistory(storage);
+  t.after(() => openCodeHistory.close());
+  const registry = createBackendRegistry({ opencode: createOpenCodeAdapter({}, {}, openCodeHistory), antigravity: createAntigravityAdapter(native) }, owners, Promise.resolve());
   const app = express();
   const client = folder => createOpenCodeClient({ baseUrl: `http://127.0.0.1:${upstreamServer.address().port}`, directory: folder });
   const permissions = createToolPermissions({ file: path.join(directory, 'permissions.json'), readPolicy: async sessionID => ({ directory: sessionID === 'elsewhere' ? '/elsewhere' : directory, projectDirectory: directory, rules: [] }), publish: () => {} });
@@ -165,11 +171,11 @@ test('conversation HTTP normalizes both backends and adopts the prepared native 
     await native.remove(extra.id);
     await native.remove(last.id);
   });
-  const messages = await request(`${root}/${standard.id}/message?limit=10&partShells=true&cursor=page&order=asc`);
+  const messages = await request(`${root}/${standard.id}/message?limit=10&partShells=true&order=asc`);
   assert.equal(messages.items[0].info.role, 'user');
   assert.equal(messages.items[0].parts[0].text, 'Hello');
   assert.equal(messages.cursor.next, undefined);
-  assert.equal(calls.findLast(call => call.path.endsWith('/message')).query.order, undefined);
+  assert.equal(calls.findLast(call => call.path.endsWith('/message')).query.order, 'asc');
   assert.equal((await request(`${root}/${standard.id}/message/msg_standard`)).info.role, 'user');
   const context = await request(`${root}/${created.id}/context`, 'POST', { text: 'Context: ' });
   await request(`${root}/${created.id}/prompt`, 'POST', { id: 'msg_native', text: 'Hello', files: [], context, agents: [], skills: [{ id: 'http-skill' }] });

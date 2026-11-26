@@ -19,9 +19,11 @@ import type { createTurnDiffRuntime } from '../turn-diffs/runtime.js';
 import type { TurnDiffReference } from '@openchamber/sdk/agent-backends';
 import { createAntigravityStorage, type StoredConversation } from './antigravity-storage.js';
 import type { MessageListOptions, MessageRecord } from '@openchamber/sdk/conversations/http';
+import type { ConversationStorage } from './conversation-storage.js';
 
 interface Options {
   dataDir: string;
+  storage: ConversationStorage;
   turnDiffs: Pick<ReturnType<typeof createTurnDiffRuntime>, 'begin' | 'finish' | 'remove'>;
   environment(): NodeJS.ProcessEnv;
   mcpServers(sessionID: string): McpServer[];
@@ -50,7 +52,7 @@ export function createAntigravityBackend(options: Options) {
   let storage: ReturnType<typeof createAntigravityStorage> | undefined;
   const ready = (async () => {
     await fs.mkdir(root, { recursive: true });
-    const history = createAntigravityStorage(root);
+    const history = createAntigravityStorage(options.storage);
     storage = history;
     for (const session of history.sessions()) {
       session.turns = history.summaries(session.id);
@@ -436,7 +438,6 @@ export function createAntigravityBackend(options: Options) {
       await authentication.close();
       await disconnect();
       await ready;
-      storage?.close();
       storage = undefined;
     },
   };

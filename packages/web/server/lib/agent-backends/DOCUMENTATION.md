@@ -39,13 +39,30 @@ mobile clients use the host routes; the VS Code extension uses OpenCode.
 - Creation adopts the composer's host conversation ID while retaining the
   prepared native session and its MCP credential. Credential resolution follows
   the adopted host ID.
-- Host message identities, streamed updates and projected messages are stored in
-  `agent-backends/antigravity/history.sqlite`. Startup reads session metadata and
+- `conversation-storage.ts` owns paged display messages for both backends in
+  `conversations/sessions/<sessionID>.sqlite`. Each database also contains that
+  conversation's native turns and recorded file diffs. The shared
+  `conversations/index.sqlite` stores native session metadata for discovery;
+  message bodies, tool results and patches stay in the session databases.
+  The host shares a pool of at most five open session databases, ordered by
+  last access. SQL callbacks are synchronous; async operations acquire a
+  connection only when they read or write. The index stays open separately.
+  OpenCode imports existing messages
+  in ascending pages on its first history read after startup or reconnect, then
+  records normalized message and tool events before publishing them. History
+  pages and exact message reads query this store. Backend context and compaction
+  remain native.
+  Startup reads native session metadata and
   the latest small turn summary for each model; message bodies remain on disk.
   Active turns retain their streamed content until completion. History reads
   persist the active snapshot before querying the requested messages. The latest
   assistant message includes refreshed native token and context measurements.
-- Native history pages retain insertion order, requested direction and the last
+- Startup converts backend `history.sqlite` files and host turn diff JSON
+  records into this storage. Each source is deleted after its data has been
+  copied. Active manifests and original file baselines remain on disk.
+  Deleting a conversation closes its database and deletes that file and its
+  index entry. Archive retains both.
+- Shared history pages retain insertion order, requested direction and the last
   returned message identity in their cursor. Indexed message queries default to
   100 records and descending order. Exact message reads use the same stored
   projection. Native session pages sort by updated

@@ -1,13 +1,19 @@
 import { z } from 'zod';
-import { projectSession, projectMessage, projectMessages, projectInboxMessage, projectAgent, projectProject, projectVcs, mergeConfigDocuments, configModelIdentifier } from '@openchamber/sdk/conversations/opencode';
+import { projectSession, projectMessages, projectInboxMessage, projectAgent, projectProject, projectVcs, mergeConfigDocuments, configModelIdentifier } from '@openchamber/sdk/conversations/opencode';
 import { compact } from '@openchamber/sdk/conversations/identities';
 import type { ConversationApi, ConversationContextOptions } from './conversation-contract.js';
-import { PART_SHELLS_HEADER } from '../opencode/message-shells.js';
+import { shellMessageRecords } from '../opencode/message-shells.js';
+import type { OpenCodeHistory } from './opencode-history.js';
+import { OpenChamberControlError } from '../openchamber-control/error.js';
 
 const cursor = (value: { previous?: string | null | undefined; next?: string | null | undefined }) => ({ ...value.previous != null && { previous: value.previous }, ...value.next != null && { next: value.next } });
 const spacesSchema = z.object({ spaces: z.array(z.object({ id: z.string(), name: z.string(), taskTitle: z.object({ title: z.string(), by: z.enum(['user', 'agent']) }).nullish(), state: z.enum(['complete', 'partial', 'stale', 'unknown']), projectDirectory: z.string().nullable(), directory: z.string().nullable() })).optional() });
 
-export function createOpenCodeConversations({ client, directory }: ConversationContextOptions): ConversationApi {
+export function createOpenCodeConversations({ client, directory }: ConversationContextOptions, history: OpenCodeHistory): ConversationApi {
+  const importHistory = (id: string) => history.importSession(id, async options => {
+    const page = await client.message.list({ sessionID: id, limit: options.limit, cursor: options.cursor, order: 'asc' });
+    return { items: projectMessages(page.data, id).map(item => ({ info: item.message, parts: item.parts })), cursor: cursor(page.cursor) };
+  });
   return {
     create: async input => projectSession(await client.session.create({ id: input.id, title: input.title, agent: input.agent, model: input.model ? { id: input.model.id, providerID: input.model.providerID, ...input.model.variant != null && { variant: input.model.variant } } : undefined, metadata: input.metadata, location: directory ? { directory } : undefined })),
     async list(input) {
@@ -15,16 +21,18 @@ export function createOpenCodeConversations({ client, directory }: ConversationC
       return { sessions: page.data.map(projectSession), cursor: cursor(page.cursor), ...spacesSchema.parse(page) };
     },
     get: async id => projectSession(await client.session.get({ sessionID: id })),
-    remove: async id => { await client.session.remove({ sessionID: id }); },
+    remove: async id => { await client.session.remove({ sessionID: id }); history.remove(id); },
     rename: async (id, title) => { await client.session.update({ sessionID: id, title }); },
     async messages(id, options) {
-      const page = await client.message.list({ sessionID: id, limit: options.limit, cursor: options.cursor, order: options.cursor ? undefined : options.order }, options.partShells ? { headers: { [PART_SHELLS_HEADER]: 'v1' } } : undefined);
-      const items = projectMessages(page.data, id).map(item => ({ info: item.message, parts: item.parts }));
-      return { items, cursor: cursor({ ...page.cursor, next: options.limit !== undefined && items.length < options.limit ? undefined : page.cursor.next }) };
+      await importHistory(id);
+      const page = history.messages(id, options);
+      return options.partShells ? { ...page, items: shellMessageRecords(page.items) } : page;
     },
     async message(id, messageID) {
-      const item = projectMessage(await client.session.message.get({ sessionID: id, messageID }), id);
-      return { info: item.message, parts: item.parts };
+      await importHistory(id);
+      const message = history.message(id, messageID);
+      if (!message) throw new OpenChamberControlError('Message not found', 404);
+      return message;
     },
     inbox: async id => (await client.session.inbox.list({ sessionID: id })).flatMap(item => {
       const message = projectInboxMessage(item, { sessionID: id, messageID: item.id, created: item.time.created });

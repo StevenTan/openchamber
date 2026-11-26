@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import { readToolEnvelope } from '../openchamber-control/tool-envelope.js';
 import { isRecord, isString } from '../shared/object-guards.js';
+import type { MessageRecord } from '@openchamber/sdk/conversations/http';
 
 interface ShellToolInput {
   native?: unknown;
@@ -109,3 +110,16 @@ export const shellMessagePage = <Payload>(payload: Payload, keepWhole: ReadonlyS
   if (!isRecord(payload) || !Array.isArray(payload.data)) return payload;
   return { ...payload, data: payload.data.map((message) => shellMessage(message, keepWhole)) };
 };
+
+export const shellMessageRecords = (records: MessageRecord[]): MessageRecord[] => records.map(record => ({
+  ...record,
+  parts: record.parts.map(part => {
+    if (part.type !== 'tool' || (part.state.status !== 'completed' && part.state.status !== 'error')) return part;
+    const state = part.state;
+    const tool = shellTool({ name: part.tool, state: { ...state, content: [{ type: 'text', text: state.output ?? '' }] } }, new Set());
+    const metadata = z.record(z.string(), z.json()).optional().parse(tool.state.metadata);
+    const next = { ...state, output: tool.state.content[0].text, ...metadata !== undefined && { metadata } };
+    if (next.status === 'completed' && metadata?.[CONTENT_SHELL_METADATA_KEY]) delete next.attachments;
+    return { ...part, state: next };
+  }),
+}));

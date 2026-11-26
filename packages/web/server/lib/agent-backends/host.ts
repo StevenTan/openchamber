@@ -29,6 +29,8 @@ import { antigravityEvents } from './antigravity-events.js';
 import type { ForwardEventPayload } from '../event-stream/contracts.js';
 import { listConversationSkills, conversationSkillGuidance, registerSkillCatalogRoute } from './skills.js';
 import { readProjectRules } from './project-rules.js';
+import { createConversationStorage } from './conversation-storage.js';
+import { createOpenCodeHistory } from './opencode-history.js';
 
 interface Options {
   dataDir: string;
@@ -46,14 +48,18 @@ interface Options {
   skillDirectories?(): readonly string[];
 }
 export function createAgentBackendHost(options: Options) {
-  const stream = createConversationStream(options.hub, options.processForwardedEventPayload);
+  const storage = createConversationStorage(options.dataDir);
+  const history = createOpenCodeHistory(storage);
+  const stream = createConversationStream(options.hub, options.processForwardedEventPayload, history.record);
+  const unsubscribeHistory = options.hub.subscribeStatus(status => { if (status.type === 'connect') history.reset(); });
   const identity = createBackendMcpIdentity();
   const owners = new Map<string, BackendID>();
   const turnDiffs = createTurnDiffRuntime(options.dataDir, async (sessionID, reference) => {
     if (backend.lookup(sessionID)) await backend.recordFileDiff(sessionID, reference);
-  });
+  }, storage);
   const backend = createAntigravityBackend({
     ...options,
+    storage,
     readInstructions: async sessionID => {
       const session = await backend.get(sessionID);
       const skills = await listConversationSkills(session.directory, options.skillDirectories?.());
@@ -83,7 +89,7 @@ export function createAgentBackendHost(options: Options) {
     changed: async (sessionID, call, turnID) => { if (backend.lookup(sessionID)) await backend.recordToolCall(sessionID, call, turnID); },
   });
   const openCodeArchive = createOpenCodeSessionArchive({ clientFor: options.openCodeClient });
-  const registry = createBackendRegistry({ opencode: createOpenCodeAdapter(openCodeArchive, options.openCodeMetadata), antigravity: createAntigravityAdapter(backend) }, owners, backend.ready);
+  const registry = createBackendRegistry({ opencode: createOpenCodeAdapter(openCodeArchive, options.openCodeMetadata, history), antigravity: createAntigravityAdapter(backend) }, owners, backend.ready);
   const applicationDirectory = (sessionID: string) => backend.lookup(sessionID)?.directory;
   const toolOptions = {
     turnDiffs,
@@ -114,7 +120,7 @@ export function createAgentBackendHost(options: Options) {
       setArchived: async (sessionID: string, archived: boolean) => { await registry.ready; return registry.forSession(sessionID).archive.setArchived(sessionID, archived); },
       readArchivedAt: async (sessionID: string, readOptions?: Parameters<OpenCodeSessionArchive['readArchivedAt']>[1]) => { await registry.ready; return registry.forSession(sessionID).archive.readArchivedAt(sessionID, readOptions); },
     },
-    close: async () => { await backend.close(); await turnDiffs.close(); stream.close(); },
+    close: async () => { await backend.close(); await turnDiffs.close(); stream.close(); unsubscribeHistory(); history.close(); },
     toolOptions,
     applicationPolicy,
     createTools(input: ToolOptions): AgentBackendTools {

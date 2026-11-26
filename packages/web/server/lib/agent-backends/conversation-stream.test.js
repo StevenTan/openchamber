@@ -10,7 +10,7 @@ import { WebSocket } from 'ws';
 import { createAgentBackendHost } from './host.js';
 import { createGlobalMessageStreamHub } from '../event-stream/global-hub.js';
 import { createMessageStreamWsRuntime, createGlobalUiEventBroadcaster } from '../event-stream/runtime.js';
-import { acpMessages } from '@openchamber/sdk/conversations/antigravity';
+import { createConversationStorage } from './conversation-storage.js';
 
 test('shared SSE and WebSocket streams deliver native and OpenCode events with resumable history identities', async t => {
   const changes = new EventEmitter();
@@ -86,6 +86,8 @@ test('shared SSE and WebSocket streams deliver native and OpenCode events with r
   const busyCursor = hub.cursor();
   const turnStartedAt = Date.now() - 3_000;
   broadcast({ type: 'openchamber:session-status', properties: { sessionID: 'ses_standard', status: 'busy', timestamp: Date.now() - 1_000, turnStartedAt } });
+  raw('session.step.started', { sessionID: 'ses_standard', assistantMessageID: 'msg_standard', agent: 'build', model: { id: 'gpt', providerID: 'codex' } }, 'standard-step');
+  raw('session.text.started', { sessionID: 'ses_standard', assistantMessageID: 'msg_standard', ordinal: 0 }, 'standard-text-start');
   raw('session.text.delta', { sessionID: 'ses_standard', assistantMessageID: 'msg_standard', ordinal: 0, delta: 'Hello' }, 'standard-text');
   raw('session.status', status('idle'), 'standard-idle');
   hub.flushPending();
@@ -94,8 +96,7 @@ test('shared SSE and WebSocket streams deliver native and OpenCode events with r
   assert.deepEqual(live, sse);
   const events = live.filter(frame => frame.type === 'event').flatMap(frame => frame.payload.events.map(item => item.event));
   assert.equal(events.filter(event => event.type === 'session.created' && event.properties.info.id === session.id).length, 1);
-  const saved = await host.backend.get(session.id);
-  const history = saved.turns.flatMap(turn => acpMessages(saved, turn));
+  const history = (await host.backend.messages(session.id, {})).items;
   for (const message of history) {
     assert.ok(events.some(event => event.type === 'message.updated' && event.properties.info.id === message.info.id));
     for (const part of message.parts) assert.deepEqual(events.findLast(event => event.type === 'message.part.updated' && event.properties.part.id === part.id)?.properties.part, part);
@@ -104,6 +105,10 @@ test('shared SSE and WebSocket streams deliver native and OpenCode events with r
   assert.ok(events.some(event => event.type === 'session.patched' && event.properties.patch.metadata?.pinned === true));
   assert.ok(events.some(event => event.type === 'openchamber.notification' && event.properties.title === 'Finished'));
   assert.ok(events.some(event => event.type === 'message.part.delta' && event.properties.sessionID === 'ses_standard' && event.properties.delta === 'Hello'));
+  const stored = createConversationStorage(directory);
+  cleanup(() => stored.close());
+  assert.equal(stored.message('ses_standard', 'msg_standard').parts[0].text, 'Hello');
+  assert.deepEqual(stored.messages(session.id, {}).items, history);
   const resumed = [];
   const reconnect = new WebSocket(`${base.replace('http:', 'ws:')}/api/conversations/events/ws?lastEventId=${busyCursor}`, { origin: base });
   reconnect.on('message', value => { resumed.push(JSON.parse(String(value))); changes.emit('frame'); });

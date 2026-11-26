@@ -32,6 +32,8 @@ import { createOpenCodeAdapter } from './opencode-adapter.js';
 import type { BackendID } from './contracts.js';
 import { createWorktreeBootstrapStore } from '../git/worktree-bootstrap-storage.js';
 import { createServer } from 'node:http';
+import { createConversationStorage } from './conversation-storage.js';
+import { createOpenCodeHistory } from './opencode-history.js';
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -39,6 +41,8 @@ afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) awai
 test('ACP sessions retain streamed history and admit an async answer during a running turn', async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'openchamber-acp-test-'));
   cleanups.push(() => fs.rm(directory, { recursive: true, force: true }));
+  const storage = createConversationStorage(directory);
+  cleanups.push(async () => storage.close());
   const executable = path.join(directory, 'agy');
   const source = fileURLToPath(new URL('./antigravity.fixture.mjs', import.meta.url));
   const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
@@ -54,8 +58,8 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
   let userInputs = 0;
   let userInputDirectory: string | undefined;
   const owners = new Map<string, BackendID>();
-  const turnDiffs = createTurnDiffRuntime(directory, async (id, reference) => backend.recordFileDiff(id, reference));
-  const make = () => createAntigravityBackend({ dataDir: directory, initializeSession: async () => {},
+  const turnDiffs = createTurnDiffRuntime(directory, async (id, reference) => backend.recordFileDiff(id, reference), storage);
+  const make = () => createAntigravityBackend({ storage, dataDir: directory, initializeSession: async () => {},
       registerSession: (id, previous) => { if (previous) owners.delete(previous); owners.set(id, 'antigravity'); },
       onUserInput: (_id, inputDirectory) => { userInputs++; userInputDirectory = inputDirectory; }, readInstructions: instructions.read, turnDiffs, environment: () => process.env, mcpServers: id => { identity.token(id); return []; }, reassignSession: identity.reassign, publish, publishForm: () => {} });
   const backend = make();
@@ -149,8 +153,9 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
     worktreeBootstrapStore: createWorktreeBootstrapStore({ filePath: path.join(directory, 'bootstrap.json') }),
     hydrateWorktreeCheckout: async () => { throw new Error('Worktree hydration is unused'); },
   });
+  const openCodeHistory = createOpenCodeHistory(storage);
   const registry = createBackendRegistry({
-    opencode: createOpenCodeAdapter({ setArchived: async () => {}, readArchivedAt: async () => null }, { read: async () => ({}), write: async () => {} }),
+    opencode: createOpenCodeAdapter({ setArchived: async () => {}, readArchivedAt: async () => null }, { read: async () => ({}), write: async () => {} }, openCodeHistory),
     antigravity: createAntigravityAdapter(backend),
   }, owners, backend.ready);
   const service = createBackendSessionService(openCodeService, registry, async () => true, createChatsScope(path.join(directory, 'chats')));
@@ -266,13 +271,15 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
 test('Antigravity keeps five recent idle workers and retains running sessions until completion', { timeout: 15_000 }, async context => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'openchamber-resident-test-'));
   cleanups.push(() => fs.rm(directory, { recursive: true, force: true }));
+  const storage = createConversationStorage(directory);
+  cleanups.push(async () => storage.close());
   const executable = path.join(directory, 'agy');
   const source = fileURLToPath(new URL('./antigravity.fixture.mjs', import.meta.url));
   const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
   await fs.writeFile(executable, `#!/bin/sh\nexec ${quote(process.execPath)} ${quote(source)} "$@"\n`, { mode: 0o700 });
   const backend = createAntigravityBackend({
-    dataDir: directory, initializeSession: async () => {}, readInstructions: async () => [],
-    turnDiffs: createTurnDiffRuntime(directory, async () => {}), environment: () => process.env,
+    storage, dataDir: directory, initializeSession: async () => {}, readInstructions: async () => [],
+    turnDiffs: createTurnDiffRuntime(directory, async () => {}, storage), environment: () => process.env,
     mcpServers: () => [], reassignSession: () => {}, publish: () => {}, publishForm: () => {},
   });
   cleanups.push(() => backend.close());
@@ -330,14 +337,16 @@ test('MCP headers and nested Code Mode metadata resolve the same host session', 
 test('Google sign-in exposes its URL, accepts a code and verifies ACP access in the same profile', { timeout: 15_000 }, async context => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'openchamber-auth-test-'));
   cleanups.push(() => fs.rm(directory, { recursive: true, force: true }));
+  const storage = createConversationStorage(directory);
+  cleanups.push(async () => storage.close());
   const executable = path.join(directory, 'agy');
   const source = fileURLToPath(new URL('./antigravity.fixture.mjs', import.meta.url));
   const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
   await fs.writeFile(executable, `#!/bin/sh\nexec ${quote(process.execPath)} ${quote(source)} "$@"\n`, { mode: 0o700 });
   let rejectAccount = false;
   const events = new EventEmitter();
-  const make = () => createAntigravityBackend({ dataDir: directory, initializeSession: async () => {},
-      onUserInput: () => {}, readInstructions: async () => [], turnDiffs: createTurnDiffRuntime(directory, async () => {}), environment: () => ({ ...process.env, AGY_FIXTURE_REJECT_ACCOUNT: rejectAccount ? '1' : '0' }), mcpServers: () => [], reassignSession: () => {}, publish: () => { events.emit('authentication'); }, publishForm: () => {} });
+  const make = () => createAntigravityBackend({ storage, dataDir: directory, initializeSession: async () => {},
+      onUserInput: () => {}, readInstructions: async () => [], turnDiffs: createTurnDiffRuntime(directory, async () => {}, storage), environment: () => ({ ...process.env, AGY_FIXTURE_REJECT_ACCOUNT: rejectAccount ? '1' : '0' }), mcpServers: () => [], reassignSession: () => {}, publish: () => { events.emit('authentication'); }, publishForm: () => {} });
   const backend = make();
   cleanups.push(() => backend.close());
   await backend.configure({ binary: executable });

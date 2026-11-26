@@ -7,23 +7,26 @@ import { createAntigravityStorage, type StoredConversation } from './antigravity
 import { createAntigravityBackend } from './antigravity.js';
 import type { AcpTurn } from '@openchamber/sdk/agent-backends';
 import { DatabaseSync } from 'node:sqlite';
+import { createConversationStorage } from './conversation-storage.js';
 
 test('disk history pages preserve messages while startup retains only model summaries', async t => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'antigravity-storage-'));
   t.after(() => fs.rm(directory, { recursive: true }));
   const folder = path.join(directory, 'agent-backends', 'antigravity');
   await fs.mkdir(folder, { recursive: true });
-  const store = createAntigravityStorage(folder);
+  const initial = createConversationStorage(directory);
+  const store = createAntigravityStorage(initial);
   const session: StoredConversation = { id: 'ses_ag_stored', nativeID: 'native-stored', directory, title: 'Stored', created: 1, updated: 2, draft: false, config: [], forms: [], turns: [] };
   const payload = 'large output '.repeat(1024);
   for (let index = 0; index < 150; index++) {
     const turn: AcpTurn = { id: `prompt_${index}`, assistantID: `reply_${index}`, modelID: `model_${index % 2}`, text: `Prompt ${index}`, created: index, completed: index + 1, files: [], followups: [], updates: [{ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: `${index}: ${payload}` } }] };
     store.save(session, turn);
   }
-  store.close();
+  initial.close();
+  const storage = createConversationStorage(directory);
   const owners: string[] = [];
-  const backend = createAntigravityBackend({ dataDir: directory, turnDiffs: { begin: async () => {}, finish: async () => {}, remove: async () => {} }, environment: () => process.env, mcpServers: () => [], reassignSession: () => {}, initializeSession: async () => {}, readInstructions: async () => [], publish: () => {}, publishForm: () => {}, registerSession: id => owners.push(id) });
-  t.after(() => backend.close());
+  const backend = createAntigravityBackend({ storage, dataDir: directory, turnDiffs: { begin: async () => {}, finish: async () => {}, remove: async () => {} }, environment: () => process.env, mcpServers: () => [], reassignSession: () => {}, initializeSession: async () => {}, readInstructions: async () => [], publish: () => {}, publishForm: () => {}, registerSession: id => owners.push(id) });
+  t.after(async () => { await backend.close(); storage.close(); });
   await backend.ready;
   assert.deepEqual(owners, [session.id]);
   const resident = await backend.get(session.id);
@@ -60,8 +63,9 @@ test('disk history pages preserve messages while startup retains only model summ
   await backend.rename(session.id, 'Renamed');
   await backend.archive.setArchived(session.id, true);
   await backend.close();
-  const reopened = createAntigravityStorage(folder);
-  t.after(() => reopened.close());
+  const reopenedStorage = createConversationStorage(directory);
+  const reopened = createAntigravityStorage(reopenedStorage);
+  t.after(() => reopenedStorage.close());
   assert.equal(reopened.sessions()[0]?.title, 'Renamed');
   assert.ok(reopened.sessions()[0]?.archived);
   assert.equal(reopened.messages(session.id, { limit: 1 }).items[0]?.info.id, 'reply_149');

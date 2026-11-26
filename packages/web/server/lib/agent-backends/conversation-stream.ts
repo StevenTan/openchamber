@@ -14,7 +14,7 @@ const replayFrame = z.object({ payload: z.json(), directory: z.string().optional
 
 export type ConversationEventHub = Pick<GlobalMessageStreamHub, 'subscribeEvent' | 'subscribeStatus' | 'injectEvent' | 'flushPending' | 'cursor' | 'replayAfter'>;
 
-export function createConversationStream(hub: ConversationEventHub, processForwardedEventPayload?: ForwardEventPayload) {
+export function createConversationStream(hub: ConversationEventHub, processForwardedEventPayload?: ForwardEventPayload, record?: (event: SyncEvent) => void) {
   const listeners = new Set<Listener>();
   const frameFor = (payload: JsonValue, directory: string | undefined, eventId: string): Frame => ({
     type: 'event', eventId,
@@ -24,7 +24,11 @@ export function createConversationStream(hub: ConversationEventHub, processForwa
     for (const send of listeners) if (!send(frame)) listeners.delete(send);
   };
   const unsubscribe = hub.subscribeEvent(event => {
-    broadcast(frameFor(event.payload, event.directory, event.eventId));
+    const frame = frameFor(event.payload, event.directory, event.eventId);
+    if (frame.type === 'event' && frame.payload.kind === 'events' && !injectedConversationPayload(event.payload)) {
+      for (const item of frame.payload.events) record?.(item.event);
+    }
+    broadcast(frame);
     processForwardedEventPayload?.(event.payload, payload => hub.injectEvent({ payload, directory: event.directory, spaceId: event.spaceId }), { spaceId: event.spaceId });
   }, { spaces: true });
   const unsubscribeStatus = hub.subscribeStatus(status => {

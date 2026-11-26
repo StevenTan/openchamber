@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process';
 import { z } from 'zod';
 import { recordedTurnDiffSchema, type TurnDiffReference } from '@openchamber/sdk/agent-backends';
 import { isMissingFileError } from '../share-pages/file-errors.js';
+import type { ConversationStorage } from '../agent-backends/conversation-storage.js';
 
 export const turnContext = z.object({ sessionID: z.string().min(1), turnID: z.string().min(1), directory: z.string() });
 const baselineSchema = z.object({ original: z.string(), existed: z.boolean(), error: z.string().optional() });
@@ -48,14 +49,13 @@ const diffFile = async (baseline: Baseline, file: string, directory: string, emp
   return { file: display, status, patch: `diff --git a/${display} b/${display}\n--- ${oldPath}\n+++ ${newPath}\n${body}`, additions, deletions };
 };
 
-export function createTurnDiffRuntime(dataDir: string, changed: (sessionID: string, reference: TurnDiffReference) => Promise<void>) {
+export function createTurnDiffRuntime(dataDir: string, changed: (sessionID: string, reference: TurnDiffReference) => Promise<void>, storage: ConversationStorage) {
   const root = path.join(dataDir, 'turn-diffs');
   const active = new Map<string, TurnContext>();
   const turns = new Map<string, Turn>();
   const pending = new Map<Turn, number>();
   const queues = new Map<string, Promise<unknown>>();
   const sessionPath = (sessionID: string) => path.join(root, encodeURIComponent(sessionID));
-  const recordPath = ({ sessionID, turnID }: Pick<TurnContext, 'sessionID' | 'turnID'>) => path.join(sessionPath(sessionID), `${encodeURIComponent(turnID)}.json`);
   const activePath = ({ sessionID, turnID }: Pick<TurnContext, 'sessionID' | 'turnID'>) => path.join(sessionPath(sessionID), 'active', encodeURIComponent(turnID));
   const key = ({ sessionID, turnID }: Pick<TurnContext, 'sessionID' | 'turnID'>) => JSON.stringify([sessionID, turnID]);
   const readJson = async <Value>(file: string, schema: z.ZodType<Value>): Promise<Value | undefined> => {
@@ -96,7 +96,7 @@ export function createTurnDiffRuntime(dataDir: string, changed: (sessionID: stri
       } catch (error) { files.push({ file: displayPath(file, turn.directory), status: 'modified' as const, error: (error instanceof Error ? error.message : String(error)) }); }
     }
     record.files = files;
-    await writeJson(recordPath(turn), record);
+    storage.saveDiff(record);
     await writeJson(path.join(activePath(turn), 'manifest.json'), { ...turn, dirty: false });
     turn.dirty = false;
     return summary(record);
@@ -105,7 +105,7 @@ export function createTurnDiffRuntime(dataDir: string, changed: (sessionID: stri
     current: (sessionID: string) => active.get(sessionID),
     begin: (context: TurnContext) => serial(context.sessionID, async () => {
       active.set(context.sessionID, context);
-      if (!await exists(recordPath(context))) await writeJson(recordPath(context), { version: 1, sessionID: context.sessionID, turnID: context.turnID, revision: 0, files: [], directory: context.directory });
+      if (!storage.diff(context.sessionID, context.turnID)) storage.saveDiff({ version: 1, sessionID: context.sessionID, turnID: context.turnID, revision: 0, files: [], directory: context.directory });
     }),
     before: (sessionID: string, paths: string[]) => serial(sessionID, async () => {
       let turn: Turn | undefined;
@@ -154,7 +154,7 @@ export function createTurnDiffRuntime(dataDir: string, changed: (sessionID: stri
       const context = { sessionID, turnID };
       const current = turns.get(key(context)) ?? await readJson(path.join(activePath(context), 'manifest.json'), activeSchema);
       if (current?.dirty) return { version: 1 as const, sessionID, turnID, unavailable: true };
-      return await readJson(recordPath(context), recordedTurnDiffSchema) ?? { version: 1 as const, sessionID, turnID, unavailable: true };
+      return storage.diff(sessionID, turnID) ?? { version: 1 as const, sessionID, turnID, unavailable: true };
     }),
     finish: (sessionID: string) => serial(sessionID, async () => {
       active.delete(sessionID);
@@ -164,7 +164,7 @@ export function createTurnDiffRuntime(dataDir: string, changed: (sessionID: stri
         const manifest = path.join(directory, name, 'manifest.json');
         const stored = activeSchema.parse(await readJson(manifest, activeSchema));
         const current = turns.get(key(stored)) ?? stored;
-        const record = await readJson(recordPath(stored), recordedTurnDiffSchema);
+        const record = storage.diff(stored.sessionID, stored.turnID);
         if (current.dirty || !record || record.files?.some(file => file.error)) continue;
         await fs.rm(path.dirname(manifest), { recursive: true });
         turns.delete(key(stored));
@@ -174,12 +174,13 @@ export function createTurnDiffRuntime(dataDir: string, changed: (sessionID: stri
       active.delete(sessionID);
       for (const [id, turn] of turns) if (turn.sessionID === sessionID) { turns.delete(id); pending.delete(turn); }
       await fs.rm(sessionPath(sessionID), { recursive: true, force: true });
+      storage.clearDiffs(sessionID);
     }),
     import: async (entries: Array<{ key: string; value: unknown }>) => {
       for (const entry of entries) {
         if (entry.key.startsWith('turn:')) {
           const record = recordedTurnDiffSchema.parse(entry.value);
-          await serial(record.sessionID, async () => { if (!await exists(recordPath(record))) await writeJson(recordPath(record), record); });
+          await serial(record.sessionID, async () => { if (!storage.diff(record.sessionID, record.turnID)) storage.saveDiff(record); });
         } else {
           const turn = activeSchema.parse(entry.value);
           await serial(turn.sessionID, async () => {

@@ -10,6 +10,7 @@ import { createAgentToolRuntime } from '../agent-tool/runtime.js';
 import { resolveOpenCodeMcpContext } from '../opencode/mcp-context.js';
 import plugin from './plugin.js';
 import { createTurnDiffRuntime } from '../turn-diffs/runtime.js';
+import { createConversationStorage } from '../agent-backends/conversation-storage.js';
 
 const cleanup = [];
 afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); });
@@ -18,7 +19,10 @@ async function fixture() {
   cleanup.push(() => fs.rm(directory, { recursive: true, force: true }));
   const approve = vi.fn(async () => {});
   let listener;
-  const turnDiffs = createTurnDiffRuntime(directory, async () => {});
+  const history = createConversationStorage(directory);
+  cleanup.push(async () => history.close());
+  const turnDiffs = createTurnDiffRuntime(directory, async () => {}, history);
+  cleanup.push(() => turnDiffs.close());
   await turnDiffs.begin({ sessionID: 'session', turnID: 'user-1', directory });
   const runtime = createAgentToolRuntime({ resolveMcpContext: resolveOpenCodeMcpContext, crypto,
     turnDiffs,
