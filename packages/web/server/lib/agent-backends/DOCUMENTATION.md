@@ -17,6 +17,11 @@ mobile clients use the host routes; the VS Code extension uses OpenCode.
   message, part and catalog records. The registry selects the recorded session
   owner before dispatch. OpenCode requests pass through its readiness, workspace
   and trust middleware; native requests use the Antigravity adapter.
+- `/api/conversation-requests/forms` and `/permissions` aggregate pending requests
+  for the selected directory. Conversation reply and cancellation routes dispatch
+  native requests through the owning adapter. Host-owned tool permissions and
+  asynchronous questions use their existing approval and answer-delivery runtimes
+  before adapter dispatch.
 - Both adapters use the SDK's shared projections for HTTP records and the UI's
   event contracts. OpenCode transport retains owned-state overlays, hidden-session
   filtering, space routing and message-part shells.

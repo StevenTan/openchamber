@@ -15,12 +15,13 @@ import { spaceIdOfDirectory } from '../spaces/space-route'
 import { getSpaceMark } from '../spaces/spaces-store'
 import { isDefiniteTransportFailure, markAmbiguousTransportFailure } from '../relay/transport-error'
 import { readMessageThroughAncestors } from '../opencode/message-ownership'
+import type { FormRequest, PermissionRequest, FormValue } from './requests'
 
 const root = '/api/conversations'
 const catalogRoot = '/api/conversation-catalog'
-type ConversationBody = CreateConversation | ModelSelection | ConversationContext | ConversationPrompt | { title: string } | { agent: string } | { names: readonly string[] }
+type ConversationBody = CreateConversation | ModelSelection | ConversationContext | ConversationPrompt | { title: string } | { agent: string } | { names: readonly string[] } | { decision: 'once' | 'always' | 'reject'; message?: string } | { answer: Record<string, FormValue> } | { message?: string }
 
-export function createConversationHttpClient(backendID: string, runtime: AgentRuntime, pending: Pick<ConversationClient, 'replyToPermission' | 'replyToForm' | 'cancelForm'>): ConversationClient {
+export function createConversationHttpClient(backendID: string, runtime: AgentRuntime): ConversationClient & Pick<AgentRuntime, 'listPendingForms' | 'listPendingPermissions'> {
   const catalogs = new Map<string, Promise<ProviderCatalog>>()
   const agents = new Map<string, Promise<Agent[]>>()
   const directoryOf = (directory?: string | null) => normalizePath(directory) ?? runtime.getDirectory()
@@ -43,7 +44,7 @@ export function createConversationHttpClient(backendID: string, runtime: AgentRu
         const failure: { error: string; tag?: string; ref?: string } = response.headers.get('content-type')?.includes('application/json') ? await response.json() : { error: await response.text() }
         throw new OpencodeApiError(path, failure.error, { status: response.status, tag: failure.tag, ref: failure.ref })
       }
-      return await response.json()
+      return JSON.parse(response.status === 204 ? 'null' : await response.text())
     } catch (error) { throw normalizeOpencodeError(path, error) }
   }
   const sessionPath = (id: string, suffix = '') => `${root}/${encodeURIComponent(id)}${suffix}`
@@ -57,7 +58,12 @@ export function createConversationHttpClient(backendID: string, runtime: AgentRu
     agents.set(key, operation)
     try { return await operation } finally { if (agents.get(key) === operation) agents.delete(key) }
   }
-  const client: ConversationClient = {
+  const pending = async <T extends { id: string }>(kind: string, options?: { directories?: string[] }): Promise<T[]> => {
+    const directories = [...new Set(options?.directories?.map(normalizePath).filter((directory): directory is string => !!directory))]
+    const lists = await Promise.all(directories.map(directory => request<T[]>(`/api/conversation-requests/${kind}`, directory)))
+    return [...new Map(lists.flat().map(item => [item.id, item])).values()]
+  }
+  const client: ConversationClient & Pick<AgentRuntime, 'listPendingForms' | 'listPendingPermissions'> = {
     listSessionsPage: (options = {}) => request(root, options.global ? undefined : directoryOf(options.directory), 'GET', undefined, { global: options.global || undefined, limit: options.limit, order: options.order, search: options.search, cursor: options.cursor, parentID: options.parentID }),
     listSessions: async directory => (await client.listSessionsPage({ directory })).sessions,
     createSession: (params, directory) => request(root, directoryOf(directory), 'POST', { ...params, backendID: params?.backendID ?? backendID, model: params?.model && !isAutoModel(params.model.providerID, params.model.id) ? params.model : undefined }),
@@ -127,9 +133,20 @@ export function createConversationHttpClient(backendID: string, runtime: AgentRu
       try { return await operation } finally { if (catalogs.get(key) === operation) catalogs.delete(key) }
     },
     listAgents: directory => readAgents(directory),
-    replyToPermission: (...args) => pending.replyToPermission(...args),
-    replyToForm: (...args) => pending.replyToForm(...args),
-    cancelForm: (...args) => pending.cancelForm(...args),
+    async replyToPermission(id, requestID, decision, options) {
+      await request(sessionPath(id, `/permission/${encodeURIComponent(requestID)}/reply`), directoryOf(options?.directory), 'POST', { decision, message: options?.message })
+      return true
+    },
+    async replyToForm(id, formID, answer, directory) {
+      await request(sessionPath(id, `/form/${encodeURIComponent(formID)}/reply`), directoryOf(directory), 'POST', { answer })
+      return true
+    },
+    async cancelForm(id, formID, directory, message) {
+      await request(sessionPath(id, `/form/${encodeURIComponent(formID)}`), directoryOf(directory), 'DELETE', { message })
+      return true
+    },
+    listPendingForms: options => pending<FormRequest>('forms', options),
+    listPendingPermissions: options => pending<PermissionRequest>('permissions', options),
   }
   return client
 }

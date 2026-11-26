@@ -22,7 +22,7 @@ export function registerToolPermissionRoutes(app: Application, express: Pick<Exp
     const request = options.permissions.get(req.params.sessionID, req.params.requestID);
     return request ? res.json({ data: request }) : res.status(404).json({ error: 'Permission request not found' });
   });
-  app.post<unknown, { sessionID: string; requestID: string }>('/api/session/:sessionID/permission/:requestID/reply', express.json({ limit: '1mb' }), async (req, res, next) => {
+  app.post<unknown, { sessionID: string; requestID: string }>(['/api/session/:sessionID/permission/:requestID/reply', '/api/conversations/:sessionID/permission/:requestID/reply'], express.json({ limit: '1mb' }), async (req, res, next) => {
     if (!req.params.requestID.startsWith('per_oc_')) return next();
     const input = reply.parse(req.body);
     const handled = await options.permissions.reply(req.params.sessionID, req.params.requestID, input.decision, input.message);

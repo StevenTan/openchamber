@@ -12,12 +12,6 @@ export function createApplicationBackend(opencode: AgentBackend, antigravity: Ag
         const [standard, native] = await Promise.all([opencode.runtime.getActiveSessionStatuses(directory), antigravity.runtime.getActiveSessionStatuses(directory)])
         return standard === null ? null : { ...standard, ...native }
       },
-      async listPendingForms(options) {
-        return (await Promise.all([opencode.runtime.listPendingForms(options), antigravity.runtime.listPendingForms(options)])).flat()
-      },
-      async listPendingPermissions(options) {
-        return (await Promise.all([opencode.runtime.listPendingPermissions(options), antigravity.runtime.listPendingPermissions(options)])).flat()
-      },
     },
     events: opencode.events,
   }

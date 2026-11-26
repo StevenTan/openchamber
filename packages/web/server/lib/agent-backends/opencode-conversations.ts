@@ -57,5 +57,10 @@ export function createOpenCodeConversations({ client, directory }: ConversationC
     },
     providers: async () => (await client.provider.list()).data,
     agents: async () => (await client.agent.list()).data.map(projectAgent),
+    pendingForms: async () => (await client.form.list()).data,
+    pendingPermissions: async () => (await client.permission.request.list()).data,
+    replyPermission: async (sessionID, requestID, decision, message) => { await client.permission.reply({ sessionID, requestID, decision, message }); },
+    replyForm: async (sessionID, formID, answer) => { await client.session.form.reply({ sessionID, formID, answer }); },
+    cancelForm: async (sessionID, formID, message) => { await client.session.form.cancel({ sessionID, formID, message }); },
   };
 }

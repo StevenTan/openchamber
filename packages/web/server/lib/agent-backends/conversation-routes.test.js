@@ -12,15 +12,25 @@ import { createOpenCodeAdapter } from './opencode-adapter.js';
 import { createBackendRegistry } from './registry.js';
 import { registerConversationRoutes } from './conversation-routes.js';
 import { createTurnDiffRuntime } from '../turn-diffs/runtime.js';
+import { createToolPermissions } from '../agent-tool/permissions.js';
+import { registerToolPermissionRoutes } from '../agent-tool/permission-routes.js';
+import { createQuestionRuntime } from '../agent-question/src/runtime.js';
+import { registerQuestionFormRoutes } from '../agent-question/src/mcp.js';
 
 test('conversation HTTP normalizes both backends and adopts the prepared native session', async t => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'conversation-http-'));
   t.after(() => fs.rm(directory, { recursive: true, force: true }));
   const owners = new Map();
+  const delivered = Promise.withResolvers();
+  const cancellation = Promise.withResolvers();
   const native = createAntigravityBackend({
     dataDir: directory, initializeSession: async () => {}, readInstructions: async () => [],
     environment: () => process.env, mcpServers: () => [], reassignSession: () => {},
-    publish: () => {}, publishForm: () => {},
+    publish: event => {
+      if (event.type !== 'turn' || !event.turn.completed) return;
+      if (event.turn.text.includes('Blue')) delivered.resolve(event.turn.text);
+      if (event.turn.text.includes('cancelled')) cancellation.resolve(event.turn.text);
+    }, publishForm: () => {},
     registerSession: (id, previous) => { owners.delete(previous); owners.set(id, 'antigravity'); },
     turnDiffs: createTurnDiffRuntime(directory, async () => {}),
   });
@@ -35,10 +45,18 @@ test('conversation HTTP normalizes both backends and adopts the prepared native 
   const wire = { id: 'ses_standard', projectID: 'project', title: 'Standard', location: { directory }, agent: 'build', cost: 0, tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } }, time: { created: 1, updated: 1 } };
   const user = { id: 'msg_standard', type: 'user', text: 'Hello', files: [], time: { created: 2 } };
   const calls = [];
+  const upstreamForm = { id: 'frm_native', sessionID: wire.id, title: 'Choose', fields: [{ key: 'color', type: 'string' }], state: { status: 'pending' } };
+  const upstreamPermission = { id: 'per_native', sessionID: wire.id, action: 'shell', resources: ['pwd'] };
+  let pendingFailure = false;
   const upstream = express();
   upstream.use(express.json());
   upstream.use((req, res) => {
     calls.push({ path: req.path, query: req.query, body: req.body, directory: req.get('x-opencode-directory') });
+    if (req.path === '/api/form' || req.path === '/api/permission/request') {
+      if (pendingFailure) return res.status(503).json({ _tag: 'ServiceUnavailableError', message: 'Pending requests unavailable' });
+      return res.json({ location: { directory }, data: req.path === '/api/form' ? [upstreamForm] : [upstreamPermission] });
+    }
+    if (req.path.includes('/form/') || req.path.includes('/permission/')) return res.status(204).end();
     if (req.path.endsWith('/missing')) return res.status(404).json({ _tag: 'SessionNotFoundError', message: 'Missing' });
     if (req.path === '/api/session' && req.method === 'GET') return res.json({ data: [wire], cursor: { next: 'next-page' } });
     if (req.path.endsWith('/message') && req.method === 'GET') return res.json({ data: [user], cursor: { next: 'more' } });
@@ -52,7 +70,12 @@ test('conversation HTTP normalizes both backends and adopts the prepared native 
   const registry = createBackendRegistry({ opencode: createOpenCodeAdapter({}, {}), antigravity: createAntigravityAdapter(native) }, owners, Promise.resolve());
   const app = express();
   const client = folder => createOpenCodeClient({ baseUrl: `http://127.0.0.1:${upstreamServer.address().port}`, directory: folder });
-  for (const phase of ['native', 'opencode']) registerConversationRoutes(app, express, { registry, client, phase, abortTools: () => {} });
+  const permissions = createToolPermissions({ file: path.join(directory, 'permissions.json'), readPolicy: async sessionID => ({ directory: sessionID === 'elsewhere' ? '/elsewhere' : directory, projectDirectory: directory, rules: [] }), publish: () => {} });
+  const questions = createQuestionRuntime({ dataDir: directory, client: () => ({ session: native.questionSession }), globalEventHub: { subscribeEvent: () => () => {}, subscribeStatus: () => () => {} }, isSessionArchived: async () => false, isEnabled: () => true, retryMs: 1 });
+  t.after(() => questions.stop());
+  registerQuestionFormRoutes(questions, app, express);
+  registerToolPermissionRoutes(app, express, { permissions, directory: async req => req.query.directory, listNative: async () => ({ location: { directory }, data: [upstreamPermission] }) });
+  for (const phase of ['native', 'opencode']) registerConversationRoutes(app, express, { registry, client, phase, abortTools: () => {}, permissions });
   const listener = app.listen(0, '127.0.0.1');
   await new Promise(resolve => listener.once('listening', resolve));
   t.after(() => new Promise(resolve => listener.close(resolve)));
@@ -94,6 +117,41 @@ test('conversation HTTP normalizes both backends and adopts the prepared native 
   await request(`${root}/${created.id}`, 'PATCH', { title: 'Renamed' });
   assert.equal((await request(`${root}/${created.id}`)).title, 'Renamed');
   await request(`${root}/${created.id}/interrupt`, 'POST');
+  const approvalSession = await permissions.session(created.id);
+  const granted = approvalSession.assert({ action: 'edit', resources: ['a.txt'], save: ['a.txt'] }, new AbortController().signal);
+  const ownPermission = permissions.list()[0].request;
+  assert.deepEqual((await request(`/api/conversation-requests/permissions${folder}`)).map(item => item.id), [upstreamPermission.id, ownPermission.id]);
+  const permitted = await fetch(`${base}${root}/${created.id}/permission/${ownPermission.id}/reply`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision: 'once' }) });
+  assert.equal(permitted.status, 204);
+  await granted;
+  assert.deepEqual((await request(`/api/conversation-requests/permissions${folder}`)).map(item => item.id), [upstreamPermission.id]);
+  const otherApproval = await permissions.session('elsewhere');
+  const rejected = otherApproval.assert({ action: 'edit', resources: ['b.txt'], save: [] }, new AbortController().signal);
+  const rejection = assert.rejects(rejected, /Stop/);
+  const otherPermission = permissions.list()[0].request;
+  assert.deepEqual((await request(`/api/conversation-requests/permissions${folder}`)).map(item => item.id), [upstreamPermission.id]);
+  assert.equal((await fetch(`${base}${root}/elsewhere/permission/${otherPermission.id}/reply`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision: 'reject', message: 'Stop' }) })).status, 204);
+  await rejection;
+  await request(`${root}/${wire.id}/permission/${upstreamPermission.id}/reply${folder}`, 'POST', { decision: 'always', message: 'Approved' });
+  assert.deepEqual(calls.at(-1).body, { decision: 'always', message: 'Approved' });
+  const question = await questions.ask({ sessionID: created.id, callID: 'color', input: { questions: [{ title: 'Color', options: ['Blue', 'Green'] }] } });
+  assert.deepEqual((await request(`/api/conversation-requests/forms${folder}`)).map(item => item.id), [upstreamForm.id, question.question_id]);
+  assert.deepEqual((await request('/api/conversation-requests/forms?directory=/elsewhere')).map(item => item.id), [upstreamForm.id]);
+  const answered = await fetch(`${base}${root}/${created.id}/form/${question.question_id}/reply`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ answer: { q0: 'Blue' } }) });
+  assert.equal(answered.status, 204);
+  assert.match(await delivered.promise, /Blue/);
+  assert.deepEqual((await request(`/api/conversation-requests/forms${folder}`)).map(item => item.id), [upstreamForm.id]);
+  const cancelledQuestion = await questions.ask({ sessionID: created.id, callID: 'cancel-color', input: { questions: [{ title: 'Another color' }] } });
+  assert.equal((await fetch(`${base}${root}/${created.id}/form/${cancelledQuestion.question_id}`, { method: 'DELETE' })).status, 204);
+  assert.match(await cancellation.promise, /cancelled/);
+  assert.deepEqual((await request(`/api/conversation-requests/forms${folder}`)).map(item => item.id), [upstreamForm.id]);
+  await request(`${root}/${wire.id}/form/${upstreamForm.id}/reply${folder}`, 'POST', { answer: { color: 'Green', count: 3, enabled: true, tags: ['one', 'two'] } });
+  assert.deepEqual(calls.at(-1).body.answer, { color: 'Green', count: 3, enabled: true, tags: ['one', 'two'] });
+  await request(`${root}/${wire.id}/form/${upstreamForm.id}${folder}`, 'DELETE', { message: 'Skip' });
+  assert.equal(calls.at(-1).query.message, 'Skip');
+  pendingFailure = true;
+  assert.equal((await fetch(`${base}/api/conversation-requests/forms${folder}`)).ok, false);
+  pendingFailure = false;
   const failure = await fetch(`${base}${root}/missing`);
   assert.equal(failure.status, 404);
   assert.equal((await failure.json()).tag, 'SessionNotFoundError');

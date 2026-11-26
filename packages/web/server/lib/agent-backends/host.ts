@@ -90,12 +90,12 @@ export function createAgentBackendHost(options: Options) {
     const directory = applicationDirectory(sessionID);
     return directory ? { directory, projectDirectory: directory, rules: [] } : undefined;
   };
-  const conversations = { registry, client: options.openCodeClient, abortTools: (id: string) => options.tools().abortSession(id) };
+  const conversations = { registry, client: options.openCodeClient, abortTools: (id: string) => options.tools().abortSession(id), permissions: { list: (directory?: string) => options.tools().permissions.list(directory) } };
   return {
     backend, registry, stream,
     registerRoutes(app: Application) {
       stream.registerRoutes(app);
-      registerAgentBackendRoutes(app, express, backend, options.tools());
+      registerAgentBackendRoutes(app, express, backend);
       registerConversationRoutes(app, express, { ...conversations, phase: 'native' });
     },
     registerConversations(app: Application, requestFetch: typeof fetch) {

@@ -6,6 +6,7 @@ import type { BackendRegistry } from './registry.js';
 import type { ConversationApi } from './conversation-contract.js';
 import { OpenChamberControlError } from '../openchamber-control/error.js';
 import { AntigravityNotInstalledError } from './antigravity-executable.js';
+import type { createToolPermissions } from '../agent-tool/permissions.js';
 
 const metadata = z.record(z.string(), z.json());
 const model = z.object({ id: z.string(), providerID: z.string(), variant: z.string().nullable().optional() });
@@ -17,8 +18,12 @@ const catalogQuery = z.object({ backendID: z.enum(['opencode', 'antigravity']).o
 const create = z.object({ id: z.string().optional(), title: z.string().optional(), agent: z.string().optional(), model: model.optional(), metadata: metadata.optional(), backendID: z.enum(['opencode', 'antigravity']).optional() });
 const sessionRoot = '/api/conversations';
 const catalogRoot = '/api/conversation-catalog';
+const requestRoot = '/api/conversation-requests';
+const permissionReply = z.object({ decision: z.enum(['once', 'always', 'reject']), message: z.string().optional() });
+const formReply = z.object({ answer: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.array(z.string())])) });
+const formCancel = z.object({ message: z.string().optional() });
 
-type ConversationRequest = Request<unknown, { id: string; messageID: string }>;
+type ConversationRequest = Request<unknown, { id: string; messageID: string; requestID: string; formID: string }>;
 type ConversationResponse = Exclude<Awaited<ReturnType<ConversationApi[keyof ConversationApi]>>, void> | boolean | null | { id: string };
 
 interface Options {
@@ -27,6 +32,7 @@ interface Options {
   abortTools(sessionID: string): void;
   phase: 'native' | 'opencode';
   fetch?: typeof fetch;
+  permissions: Pick<ReturnType<typeof createToolPermissions>, 'list'>;
 }
 
 export function registerConversationRoutes(app: Application, express: Pick<ExpressFactory, 'json' | 'Router'>, options: Options) {
@@ -81,5 +87,27 @@ export function registerConversationRoutes(app: Application, express: Pick<Expre
   router.get(catalogRoot, handle((api, req) => { const input = catalogQuery.parse(req.query); return api.catalog(input.sessionID, input.includeProviders !== 'false'); }));
   router.get(`${catalogRoot}/providers`, handle(api => api.providers()));
   router.get(`${catalogRoot}/agents`, handle(api => api.agents()));
+  router.get(`${requestRoot}/forms`, handle(async (api, req) => {
+    const directory = z.string().optional().parse(req.query.directory);
+    const additional = await Promise.all(options.registry.additional.map(adapter => adapter.conversations({ client: options.client(), directory }).pendingForms()));
+    return [...await api.pendingForms(), ...additional.flat()];
+  }));
+  router.get(`${requestRoot}/permissions`, handle(async (api, req) => [
+    ...await api.pendingPermissions(),
+    ...options.permissions.list(z.string().optional().parse(req.query.directory)).map(({ request: { metadata, ...request } }) => ({ ...request, ...metadata && { metadata: z.record(z.string(), z.json()).parse(metadata) } })),
+  ]));
+  router.post(`${sessionRoot}/:id/permission/:requestID/reply`, express.json({ limit: '1mb' }), handle(async (api, req) => {
+    const input = permissionReply.parse(req.body);
+    await api.replyPermission(req.params.id, req.params.requestID, input.decision, input.message);
+    return true;
+  }));
+  router.post(`${sessionRoot}/:id/form/:formID/reply`, express.json({ limit: '1mb' }), handle(async (api, req) => {
+    await api.replyForm(req.params.id, req.params.formID, formReply.parse(req.body).answer);
+    return true;
+  }));
+  router.delete(`${sessionRoot}/:id/form/:formID`, express.json({ limit: '1mb' }), handle(async (api, req) => {
+    await api.cancelForm(req.params.id, req.params.formID, formCancel.parse(req.body ?? {}).message);
+    return true;
+  }));
   app.use(router);
 }

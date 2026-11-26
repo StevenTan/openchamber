@@ -4,6 +4,8 @@ Managed OpenCode discovers `request_user_input_async` through the native `reques
 MCP server at `/api/openchamber/async-question/mcp`. Its `user_input_async` tool takes one or more questions,
 each carrying `title` and optional string `options`. Every field accepts free
 text; the first option is selected initially and requires explicit submission.
+The shared conversation form reply and cancellation routes resolve host-owned
+questions through this runtime, including their later answer messages.
 The tool returns a receipt object containing `question_id`, `status: "pending"`,
 and `message`. Awaiting the call waits for question creation; the same turn can
 continue independent work while the user answers. Answers arrive as later session

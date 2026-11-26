@@ -43,6 +43,6 @@ export function registerQuestionFormRoutes(questionRuntime: ReturnType<typeof cr
         return res.status(204).end();
       }, (error: Error & { status?: number }) => res.status(error.status ?? (error.name === 'ZodError' ? 400 : 500)).json({ error: error.message }));
     };
-    app.post('/api/session/:sessionID/form/:formID/reply', express.json({ limit: '1mb' }), resolveQuestion(false));
-    app.delete('/api/session/:sessionID/form/:formID', resolveQuestion(true));
+    app.post(['/api/session/:sessionID/form/:formID/reply', '/api/conversations/:sessionID/form/:formID/reply'], express.json({ limit: '1mb' }), resolveQuestion(false));
+    app.delete(['/api/session/:sessionID/form/:formID', '/api/conversations/:sessionID/form/:formID'], resolveQuestion(true));
 }

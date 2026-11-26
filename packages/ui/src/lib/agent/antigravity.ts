@@ -5,7 +5,6 @@ import type { AcpConversation } from '@openchamber/sdk/agent-backends';
 import type { AgentBackend } from './backend';
 import { createConversationHttpClient } from './http-client';
 import type { AgentRuntime, DirectoryAvailability, ConversationLocation } from './runtime';
-import type { FormRequest, PermissionRequest } from './requests';
 import { acpSession } from './antigravity-projection';
 
 const base = '/api/agent/antigravity';
@@ -25,23 +24,6 @@ export function createAntigravityAdapter(events = createConversationEventSource(
     const result = await antigravityRequest<AcpConversation[]>(`/sessions${folder ? `?directory=${encodeURIComponent(folder)}` : ''}`);
     return result.map(acpSession);
   };
-  const pending: Parameters<typeof createConversationHttpClient>[2] = {
-    async replyToPermission(id, requestID, decision, options) {
-      const response = await runtimeFetch(`/api/session/${id}/permission/${requestID}/reply`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision, message: options?.message }) });
-      if (!response.ok) throw new BackendApiError(await response.text(), response.status);
-      return true;
-    },
-    async replyToForm(id, formID, answer) {
-      const response = await runtimeFetch(`/api/session/${id}/form/${formID}/reply`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ answer }) });
-      if (!response.ok) throw new BackendApiError(await response.text(), response.status);
-      return true;
-    },
-    async cancelForm(id, formID) {
-      const response = await runtimeFetch(`/api/session/${id}/form/${formID}`, { method: 'DELETE' });
-      if (!response.ok) throw new BackendApiError(await response.text(), response.status);
-      return true;
-    },
-  };
   const runtime: AgentRuntime = {
     checkHealth: async () => (await runtimeFetch('/health')).ok,
     probeHealth: async () => (await runtimeFetch('/health')).ok ? 'healthy' : 'unhealthy',
@@ -59,11 +41,12 @@ export function createAntigravityAdapter(events = createConversationEventSource(
     listProjects: async () => [...new Set((await list()).map(session => session.directory))].map(folder => ({ id: folder, worktree: folder, time: { created: 0, updated: 0 }, sandboxes: [] })),
     getVcs: async () => ({}),
     getActiveSessionStatuses: () => antigravityRequest('/statuses'),
-    listPendingForms: () => antigravityRequest<FormRequest[]>('/forms'),
-    listPendingPermissions: () => antigravityRequest<PermissionRequest[]>('/permissions'),
+    listPendingForms: options => client.listPendingForms(options),
+    listPendingPermissions: options => client.listPendingPermissions(options),
     listRunningShells: async folder => ({ directory: folder, shells: [] }),
     listRunningImageJobs: async () => [],
     getInitializationError: async message => message,
   };
-  return { id: 'antigravity', client: createConversationHttpClient('antigravity', runtime, pending), runtime, events };
+  const client = createConversationHttpClient('antigravity', runtime);
+  return { id: 'antigravity', client, runtime, events };
 }

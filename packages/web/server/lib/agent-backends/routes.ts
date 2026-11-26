@@ -3,12 +3,11 @@ import fs from 'node:fs/promises';
 import { z } from 'zod';
 import type { Application, ExpressFactory, ErrorRequestHandler } from '../shared/http-contracts.js';
 import type { createAntigravityBackend } from './antigravity.js';
-import type { createManagedAgentTools } from '../opencode/managed-agent-tools.js';
 import { AntigravityNotInstalledError } from './antigravity-executable.js';
 
 const directoryInput = z.object({ directory: z.string().min(1) });
 
-export function registerAgentBackendRoutes(app: Application, express: Pick<ExpressFactory, 'json'>, backend: ReturnType<typeof createAntigravityBackend>, tools: ReturnType<typeof createManagedAgentTools>) {
+export function registerAgentBackendRoutes(app: Application, express: Pick<ExpressFactory, 'json'>, backend: ReturnType<typeof createAntigravityBackend>) {
   const base = '/api/agent/antigravity';
   app.get(`${base}/settings`, async (_req, res) => res.json(await backend.settings()));
   app.put(`${base}/settings`, express.json({ limit: '1mb' }), async (req, res) => { await backend.configure(z.object({ binary: z.string().min(1) }).parse(req.body)); res.status(204).end(); });
@@ -21,8 +20,6 @@ export function registerAgentBackendRoutes(app: Application, express: Pick<Expre
   app.get(`${base}/sessions`, async (req, res) => res.json(await backend.list(z.string().optional().parse(req.query.directory))));
   app.get<unknown, { id: string }>(`${base}/sessions/:id`, async (req, res) => res.json(await backend.get(req.params.id)));
   app.get(`${base}/statuses`, (_req, res) => res.json(backend.statuses()));
-  app.get(`${base}/permissions`, (_req, res) => res.json(tools.permissions.list().filter(entry => backend.lookup(entry.request.sessionID)).map(entry => entry.request)));
-  app.get(`${base}/forms`, async (_req, res) => res.json((await backend.list()).flatMap(session => session.forms.filter(form => form.state.status === 'pending'))));
   app.get(`${base}/home`, (_req, res) => res.json(os.homedir()));
   app.get(`${base}/location`, async (req, res) => {
     const directory = z.string().optional().parse(req.query.directory) || os.homedir();

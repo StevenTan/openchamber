@@ -10,7 +10,9 @@ conversation HTTP API for creation, history, sends, selection and interruption.
 The host selects the recorded owner and returns the shared conversation model,
 including the combined session list and model catalogs. VS Code uses the direct
 OpenCode SDK client. Managed backends share the host's normalized live event
-stream. Pending request operations retain their backend transports. Sync owns
+stream. Pending permission and form lists use `/api/conversation-requests`, and
+replies and cancellation use `/api/conversations/:id`. The host aggregates the
+directory's pending cards and dispatches replies to their owner. Sync owns
 transcript membership and store writes.
 New-conversation drafts select their backend; existing
 conversations retain their stored backend.

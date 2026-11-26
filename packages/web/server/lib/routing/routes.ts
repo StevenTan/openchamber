@@ -22,6 +22,7 @@ const SEND_PATHS = [
   '/api/session/:sessionId/prompt',
   '/api/session/:sessionId/command',
   '/api/session/:sessionId/form/:formId/reply',
+  '/api/conversations/:sessionId/form/:formId/reply',
 ];
 
 const sendError = (res: Response, cause: unknown) => {

@@ -9,7 +9,8 @@ import { createConversationEventSource } from './agent/http-events'
 const standard = createOpenCodeBackend()
 const events = createConversationEventSource()
 const antigravity = createAntigravityAdapter(events)
-const opencode = { ...standard, events, client: createConversationHttpClient('opencode', standard.runtime, standard.client) }
+const client = createConversationHttpClient('opencode', standard.runtime)
+const opencode = { ...standard, events, client, runtime: { ...standard.runtime, listPendingForms: client.listPendingForms, listPendingPermissions: client.listPendingPermissions } }
 registerAgentBackend('opencode', () => isVSCodeRuntime() ? standard : opencode)
 registerAgentBackend('antigravity', () => antigravity)
 registerAgentBackend('application', () => isVSCodeRuntime() ? standard : { ...createApplicationBackend(opencode, antigravity), client: opencode.client })
