@@ -9,8 +9,9 @@ registers the application's backend factories. Managed clients share the host's
 conversation HTTP API for creation, history, sends, selection and interruption.
 The host selects the recorded owner and returns the shared conversation model,
 including the combined session list and model catalogs. VS Code uses the direct
-OpenCode SDK client. Pending requests and live events retain their backend
-transports. Sync owns transcript membership and store writes.
+OpenCode SDK client. Managed backends share the host's normalized live event
+stream. Pending request operations retain their backend transports. Sync owns
+transcript membership and store writes.
 New-conversation drafts select their backend; existing
 conversations retain their stored backend.
 
@@ -72,6 +73,9 @@ snapshots reach sync and composer selection.
 
 ### Transport ownership
 
-The OpenCode event source owns wire ordering and translation before publishing
-application events. Sync consumes normalized events and retains its transcript
-batching, routing and reconciliation behavior.
+Managed backends subscribe once to `/api/conversations/events/ws`, with SSE at
+`/api/conversations/events` as the transport fallback. The host translates native
+events and publishes the shared SDK event model with replay cursors. VS Code's
+direct OpenCode source translates its SDK wire events locally. Both sources use
+`event-pipeline.ts` for batching, authentication, reconnect and backpressure.
+Sync consumes normalized events and retains its transcript reconciliation.

@@ -872,7 +872,7 @@
             {"do": "session.send", "session": "s", "prompt": "Bump TypeScript to 5.7 and fix whatever breaks."},
             {"do": "open", "session": "s"},
             {"do": "hover", "on": "chat.answer", "text": "Bumped. Two errors came up"},
-            {"do": "network.block", "urls": ["*/session/*/message*"]},
+            {"do": "network.block", "urls": ["*/conversations/*/message*"]},
             {"do": "click", "on": "chat.footerBranch"},
             {"do": "click", "on": "menu.item", "text": "Fork from here"},
             {"do": "see", "on": "sidebar.anyActiveRow", "text": "Chat fork retry (fork #1)"},

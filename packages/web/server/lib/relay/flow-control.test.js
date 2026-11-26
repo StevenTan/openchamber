@@ -5,7 +5,7 @@ import { startRelayHost } from './host-client.js';
 import { generateEcdhKeyPair, exportPublicKeyJwk } from './e2ee.js';
 import { createRelayTunnelClient } from '../../../../ui/src/lib/relay/tunnel-client.ts';
 
-async function exercise({ clientFlow = true, hostFlow = true, batch = true, cancel = false, websocket = false } = {}) {
+async function exercise({ clientFlow = true, hostFlow = true, batch = true, cancel = false, websocket = false, socketPath = '/api/terminal/ws' } = {}) {
   const total = 512 * 1024;
   const content = Buffer.alloc(total, 'a');
   content.fill('b', total / 2);
@@ -103,7 +103,7 @@ async function exercise({ clientFlow = true, hostFlow = true, batch = true, canc
     });
     let stream;
     if (websocket) {
-      const socket = client.openWebSocket('/api/terminal/ws?oc_url_token=fixture-url-token');
+      const socket = client.openWebSocket(`${socketPath}?oc_url_token=fixture-url-token`);
       stream = new Promise((resolve, reject) => {
         socket.onmessage = event => {
           const bytes = new Uint8Array(event.data);
@@ -171,6 +171,9 @@ describe('end-to-end downstream credit', () => {
   });
   test('fragmented WS messages remain complete and precede the close', async () => {
     await exercise({ websocket: true });
+  });
+  test('managed conversation events cross the encrypted relay WebSocket', async () => {
+    await exercise({ websocket: true, socketPath: '/api/conversations/events/ws' });
   });
   for (const legacy of [{ clientFlow: false }, { hostFlow: false }]) {
     test(`legacy fallback ${JSON.stringify(legacy)} preserves delivery`, async () => {

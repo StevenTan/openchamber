@@ -381,7 +381,7 @@ describe('relay host WebSocket allowlist', () => {
   });
 
   test('allows the sockets of an isolated space by path shape only', () => {
-    for (const socket of ['terminal/ws', 'dev-tunnel', 'event/ws', 'global/event/ws']) {
+    for (const socket of ['terminal/ws', 'dev-tunnel', 'event/ws', 'global/event/ws', 'conversations/events/ws']) {
       expect(isAllowedRelayWebSocketPath(`/api/spaces/a1b2c3d4e5f6/${socket}`)).toBe(true);
     }
     expect(isAllowedRelayWebSocketPath('/api/spaces/a1b2c3d4e5f6/dictation/ws')).toBe(false);

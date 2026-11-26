@@ -36,7 +36,7 @@ type PipelineOptions =
   & Pick<TerminalOptions, 'fs' | 'path' | 'buildAugmentedPath' | 'searchPathFor' | 'isExecutable' | 'broadcastUiEvent'>
   & Pick<TerminalOptions, 'app' | 'express' | 'uiAuthController' | 'isRequestOriginAllowed' | 'rejectWebSocketUpgrade'>
   & Required<Pick<MessageStreamWsRuntimeOptions, 'buildOpenCodeUrl' | 'getOpenCodeAuthHeaders' | 'globalEventHub' |
-    'processForwardedEventPayload' | 'triggerHealthCheck' | 'upstreamStallTimeoutMs'>>
+    'processForwardedEventPayload' | 'triggerHealthCheck' | 'upstreamStallTimeoutMs' | 'conversationStream'>>
   & {
     host: string | undefined;
     messageStreamWsClients: MessageStreamWsRuntimeOptions['wsClients'];
@@ -85,6 +85,7 @@ export const createStartupPipelineRuntime = (dependencies: StartupPipelineDepend
       messageStreamWsClients,
       triggerHealthCheck,
       upstreamStallTimeoutMs,
+      conversationStream,
       terminalHeartbeatIntervalMs,
       terminalRebindWindowMs,
       terminalMaxRebindsPerWindow,
@@ -157,6 +158,7 @@ export const createStartupPipelineRuntime = (dependencies: StartupPipelineDepend
       globalEventHub,
       processForwardedEventPayload,
       wsClients: messageStreamWsClients,
+      conversationStream,
       triggerHealthCheck,
       upstreamStallTimeoutMs,
     });

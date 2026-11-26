@@ -1,7 +1,8 @@
-import type { SpaceCreationStep, SpaceTaskTitle } from "@/lib/spaces/spaces-api"
+import type { SpaceTaskTitle } from "@/lib/spaces/spaces-api"
 import type { SyncEvent } from "@/lib/agent/events"
 
-export type SpaceProgress = { spaceId: string; step: SpaceCreationStep | "failed" | "removed"; failure: { code: string; message: string } | null }
+import type { SpaceProgress } from '@openchamber/sdk/conversations/stream'
+export type { SpaceProgress } from '@openchamber/sdk/conversations/stream'
 
 type EventDelivery = {
   onEvent: (directory: string, payload: SyncEvent) => void

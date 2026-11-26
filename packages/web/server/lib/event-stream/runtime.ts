@@ -15,10 +15,13 @@ import {
   MESSAGE_STREAM_WS_HEARTBEAT_INTERVAL_MS,
   serializeMessageStreamWsEvent,
   sendSerializedMessageStreamWsFrame,
+  sendMessageStreamWsFrame,
 } from './protocol.js';
 import { createGlobalMessageStreamHub } from './global-hub.js';
 import { createGlobalMessageStreamWsBridge } from './global-ws-bridge.js';
 import { acceptDirectoryMessageStreamWsConnection } from './directory-ws-bridge.js';
+import { CONVERSATION_EVENTS_WS_PATH } from '@openchamber/sdk/conversations/stream';
+import type { createConversationStream } from '../agent-backends/conversation-stream.js';
 import {
   DEFAULT_UPSTREAM_RECONNECT_DELAY_MS,
   DEFAULT_UPSTREAM_STALL_TIMEOUT_MS,
@@ -28,6 +31,7 @@ export interface GlobalUiEventBroadcasterOptions<SseClient> {
   sseClients: Set<SseClient>;
   wsClients: Set<StreamSocket>;
   writeSseEvent: <Payload>(res: SseClient, payload: Payload, serializedPayload: string | undefined) => void;
+  eventHub?: Pick<GlobalMessageStreamHub, 'injectEvent'>;
 }
 
 export interface MessageStreamWsRuntimeOptions extends UpstreamConnection, Omit<BridgeOptions, 'heartbeatIntervalMs'> {
@@ -37,6 +41,7 @@ export interface MessageStreamWsRuntimeOptions extends UpstreamConnection, Omit<
   rejectWebSocketUpgrade: ReturnType<typeof createRequestSecurityRuntime>['rejectWebSocketUpgrade'];
   heartbeatIntervalMs?: number;
   globalEventHub?: GlobalMessageStreamHub | null;
+  conversationStream?: ReturnType<typeof createConversationStream>;
 }
 
 const isRequestUrl = (value: unknown): value is string => typeof value === 'string';
@@ -45,10 +50,12 @@ export function createGlobalUiEventBroadcaster<SseClient>({
   sseClients,
   wsClients,
   writeSseEvent,
+  eventHub,
 }: GlobalUiEventBroadcasterOptions<SseClient>) {
   return <Payload>(payload: Payload, options: EventRouting = {}) => {
+    if (eventHub) eventHub.injectEvent({ payload: JSON.parse(JSON.stringify(payload)), directory: options.directory || 'global', spaceId: null });
     const hasSseClients = sseClients.size > 0;
-    const hasWsClients = wsClients.size > 0;
+    const hasWsClients = !eventHub && wsClients.size > 0;
     if (!hasSseClients && !hasWsClients) {
       return;
     }
@@ -94,6 +101,7 @@ export function createMessageStreamWsRuntime({
   upstreamReconnectDelayMs = DEFAULT_UPSTREAM_RECONNECT_DELAY_MS,
   fetchImpl = fetch,
   globalEventHub = null,
+  conversationStream,
 }: MessageStreamWsRuntimeOptions) {
   const wsServer = new WebSocketServer({
     noServer: true,
@@ -114,7 +122,7 @@ export function createMessageStreamWsRuntime({
     globalHub,
     ownsGlobalHub,
     wsClients,
-    processForwardedEventPayload,
+    processForwardedEventPayload: conversationStream ? () => {} : processForwardedEventPayload,
     triggerHealthCheck,
     heartbeatIntervalMs,
   });
@@ -126,6 +134,12 @@ export function createMessageStreamWsRuntime({
     const isGlobalStream = pathname === MESSAGE_STREAM_GLOBAL_WS_PATH;
     const requestedLastEventId = requestUrl.searchParams.get('lastEventId')?.trim() || '';
     const requestedDirectory = requestUrl.searchParams.get('directory')?.trim() || '';
+
+    if (pathname === CONVERSATION_EVENTS_WS_PATH && conversationStream) {
+      const stop = conversationStream.connect(frame => sendMessageStreamWsFrame(socket, frame), requestedLastEventId);
+      socket.on('close', stop);
+      return;
+    }
 
     if (isGlobalStream) {
       globalBridge.accept(socket, {
@@ -158,7 +172,7 @@ export function createMessageStreamWsRuntime({
 
   const upgradeHandler = (req: IncomingMessage, socket: Duplex, head: Buffer) => {
     const pathname = parseRequestPathname(req.url);
-    if (pathname !== MESSAGE_STREAM_GLOBAL_WS_PATH && pathname !== MESSAGE_STREAM_DIRECTORY_WS_PATH) {
+    if (pathname !== MESSAGE_STREAM_GLOBAL_WS_PATH && pathname !== MESSAGE_STREAM_DIRECTORY_WS_PATH && !(pathname === CONVERSATION_EVENTS_WS_PATH && conversationStream)) {
       return;
     }
 

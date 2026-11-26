@@ -6,7 +6,6 @@ import { createAntigravityBackend } from './antigravity.js';
 import { createBackendMcpIdentity } from './mcp-identity.js';
 import { resolveOpenCodeMcpContext } from '../opencode/mcp-context.js';
 import { createManagedAgentTools } from '../opencode/managed-agent-tools.js';
-import type { GlobalMessageStreamHub } from '../event-stream/global-hub.js';
 import type { AcpConversationEvent } from '@openchamber/sdk/agent-backends';
 import { createQuestionRuntime } from '../agent-question/src/runtime.js';
 import { createOpenCodeSessionArchive, type OpenCodeSessionArchive } from '../openchamber-sessions/session-archive.js';
@@ -25,6 +24,9 @@ import type { OpenCodeClient } from '@opencode/client';
 import type { Application } from '../shared/http-contracts.js';
 import { registerAgentBackendRoutes } from './routes.js';
 import { registerConversationRoutes } from './conversation-routes.js';
+import { createConversationStream, type ConversationEventHub } from './conversation-stream.js';
+import { antigravityEvents } from './antigravity-events.js';
+import type { ForwardEventPayload } from '../event-stream/contracts.js';
 
 interface Options {
   dataDir: string;
@@ -32,14 +34,16 @@ interface Options {
   tools(): ReturnType<typeof createManagedAgentTools>;
   environment(): NodeJS.ProcessEnv;
   publish(event: { type: 'openchamber:acp'; properties: AcpConversationEvent }): void;
-  hub: Pick<GlobalMessageStreamHub, 'injectEvent' | 'subscribeEvent' | 'subscribeStatus'>;
+  hub: ConversationEventHub;
   openCodeClient(directory?: string, requestFetch?: typeof fetch): OpenCodeClient;
   initializeSession(sessionID: string, directory: string): Promise<void>;
   readInstructions(sessionID: string): Promise<Array<{ text: string }>>;
   onUserInput(sessionID: string): void;
   openCodeMetadata: OpenCodeSessionMetadata;
+  processForwardedEventPayload?: ForwardEventPayload;
 }
 export function createAgentBackendHost(options: Options) {
+  const stream = createConversationStream(options.hub, options.processForwardedEventPayload);
   const identity = createBackendMcpIdentity();
   const owners = new Map<string, BackendID>();
   const turnDiffs = createTurnDiffRuntime(options.dataDir, async (sessionID, reference) => {
@@ -50,7 +54,12 @@ export function createAgentBackendHost(options: Options) {
     turnDiffs,
     reassignSession: identity.reassign,
     registerSession: (sessionID, previousID) => { if (previousID) owners.delete(previousID); owners.set(sessionID, 'antigravity'); },
-    publish: event => options.publish({ type: 'openchamber:acp', properties: event }),
+    publish: event => {
+      options.publish({ type: 'openchamber:acp', properties: event });
+      if (event.type === 'control') return;
+      if (event.type === 'deleted') stream.publish([{ type: 'session.deleted', properties: { sessionID: event.sessionID } }], event.directory);
+      else stream.publish(antigravityEvents(event), event.session.directory);
+    },
     publishForm: (type, data, directory) => options.hub.injectEvent({ directory, spaceId: null, payload: { id: randomUUID(), created: Date.now(), type, data: z.record(z.string(), z.json()).parse(data), location: { directory } } }),
     mcpServers: sessionID => {
       const address = options.server()?.address();
@@ -68,11 +77,6 @@ export function createAgentBackendHost(options: Options) {
   const openCodeArchive = createOpenCodeSessionArchive({ clientFor: options.openCodeClient });
   const registry = createBackendRegistry({ opencode: createOpenCodeAdapter(openCodeArchive, options.openCodeMetadata), antigravity: createAntigravityAdapter(backend) }, owners, backend.ready);
   const applicationDirectory = (sessionID: string) => backend.lookup(sessionID)?.directory;
-  const unsubscribe = options.hub.subscribeEvent(event => {
-    const parsed = z.object({ type: z.enum(['permission.asked', 'permission.replied', 'form.created', 'form.replied', 'form.cancelled']), data: z.object({ sessionID: z.string().optional(), form: z.object({ sessionID: z.string() }).optional() }) }).safeParse(event.payload);
-    const sessionID = parsed.success ? parsed.data.data.sessionID ?? parsed.data.data.form?.sessionID : undefined;
-    if (sessionID && backend.lookup(sessionID)) options.publish({ type: 'openchamber:acp', properties: { type: 'control', payload: event.payload, directory: event.directory } });
-  });
   const toolOptions = {
     turnDiffs,
     applicationContext: (request: Parameters<typeof resolveOpenCodeMcpContext>[0]) => {
@@ -88,8 +92,9 @@ export function createAgentBackendHost(options: Options) {
   };
   const conversations = { registry, client: options.openCodeClient, abortTools: (id: string) => options.tools().abortSession(id) };
   return {
-    backend, registry,
+    backend, registry, stream,
     registerRoutes(app: Application) {
+      stream.registerRoutes(app);
       registerAgentBackendRoutes(app, express, backend, options.tools());
       registerConversationRoutes(app, express, { ...conversations, phase: 'native' });
     },
@@ -100,7 +105,7 @@ export function createAgentBackendHost(options: Options) {
       setArchived: async (sessionID: string, archived: boolean) => { await registry.ready; return registry.forSession(sessionID).archive.setArchived(sessionID, archived); },
       readArchivedAt: async (sessionID: string, readOptions?: Parameters<OpenCodeSessionArchive['readArchivedAt']>[1]) => { await registry.ready; return registry.forSession(sessionID).archive.readArchivedAt(sessionID, readOptions); },
     },
-    close: async () => { unsubscribe(); await backend.close(); await turnDiffs.close(); },
+    close: async () => { await backend.close(); await turnDiffs.close(); stream.close(); },
     toolOptions,
     applicationPolicy,
     createTools(input: ToolOptions): AgentBackendTools {
@@ -129,7 +134,7 @@ export function createManagedAgentBackendHost(options: Omit<Options, 'initialize
   const host = createAgentBackendHost({
     ...options,
     publish: event => {
-      options.publish(event);
+      if (event.properties.type === 'control') options.publish(event);
       if (event.properties.type === 'turn') options.sessionStatus(event.properties.sessionID, event.properties.turn.completed ? 'idle' : 'busy');
     },
     initializeSession: async (sessionID, directory) => {

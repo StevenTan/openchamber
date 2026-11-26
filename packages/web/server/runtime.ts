@@ -677,17 +677,25 @@ const notificationEmitterRuntime = createNotificationEmitterRuntime({
 
 const writeSseEvent: typeof notificationEmitterRuntime.writeSseEvent = (...args) => notificationEmitterRuntime.writeSseEvent(...args);
 const emitDesktopNotification: typeof notificationEmitterRuntime.emitDesktopNotification = (...args) => notificationEmitterRuntime.emitDesktopNotification(...args);
+const hiddenSessions = createHiddenSessionRegistry();
+const globalMessageStreamHub = createGlobalMessageStreamHub({
+  isHiddenPayload: hiddenSessions.isHiddenPayload,
+  buildOpenCodeUrl: (...args) => buildOpenCodeUrl(...args),
+  getOpenCodeAuthHeaders: () => getOpenCodeAuthHeaders(),
+  upstreamStallTimeoutMs: () => getUpstreamStallTimeoutMs(),
+  deltaCoalesceWindowMs: resolveDeltaCoalesceWindowMs(),
+});
 const broadcastGlobalUiEvent = createGlobalUiEventBroadcaster({
   sseClients: uiNotificationClients,
   wsClients: uiNotificationWsClients,
-  writeSseEvent,
+  writeSseEvent, eventHub: globalMessageStreamHub,
 });
 const broadcastUiNotification: typeof notificationEmitterRuntime.broadcastUiNotification = (...args) => notificationEmitterRuntime.broadcastUiNotification(...args);
 
 const broadcastOpenChamberUiEvent = createGlobalUiEventBroadcaster({
   sseClients: uiOpenChamberEventClients,
   wsClients: uiNotificationWsClients,
-  writeSseEvent,
+  writeSseEvent, eventHub: globalMessageStreamHub,
 });
 
 const broadcastControlSseEvent = createGlobalUiEventBroadcaster({
@@ -1238,16 +1246,6 @@ const extensionServiceLifetime = createServiceLifetime({
   persistPath: extensionsPersistPath(OPENCHAMBER_DATA_DIR),
 });
 
-const hiddenSessions = createHiddenSessionRegistry();
-
-const globalMessageStreamHub = createGlobalMessageStreamHub({
-  isHiddenPayload: hiddenSessions.isHiddenPayload,
-  buildOpenCodeUrl,
-  getOpenCodeAuthHeaders,
-  upstreamStallTimeoutMs: getUpstreamStallTimeoutMs,
-  deltaCoalesceWindowMs: resolveDeltaCoalesceWindowMs(),
-});
-
 const routingRuntime = createRoutingRuntime({
   dataDir: OPENCHAMBER_DATA_DIR,
   buildOpenCodeUrl,
@@ -1651,7 +1649,7 @@ const agentBackendHost = createManagedAgentBackendHost({
   openCodeMetadata: createOpenCodeSessionMetadata({ buildOpenCodeUrl: (...args) => buildOpenCodeUrl(...args), getOpenCodeAuthHeaders: () => getOpenCodeAuthHeaders() }),
   tools: () => { if (!agentToolRuntime) throw new Error('Agent tools are unavailable'); return agentToolRuntime; },
   environment: () => overlayEnvironment({ ...process.env, PATH: buildAugmentedPath() }, environmentRuntime.forOpenCode()),
-  publish: broadcastOpenChamberUiEvent, hub: globalMessageStreamHub,
+  publish: broadcastOpenChamberUiEvent, hub: globalMessageStreamHub, processForwardedEventPayload,
   sessionStatus: messageQueueRuntime.sessionStatus,
   initializePermission: permissionAutoAcceptRuntime.initializeSession,
   syncKnowledge: sessionKnowledgeRuntime.sync,
@@ -3039,7 +3037,7 @@ async function main(options: WebUiServerOptions = {}) {
     rejectWebSocketUpgrade,
     buildOpenCodeUrl,
     getOpenCodeAuthHeaders,
-    globalEventHub: globalMessageStreamHub,
+    globalEventHub: globalMessageStreamHub, conversationStream: agentBackendHost.stream,
     processForwardedEventPayload,
     messageStreamWsClients: uiNotificationWsClients,
     upstreamStallTimeoutMs: getUpstreamStallTimeoutMs,

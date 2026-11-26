@@ -19,16 +19,6 @@ export function createApplicationBackend(opencode: AgentBackend, antigravity: Ag
         return (await Promise.all([opencode.runtime.listPendingPermissions(options), antigravity.runtime.listPendingPermissions(options)])).flat()
       },
     },
-    events: {
-      get identity() { return opencode.events.identity },
-      connect(input) {
-        const standard = opencode.events.connect(input)
-        const native = antigravity.events.connect(input)
-        return {
-          cleanup() { standard.cleanup(); native.cleanup() },
-          reconnect(reason) { standard.reconnect(reason); native.reconnect(reason) },
-        }
-      },
-    },
+    events: opencode.events,
   }
 }

@@ -3,6 +3,12 @@
 ## Purpose
 This module contains the OpenChamber message-stream WebSocket protocol and runtime bridge. It keeps the browser-facing WebSocket transport separate from the upstream OpenCode SSE transport.
 
+Managed conversation clients use `/api/conversations/events/ws` or SSE at
+`/api/conversations/events`. The agent-backend host projects the shared hub's
+events into SDK sync events. Host UI broadcasts enter the hub before WS fan-out
+and retain their direct SSE delivery. Managed streams also record the host's
+synthetic status events in the hub; replay only projects stored events.
+
 ## Entrypoints and structure
 - `packages/web/server/lib/event-stream/index.ts`: public entrypoint re-exporting protocol and runtime helpers.
 - `packages/web/server/lib/event-stream/global-hub.ts`: shared global upstream SSE hub for server-side subscribers and browser WS fan-out.

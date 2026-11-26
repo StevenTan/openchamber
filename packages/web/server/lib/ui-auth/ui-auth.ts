@@ -371,7 +371,7 @@ const parseUrlAuthScope = (value: AuthInput['scope']): UrlAuthScope | null | und
 const isGuestScopedPath = (pathname: string, guestId: string) => pathname.startsWith(`/api/guests/${guestId}/`);
 
 const SPACE_RAW_FILE_PATH = /^\/api\/spaces\/[0-9a-f]{12}\/fs\/raw$/;
-const SPACE_WS_PATH = /^\/api\/spaces\/[0-9a-f]{12}\/(?:terminal\/ws|dev-tunnel|event\/ws|global\/event\/ws)$/;
+const SPACE_WS_PATH = /^\/api\/spaces\/[0-9a-f]{12}\/(?:terminal\/ws|dev-tunnel|event\/ws|global\/event\/ws|conversations\/events\/ws)$/;
 
 const SOURCE_CONTROL_UPLOAD_PREFIXES = Object.freeze(sourceControlProviderDescriptors.list()
   .filter((descriptor) => descriptor.capabilities.uploads)
@@ -394,7 +394,7 @@ const isUrlAuthReadableHttpPath = (pathname: string) => {
 
 const isUrlAuthWebSocketPath = (pathname: string) => {
   return pathname === '/api/event/ws'
-    || pathname === '/api/global/event/ws'
+    || pathname === '/api/global/event/ws' || pathname === '/api/conversations/events/ws'
     || pathname === '/api/openchamber/realtime-proxy/ws'
     || pathname === '/api/terminal/ws'
     || pathname === '/api/dictation/ws'

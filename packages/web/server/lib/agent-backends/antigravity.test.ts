@@ -198,7 +198,7 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
     onUserInput: () => {}, readInstructions: async () => [], environment: () => process.env, server: () => listener,
     tools: () => { throw new Error('Tool runtime is unused'); }, publish: () => {},
     openCodeMetadata: { read: async () => ({}), write: async () => {} },
-    hub: { injectEvent: () => {}, subscribeEvent: () => () => {}, subscribeStatus: () => () => {} },
+    hub: { injectEvent: () => {}, subscribeEvent: () => () => {}, subscribeStatus: () => () => {}, flushPending: () => {}, cursor: () => 'start', replayAfter: () => [] },
     openCodeClient: () => createOpenCodeClient({ baseUrl: 'http://127.0.0.1', headers: {}, fetch: async (url, init) => {
       if (init?.method === 'PATCH') { openCodeArchives.push([path.basename(new URL(String(url)).pathname), JSON.parse(String(init.body)).archived]); return new Response(null, { status: 204 }); }
       return Response.json({ data: { id: 'ses_opencode', time: { archived: 1234 } } });

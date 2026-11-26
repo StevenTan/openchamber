@@ -56,11 +56,7 @@ export function findCatalogModel<T extends { id: string; modelID: string }>(
 }
 
 
-export function compact<T extends object>(value: T): T {
-  // SAFETY: only keys with an undefined value are dropped; every remaining
-  // key keeps its declared type, so the result still satisfies T.
-  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as T
-}
+export { compact } from '@openchamber/sdk/conversations/identities'
 
 
 

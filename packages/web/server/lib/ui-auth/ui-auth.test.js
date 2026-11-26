@@ -316,7 +316,7 @@ describe('ui auth client credential seam', () => {
     expect(await auth.ensureSessionToken(devTunnelWsReq, null)).toBe('client:device-1');
 
     // The sockets and the raw file of an isolated space, by path shape, and nothing else under the prefix.
-    for (const socket of ['terminal/ws', 'dev-tunnel', 'event/ws', 'global/event/ws']) {
+    for (const socket of ['terminal/ws', 'dev-tunnel', 'event/ws', 'global/event/ws', 'conversations/events/ws']) {
       const spaceWsReq = {
         method: 'GET',
         path: `/api/spaces/a1b2c3d4e5f6/${socket}`,

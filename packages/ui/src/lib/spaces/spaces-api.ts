@@ -6,8 +6,9 @@ import { runtimeFetch } from '@/lib/runtime-fetch';
 const SPACES_ROUTE = '/api/openchamber/spaces';
 
 const spaceIdSchema = z.string().regex(/^[0-9a-f]{12}$/);
-export const spaceTaskTitleSchema = z.object({ title: z.string().min(1).max(120), by: z.enum(['user', 'agent']) });
-export type SpaceTaskTitle = z.infer<typeof spaceTaskTitleSchema>;
+export { spaceTaskTitleSchema } from '@openchamber/sdk/conversations/space-events';
+import { spaceTaskTitleSchema } from '@openchamber/sdk/conversations/space-events';
+export type { SpaceTaskTitle } from '@openchamber/sdk/conversations/space-events';
 
 const failureSchema = z.object({
   code: z.string(),
@@ -100,11 +101,8 @@ export type SpaceGrant = z.infer<typeof grantSchema>;
 export const providerGrantOf = (grants: readonly SpaceGrant[], providerId: string): Extract<SpaceGrant, { kind: 'model' | 'login' | 'custom' }> | undefined =>
   grants.find((grant): grant is Extract<SpaceGrant, { kind: 'model' | 'login' | 'custom' }> => (grant.kind === 'model' || grant.kind === 'login' || grant.kind === 'custom') && grant.provider === providerId);
 
-const SPACE_CREATION_STEPS = ['checking_place', 'creating', 'downloading_image', 'preparing_tools', 'setting_network', 'bringing_code', 'giving_access', 'ready'] as const;
-
-export type SpaceCreationStep = (typeof SPACE_CREATION_STEPS)[number];
-
-export const spaceCreationStepSchema = z.enum(SPACE_CREATION_STEPS);
+import { spaceCreationStepSchema } from '@openchamber/sdk/conversations/space-events';
+export type { SpaceCreationStep } from '@openchamber/sdk/conversations/space-events';
 
 const setupSchema = z.discriminatedUnion('state', [
   z.object({ state: z.literal('queued'), total: z.number().int().min(1) }),

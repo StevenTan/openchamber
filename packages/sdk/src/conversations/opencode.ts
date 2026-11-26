@@ -1,3 +1,4 @@
+import { compact } from './identities.js'
 
 import type {
   ConfigEntry,
@@ -36,10 +37,7 @@ import { partIds } from './identities.js'
 import type { ConfigEntry as DocumentEntry } from '@opencode/client'
 type ConfigDocument = Extract<DocumentEntry, { type: 'document' }>
 type Config = ConfigDocument['info']
-function compact<T extends object>(value: T): T {
-  // SAFETY: dropping undefined entries preserves each remaining property's type.
-  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as T
-}
+
 
 export type AssistantContentItem = SessionMessageAssistant["content"][number]
 export type AssistantToolItem = Extract<AssistantContentItem, { type: "tool" }>

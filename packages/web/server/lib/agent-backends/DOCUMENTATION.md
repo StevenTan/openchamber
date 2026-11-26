@@ -31,6 +31,11 @@ mobile clients use the host routes; the VS Code extension uses OpenCode.
   the adopted host ID.
 - Host message identities and streamed updates are persisted together. Reloading
   history projects those records with the same identities as live updates.
+- Managed backends publish normalized SDK events through
+  `/api/conversations/events` and `/api/conversations/events/ws`. OpenCode wire
+  events, native turn updates and host broadcasts share the global hub's replay
+  cursor. A missing cursor or an upstream reconnect requests history repair.
+  Native streaming starts independently of the OpenCode upstream connection.
 - Archive timestamps belong to the host conversation record. Archive and restore
   use the common session routes and publish native conversation updates.
 - Antigravity prompt steering admits additional user messages and asynchronous

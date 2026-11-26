@@ -58,10 +58,10 @@ export interface AcpConversation {
 }
 
 export type AcpConversationEvent =
-  | { type: 'session'; session: AcpConversation }
+  | { type: 'session'; session: AcpConversation; created?: boolean }
   | { type: 'deleted'; sessionID: string; directory: string }
-  | { type: 'turn'; sessionID: string; directory: string; turn: AcpTurn }
-  | { type: 'update'; sessionID: string; directory: string; turnID: string; update: SessionNotification['update'] }
+  | { type: 'turn'; sessionID: string; directory: string; turn: AcpTurn; session: AcpConversation }
+  | { type: 'update'; sessionID: string; directory: string; turnID: string; update: SessionNotification['update']; turn: AcpTurn; session: AcpConversation }
   | { type: 'control'; payload: unknown; directory: string };
 
 export interface AcpSend {

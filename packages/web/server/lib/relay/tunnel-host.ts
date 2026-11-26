@@ -68,12 +68,13 @@ const isAllowedHttpPath = (pathname: string) =>
 const ALLOWED_WS_PATHS = new Set([
   '/api/global/event/ws',
   '/api/event/ws',
+  '/api/conversations/events/ws',
   '/api/terminal/ws',
   '/api/dictation/ws',
   '/api/dev-tunnel',
 ]);
 const GUEST_SURFACE_WS_PATH = /^\/api\/guests\/[a-z][a-z0-9-]*\/surface\/ws$/;
-const SPACE_WS_PATH = /^\/api\/spaces\/[0-9a-f]{12}\/(?:terminal\/ws|dev-tunnel|event\/ws|global\/event\/ws)$/;
+const SPACE_WS_PATH = /^\/api\/spaces\/[0-9a-f]{12}\/(?:terminal\/ws|dev-tunnel|event\/ws|global\/event\/ws|conversations\/events\/ws)$/;
 export const isAllowedRelayWebSocketPath = (pathname: string) => ALLOWED_WS_PATHS.has(pathname) || GUEST_SURFACE_WS_PATH.test(pathname) || SPACE_WS_PATH.test(pathname);
 
 const STRIPPED_REQUEST_HEADERS = new Set([

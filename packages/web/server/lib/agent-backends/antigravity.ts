@@ -74,7 +74,7 @@ export function createAntigravityBackend(options: Options) {
     refreshUsage(session);
     return session;
   };
-  const publishTurn = (session: AcpConversation, turn: AcpTurn) => options.publish({ type: 'turn', sessionID: session.id, directory: session.directory, turn });
+  const publishTurn = (session: AcpConversation, turn: AcpTurn) => options.publish({ type: 'turn', sessionID: session.id, directory: session.directory, turn, session });
   const update = async (notification: SessionNotification) => {
     const session = [...conversations.values()].find(item => item.nativeID === notification.sessionId);
     if (!session) return;
@@ -87,7 +87,7 @@ export function createAntigravityBackend(options: Options) {
     const turn = active.get(session.id);
     if (!turn) return;
     turn.updates.push(notification.update);
-    options.publish({ type: 'update', sessionID: session.id, directory: session.directory, turnID: turn.id, update: notification.update });
+    options.publish({ type: 'update', sessionID: session.id, directory: session.directory, turnID: turn.id, update: notification.update, turn, session });
   };
   const requestPermission = async (request: RequestPermissionRequest) => {
     const accept = request.options.find(option => option.kind === 'allow_once');
@@ -295,7 +295,7 @@ export function createAntigravityBackend(options: Options) {
       if (title) session.title = title;
       await save(session);
       await options.initializeSession(session.id, session.directory);
-      options.publish({ type: 'session', session });
+      options.publish({ type: 'session', session, created: true });
       return session;
     },
     async metadata(id: string, metadata: import('../openchamber-sessions/session-metadata-store.js').SessionMetadata | undefined) {
