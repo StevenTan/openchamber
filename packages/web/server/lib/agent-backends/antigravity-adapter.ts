@@ -92,16 +92,11 @@ export function createAntigravityAdapter(backend: ReturnType<typeof createAntigr
       list: async input => ({ data: input.cursor ? [] : (await backend.list(input.directory)).map(nativeSessionInfo), cursor: { next: null } }),
       active: async () => backend.statuses(),
       async messages(sessionID, input) {
-        const session = await backend.get(sessionID);
-        let messages = session.turns.flatMap(turn => [
-          ...[{ id: turn.id, text: turn.text, created: turn.created }, ...turn.followups].map(message => ({ id: message.id, type: 'user', text: message.text, time: { created: message.created } })),
-          { id: turn.assistantID, type: 'assistant', text: turn.updates.flatMap(update => update.sessionUpdate === 'agent_message_chunk' && update.content.type === 'text' ? [update.content.text] : []).join(''),
-            model: { providerID: 'antigravity', id: turn.modelID }, time: { created: turn.created, ...turn.completed !== undefined && { completed: turn.completed } } },
-        ]);
-        if (input.order === 'desc') messages = messages.reverse();
-        const offset = Number(input.cursor ?? 0);
-        const data = messages.slice(offset, input.limit ? offset + input.limit : undefined);
-        return { data, cursor: { next: offset + data.length < messages.length ? String(offset + data.length) : null } };
+        const page = await backend.messages(sessionID, { ...input, order: input.order ?? 'asc' });
+        return { data: page.items.map(({ info, parts }) => ({ id: info.id, type: info.role,
+          text: parts.flatMap(part => part.type === 'text' ? [part.text] : []).join(''), time: info.time,
+          ...info.role === 'assistant' && { model: { providerID: info.providerID, id: info.modelID } },
+        })), cursor: { next: page.cursor.next ?? null } };
       },
       rename: (sessionID, title) => backend.rename(sessionID, title),
       async interrupt(sessionID) {

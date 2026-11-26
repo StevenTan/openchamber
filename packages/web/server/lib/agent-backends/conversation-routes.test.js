@@ -64,7 +64,7 @@ test('conversation HTTP normalizes both backends and adopts the prepared native 
     }
     if (req.path.includes('/form/') || req.path.includes('/permission/')) return res.status(204).end();
     if (req.path.endsWith('/missing')) return res.status(404).json({ _tag: 'SessionNotFoundError', message: 'Missing' });
-    if (req.path === '/api/session' && req.method === 'GET') return res.json({ data: [wire], cursor: { next: 'next-page' } });
+    if (req.path === '/api/session' && req.method === 'GET') return res.json(req.query.cursor ? { data: [{ ...wire, id: 'ses_standard_next' }], cursor: {} } : { data: [wire], cursor: { next: 'next-page' } });
     if (req.path.endsWith('/message') && req.method === 'GET') return res.json({ data: [user], cursor: { next: 'more' } });
     if (req.path.endsWith('/message/msg_standard')) return res.json({ data: user });
     if (req.method === 'DELETE') return res.status(204).end();
@@ -128,8 +128,43 @@ test('conversation HTTP normalizes both backends and adopts the prepared native 
   assert.deepEqual(await request(`${runtime}/vcs${folder}&backendID=antigravity`), {});
   const all = await request(`${root}?global=true`);
   assert.deepEqual(all.sessions.map(session => session.backendID), ['opencode', 'antigravity']);
-  assert.equal(all.cursor.next, 'next-page');
-  assert.deepEqual((await request(`${root}?cursor=next-page`)).sessions.map(session => session.id), [standard.id]);
+  assert.ok(all.cursor.next);
+  assert.deepEqual((await request(`${root}?cursor=${all.cursor.next}`)).sessions.map(session => session.id), ['ses_standard_next']);
+  await t.test('native and mixed session lists continue every backend through its final page', async () => {
+    const extra = await native.create(directory, 'Native extra');
+    const last = await native.create(directory, 'Native last');
+    const ascending = [];
+    for (const order of ['asc', 'desc']) {
+      let next;
+      const ids = [];
+      do {
+        const query = new URLSearchParams({ backendID: 'antigravity', limit: '1', order });
+        if (next) query.set('cursor', next);
+        const result = await request(`${root}?${query}`);
+        assert.equal(result.sessions.length, 1);
+        ids.push(result.sessions[0].id);
+        next = result.cursor.next;
+      } while (next);
+      assert.deepEqual(new Set(ids), new Set([created.id, extra.id, last.id]));
+      assert.equal(ids.length, 3);
+      if (order === 'asc') ascending.push(...ids);
+      else assert.deepEqual(ids, ascending.toReversed());
+    }
+    let next;
+    const ids = [];
+    do {
+      const query = new URLSearchParams({ global: 'true', limit: '1' });
+      if (next) query.set('cursor', next);
+      const result = await request(`${root}?${query}`);
+      assert.ok(result.sessions.length <= 2);
+      ids.push(...result.sessions.map(session => session.id));
+      next = result.cursor.next;
+    } while (next);
+    assert.deepEqual(new Set(ids), new Set([standard.id, 'ses_standard_next', created.id, extra.id, last.id]));
+    assert.equal(ids.length, 5);
+    await native.remove(extra.id);
+    await native.remove(last.id);
+  });
   const messages = await request(`${root}/${standard.id}/message?limit=10&partShells=true&cursor=page&order=asc`);
   assert.equal(messages.items[0].info.role, 'user');
   assert.equal(messages.items[0].parts[0].text, 'Hello');
@@ -145,6 +180,21 @@ test('conversation HTTP normalizes both backends and adopts the prepared native 
   assert.ok(history.items[0].parts[0].text.includes('HTTP_SKILL_BODY'));
   assert.ok(history.items[0].parts[0].text.includes(skillFile));
   assert.deepEqual(await request(`${root}/${created.id}/message/${history.items[0].info.id}`), history.items[0]);
+  await t.test('native message pages retain direction and insertion order', async () => {
+    for (const order of ['asc', 'desc']) {
+      const first = await request(`${root}/${created.id}/message?limit=1&order=${order}`);
+      assert.equal(first.items.length, 1);
+      assert.ok(first.cursor.next);
+      const second = await request(`${root}/${created.id}/message?limit=1&cursor=${first.cursor.next}`);
+      assert.equal(second.items.length, 1);
+      assert.equal(second.cursor.next, undefined);
+      assert.deepEqual([...first.items, ...second.items], order === 'desc' ? history.items : history.items.toReversed());
+    }
+    const trimmed = Buffer.from(JSON.stringify({ id: history.items[0].info.id, order: 'desc', direction: 'next' })).toString('base64url');
+    const restored = await request(`${root}/${created.id}/message?limit=1&cursor=${trimmed}`);
+    assert.deepEqual(restored.items, history.items.slice(1));
+    assert.equal(restored.cursor.next, undefined);
+  });
   await native.send(created.id, { id: 'msg_working', text: 'working', files: [], context: [], agents: [], skills: [] });
   assert.deepEqual(await request(`${runtime}/statuses${folder}`), { [wire.id]: { type: 'busy' }, [created.id]: { type: 'busy' } });
   statusFailure = true;

@@ -83,6 +83,9 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
   await backend.send(session.id, { id: 'msg_first', text: 'working', files: [], context: [] });
   await update;
   assert.equal(backend.statuses()[session.id]?.type, 'busy');
+  const activeHistory = await backend.messages(session.id, { limit: 2, order: 'asc' });
+  assert.equal(activeHistory.items[0]?.info.id, 'msg_first');
+  assert.ok(activeHistory.items[1]?.parts.some(part => part.type === 'text' && part.text === 'working'));
   const file = path.join(directory, 'code.txt');
   await fs.writeFile(file, 'before\n');
   const permissions = createToolPermissions({ file: path.join(directory, 'permissions.json'), readPolicy: async () => ({ directory, projectDirectory: directory, rules: [{ action: '*', resource: '*', effect: 'allow' }] }), publish: () => {} });
@@ -120,8 +123,12 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
   await completed;
   assert.match((await turnDiffs.read(session.id, 'msg_first')).files?.[0]?.patch ?? '', /-before\n\+after/);
   await assert.rejects(fs.stat(path.join(directory, 'turn-diffs', session.id, 'active', 'msg_first')));
-  assert.deepEqual(session.turns[0]?.followups.map(input => input.text), ['answer']);
-  assert.deepEqual(session.turns[0]?.updates.filter(item => item.sessionUpdate === 'agent_message_chunk').map(item => item.content), [{ type: 'text', text: 'working' }, { type: 'text', text: 'answer' }]);
+  const firstTurn = await backend.turn(session.id, 'msg_first');
+  assert.ok(firstTurn);
+  const firstReply = await backend.message(session.id, firstTurn.assistantID);
+  assert.ok(firstReply?.parts.some(part => part.type === 'tool' && part.state.status === 'completed' && Array.isArray(part.state.metadata?.files)));
+  assert.deepEqual(firstTurn?.followups.map(input => input.text), ['answer']);
+  assert.deepEqual(firstTurn?.updates.filter(item => item.sessionUpdate === 'agent_message_chunk').map(item => item.content), [{ type: 'text', text: 'working' }, { type: 'text', text: 'answer' }]);
   const usageCompleted = new Promise<void>(resolve => { onCompleted = resolve; });
   await backend.send(session.id, { id: 'msg_usage', text: 'usage', files: [], context: [] });
   await usageCompleted;
@@ -131,7 +138,7 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
   await instructions.put(session.id, directory, 'project', 'project instructions: ');
   await backend.send(session.id, { id: 'msg_instructions', text: 'check', files: [], context: [] });
   await backend.wait(session.id, new AbortController().signal);
-  assert.deepEqual(session.turns.at(-1)?.updates.filter(item => item.sessionUpdate === 'agent_message_chunk').map(item => item.content), [{ type: 'text', text: 'project instructions: check' }]);
+  assert.deepEqual((await backend.turn(session.id, 'msg_instructions'))?.updates.filter(item => item.sessionUpdate === 'agent_message_chunk').map(item => item.content), [{ type: 'text', text: 'project instructions: check' }]);
   await instructions.remove(session.id, directory, 'project');
   assert.deepEqual(await instructions.read(session.id), []);
   const openCodeService = createOpenChamberSessionService({
@@ -187,7 +194,9 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
   assert.ok(run.sessionID.startsWith('ses_ag_'));
   const scheduledSession = await backend.get(run.sessionID);
   await backend.wait(scheduledSession.id, new AbortController().signal);
-  assert.equal(scheduledSession.turns[0]?.text, 'scheduled input');
+  const scheduledTurn = scheduledSession.turns[0];
+  assert.ok(scheduledTurn);
+  assert.equal((await backend.turn(scheduledSession.id, scheduledTurn.id))?.text, 'scheduled input');
   assert.equal(scheduledSession.turns[0]?.modelID, 'fixture');
   scheduler.stop();
   await backend.close();
@@ -220,7 +229,7 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
   const injected = await host.backend.get(selected.sessionId);
   await host.backend.send(injected.id, { id: 'msg_catalog', text: 'mcp-catalog', files: [], context: [] });
   await host.backend.wait(injected.id, new AbortController().signal);
-  const catalog = injected.turns.at(-1)?.updates.flatMap(update => update.sessionUpdate === 'agent_message_chunk' && update.content.type === 'text' ? [JSON.parse(update.content.text)] : []).flat();
+  const catalog = (await host.backend.turn(injected.id, 'msg_catalog'))?.updates.flatMap(update => update.sessionUpdate === 'agent_message_chunk' && update.content.type === 'text' ? [JSON.parse(update.content.text)] : []).flat();
   assert.deepEqual(catalog, [
     { name: 'openchamber', path: '/api/openchamber/code-mode/mcp' },
     { name: 'openchamber_commands', path: '/api/openchamber/command-tool/mcp' },
@@ -230,14 +239,14 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
   ]);
   await host.backend.send(injected.id, { id: 'msg_skill_catalog', text: 'skill catalog', files: [], context: [] });
   await host.backend.wait(injected.id, new AbortController().signal);
-  const skillText = injected.turns.at(-1)?.updates.flatMap(update => update.sessionUpdate === 'agent_message_chunk' && update.content.type === 'text' ? [update.content.text] : []).join('');
+  const skillText = (await host.backend.turn(injected.id, 'msg_skill_catalog'))?.updates.flatMap(update => update.sessionUpdate === 'agent_message_chunk' && update.content.type === 'text' ? [update.content.text] : []).join('');
   assert.ok(skillText?.includes(skillFile));
   assert.ok(skillText?.includes('NATIVE_HOST_SKILL'));
   await fs.writeFile(path.join(directory, 'AGENTS.md'), 'NATIVE_HOST_AGENT_RULE');
   await fs.writeFile(path.join(directory, 'GEMINI.md'), 'NATIVE_HOST_GEMINI_RULE');
   await host.backend.send(injected.id, { id: 'msg_project_rules', text: 'project rules', files: [], context: [] });
   await host.backend.wait(injected.id, new AbortController().signal);
-  const ruleText = injected.turns.at(-1)?.updates.flatMap(update => update.sessionUpdate === 'agent_message_chunk' && update.content.type === 'text' ? [update.content.text] : []).join('');
+  const ruleText = (await host.backend.turn(injected.id, 'msg_project_rules'))?.updates.flatMap(update => update.sessionUpdate === 'agent_message_chunk' && update.content.type === 'text' ? [update.content.text] : []).join('');
   assert.ok(ruleText?.includes('NATIVE_HOST_AGENT_RULE'));
   assert.ok(ruleText?.includes('NATIVE_HOST_GEMINI_RULE'));
   assert.ok(ruleText?.includes(path.join(directory, 'AGENTS.md')));

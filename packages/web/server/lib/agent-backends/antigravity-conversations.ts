@@ -1,4 +1,4 @@
-import { acpSession, acpMessages, acpCatalog } from '@openchamber/sdk/conversations/antigravity';
+import { acpSession, acpCatalog } from '@openchamber/sdk/conversations/antigravity';
 import type { ConversationApi } from './conversation-contract.js';
 import type { createAntigravityBackend } from './antigravity.js';
 import { OpenChamberControlError } from '../openchamber-control/error.js';
@@ -7,6 +7,7 @@ import fs from 'node:fs/promises';
 import { z } from 'zod';
 import type { SessionApi } from '@opencode/client/promise/api';
 import type { FormField, FormRequest } from '@openchamber/sdk/conversations/requests';
+import type { MessageListOptions } from '@openchamber/sdk/conversations/http';
 
 type NativeForm = Parameters<SessionApi['form']['create']>[0];
 
@@ -30,21 +31,39 @@ function projectForm(form: NativeForm): FormRequest {
   return { id: z.string().parse(form.id), sessionID: form.sessionID, title: form.title, fields: [projectField(first), ...rest.map(projectField)], ...form.metadata && { metadata: form.metadata } };
 }
 
+const historyCursor = z.object({ id: z.string(), order: z.enum(['asc', 'desc']), direction: z.literal('next') });
+
+function paginate<T>(records: T[], input: MessageListOptions, id: (record: T) => string) {
+  const position = input.cursor ? historyCursor.parse(JSON.parse(Buffer.from(input.cursor, 'base64url').toString())) : undefined;
+  const order = position?.order ?? input.order ?? 'desc';
+  const ordered = order === 'desc' ? records.toReversed() : records;
+  const start = position ? ordered.findIndex(record => id(record) === position.id) + 1 : 0;
+  const end = start + (input.limit ?? ordered.length);
+  const items = ordered.slice(start, end);
+  const last = items.at(-1);
+  return { items, cursor: last && end < ordered.length ? { next: Buffer.from(JSON.stringify({ id: id(last), order, direction: 'next' })).toString('base64url') } : {} };
+}
+
 export function createAntigravityConversations(backend: ReturnType<typeof createAntigravityBackend>, directory?: string): ConversationApi {
-  const history = async (id: string) => { const session = await backend.get(id); return session.turns.flatMap(turn => acpMessages(session, turn)); };
   return {
     async create(input) {
       const session = await backend.create(directory ?? os.homedir(), input.title, input.id);
       if (input.model) await backend.model(session.id, input.model.id, input.model.variant);
       return acpSession(await backend.get(session.id));
     },
-    list: async input => ({ sessions: input.cursor ? [] : (await backend.list(input.global ? undefined : directory)).map(acpSession).filter(session => !input.parentID && (!input.search || session.title.includes(input.search))), cursor: {} }),
+    async list(input) {
+      const sessions = (await backend.list(input.global ? undefined : directory)).map(acpSession)
+        .filter(session => !input.parentID && (!input.search || session.title.includes(input.search)))
+        .sort((a, b) => a.time.updated - b.time.updated || a.id.localeCompare(b.id));
+      const page = paginate(sessions, { ...input, limit: input.limit ?? 100 }, session => session.id);
+      return { sessions: page.items, cursor: page.cursor };
+    },
     get: async id => acpSession(await backend.get(id)),
     remove: id => backend.remove(id),
     rename: (id, title) => backend.rename(id, title),
-    messages: async id => ({ items: (await history(id)).reverse(), cursor: {} }),
+    messages: (id, input) => backend.messages(id, input),
     async message(id, messageID) {
-      const message = (await history(id)).find(item => item.info.id === messageID);
+      const message = await backend.message(id, messageID);
       if (!message) throw new OpenChamberControlError('Message not found', 404);
       return message;
     },

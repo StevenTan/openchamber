@@ -39,8 +39,20 @@ mobile clients use the host routes; the VS Code extension uses OpenCode.
 - Creation adopts the composer's host conversation ID while retaining the
   prepared native session and its MCP credential. Credential resolution follows
   the adopted host ID.
-- Host message identities and streamed updates are persisted together. Reloading
-  history projects those records with the same identities as live updates.
+- Host message identities, streamed updates and projected messages are stored in
+  `agent-backends/antigravity/history.sqlite`. Startup reads session metadata and
+  the latest small turn summary for each model; message bodies remain on disk.
+  Active turns retain their streamed content until completion. History reads
+  persist the active snapshot before querying the requested messages. The latest
+  assistant message includes refreshed native token and context measurements.
+- Native history pages retain insertion order, requested direction and the last
+  returned message identity in their cursor. Indexed message queries default to
+  100 records and descending order. Exact message reads use the same stored
+  projection. Native session pages sort by updated
+  time and identity, with a default limit of 100. Combined session lists preserve
+  each backend's ordering and per-backend limit; their cursor carries only the
+  backends with more results, so continuation reads neither repeat completed
+  backends nor omit native pages.
 - Managed backends publish normalized SDK events through
   `/api/conversations/events` and `/api/conversations/events/ws`. OpenCode wire
   events, native turn updates and host broadcasts share the global hub's replay

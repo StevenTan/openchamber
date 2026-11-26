@@ -17,6 +17,8 @@ import { readAntigravityUsage } from './antigravity-usage.js';
 import { readAntigravityQuota } from './antigravity-quota.js';
 import type { createTurnDiffRuntime } from '../turn-diffs/runtime.js';
 import type { TurnDiffReference } from '@openchamber/sdk/agent-backends';
+import { createAntigravityStorage, type StoredConversation } from './antigravity-storage.js';
+import type { MessageListOptions, MessageRecord } from '@openchamber/sdk/conversations/http';
 
 interface Options {
   dataDir: string;
@@ -34,7 +36,6 @@ interface Options {
 const settingsSchema = z.object({ binary: z.string().default('agy') });
 const MAX_RESIDENT_SESSIONS = 5;
 const errorMessage = (cause: unknown) => cause instanceof Error ? cause.message : String(cause);
-type StoredConversation = AcpConversation & { forms: Array<Parameters<QuestionSessionApi['form']['create']>[0] & { state: { status: 'pending' | 'answered' | 'cancelled'; answer?: Record<string, string> } }> };
 
 export function createAntigravityBackend(options: Options) {
   const root = path.join(options.dataDir, 'agent-backends', 'antigravity');
@@ -46,18 +47,24 @@ export function createAntigravityBackend(options: Options) {
   let connection: Promise<ClientSideConnection> | undefined;
   let process: ReturnType<typeof spawn> | undefined;
   let settings = { binary: 'agy' };
+  let storage: ReturnType<typeof createAntigravityStorage> | undefined;
   const ready = (async () => {
     await fs.mkdir(root, { recursive: true });
-    for (const name of await fs.readdir(root)) {
-      if (!name.startsWith('ses_ag_') || !name.endsWith('.json')) continue;
-      const session: StoredConversation = JSON.parse(await fs.readFile(path.join(root, name), 'utf8'));
+    const history = createAntigravityStorage(root);
+    storage = history;
+    for (const session of history.sessions()) {
+      session.turns = history.summaries(session.id);
       conversations.set(session.id, session);
       options.registerSession?.(session.id);
     }
     try { settings = settingsSchema.parse(JSON.parse(await fs.readFile(path.join(root, 'settings.json'), 'utf8'))); }
     catch (cause) { if (!(cause instanceof Error && 'code' in cause && cause.code === 'ENOENT')) throw cause; }
   })();
-  const save = (session: StoredConversation) => fs.writeFile(path.join(root, `${session.id}.json`), JSON.stringify(session));
+  const history = () => {
+    if (!storage) throw new Error('Antigravity storage is closed');
+    return storage;
+  };
+  const save = async (session: StoredConversation, turn?: AcpTurn) => { history().save(session, turn); };
   const refreshUsage = (session: StoredConversation) => {
     const turn = session.turns.at(-1);
     if (!turn?.completed) return;
@@ -75,6 +82,17 @@ export function createAntigravityBackend(options: Options) {
     return session;
   };
   const publishTurn = (session: AcpConversation, turn: AcpTurn) => options.publish({ type: 'turn', sessionID: session.id, directory: session.directory, turn, session });
+  const flushActive = (session: StoredConversation) => {
+    const turn = active.get(session.id);
+    if (turn) history().save(session, turn);
+  };
+  const withUsage = (session: StoredConversation, message: MessageRecord) => {
+    const turn = session.turns.at(-1);
+    if (message.info.role === 'assistant' && message.info.id === turn?.assistantID) {
+      message.info = { ...message.info, ...turn.tokens && { tokens: turn.tokens }, ...turn.context && { context: turn.context } };
+    }
+    return message;
+  };
   const update = async (notification: SessionNotification) => {
     const session = [...conversations.values()].find(item => item.nativeID === notification.sessionId);
     if (!session) return;
@@ -180,12 +198,13 @@ export function createAntigravityBackend(options: Options) {
         const model = session.config.find(option => option.category === 'model' && option.type === 'select');
         const thought = session.config.find(option => option.category === 'thought_level' && option.type === 'select');
         turn = { id: input.id, assistantID: createMessageId(Date.now() + 1), modelID: model?.type === 'select' ? model.currentValue : '', ...thought?.type === 'select' && { variant: thought.currentValue }, text: input.text, files: input.files, created: Date.now(), updates: [], followups: [], toolCalls: [] };
-        session.turns.push(turn);
+        const modelID = turn.modelID;
+        session.turns = [...history().summaries(sessionID).filter(item => item.modelID !== modelID), turn];
         active.set(sessionID, turn);
         await options.turnDiffs.begin({ sessionID, turnID: turn.id, directory: session.directory });
       }
       session.updated = Date.now();
-      await save(session);
+      await save(session, turn);
       publishTurn(session, turn);
       const instructions = await options.readInstructions(sessionID);
       const prompt: AcpPrompt = [...instructions, ...input.context].map(item => ({ type: 'text' as const, text: item.text }));
@@ -203,9 +222,10 @@ export function createAntigravityBackend(options: Options) {
         active.delete(sessionID);
         prompts.delete(sessionID);
         refreshUsage(session);
-        await save(session);
+        await save(session, turn);
         options.publish({ type: 'session', session });
         publishTurn(session, turn);
+        session.turns = history().summaries(sessionID);
         await releaseIdleSessions(acp);
       });
       prompts.set(sessionID, responding);
@@ -247,6 +267,19 @@ export function createAntigravityBackend(options: Options) {
   });
   return {
     get, prepare, send, ready,
+    async messages(id: string, input: MessageListOptions) {
+      const session = await get(id);
+      flushActive(session);
+      const page = history().messages(id, input);
+      return { ...page, items: page.items.map(message => withUsage(session, message)) };
+    },
+    async message(id: string, messageID: string) {
+      const session = await get(id);
+      flushActive(session);
+      const message = history().message(id, messageID);
+      return message && withUsage(session, message);
+    },
+    async turn(id: string, turnID: string) { await ready; return active.get(id)?.id === turnID ? active.get(id) : history().turn(id, turnID); },
     async wait(sessionID: string, signal: AbortSignal) {
       signal.throwIfAborted();
       const pending = prompts.get(sessionID) ?? Promise.resolve();
@@ -260,13 +293,14 @@ export function createAntigravityBackend(options: Options) {
     lookup: (id: string) => conversations.get(id),
     async recordToolCall(id: string, call: AgentToolCall, turnID: string | undefined) {
       const session = await get(id);
-      for (const turn of session.turns.filter(turn => turn.id === turnID)) {
+      const turn = active.get(id)?.id === turnID ? active.get(id) : turnID && history().turn(id, turnID);
+      if (turn) {
         const calls = turn.toolCalls ?? [];
         const index = calls.findIndex(item => item.id === call.id);
         if (index === -1) calls.push(call);
         else calls[index] = call;
         turn.toolCalls = calls;
-        await save(session);
+        await save(session, turn);
         publishTurn(session, turn);
       }
     },
@@ -275,7 +309,7 @@ export function createAntigravityBackend(options: Options) {
       const turn = active.get(id);
       if (!turn) throw new Error('File change has no active turn');
       turn.fileDiff = reference;
-      await save(session);
+      await save(session, turn);
       publishTurn(session, turn);
     },
     async list(directory?: string) { await ready; return [...conversations.values()].filter(item => !item.draft && (!directory || item.directory === directory)); },
@@ -290,7 +324,7 @@ export function createAntigravityBackend(options: Options) {
         options.registerSession?.(id, previous);
         conversations.set(id, session);
         loaded.set(id, session.nativeID);
-        await fs.rename(path.join(root, `${previous}.json`), path.join(root, `${id}.json`));
+        history().rename(previous, id);
       }
       session.draft = false;
       if (title) session.title = title;
@@ -319,7 +353,7 @@ export function createAntigravityBackend(options: Options) {
       const session = await get(id);
       return withSession(session, async acp => {
         await acp.closeSession({ sessionId: session.nativeID });
-        await fs.unlink(path.join(root, `${id}.json`));
+        history().remove(id);
         await options.turnDiffs.remove(id);
         conversations.delete(id);
         loaded.delete(id);
@@ -401,6 +435,9 @@ export function createAntigravityBackend(options: Options) {
     async close() {
       await authentication.close();
       await disconnect();
+      await ready;
+      storage?.close();
+      storage = undefined;
     },
   };
 }
