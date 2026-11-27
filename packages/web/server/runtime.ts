@@ -222,7 +222,6 @@ import { openCodePluginDelivery } from './lib/guests/opencode-plugin.js';
 import { createLimitFailoverRuntime } from './lib/limit-failover/runtime.js';
 import { prepareInstanceDir } from './lib/opencode/instance-dir.js';
 import { createOpenChamberSessionService } from './lib/openchamber-sessions/routes.js';
-import { createOpenCodeSessionMetadata } from './lib/openchamber-sessions/session-metadata-store.js';
 import { createUnreadBaseline } from './lib/openchamber-sessions/unread-baseline.js';
 import { createTurnDurationRecorder } from './lib/openchamber-sessions/turn-duration.js';
 import { createOpenCodeClient } from './lib/openchamber-sessions/opencode-client.js';
@@ -1648,7 +1647,6 @@ const environmentRuntime = composeEnvironmentRuntime({
 });
 const agentBackendHost = createManagedAgentBackendHost({
   dataDir: OPENCHAMBER_DATA_DIR, server: () => server, openCodeClient: openCodeSessionClient,
-  openCodeMetadata: createOpenCodeSessionMetadata({ buildOpenCodeUrl: (...args) => buildOpenCodeUrl(...args), getOpenCodeAuthHeaders: () => getOpenCodeAuthHeaders() }),
   tools: () => { if (!agentToolRuntime) throw new Error('Agent tools are unavailable'); return agentToolRuntime; },
   environment: () => overlayEnvironment({ ...process.env, PATH: buildAugmentedPath() }, environmentRuntime.forOpenCode()),
   publish: broadcastOpenChamberUiEvent, hub: globalMessageStreamHub, processForwardedEventPayload,
@@ -2062,6 +2060,7 @@ const openChamberSessionService = createOpenChamberSessionService({
   persistSessionMetadata: persistSessionMetadataPatch,
   updateSessionMetadata: updateSessionMetadataWith,
   broadcastGlobalUiEvent: broadcastOpenChamberUiEvent,
+  sessions: createApplicationSessions({ openCode: async () => openCodeSessionClient(''), registry: agentBackendHost.registry }),
   resolveAutoSelection: (input) => routingRuntime.resolveAutoSelection(input),
   isAutoReady: async () => (await routingRuntime.describe()).autoReady,
   readProjectSetup: (projectID) => projectConfigRuntime.readProjectSetup(projectID),

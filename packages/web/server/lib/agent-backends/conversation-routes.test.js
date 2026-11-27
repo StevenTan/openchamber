@@ -18,6 +18,7 @@ import { createQuestionRuntime } from '../agent-question/src/runtime.js';
 import { registerQuestionFormRoutes } from '../agent-question/src/mcp.js';
 import { createConversationStorage } from './conversation-storage.js';
 import { createOpenCodeHistory } from './opencode-history.js';
+import { createConversationCatalog } from './conversation-catalog.js';
 
 test('conversation HTTP normalizes both backends and adopts the prepared native session', async t => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'conversation-http-'));
@@ -79,9 +80,10 @@ test('conversation HTTP normalizes both backends and adopts the prepared native 
   t.after(() => new Promise(resolve => upstreamServer.close(resolve)));
   const openCodeHistory = createOpenCodeHistory(storage);
   t.after(() => openCodeHistory.close());
-  const registry = createBackendRegistry({ opencode: createOpenCodeAdapter({}, {}, openCodeHistory), antigravity: createAntigravityAdapter(native) }, owners, Promise.resolve());
   const app = express();
   const client = folder => createOpenCodeClient({ baseUrl: `http://127.0.0.1:${upstreamServer.address().port}`, directory: folder });
+  const catalog = createConversationCatalog(storage.catalog, { opencode: createOpenCodeAdapter(openCodeHistory), antigravity: createAntigravityAdapter(native) }, client, () => {});
+  const registry = createBackendRegistry(catalog.adapters, owners, native.ready, catalog.list);
   const permissions = createToolPermissions({ file: path.join(directory, 'permissions.json'), readPolicy: async sessionID => ({ directory: sessionID === 'elsewhere' ? '/elsewhere' : directory, projectDirectory: directory, rules: [] }), publish: () => {} });
   const questions = createQuestionRuntime({ dataDir: directory, client: () => ({ session: native.questionSession }), globalEventHub: { subscribeEvent: () => () => {}, subscribeStatus: () => () => {} }, isSessionArchived: async () => false, isEnabled: () => true, retryMs: 1 });
   t.after(() => questions.stop());
@@ -132,10 +134,10 @@ test('conversation HTTP normalizes both backends and adopts the prepared native 
   assert.deepEqual(await request(`${runtime}/location${folder}&backendID=antigravity`), { directory, project: { id: directory, directory, canonical: await fs.realpath(directory) } });
   assert.deepEqual(await request(`${runtime}/projects?backendID=antigravity`), [{ id: directory, worktree: directory, time: { created: 0, updated: 0 }, sandboxes: [] }]);
   assert.deepEqual(await request(`${runtime}/vcs${folder}&backendID=antigravity`), {});
-  const all = await request(`${root}?global=true`);
-  assert.deepEqual(all.sessions.map(session => session.backendID), ['opencode', 'antigravity']);
+  const all = await request(`${root}?global=true&limit=2`);
+  assert.deepEqual(all.sessions.map(session => session.backendID), ['antigravity', 'opencode']);
   assert.ok(all.cursor.next);
-  assert.deepEqual((await request(`${root}?cursor=${all.cursor.next}`)).sessions.map(session => session.id), ['ses_standard_next']);
+  assert.deepEqual((await request(`${root}?cursor=${all.cursor.next}`)).sessions.map(session => session.id), ['ses_standard']);
   await t.test('native and mixed session lists continue every backend through its final page', async () => {
     const extra = await native.create(directory, 'Native extra');
     const last = await native.create(directory, 'Native last');
@@ -162,7 +164,7 @@ test('conversation HTTP normalizes both backends and adopts the prepared native 
       const query = new URLSearchParams({ global: 'true', limit: '1' });
       if (next) query.set('cursor', next);
       const result = await request(`${root}?${query}`);
-      assert.ok(result.sessions.length <= 2);
+      assert.equal(result.sessions.length, 1);
       ids.push(...result.sessions.map(session => session.id));
       next = result.cursor.next;
     } while (next);
@@ -211,6 +213,31 @@ test('conversation HTTP normalizes both backends and adopts the prepared native 
   assert.deepEqual(await request(`${runtime}/statuses${folder}`), { [wire.id]: { type: 'busy' } });
   await request(`${root}/${created.id}`, 'PATCH', { title: 'Renamed' });
   assert.equal((await request(`${root}/${created.id}`)).title, 'Renamed');
+  await t.test('host titles, archive and metadata drive both HTTP and application session reads', async () => {
+    const before = calls.length;
+    for (const session of [standard, created]) {
+      const adapter = registry.forSession(session.id);
+      await request(`${root}/${session.id}`, 'PATCH', { title: `Host ${session.backendID}` });
+      await adapter.metadata.write(session.id, { pinned: true });
+      await adapter.archive.setArchived(session.id, true);
+      const info = await request(`${root}/${session.id}`);
+      assert.equal(info.title, `Host ${session.backendID}`);
+      assert.deepEqual(info.metadata, { pinned: true });
+      assert.ok(info.time.archived);
+      assert.equal((await adapter.sessions(client).get(session.id)).title, info.title);
+      const stale = storage.catalog.record({ type: 'session.patched', properties: { sessionID: session.id, patch: { title: 'Native title', metadata: {}, time: { archived: null, updated: 123 } } } });
+      assert.equal(stale.properties.patch.title, info.title);
+      assert.deepEqual(stale.properties.patch.metadata, { pinned: true });
+      assert.equal(stale.properties.patch.time.archived, info.time.archived);
+      assert.equal((await request(`${root}?search=HOST&backendID=${session.backendID}${folder.replace('?', '&')}`)).sessions[0].id, session.id);
+      assert.equal((await adapter.sessions(client).list({ archived: true, directory })).data[0].id, session.id);
+      await adapter.archive.setArchived(session.id, false);
+      await adapter.metadata.write(session.id, {});
+      assert.equal((await request(`${root}/${session.id}`)).time.archived, undefined);
+    }
+    assert.equal(calls.length, before);
+    assert.equal(await registry.forSession('missing').metadata.read('missing'), null);
+  });
   await request(`${root}/${created.id}/interrupt`, 'POST');
   const approvalSession = await permissions.session(created.id);
   const granted = approvalSession.assert({ action: 'edit', resources: ['a.txt'], save: ['a.txt'] }, new AbortController().signal);

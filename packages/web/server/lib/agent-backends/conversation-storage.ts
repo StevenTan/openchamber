@@ -6,6 +6,7 @@ import { loadSqliteOpener } from '../message-search/sqlite.js';
 import type { SqliteConnection } from '../message-search/sqlite.js';
 import { recordedTurnDiffSchema } from '@openchamber/sdk/agent-backends';
 import { migrateConversationStorage } from './conversation-storage-migration.js';
+import { createConversationIndex } from './conversation-index.js';
 
 const messageCursor = z.object({ id: z.string(), order: z.enum(['asc', 'desc']), direction: z.literal('next') });
 
@@ -17,6 +18,7 @@ export function createConversationStorage(dataDir: string) {
   if (!open) throw new Error('SQLite is unavailable');
   const index = open(path.join(directory, 'index.sqlite'));
   index.exec('PRAGMA journal_mode = WAL; CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, backend_id TEXT NOT NULL, data TEXT NOT NULL)');
+  const catalog = createConversationIndex(index);
   const connections = new Map<string, SqliteConnection>();
   const file = (id: string) => path.join(sessions, `${encodeURIComponent(id)}.sqlite`);
   const closeSession = (id: string) => { connections.get(id)?.close(); connections.delete(id); };
@@ -47,6 +49,7 @@ export function createConversationStorage(dataDir: string) {
   const readSession = <Value>(id: string, work: (db: SqliteConnection) => Value): Value | undefined => fs.existsSync(file(id)) ? session(id, work) : undefined;
   const storage = {
     index,
+    catalog,
     session,
     readSession,
     saveMessages(records: MessageRecord[], sequence?: number) {
@@ -96,11 +99,13 @@ export function createConversationStorage(dataDir: string) {
         }));
       }
       index.run("UPDATE sessions SET id = ?, data = json_set(data, '$.id', ?) WHERE id = ?", [to, to, from]);
+      index.run("UPDATE conversations SET id = ?, data = json_set(data, '$.id', ?) WHERE id = ?", [to, to, from]);
     },
     remove(id: string) {
       closeSession(id);
       fs.rmSync(file(id), { force: true });
       index.run('DELETE FROM sessions WHERE id = ?', [id]);
+      index.run('DELETE FROM conversations WHERE id = ?', [id]);
     },
     close() { for (const db of connections.values()) db.close(); connections.clear(); index.close(); },
   };

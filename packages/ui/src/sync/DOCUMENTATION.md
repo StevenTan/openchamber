@@ -27,6 +27,7 @@ Conversation reads, creation cleanup, request selection and tool-result completi
 use `lib/agent` and the session's owning backend. Directory selection and
 background-job refreshes use its runtime contract. The OpenCode adapter owns the
 SDK requests and native directory, selection and message-ancestry semantics.
+Managed UI forks copy source metadata through the host API before applying fork inheritance. VS Code retains native OpenCode metadata inheritance.
 
 `sync-context.tsx` owns the provider's shared recovery refs, lifecycle effects and public exports. Its module-lifetime observers run in the module body after dependency evaluation. Runtime contexts keep their global identity in `sync-runtime-context.ts`. Event dispatch, routing, snapshots, and reactive readers own their mechanics outside the provider. `viewed-sessions.ts` keeps mutable view tracking private and exposes reads through accessors.
 

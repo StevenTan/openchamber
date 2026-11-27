@@ -1,14 +1,18 @@
 import { sessionParentId } from '../session-lineage.js';
-import type { OpenCodeClient } from '@opencode/client';
+import type { SessionListInput, SessionsResponse } from '@opencode/client';
+import type { SessionReader } from '../agent-backends/contracts.js';
+import type { SessionClient } from './opencode-client-contract.js';
+import type { createSessionArchive } from './session-archive.js';
+import { hasMessage } from './contracts.js';
 
 const ARCHIVED_PAGE_SIZE = 200;
 
-export const listArchivedSubsessions = async (client: OpenCodeClient, rootID: string) => {
+export const listArchivedSubsessions = async (list: (input: SessionListInput) => Promise<SessionsResponse>, rootID: string) => {
   const childrenOf = new Map<string, string[]>();
   const seenCursors = new Set<string>();
   let cursor: string | null | undefined;
   do {
-    const page = await client.session.list(cursor
+    const page = await list(cursor
       ? { cursor }
       : { archived: true, limit: ARCHIVED_PAGE_SIZE });
     for (const record of page?.data ?? []) {
@@ -35,4 +39,20 @@ export const listArchivedSubsessions = async (client: OpenCodeClient, rootID: st
   }
   seen.delete(rootID);
   return [...seen];
+};
+
+export const restoreArchivedAfterSend = async (client: SessionClient, sessionID: string, archive: ReturnType<typeof createSessionArchive>, sessions?: Pick<SessionReader, 'get' | 'list'>) => {
+  try {
+    const session = await (sessions ? sessions.get(sessionID) : client.session.get({ sessionID }));
+    if (sessionParentId(session)) return;
+    const archivedAt = await archive.archivedAt(sessionID);
+    if (!archivedAt) return;
+    const subsessionIDs = await listArchivedSubsessions(sessions ? sessions.list : input => client.session.list(input), sessionID);
+    if (await archive.archivedAt(sessionID) !== archivedAt) return;
+    const { failedIds } = await archive.unarchive([sessionID]);
+    if (failedIds.length > 0) return;
+    if (subsessionIDs.length > 0) await archive.unarchive(subsessionIDs);
+  } catch (error) {
+    console.warn(`[openchamber-sessions] could not restore ${sessionID} after a send:`, (hasMessage(error) ? error.message : undefined) ?? error);
+  }
 };

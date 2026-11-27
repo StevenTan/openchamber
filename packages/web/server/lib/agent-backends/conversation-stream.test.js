@@ -31,7 +31,6 @@ test('shared SSE and WebSocket streams deliver native and OpenCode events with r
     initializeSession: async () => {}, readInstructions: async () => [], onUserInput: () => {}, publish: () => {},
     tools: () => { throw new Error('This test does not execute MCP tools'); },
     openCodeClient: () => { throw new Error('This test supplies OpenCode wire events'); },
-    openCodeMetadata: { read: async () => ({}), write: async () => {} },
   });
   cleanup(() => host.close());
   host.stream.registerRoutes(app);
@@ -80,10 +79,14 @@ test('shared SSE and WebSocket streams deliver native and OpenCode events with r
   await host.backend.send(session.id, { id: 'msg_native', text: 'Hello', files: [], context: [] });
   await host.backend.wait(session.id, controller.signal);
   const raw = (type, data, id) => hub.injectEvent({ directory, spaceId: null, payload: { type, data, id, created: 1, location: { directory } } });
+  raw('session.created', { sessionID: 'ses_standard', projectID: directory, title: 'Native title', location: { directory } }, 'standard-created');
+  hub.flushPending();
+  await host.registry.forSession('ses_standard').sessions(() => { throw new Error('Rename uses the host index'); }).rename('ses_standard', 'Host title');
   const status = value => ({ sessionID: 'ses_standard', status: { type: value } });
   raw('session.status', status('busy'), 'standard-busy');
   hub.flushPending();
   const busyCursor = hub.cursor();
+  raw('session.renamed', { sessionID: 'ses_standard', title: 'Generated title' }, 'standard-title');
   const turnStartedAt = Date.now() - 3_000;
   broadcast({ type: 'openchamber:session-status', properties: { sessionID: 'ses_standard', status: 'busy', timestamp: Date.now() - 1_000, turnStartedAt } });
   raw('session.step.started', { sessionID: 'ses_standard', assistantMessageID: 'msg_standard', agent: 'build', model: { id: 'gpt', providerID: 'codex' } }, 'standard-step');
@@ -103,6 +106,7 @@ test('shared SSE and WebSocket streams deliver native and OpenCode events with r
   }
   assert.ok(events.some(event => event.type === 'session.idle' && event.properties.sessionID === session.id));
   assert.ok(events.some(event => event.type === 'session.patched' && event.properties.patch.metadata?.pinned === true));
+  assert.equal(events.findLast(event => event.type === 'session.patched' && event.properties.sessionID === 'ses_standard' && 'title' in event.properties.patch)?.properties.patch.title, 'Host title');
   assert.ok(events.some(event => event.type === 'openchamber.notification' && event.properties.title === 'Finished'));
   assert.ok(events.some(event => event.type === 'message.part.delta' && event.properties.sessionID === 'ses_standard' && event.properties.delta === 'Hello'));
   const stored = createConversationStorage(directory);
@@ -119,6 +123,7 @@ test('shared SSE and WebSocket streams deliver native and OpenCode events with r
   assert.deepEqual(resumed.slice(1).map(frame => frame.eventId), live.slice(live.findIndex(frame => frame.eventId === busyCursor) + 1).map(frame => frame.eventId));
   const replayedStatus = resumed.slice(1).flatMap(frame => frame.payload.events.map(item => item.event)).find(event => event.type === 'session.status' && event.properties.turnStart);
   assert.deepEqual(replayedStatus.properties.turnStart, { at: turnStartedAt, source: 'host' });
+  assert.equal(resumed.slice(1).flatMap(frame => frame.payload.events.map(item => item.event)).find(event => event.type === 'session.patched' && 'title' in event.properties.patch)?.properties.patch.title, 'Host title');
   const reset = [];
   const missing = new WebSocket(`${base.replace('http:', 'ws:')}/api/conversations/events/ws?lastEventId=old-process`, { origin: base });
   missing.on('message', value => { reset.push(JSON.parse(String(value))); changes.emit('frame'); });

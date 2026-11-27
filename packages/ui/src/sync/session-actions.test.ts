@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach, afterEach, mock } from "bun:test"
+import { describe, expect, test, beforeEach, afterEach, beforeAll, mock } from "bun:test"
 import type { PermissionRequest } from "@/types/permission"
 import type { WorktreeMetadata } from "@/types/worktree"
 import type { FormRequest } from "@/lib/opencode/model"
@@ -98,7 +98,11 @@ const notFound = (kind: string) => Object.assign(new Error(`${kind}NotFoundError
 
 const sdkClient = {}
 
-mock.module("@/lib/opencode/client", () => ({
+const mockedOpenCodeModule = {
+  OpencodeApiError: (await import("@/lib/opencode/api-error")).OpencodeApiError,
+  AgentUnavailableError: (await import("@/lib/opencode/agent-unavailable-error")).AgentUnavailableError,
+  createRuntimeConversationFetch: () => fetch,
+  normalizeOpencodeError: (_operation: string, error: unknown) => error,
   isOpencodeNotFound: (error: unknown) => error instanceof Error && "status" in error && error.status === 404,
   ascendingId: (prefix: string) => `${prefix}_${(idCounter += 1).toString(16).padStart(12, "0")}`,
   opencodeClient: {
@@ -197,6 +201,7 @@ mock.module("@/lib/opencode/client", () => ({
       beforeSessionForkResolve?.()
       if (sessionForkError) throw sessionForkError
       if (!sessionForkResult) throw new Error("Missing fork session fixture")
+      sessionRecords.set(sessionForkResult.id, sessionForkResult)
       return sessionForkResult
     }),
     replyToPermission: mock(async (
@@ -249,7 +254,9 @@ mock.module("@/lib/opencode/client", () => ({
       return true
     }),
   },
-}))
+}
+
+mock.module("@/lib/opencode/client", () => mockedOpenCodeModule)
 
 let idCounter = 0
 
@@ -482,7 +489,9 @@ mock.module("@/stores/useGlobalSessionsStore", () => ({
   },
 }))
 
+const runtimeFetchModule = await import("@/lib/runtime-fetch")
 mock.module("@/lib/runtime-fetch", () => ({
+  ...runtimeFetchModule,
   runtimeFetch: async (path: string, init?: { body?: string }) => {
     const payload = JSON.parse(String(init?.body ?? "{}"))
     openchamberRouteRequests.push({ path, body: payload })
@@ -2570,6 +2579,15 @@ describe("respondToPermission passes directory", () => {
   })
 })
 
+beforeAll(async () => {
+  await import("@/lib/agent/active")
+  const { registerAgentBackend } = await import("@/lib/agent/registry")
+  const { createOpenCodeBackend } = await import("@/lib/opencode/backend")
+  const backend = createOpenCodeBackend()
+  registerAgentBackend('opencode', () => backend)
+  registerAgentBackend('application', () => backend)
+})
+
 describe("forkFromMessage composer restore", () => {
   const sourceSession: Session = {
     id: "session-a",
@@ -2600,6 +2618,7 @@ describe("forkFromMessage composer restore", () => {
   const restoredFile = { url: filePart.url, mimeType: filePart.mime, filename: filePart.filename }
 
   beforeEach(() => {
+    sessionRecords.set(sourceSession.id, sourceSession)
     replyCalls.length = 0
     selectedSessions.length = 0
     runtimeKey = "fork-runtime"
@@ -2636,6 +2655,9 @@ describe("forkFromMessage composer restore", () => {
       expect(replyCalls).toEqual([{
         method: "session.fork",
         params: { sessionID: sourceSession.id, messageID: "message-fork", directory: sourceSession.directory },
+      }, {
+        method: "session.get",
+        params: { sessionID: sourceSession.id, directory: sourceSession.directory },
       }])
       expect(inputState.pendingComposerRestore).toEqual({
         target: { runtimeKey: "fork-runtime", directory, sessionId: forkedSession.id },
@@ -2768,6 +2790,7 @@ describe("forkAfterMessage", () => {
   ]
 
   beforeEach(() => {
+    sessionRecords.set(sourceSession.id, sourceSession)
     replyCalls.length = 0
     selectedSessions.length = 0
     runtimeKey = "fork-runtime"
@@ -2787,6 +2810,9 @@ describe("forkAfterMessage", () => {
     expect(replyCalls).toEqual([{
       method: "session.fork",
       params: { sessionID: sourceSession.id, messageID: "msg-user-2", directory: sourceSession.directory },
+    }, {
+      method: "session.get",
+      params: { sessionID: sourceSession.id, directory: sourceSession.directory },
     }])
     expect(selectedSessions).toEqual([{ sessionId: forkedSession.id, directoryHint: sourceSession.directory }])
     expect(source.getState().session).toEqual([sourceSession, forkedSession])
@@ -2870,6 +2896,9 @@ describe("forkAfterMessage", () => {
     expect(replyCalls).toEqual([{
       method: "session.fork",
       params: { sessionID: sourceSession.id, messageID: "msg-compaction", directory: sourceSession.directory },
+    }, {
+      method: "session.get",
+      params: { sessionID: sourceSession.id, directory: sourceSession.directory },
     }])
   })
 
@@ -3005,7 +3034,28 @@ describe("forkAfterMessage", () => {
     expect(replyCalls).toEqual([{
       method: "session.fork",
       params: { sessionID: sourceSession.id, messageID: undefined, directory: sourceSession.directory },
+    }, {
+      method: "session.get",
+      params: { sessionID: sourceSession.id, directory: sourceSession.directory },
     }])
+  })
+
+  test("inherits metadata from the host source when the native fork has none", async () => {
+    const metadata = { custom: { value: "host" } }
+    sessionRecords.set(sourceSession.id, { ...sourceSession, metadata })
+    const previousResponse = archiveBatchResponse
+    archiveBatchResponse = { status: 200, body: { metadata } }
+    openchamberRouteRequests.length = 0
+    const source = createStore({}, { session: [sourceSession], message: { [sourceSession.id]: transcript } })
+    const { forkAfterMessage, setActionRefs } = await import("./session-actions")
+    setActionRefs(createChildStores([[sourceSession.directory, source]]), () => sourceSession.directory)
+    try {
+      await forkAfterMessage(sourceSession.id, "msg-answer-2")
+      expect(openchamberRouteRequests.find(entry => entry.path.endsWith(`/${forkedSession.id}/metadata`))?.body.patch).toEqual(metadata)
+      expect(source.getState().session.find(session => session.id === forkedSession.id)?.metadata).toEqual(metadata)
+    } finally {
+      archiveBatchResponse = previousResponse
+    }
   })
 
   test("refuses to fork from a message that is not loaded", async () => {
@@ -3147,6 +3197,7 @@ describe("forkFromLastCompletedTurn", () => {
     ({ id, role, sessionID: sourceSession.id, finish, time: completed === undefined ? { created: 1 } : { created: 1, completed } }) as Message
 
   beforeEach(() => {
+    sessionRecords.set(sourceSession.id, sourceSession)
     replyCalls.length = 0
     selectedSessions.length = 0
     runtimeKey = "fork-runtime"
@@ -3176,6 +3227,9 @@ describe("forkFromLastCompletedTurn", () => {
     expect(replyCalls).toEqual([{
       method: "session.fork",
       params: { sessionID: sourceSession.id, messageID: "u2", directory: sourceSession.directory },
+    }, {
+      method: "session.get",
+      params: { sessionID: sourceSession.id, directory: sourceSession.directory },
     }])
   })
 
@@ -3318,6 +3372,9 @@ describe("forkFromLastCompletedTurn", () => {
     expect(replyCalls).toEqual([{
       method: "session.fork",
       params: { sessionID: sourceSession.id, messageID: "msg-subagent-report", directory: sourceSession.directory },
+    }, {
+      method: "session.get",
+      params: { sessionID: sourceSession.id, directory: sourceSession.directory },
     }])
   })
 })

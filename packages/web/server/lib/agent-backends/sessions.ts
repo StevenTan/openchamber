@@ -2,6 +2,7 @@ import type { SessionListInput } from '@opencode/client';
 import type { BackendRegistry } from './registry.js';
 import type { SessionClientFactory, SessionReader } from './contracts.js';
 import { createOpenCodeSessionReader } from './opencode-adapter.js';
+import { sessionInfo } from './conversation-catalog.js';
 
 export function createApplicationSessions(options: { openCode: SessionClientFactory; registry?: BackendRegistry | undefined }) {
   const openCode = createOpenCodeSessionReader(options.openCode);
@@ -13,10 +14,12 @@ export function createApplicationSessions(options: { openCode: SessionClientFact
     get: async (sessionID: string) => (await forSession(sessionID)).get(sessionID),
     async list(input: SessionListInput) {
       await options.registry?.ready;
+      if (options.registry) {
+        const page = await options.registry.list(input);
+        return { data: page.sessions.map(sessionInfo), cursor: { next: page.cursor.next ?? null } };
+      }
       const page = await openCode.list(input);
-      const pages = await Promise.all((options.registry?.additional ?? []).map(adapter => adapter.sessions(options.openCode).list(input)));
-      const own = pages.flatMap(page => page.data);
-      return own.length ? { ...page, data: [...page.data, ...own].sort((a, b) => b.time.updated - a.time.updated) } : page;
+      return page;
     },
     async active(sessionID?: string) {
       await options.registry?.ready;

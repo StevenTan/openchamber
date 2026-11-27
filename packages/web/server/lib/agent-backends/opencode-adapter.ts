@@ -1,5 +1,5 @@
 import { isAgentPrompt } from '../openchamber-control/render-page.js';
-import type { BackendAdapter, SessionClientFactory, SessionReader } from './contracts.js';
+import type { BackendAdapter, BackendRuntime, SessionClientFactory, SessionReader } from './contracts.js';
 import { createOpenCodeQuestionSession } from '../agent-question/src/runtime.js';
 import { createOpenCodeConversations } from './opencode-conversations.js';
 import type { OpenCodeHistory } from './opencode-history.js';
@@ -21,9 +21,9 @@ export const createOpenCodeSessionReader = (client: SessionClientFactory): Sessi
   forms: async () => (await client()).session.form,
 });
 
-export function createOpenCodeAdapter(archive: BackendAdapter['archive'], metadata: BackendAdapter['metadata'], history: OpenCodeHistory): BackendAdapter {
+export function createOpenCodeAdapter(history: OpenCodeHistory): BackendRuntime {
   return {
-    id: 'opencode', providers: [], archive, metadata,
+    id: 'opencode', providers: [],
     sessions: createOpenCodeSessionReader,
     dispatch: ({ openCode }) => ({ create: openCode.create, send: openCode.send, fork: openCode.fork, queueBackend: () => undefined }),
     modelCatalog: readOpenCode => directory => readOpenCode(directory),

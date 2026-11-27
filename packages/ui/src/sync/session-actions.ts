@@ -87,10 +87,9 @@ import { createChatDraftIdentity, type ChatDraftIdentity } from "@/lib/chatDraft
 import { LOCATION_SCOPED_FORM_SESSION_ID } from "./location-scoped-forms"
 import { cancelSessionTitleGeneration } from "./session-title-generation"
 import { recordSessionActionFailure } from "./session-action-failures"
-import { applyForkInheritance } from "@/lib/sessionForkInheritance"
+import { inheritForkSession } from './fork-inheritance'
 import { getSessionGoal } from "@/lib/sessionGoalMetadata"
 import { fetchGoalObjectiveContent, writeGoalObjectiveFile } from "@/lib/goalObjectiveFiles"
-import { isVSCodeRuntime } from "@/lib/desktop"
 import { runtimeFetch } from "@/lib/runtime-fetch"
 
 const MESSAGE_REFETCH_LIMIT = 100
@@ -2717,22 +2716,8 @@ async function openForkedSession(store: DirectoryStoreApi, sourceSessionId: stri
 }
 
 async function inheritForkState(sourceSessionId: string, forkedSession: Session, directory: string | null | undefined, expectedRuntimeKey: string) {
-  if (isVSCodeRuntime()) {
-    try {
-      const { usePermissionStore } = await import("@/stores/permissionStore")
-      if (isStaleRuntime(expectedRuntimeKey)) return
-      await usePermissionStore.getState().hydrate()
-      if (isStaleRuntime(expectedRuntimeKey)) return
-      const permissions = usePermissionStore.getState()
-      if (!Object.hasOwn(permissions.modes, forkedSession.id)) {
-        await permissions.setSessionMode(forkedSession.id, permissions.getSessionMode(sourceSessionId))
-      }
-    } catch (error) {
-      console.warn("[fork] failed to copy the permission mode to the fork", error)
-    }
-    if (isStaleRuntime(expectedRuntimeKey)) return
-  }
-  return applyForkInheritance(sourceSessionId, forkedSession, {
+  return inheritForkSession(sourceSessionId, forkedSession, {
+    sourceDirectory: getSessionDirectory(sourceSessionId),
     readGoalId: async (sessionId) => getSessionGoal(await conversationClient.getSession(sessionId, directory))?.id ?? null,
     readObjective: fetchGoalObjectiveContent,
     writeObjective: writeGoalObjectiveFile,

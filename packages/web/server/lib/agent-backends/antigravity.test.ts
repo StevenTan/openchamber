@@ -34,6 +34,7 @@ import { createWorktreeBootstrapStore } from '../git/worktree-bootstrap-storage.
 import { createServer } from 'node:http';
 import { createConversationStorage } from './conversation-storage.js';
 import { createOpenCodeHistory } from './opencode-history.js';
+import { createConversationCatalog } from './conversation-catalog.js';
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
@@ -154,10 +155,11 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
     hydrateWorktreeCheckout: async () => { throw new Error('Worktree hydration is unused'); },
   });
   const openCodeHistory = createOpenCodeHistory(storage);
-  const registry = createBackendRegistry({
-    opencode: createOpenCodeAdapter({ setArchived: async () => {}, readArchivedAt: async () => null }, { read: async () => ({}), write: async () => {} }, openCodeHistory),
+  const conversationCatalog = createConversationCatalog(storage.catalog, {
+    opencode: createOpenCodeAdapter(openCodeHistory),
     antigravity: createAntigravityAdapter(backend),
-  }, owners, backend.ready);
+  }, () => createOpenCodeClient({ baseUrl: 'http://127.0.0.1:1' }), () => {});
+  const registry = createBackendRegistry(conversationCatalog.adapters, owners, backend.ready, conversationCatalog.list);
   const service = createBackendSessionService(openCodeService, registry, async () => true, createChatsScope(path.join(directory, 'chats')));
   const selected = await service.create({ backendID: 'opencode', model: 'antigravity/second', directory });
   assert.equal(selected.agent, 'antigravity');
@@ -213,11 +215,11 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
     dataDir: directory, initializeSession: async () => {},
     onUserInput: () => {}, readInstructions: async () => [], environment: () => process.env, server: () => listener,
     tools: () => { throw new Error('Tool runtime is unused'); }, publish: () => {},
-    openCodeMetadata: { read: async () => ({}), write: async () => {} },
     hub: { injectEvent: () => {}, subscribeEvent: () => () => {}, subscribeStatus: () => () => {}, flushPending: () => {}, cursor: () => 'start', replayAfter: () => [] },
     openCodeClient: () => createOpenCodeClient({ baseUrl: 'http://127.0.0.1', headers: {}, fetch: async (url, init) => {
       if (init?.method === 'PATCH') { openCodeArchives.push([path.basename(new URL(String(url)).pathname), JSON.parse(String(init.body)).archived]); return new Response(null, { status: 204 }); }
-      return Response.json({ data: { id: 'ses_opencode', time: { archived: 1234 } } });
+      return Response.json({ data: { id: path.basename(new URL(String(url)).pathname), projectID: directory, location: { directory }, title: 'OpenCode', cost: 0,
+        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } }, time: { created: 1, updated: 1, archived: 1234 } } });
     } }),
   });
   cleanups.push(() => host.close());
@@ -228,9 +230,9 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
   const archivedAt = await host.archive.readArchivedAt(session.id);
   assert.ok(Number.isInteger(archivedAt));
   await host.archive.setArchived('ses_opencode', true);
-  assert.equal(await host.archive.readArchivedAt('ses_opencode'), 1234);
+  assert.ok(Number.isInteger(await host.archive.readArchivedAt('ses_opencode')));
   await host.archive.setArchived('ses_ag_external', true);
-  assert.deepEqual(openCodeArchives, [['ses_opencode', true], ['ses_ag_external', true]]);
+  assert.deepEqual(openCodeArchives, []);
   const injected = await host.backend.get(selected.sessionId);
   await host.backend.send(injected.id, { id: 'msg_catalog', text: 'mcp-catalog', files: [], context: [] });
   await host.backend.wait(injected.id, new AbortController().signal);

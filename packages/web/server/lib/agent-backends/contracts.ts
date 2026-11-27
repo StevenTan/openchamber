@@ -55,3 +55,6 @@ export interface BackendAdapter {
   models(client: (directory: string) => Promise<ControlClient>, directory: string, sessionID?: string | null): Promise<{ models: readonly CatalogModel[]; providers: Map<string, string> }>;
   conversations(options: ConversationContextOptions): ConversationApi;
 }
+export type BackendRuntime = Omit<BackendAdapter, 'archive' | 'metadata' | 'sessions'> & {
+  sessions(client: SessionClientFactory): Omit<SessionReader, 'get' | 'list' | 'rename'>;
+};

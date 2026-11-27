@@ -8,7 +8,7 @@ import { resolveOpenCodeMcpContext } from '../opencode/mcp-context.js';
 import { createManagedAgentTools } from '../opencode/managed-agent-tools.js';
 import type { AcpConversationEvent } from '@openchamber/sdk/agent-backends';
 import { createQuestionRuntime } from '../agent-question/src/runtime.js';
-import { createOpenCodeSessionArchive, type OpenCodeSessionArchive } from '../openchamber-sessions/session-archive.js';
+import type { OpenCodeSessionArchive } from '../openchamber-sessions/session-archive.js';
 import { configureAntigravityQuotaReader } from '../quota/providers/antigravity/index.js';
 import { createTurnDiffRuntime } from '../turn-diffs/runtime.js';
 import { createToolActivity } from '../agent-tool/activity.js';
@@ -17,7 +17,6 @@ import { createBackendRegistry } from './registry.js';
 import { createOpenCodeAdapter } from './opencode-adapter.js';
 import { createAntigravityAdapter } from './antigravity-adapter.js';
 import type { BackendID } from './contracts.js';
-import type { OpenCodeSessionMetadata } from '../openchamber-sessions/session-metadata-store.js';
 import { AGENT_MCP_SERVERS } from '../agent-tool/catalog.js';
 import express from 'express';
 import type { OpenCodeClient } from '@opencode/client';
@@ -31,6 +30,7 @@ import { listConversationSkills, conversationSkillGuidance, registerSkillCatalog
 import { readProjectRules } from './project-rules.js';
 import { createConversationStorage } from './conversation-storage.js';
 import { createOpenCodeHistory } from './opencode-history.js';
+import { createConversationCatalog } from './conversation-catalog.js';
 
 interface Options {
   dataDir: string;
@@ -43,17 +43,19 @@ interface Options {
   initializeSession(sessionID: string, directory: string): Promise<void>;
   readInstructions(sessionID: string): Promise<Array<{ text: string }>>;
   onUserInput(sessionID: string, directory: string): void;
-  openCodeMetadata: OpenCodeSessionMetadata;
   processForwardedEventPayload?: ForwardEventPayload;
   skillDirectories?(): readonly string[];
 }
 export function createAgentBackendHost(options: Options) {
   const storage = createConversationStorage(options.dataDir);
   const history = createOpenCodeHistory(storage);
-  const stream = createConversationStream(options.hub, options.processForwardedEventPayload, history.record);
-  const unsubscribeHistory = options.hub.subscribeStatus(status => { if (status.type === 'connect') history.reset(); });
+  const stream = createConversationStream(options.hub, options.processForwardedEventPayload, event => {
+    const recorded = storage.catalog.record(event);
+    history.record(recorded);
+  }, storage.catalog.project);
+  const unsubscribeHistory = options.hub.subscribeStatus(status => { if (status.type === 'connect') { history.reset(); catalog.reset(); } });
   const identity = createBackendMcpIdentity();
-  const owners = new Map<string, BackendID>();
+  const owners = new Map<string, BackendID>(storage.catalog.owners());
   const turnDiffs = createTurnDiffRuntime(options.dataDir, async (sessionID, reference) => {
     if (backend.lookup(sessionID)) await backend.recordFileDiff(sessionID, reference);
   }, storage);
@@ -72,7 +74,7 @@ export function createAgentBackendHost(options: Options) {
       options.publish({ type: 'openchamber:acp', properties: event });
       if (event.type === 'control') return;
       if (event.type === 'deleted') stream.publish([{ type: 'session.deleted', properties: { sessionID: event.sessionID } }], event.directory);
-      else stream.publish(antigravityEvents(event), event.session.directory);
+      else stream.publish(antigravityEvents(event).map(storage.catalog.record), event.session.directory);
     },
     publishForm: (type, data, directory) => options.hub.injectEvent({ directory, spaceId: null, payload: { id: randomUUID(), created: Date.now(), type, data: z.record(z.string(), z.json()).parse(data), location: { directory } } }),
     mcpServers: sessionID => {
@@ -88,8 +90,9 @@ export function createAgentBackendHost(options: Options) {
     anchor: sessionID => ({ turnID: turnDiffs.current(sessionID)?.turnID, updateIndex: backend.lookup(sessionID)?.turns.at(-1)?.updates.length ?? 0 }),
     changed: async (sessionID, call, turnID) => { if (backend.lookup(sessionID)) await backend.recordToolCall(sessionID, call, turnID); },
   });
-  const openCodeArchive = createOpenCodeSessionArchive({ clientFor: options.openCodeClient });
-  const registry = createBackendRegistry({ opencode: createOpenCodeAdapter(openCodeArchive, options.openCodeMetadata, history), antigravity: createAntigravityAdapter(backend) }, owners, backend.ready);
+  let conversationFetch: typeof fetch | undefined;
+  const catalog = createConversationCatalog(storage.catalog, { opencode: createOpenCodeAdapter(history), antigravity: createAntigravityAdapter(backend) }, () => options.openCodeClient(undefined, conversationFetch), stream.publish);
+  const registry = createBackendRegistry(catalog.adapters, owners, backend.ready, catalog.list);
   const applicationDirectory = (sessionID: string) => backend.lookup(sessionID)?.directory;
   const toolOptions = {
     turnDiffs,
@@ -114,6 +117,7 @@ export function createAgentBackendHost(options: Options) {
       registerConversationRoutes(app, express, { ...conversations, phase: 'native' });
     },
     registerConversations(app: Application, requestFetch: typeof fetch) {
+      conversationFetch = requestFetch;
       registerConversationRoutes(app, express, { ...conversations, phase: 'opencode', fetch: requestFetch });
     },
     archive: {

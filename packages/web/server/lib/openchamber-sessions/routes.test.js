@@ -2090,6 +2090,24 @@ describe('openchamber session routes', () => {
       expect(restoredIds().sort()).toEqual(['ses_child', 'ses_grandchild', 'ses_root']);
     });
 
+    it('restores the archived tree recorded by the host session reader', async () => {
+      const archived = new Map(archivedTree.filter(session => session.time.archived).map(session => [session.id, session.time.archived]));
+      const list = vi.fn(async () => ({ data: archivedTree.filter(session => archived.has(session.id)) }));
+      const { app } = createApp({
+        sessions: { get: async sessionID => archivedTree.find(session => session.id === sessionID), list },
+        archiveBackend: {
+          readArchivedAt: async sessionID => archived.get(sessionID) ?? null,
+          setArchived: async (sessionID, value) => { if (!value) archived.delete(sessionID); },
+        },
+      });
+
+      await send(app, 'ses_root');
+
+      expect(archived.size).toBe(0);
+      expect(list).toHaveBeenCalledWith({ archived: true, limit: 200 });
+      expect(sessionListMock).not.toHaveBeenCalled();
+    });
+
     it("brings back the root's metadata-linked children, which only OpenChamber's metadata links to it", async () => {
       useTree([
         ...archivedTree,
@@ -2197,7 +2215,7 @@ describe('openchamber session routes', () => {
       metadata: { openchamber: { btwSessionID: 'ses_btw', reviewSessionID: 'ses_review', assist: { recap: 'kept' } } },
     }));
     const { app, sessionMetadataStore } = createApp();
-    sessionMetadataStore.entries.set('ses_fork', {
+    sessionMetadataStore.entries.set('ses_source', {
       openchamber: { btwSessionID: 'ses_btw', reviewSessionID: 'ses_review', assist: { recap: 'kept' } },
     });
     await request(app)

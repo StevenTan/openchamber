@@ -8,20 +8,8 @@ import { CHATS_SCOPE_PUBLIC_ID } from '../scheduled-tasks/chats-scope.js';
 import { pathToFileURL } from 'node:url';
 import type { QueuedItem } from '../message-queue/runtime.js';
 import { z } from 'zod';
-import type { SessionInfo } from '@opencode/client';
-import type { AcpConversation } from '@openchamber/sdk/agent-backends';
-import type { BackendAdapter, DispatchContext } from './contracts.js';
+import type { BackendAdapter, BackendRuntime, DispatchContext } from './contracts.js';
 import { createAntigravityConversations } from './antigravity-conversations.js';
-
-const nativeSessionInfo = (session: AcpConversation): SessionInfo => {
-  const model = session.config.find(option => option.category === 'model' && option.type === 'select');
-  const thought = session.config.find(option => option.category === 'thought_level' && option.type === 'select');
-  return { id: session.id, projectID: session.directory, location: { directory: session.directory }, title: session.title,
-    agent: 'antigravity', cost: 0, tokens: session.tokens ?? { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-    ...session.metadata && { metadata: z.record(z.string(), z.json()).parse(session.metadata) },
-    ...model?.type === 'select' && { model: { id: model.currentValue, providerID: 'antigravity', ...thought?.type === 'select' && { variant: thought.currentValue } } },
-    time: { created: session.created, updated: session.updated, ...session.archived != null && { archived: session.archived } } };
-};
 
 function createDispatch(backend: ReturnType<typeof createAntigravityBackend>, { openCode, syncKnowledge, chatsScope }: DispatchContext): ReturnType<BackendAdapter['dispatch']> {
   const selection = async (sessionID: string, payload: SessionPayload) => {
@@ -80,16 +68,10 @@ function createDispatch(backend: ReturnType<typeof createAntigravityBackend>, { 
   };
 }
 
-export function createAntigravityAdapter(backend: ReturnType<typeof createAntigravityBackend>): BackendAdapter {
+export function createAntigravityAdapter(backend: ReturnType<typeof createAntigravityBackend>): BackendRuntime {
   return {
-    id: 'antigravity', providers: ['antigravity'], archive: backend.archive,
-    metadata: {
-      read: async sessionID => (await backend.get(sessionID)).metadata ?? {},
-      write: (sessionID, metadata) => backend.metadata(sessionID, metadata),
-    },
+    id: 'antigravity', providers: ['antigravity'],
     sessions: () => ({
-      get: async sessionID => nativeSessionInfo(await backend.get(sessionID)),
-      list: async input => ({ data: input.cursor ? [] : (await backend.list(input.directory)).map(nativeSessionInfo), cursor: { next: null } }),
       active: async () => backend.statuses(),
       async messages(sessionID, input) {
         const page = await backend.messages(sessionID, { ...input, order: input.order ?? 'asc' });
@@ -98,7 +80,6 @@ export function createAntigravityAdapter(backend: ReturnType<typeof createAntigr
           ...info.role === 'assistant' && { model: { providerID: info.providerID, id: info.modelID } },
         })), cursor: { next: page.cursor.next ?? null } };
       },
-      rename: (sessionID, title) => backend.rename(sessionID, title),
       async interrupt(sessionID) {
         const interrupted = Boolean(backend.statuses()[sessionID]);
         await backend.abort(sessionID);

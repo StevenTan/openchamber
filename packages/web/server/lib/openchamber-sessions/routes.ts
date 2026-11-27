@@ -1,4 +1,5 @@
 import type { SessionPayload } from './payload.js';
+import type { SessionReader } from '../agent-backends/contracts.js';
 export type { SessionPayload } from './payload.js';
 import { asNonEmptyString } from '../shared/guards.js';
 import express from 'express';
@@ -39,8 +40,7 @@ import { fetchSelectionInputs } from './selection-inputs.js';
 import { EMPTY_SESSION_AUTO_ERROR, assertEmptySessionModel, resolveRequestedModel, splitModel } from './requested-model.js';
 import { buildLinkedIssuesPatch, parseLinkOperation } from './session-linked-issues.js';
 import { createSessionWorktreeMover } from './worktree-move.js';
-import { sessionParentId } from '../session-lineage.js';
-import { listArchivedSubsessions } from './archived-subsessions.js';
+import { restoreArchivedAfterSend } from './archived-subsessions.js';
 import { createStartDirectoryResolver } from './worktree-start-directory.js';
 import { hasMessage } from './contracts.js';
 import type { AgentInfo, ModelInfo, SessionPromptInput, SessionForkInput, SessionSwitchModelInput } from '@opencode/client';
@@ -101,6 +101,7 @@ export interface SessionServiceDependencies {
   sessionMetadataStore?: MetadataStore | null;
   persistSessionMetadata?: MetadataStore['setSessionMetadata'] | null;
   updateSessionMetadata?: MetadataStore['updateSessionMetadata'] | null;
+  sessions?: Pick<SessionReader, 'get' | 'list'>;
   createOpenCodeClient?: typeof defaultCreateOpenCodeClient;
   createWorktree?: typeof createWorktreeDefault;
   getWorktreeBootstrapStatus?: typeof getWorktreeBootstrapStatusDefault;
@@ -644,6 +645,7 @@ export const createOpenChamberSessionService = (dependencies: SessionServiceDepe
     sessionMetadataStore: injectedSessionMetadataStore = null,
     persistSessionMetadata = null,
     updateSessionMetadata = null,
+    sessions,
     createOpenCodeClient = defaultCreateOpenCodeClient,
     createWorktree = createWorktreeDefault,
     getWorktreeBootstrapStatus = getWorktreeBootstrapStatusDefault,
@@ -1339,22 +1341,6 @@ export const createOpenChamberSessionService = (dependencies: SessionServiceDepe
     return result;
   };
 
-  const restoreAfterSend = async (client: SessionClient, sessionID: string) => {
-    try {
-      const session = await client.session.get({ sessionID });
-      if (sessionParentId(session)) return;
-      const archivedAt = await sessionArchive.archivedAt(sessionID);
-      if (!archivedAt) return;
-      const subsessionIDs = await listArchivedSubsessions(client, sessionID);
-      if (await sessionArchive.archivedAt(sessionID) !== archivedAt) return;
-      const { failedIds } = await sessionArchive.unarchive([sessionID]);
-      if (failedIds.length > 0) return;
-      if (subsessionIDs.length > 0) await sessionArchive.unarchive(subsessionIDs);
-    } catch (error) {
-      console.warn(`[openchamber-sessions] could not restore ${sessionID} after a send:`, (hasMessage(error) ? error.message : undefined) ?? error);
-    }
-  };
-
   const create = async (payload: SessionPayload = {}, options: CreateOptions = {}) => {
     const projectId = asNonEmptyString(payload.projectId) || asNonEmptyString(payload.projectID);
     if (projectId !== CHATS_SCOPE_PUBLIC_ID) return createInDirectory(payload, options);
@@ -1412,12 +1398,14 @@ export const createOpenChamberSessionService = (dependencies: SessionServiceDepe
       const authHeaders = getOpenCodeAuthHeaders();
       const client = clientFor(directory);
       if (action === 'fork') {
+        const metadata = await sessionMetadataStore.get(sourceSessionID, { directory: resolvedDirectory.directory });
         targetSession = await forkSession({
           client,
           sessionID: sourceSessionID,
           messageID: asNonEmptyString(payload.messageId) || undefined,
         });
         targetSessionID = targetSession.id;
+        targetSession.metadata = z.record(z.string(), z.json()).parse(await writeMetadata(targetSessionID, metadata ?? {}, resolvedDirectory.directory));
         await applyForkInheritance({
           sourceSessionID,
           fork: targetSession,
@@ -1452,7 +1440,7 @@ export const createOpenChamberSessionService = (dependencies: SessionServiceDepe
         clearResponseStyle: action === 'fork',
         promptedBySessionId: asNonEmptyString(payload.promptedBySessionId),
       });
-      if (action === 'send' && dispatch.promptDispatched) await restoreAfterSend(client, targetSessionID);
+      if (action === 'send' && dispatch.promptDispatched) await restoreArchivedAfterSend(client, targetSessionID, sessionArchive, sessions);
       const result: ExistingResult = {
         action,
         sessionId: targetSessionID,

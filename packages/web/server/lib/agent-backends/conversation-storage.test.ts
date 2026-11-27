@@ -7,6 +7,7 @@ import { DatabaseSync } from 'node:sqlite';
 import type { MessageRecord } from '@openchamber/sdk/conversations/http';
 import { createConversationStorage } from './conversation-storage.js';
 import { createAntigravityStorage, type StoredConversation } from './antigravity-storage.js';
+import type { Session } from '@openchamber/sdk/conversations/model';
 
 test('conversation databases isolate history and diffs while only five remain open', async t => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'conversation-storage-'));
@@ -27,7 +28,7 @@ test('conversation databases isolate history and diffs while only five remain op
   storage.saveDiff(diff);
   const session: StoredConversation = { id: 'session-0', nativeID: 'native', directory, title: 'Saved', created: 1, updated: 2, draft: false, config: [], forms: [], turns: [] };
   createAntigravityStorage(storage).save(session);
-  assert.deepEqual(storage.index.all("SELECT name FROM sqlite_master WHERE type = 'table'").map(row => row.name), ['sessions']);
+  assert.deepEqual(storage.index.all("SELECT name FROM sqlite_master WHERE type = 'table'").map(row => row.name), ['sessions', 'conversations']);
   storage.close();
   storage = createConversationStorage(directory);
   assert.deepEqual(storage.message('session-0', 'message'), records[0]);
@@ -79,4 +80,40 @@ test('backend history and recorded JSON patches migrate into conversation databa
   storage = createConversationStorage(directory);
   assert.deepEqual(storage.diff(session.id, turn.id), diff);
   assert.deepEqual(createAntigravityStorage(storage).turn(session.id, turn.id), turn);
+});
+
+test('the shared index persists owned metadata, native identities and filtered session pages', async t => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'conversation-index-'));
+  t.after(() => fs.rm(directory, { recursive: true }));
+  let storage = createConversationStorage(directory);
+  t.after(() => storage.close());
+  const info: Session = { id: 'standard', backendID: 'opencode', projectID: 'project', directory, title: 'Standard', cost: 0,
+    tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } }, time: { created: 1, updated: 1 } };
+  storage.catalog.save(info, 'opencode');
+  storage.catalog.save({ ...info, id: 'native', backendID: 'antigravity', time: { created: 2, updated: 2 } }, 'antigravity', 'native-id');
+  storage.catalog.save({ ...info, id: 'draft' }, 'antigravity', 'draft-id', true);
+  storage.catalog.save({ ...info, id: 'hidden', metadata: { hidden: true } }, 'opencode');
+  storage.catalog.change(info.id, info, { title: 'Host title', archived: 20, metadata: { pinned: true } });
+  storage.catalog.save({ ...info, title: 'Generated title', metadata: {}, time: { created: 1, updated: 3 } }, 'opencode');
+  storage.close();
+  storage = createConversationStorage(directory);
+  assert.equal(storage.catalog.get(info.id)?.title, 'Host title');
+  assert.deepEqual(storage.catalog.get(info.id)?.metadata, { pinned: true });
+  assert.equal(storage.catalog.get(info.id)?.time.archived, 20);
+  assert.equal(storage.index.get('SELECT native_id FROM conversations WHERE id = ?', ['native'])?.native_id, 'native-id');
+  assert.deepEqual(storage.catalog.list({ search: 'HOST', archived: true }).sessions.map(session => session.id), [info.id]);
+  assert.deepEqual(storage.catalog.list({ archived: false }).sessions.map(session => session.id), ['native']);
+  assert.deepEqual(storage.catalog.list({ directory: '/elsewhere' }).sessions, []);
+  for (const order of ['asc', 'desc'] as const) {
+    const first = storage.catalog.list({ limit: 1, order });
+    const next = storage.catalog.list({ limit: 1, cursor: first.cursor.next });
+    assert.deepEqual([...first.sessions, ...next.sessions].map(session => session.id), order === 'asc' ? ['native', info.id] : [info.id, 'native']);
+    assert.deepEqual(next.cursor, {});
+  }
+  storage.rename('native', 'adopted');
+  assert.equal(storage.catalog.get('native'), undefined);
+  assert.equal(storage.catalog.get('adopted')?.id, 'adopted');
+  assert.equal(storage.index.get('SELECT native_id FROM conversations WHERE id = ?', ['adopted'])?.native_id, 'native-id');
+  storage.remove('adopted');
+  assert.equal(storage.catalog.get('adopted'), undefined);
 });

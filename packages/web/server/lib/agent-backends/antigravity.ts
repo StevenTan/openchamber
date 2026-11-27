@@ -20,6 +20,7 @@ import type { TurnDiffReference } from '@openchamber/sdk/agent-backends';
 import { createAntigravityStorage, type StoredConversation } from './antigravity-storage.js';
 import type { MessageListOptions, MessageRecord } from '@openchamber/sdk/conversations/http';
 import type { ConversationStorage } from './conversation-storage.js';
+import { acpSession } from '@openchamber/sdk/conversations/antigravity';
 
 interface Options {
   dataDir: string;
@@ -55,6 +56,7 @@ export function createAntigravityBackend(options: Options) {
     const history = createAntigravityStorage(options.storage);
     storage = history;
     for (const session of history.sessions()) {
+      history.save(session);
       session.turns = history.summaries(session.id);
       conversations.set(session.id, session);
       options.registerSession?.(session.id);
@@ -81,7 +83,7 @@ export function createAntigravityBackend(options: Options) {
     const session = conversations.get(id);
     if (!session) throw Object.assign(new Error('Conversation not found'), { status: 404 });
     refreshUsage(session);
-    return session;
+    return history().metadata(session);
   };
   const publishTurn = (session: AcpConversation, turn: AcpTurn) => options.publish({ type: 'turn', sessionID: session.id, directory: session.directory, turn, session });
   const flushActive = (session: StoredConversation) => {
@@ -314,7 +316,7 @@ export function createAntigravityBackend(options: Options) {
       await save(session, turn);
       publishTurn(session, turn);
     },
-    async list(directory?: string) { await ready; return [...conversations.values()].filter(item => !item.draft && (!directory || item.directory === directory)); },
+    async list(directory?: string) { await ready; return [...conversations.values()].filter(item => !item.draft && (!directory || item.directory === directory)).map(history().metadata); },
     async create(directory: string, title?: string, id?: string) {
       const session = await prepare(directory);
       if (id && id !== session.id) {
@@ -338,14 +340,16 @@ export function createAntigravityBackend(options: Options) {
     async metadata(id: string, metadata: import('../openchamber-sessions/session-metadata-store.js').SessionMetadata | undefined) {
       const session = await get(id);
       session.metadata = z.record(z.string(), z.json()).optional().parse(metadata);
+      options.storage.catalog.change(id, acpSession(session), { metadata: z.record(z.string(), z.json()).parse(metadata ?? {}) });
       await save(session);
       options.publish({ type: 'session', session });
     },
-    async rename(id: string, title: string) { const session = await get(id); session.title = title; await save(session); options.publish({ type: 'session', session }); },
+    async rename(id: string, title: string) { const session = await get(id); session.title = title; options.storage.catalog.change(id, acpSession(session), { title }); await save(session); options.publish({ type: 'session', session }); },
     archive: {
       async setArchived(id: string, archived: boolean) {
         const session = await get(id);
         session.archived = archived ? Date.now() : null;
+        options.storage.catalog.change(id, acpSession(session), { archived: session.archived });
         await save(session);
         options.publish({ type: 'session', session });
       },

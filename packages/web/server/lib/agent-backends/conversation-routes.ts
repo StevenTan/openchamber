@@ -9,7 +9,6 @@ import { AntigravityNotInstalledError } from './antigravity-executable.js';
 import type { createToolPermissions } from '../agent-tool/permissions.js';
 import { listConversationSkills, resolveConversationSkills, readConversationSkills } from './skills.js';
 import type { ConversationSkills } from '@openchamber/sdk/conversations/http';
-import { listConversations } from './conversation-list.js';
 
 const metadata = z.record(z.string(), z.json());
 const model = z.object({ id: z.string(), providerID: z.string(), variant: z.string().nullable().optional() });
@@ -71,11 +70,7 @@ export function registerConversationRoutes(app: Application, express: Pick<Expre
   };
   router.get(sessionRoot, handle(async (api, req) => {
     const input = listing.parse(req.query);
-    if (options.phase !== 'opencode') return api.list(input);
-    return listConversations([
-      { id: 'opencode', api },
-      ...options.registry.additional.map(adapter => ({ id: adapter.id, api: adapter.conversations({ client: options.client(), directory: z.string().optional().parse(req.query.directory) }) })),
-    ], input);
+    return options.registry.list({ ...input, directory: z.string().optional().parse(req.query.directory), backendID: catalogQuery.parse(req.query).backendID });
   }));
   router.post(sessionRoot, express.json({ limit: '1mb' }), handle((api, req) => api.create(create.parse(req.body))));
   router.get(`${sessionRoot}/:id`, handle((api, req) => api.get(req.params.id)));

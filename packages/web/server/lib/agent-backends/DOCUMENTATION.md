@@ -32,17 +32,28 @@ mobile clients use the host routes; the VS Code extension uses OpenCode.
   filtering, space routing and message-part shells.
 - A prepared native session belongs to a draft and becomes the first conversation
   when sent. Its ACP configuration supplies the model and thinking-level catalog.
-- The host registry selects an adapter from the recorded session owner. Native
+- The host registry selects an adapter from the shared conversation index. Its
   records restore ownership at startup; preparation and ID adoption register it
   before dispatch. OpenCode is the default owner. Session readers, dispatch,
-  metadata, archive, model catalogs and question delivery use that registry.
+  model catalogs and question delivery use that registry. The conversation
+  catalog supplies shared session reads and host-owned metadata and archive
+  operations around each backend's runtime adapter.
 - Creation adopts the composer's host conversation ID while retaining the
   prepared native session and its MCP credential. Credential resolution follows
   the adopted host ID.
 - `conversation-storage.ts` owns paged display messages for both backends in
   `conversations/sessions/<sessionID>.sqlite`. Each database also contains that
   conversation's native turns and recorded file diffs. The shared
-  `conversations/index.sqlite` stores native session metadata for discovery;
+  `conversations/index.sqlite` stores both backends' normalized session records,
+  backend and native identities, title, directory, parent, archive state, metadata
+  and timestamps. SQL queries own directory and title filtering, updated-time
+  ordering and keyset pagination across both backends. Drafts and hidden sessions
+  stay outside visible lists. Existing OpenCode headers are imported in ascending
+  pages on the first list read after startup or reconnect. Native events update
+  the index before publication. Host changes to titles, archive state and metadata
+  remain authoritative across those events and restarts. Backends retain their
+  conversation loop, context and compaction. Backend-specific ACP configuration
+  and pending forms remain in its native metadata records;
   message bodies, tool results and patches stay in the session databases.
   The host shares a pool of at most five open session databases, ordered by
   last access. SQL callbacks are synchronous; async operations acquire a
@@ -65,18 +76,17 @@ mobile clients use the host routes; the VS Code extension uses OpenCode.
 - Shared history pages retain insertion order, requested direction and the last
   returned message identity in their cursor. Indexed message queries default to
   100 records and descending order. Exact message reads use the same stored
-  projection. Native session pages sort by updated
-  time and identity, with a default limit of 100. Combined session lists preserve
-  each backend's ordering and per-backend limit; their cursor carries only the
-  backends with more results, so continuation reads neither repeat completed
-  backends nor omit native pages.
+  projection. Session pages sort by updated time and identity, with a default
+  total limit of 100. Cursors carry the last returned timestamp, identity and
+  direction. HTTP lists and application session readers query the same index.
 - Managed backends publish normalized SDK events through
   `/api/conversations/events` and `/api/conversations/events/ws`. OpenCode wire
   events, native turn updates and host broadcasts share the global hub's replay
   cursor. A missing cursor or an upstream reconnect requests history repair.
   Native streaming starts independently of the OpenCode upstream connection.
-- Archive timestamps belong to the host conversation record. Archive and restore
-  use the common session routes and publish native conversation updates.
+- Titles, archive timestamps and metadata belong to the host conversation
+  record. Their writes publish shared session patches without updating native
+  backend metadata. Live and replayed native events preserve these owned fields.
 - Antigravity prompt steering admits additional user messages and asynchronous
   answers into the running turn. The latest prompt's completion ends that turn.
 - The custom main agent uses the supplied MCP servers. OpenChamber's MCP services
@@ -132,6 +142,13 @@ mobile clients use the host routes; the VS Code extension uses OpenCode.
   disabled; the OpenCode hook supplies the shared catalog in its system context.
   The hook reads `/api/openchamber/skills` with the managed tool credential, so
   filesystem discovery and generated skill directories stay in the host process.
+
+### Why host-owned fields are stored separately from native updates
+
+The index retains explicit title, archive and metadata values alongside each
+normalized session. Backend events can update model, token and activity fields
+without replacing those host values. The same projection applies to replayed
+events, so reconnecting clients observe the indexed metadata.
 
 ## Boundaries
 

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { AcpConversation, AcpTurn } from '@openchamber/sdk/agent-backends';
-import { acpMessages } from '@openchamber/sdk/conversations/antigravity';
+import { acpMessages, acpSession } from '@openchamber/sdk/conversations/antigravity';
 import type { QuestionSessionApi } from '../agent-question/src/runtime.js';
 import type { ConversationStorage } from './conversation-storage.js';
 
@@ -9,6 +9,15 @@ export type StoredConversation = AcpConversation & { forms: Array<Parameters<Que
 const summary = (turn: AcpTurn): AcpTurn => ({ ...turn, text: '', files: [], updates: [], followups: [], toolCalls: [] });
 
 export function createAntigravityStorage(messages: ConversationStorage) {
+  const metadata = (session: StoredConversation) => {
+    const info = messages.catalog.get(session.id);
+    if (info) {
+      session.title = info.title;
+      session.archived = info.time.archived ?? null;
+      session.metadata = info.metadata;
+    }
+    return session;
+  };
   const saveTurn = (session: StoredConversation, turn: AcpTurn) => messages.session(session.id, db => db.transaction(() => {
     db.run(`INSERT INTO turns(session_id, id, model_id, summary, data) VALUES (?, ?, ?, ?, ?)
       ON CONFLICT(session_id, id) DO UPDATE SET summary = excluded.summary, data = excluded.data`,
@@ -19,11 +28,16 @@ export function createAntigravityStorage(messages: ConversationStorage) {
   const save = (session: StoredConversation, turn?: AcpTurn) => {
     const { turns: _turns, ...metadata } = session;
     messages.index.run("INSERT INTO sessions(id, backend_id, data) VALUES (?, 'antigravity', ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data", [session.id, JSON.stringify({ ...metadata, turns: [] })]);
+    const info = messages.catalog.save(acpSession(session), 'antigravity', session.nativeID, session.draft);
+    session.title = info.title;
+    session.archived = info.time.archived ?? null;
+    session.metadata = info.metadata;
     if (turn) saveTurn(session, turn);
   };
   return {
     save,
-    sessions: (): StoredConversation[] => messages.index.all("SELECT data FROM sessions WHERE backend_id = 'antigravity'").map(row => JSON.parse(z.string().parse(row.data))),
+    metadata,
+    sessions: (): StoredConversation[] => messages.index.all("SELECT data FROM sessions WHERE backend_id = 'antigravity'").map(row => metadata(JSON.parse(z.string().parse(row.data)))),
     summaries: (id: string): AcpTurn[] => (messages.readSession(id, db => db.all(`SELECT summary FROM turns WHERE sequence IN (
       SELECT MAX(sequence) FROM turns WHERE session_id = ? GROUP BY model_id
     ) ORDER BY sequence`, [id])) ?? []).map(row => JSON.parse(z.string().parse(row.summary))),
