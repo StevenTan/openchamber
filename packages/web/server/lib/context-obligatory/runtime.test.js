@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createContextObligatoryRuntime } from './runtime.js';
+import { assertPromptResponse } from '../opencode/prompt-response.js';
 
 /**
  * Pinned messages and the compaction cursor live in OpenChamber's own session
@@ -19,6 +20,10 @@ const makeRuntime = (overrides = {}) => {
   const runtime = createContextObligatoryRuntime({
     buildOpenCodeUrl,
     getOpenCodeAuthHeaders: () => ({}),
+    deliver: async (sessionID, _directory, delivery) => {
+      const response = await fetch(`http://opencode.test/api/session/${sessionID}/synthetic`, { method: 'POST', body: JSON.stringify(delivery.context) });
+      await assertPromptResponse(response, 'session.synthetic');
+    },
     ...overrides,
   });
   runtimes.push(runtime);

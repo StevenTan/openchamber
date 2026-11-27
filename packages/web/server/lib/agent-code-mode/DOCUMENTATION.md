@@ -20,6 +20,10 @@ The managed OpenCode adapter configures MCP discovery and supplies original
 session, message and call identity outside model arguments. It forwards live
 progress, structured results and images. File MCP calls capture their changes
 through the host's shared turn-diffs runtime.
+The adapter applies this identity contract to direct calls across all shared MCP
+services. Script child calls retain the message identity and receive independent
+part IDs. The outer activity retains fetch-extension entries; service calls have
+their own recorded activities.
 
 The fetch extension adapts the upstream OpenCode implementation under this
 module's MIT license. Skill filtering uses the
@@ -48,7 +52,9 @@ module's MIT license. Skill filtering uses the
   Script text is formatted once without additional output truncation.
 - MCP progress notifications carry live `toolCalls`. Result metadata includes
   `openchamberToolCalls` with inputs, outputs, errors and timing for shared UI
-  projection. Each run owns its activity records.
+  projection. Each run owns its activity records. The host records the outer
+  execution and each service call. Transcript parts show nested service activity
+  separately; the outer part carries the script and its returned output.
 - Scripted file changes use the original outer call identity and the same
   before/after snapshot capture as direct calls. The backend adapter supplies
   the turn's net change reference for transcript rendering.

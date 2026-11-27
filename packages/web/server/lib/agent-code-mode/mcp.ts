@@ -5,7 +5,7 @@ import { CallToolRequestSchema, CallToolResultSchema, ListToolsRequestSchema, ty
 import { Effect, Schema, type JsonSchema } from 'effect';
 import { z } from 'zod';
 import { createMcpRuntime } from '../agent-tool/mcp.js';
-import type { ResolveMcpContext } from '../agent-tool/mcp-context.js';
+import { recordMcpCall, type ResolveMcpContext } from '../agent-tool/mcp-context.js';
 import type { ToolPermissions } from '../agent-tool/permissions.js';
 import { DIRECT_CONTROL_MCP_TOOLS } from '../agent-tool/control-mcp.js';
 import { scriptRuntime, scriptOutput, type ScriptTool, type ScriptCall } from './src/execution.js';
@@ -67,42 +67,47 @@ export function createCodeModeMcpRuntime(
     });
     server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
       const sessionToken = extra.requestInfo?.headers['x-openchamber-session'];
-      const meta = { ...extra._meta, ...sessionToken && { 'openchamber/sessionToken': sessionToken } };
+      const meta: NonNullable<typeof extra._meta> = { ...extra._meta, ...sessionToken && { 'openchamber/sessionToken': sessionToken } };
       if (request.params.name !== 'execute') {
         const control = clients.find(source => source.namespace === 'openchamber');
         if (!control) throw new Error('OpenChamber control tools are unavailable');
         return control.client.callTool({ ...request.params, _meta: meta }, CallToolResultSchema, { signal: extra.signal, timeout: 43_200_000 });
       }
       const context = resolveContext(extra);
-      const policy = await permissions.session(context.sessionID);
-      await policy.assert({ action: 'execute', resources: ['*'], save: ['*'] }, context.signal);
-      const entries = (await inventory()).filter(entry => (entry.namespace !== 'openchamber' || !DIRECT_CONTROL_MCP_TOOLS.includes(entry.tool.name)) && !policy.denied(entry.permission(entry.tool.name), '*'));
-      const tools = entries.map(entry => descriptor(entry, args => Effect.tryPromise({ try: async signal => {
-        const result = CallToolResultSchema.parse(await entry.client.callTool({ name: entry.tool.name, arguments: object(args), _meta: meta }, CallToolResultSchema, { signal, timeout: 43_200_000 }));
-        const text = result.content.filter(part => part.type === 'text').map(part => part.text).join('\n');
-        if (result.isError) throw new Error(text);
-        const value = json(result.structuredContent ?? (text || null));
-        return { value, text, metadata: toolResultMetadata(entry.namespace, entry.tool.name, value, args),
-          files: result.content.filter(part => part.type === 'image').map(part => ({ type: 'file' as const, uri: `data:${part.mimeType};base64,${part.data}`, mime: part.mimeType })),
-        };
-      }, catch: error => error })));
-      const network = fetchExtension(
-        (url, metadata) => Effect.tryPromise({ try: signal => policy.assert({ action: 'webfetch', resources: [url], save: ['*'], metadata }, signal), catch: error => error }),
-        url => policy.denied('webfetch', url) ? Effect.fail(new Error(`Permission denied: webfetch ${url}`)) : Effect.void,
-      );
-      const progress = (calls: ScriptCall[]) => Effect.tryPromise({
-        try: async () => {
-          if (extra._meta?.progressToken !== undefined) await extra.sendNotification({ method: 'notifications/progress', params: {
-            progressToken: extra._meta.progressToken, progress: calls.filter(call => call.status !== 'running').length,
-            message: JSON.stringify({ toolCalls: calls }),
-          } });
-        }, catch: error => error,
-      }).pipe(Effect.orDie);
-      const { result, calls, files } = await Effect.runPromise(scriptRuntime(tools, progress, [network]).execute(input.parse(request.params.arguments).code), { signal: extra.signal });
-      return { structuredContent: object(result), content: [{ type: 'text', text: scriptOutput(result) }, ...files.map(file => {
-        const comma = file.uri.indexOf(',');
-        return { type: 'image' as const, mimeType: file.mime, data: file.uri.slice(comma + 1) };
-      })], _meta: { toolCalls: calls, openchamberToolCalls: calls } };
+      return recordMcpCall(context, 'openchamber', 'execute', request.params.arguments ?? {}, async reportProgress => {
+        const { 'openchamber/source': _source, 'openchamber/callID': _callID, ...inheritedMeta } = meta;
+        const nestedMeta = { ...inheritedMeta, ...context.messageID && { 'openchamber/source': { messageID: context.messageID } } };
+        const policy = await permissions.session(context.sessionID);
+        await policy.assert({ action: 'execute', resources: ['*'], save: ['*'] }, context.signal);
+        const entries = (await inventory()).filter(entry => (entry.namespace !== 'openchamber' || !DIRECT_CONTROL_MCP_TOOLS.includes(entry.tool.name)) && !policy.denied(entry.permission(entry.tool.name), '*'));
+        const tools = entries.map(entry => descriptor(entry, args => Effect.tryPromise({ try: async signal => {
+          const result = CallToolResultSchema.parse(await entry.client.callTool({ name: entry.tool.name, arguments: object(args), _meta: nestedMeta }, CallToolResultSchema, { signal, timeout: 43_200_000 }));
+          const text = result.content.filter(part => part.type === 'text').map(part => part.text).join('\n');
+          if (result.isError) throw new Error(text);
+          const value = json(result.structuredContent ?? (text || null));
+          return { value, text, metadata: toolResultMetadata(entry.namespace, entry.tool.name, value, args),
+            files: result.content.filter(part => part.type === 'image').map(part => ({ type: 'file' as const, uri: `data:${part.mimeType};base64,${part.data}`, mime: part.mimeType })),
+          };
+        }, catch: error => error })));
+        const network = fetchExtension(
+          (url, metadata) => Effect.tryPromise({ try: signal => policy.assert({ action: 'webfetch', resources: [url], save: ['*'], metadata }, signal), catch: error => error }),
+          url => policy.denied('webfetch', url) ? Effect.fail(new Error(`Permission denied: webfetch ${url}`)) : Effect.void,
+        );
+        const progress = (calls: ScriptCall[]) => Effect.tryPromise({
+          try: async () => {
+            await reportProgress({ toolCalls: calls, openchamberToolCalls: calls });
+            if (extra._meta?.progressToken !== undefined) await extra.sendNotification({ method: 'notifications/progress', params: {
+              progressToken: extra._meta.progressToken, progress: calls.filter(call => call.status !== 'running').length,
+              message: JSON.stringify({ toolCalls: calls }),
+            } });
+          }, catch: error => error,
+        }).pipe(Effect.orDie);
+        const { result, calls, files } = await Effect.runPromise(scriptRuntime(tools, progress, [network]).execute(input.parse(request.params.arguments).code), { signal: extra.signal });
+        return { structuredContent: object(result), content: [{ type: 'text' as const, text: scriptOutput(result) }, ...files.map(file => {
+          const comma = file.uri.indexOf(',');
+          return { type: 'image' as const, mimeType: file.mime, data: file.uri.slice(comma + 1) };
+        })], _meta: { toolCalls: calls, openchamberToolCalls: calls } };
+      });
     });
     return server;
   }, { enableJsonResponse: false });

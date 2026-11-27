@@ -17,6 +17,7 @@ import { resolveOpenCodeMcpContext } from '../opencode/mcp-context.js';
 import { createToolPermissions } from '../agent-tool/permissions.js';
 import { createOpenChamberControlService } from '../openchamber-control/service.js';
 import { createSecretFiles } from '../openchamber-control/secret-request.js';
+import { fileTools } from '../agent-file/contracts.js';
 
 const cleanup = [];
 afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); vi.unstubAllEnvs(); });
@@ -31,7 +32,7 @@ async function fixture({ pluginOptions, events = Stream.never, ...dependencies }
   });
   const history = createConversationStorage(directory);
   cleanup.push(async () => history.close());
-  const turnDiffs = createTurnDiffRuntime(directory, async () => {}, history);
+  const turnDiffs = createTurnDiffRuntime(directory, history);
   cleanup.push(() => turnDiffs.close());
   await turnDiffs.begin({ sessionID: 'session', turnID: 'message', directory });
   let listener;
@@ -56,6 +57,7 @@ async function fixture({ pluginOptions, events = Stream.never, ...dependencies }
   await client.connect(transport);
   cleanup.push(async () => { await transport.terminateSession(); await client.close(); });
   const tools = new Map((await client.listTools()).tools.map(tool => [`openchamber_${tool.name}`, { ...tool, id: `openchamber_${tool.name}`, input: tool.inputSchema, output: tool.outputSchema, options: { namespace: 'openchamber', codemode: false } }]));
+  for (const tool of fileTools) tools.set(`file_${tool.name}`, { ...tool, id: `file_${tool.name}`, input: tool.inputSchema, output: tool.outputSchema, options: { namespace: 'file', codemode: false } });
   tools.set('native_probe', { id: 'native_probe', name: 'native_probe', input: Schema.Struct({}), options: { codemode: true }, execute: () => Effect.succeed({ content: 'NATIVE' }) });
   const sessionHooks = new Map(), toolHooks = new Map(), skills = [];
   const ctx = {
@@ -91,7 +93,8 @@ async function fixture({ pluginOptions, events = Stream.never, ...dependencies }
 }
 
 it('discovers execute through MCP with the complete shared catalog and keeps backend tools direct', async () => {
-  const f = await fixture();
+  const contexts = [];
+  const f = await fixture({ resolveMcpContext: request => { const context = resolveOpenCodeMcpContext(request); contexts.push(context); return context; } });
   const tool = (await f.client.listTools()).tools.find(tool => tool.name === 'execute');
   expect(tool.inputSchema).toMatchObject({ required: ['code'], properties: { code: { type: 'string' } } });
   for (const name of ['openchamber_commands.exec_command', 'file.patch', 'browser.click', 'request.user_input_async']) expect(tool.description).toContain(`tools.${name}(`);
@@ -102,6 +105,13 @@ it('discovers execute through MCP with the complete shared catalog and keeps bac
   expect(JSON.stringify(event.system)).toContain('ENVIRONMENT');
   expect(JSON.stringify(event.system)).not.toContain('OLD_CATALOG');
   expect(f.tools.get('native_probe').options.codemode).toBe(false);
+  await f.invoke('file_write', { path: 'direct.txt', content: 'direct' }, { id: 'direct-call' });
+  expect(contexts.at(-1)).toMatchObject({ sessionID: 'session', messageID: 'message', partID: 'direct-call', callID: 'direct-call' });
+  const start = contexts.length;
+  await f.run('return await tools.file.edit({path:"direct.txt",oldString:"direct",newString:"nested"});');
+  expect(contexts[start]).toMatchObject({ messageID: 'message', partID: expect.any(String) });
+  expect(contexts.at(-1)).toMatchObject({ messageID: 'message', partID: undefined });
+  expect(await fs.readFile(path.join(f.directory, 'direct.txt'), 'utf8')).toBe('nested');
   f.runtime.configureTools({ includeWeb: false });
   expect((await f.client.listTools()).tools.find(tool => tool.name === 'execute').description).not.toContain('tools.browser.');
   expect((await f.run('return await tools.browser.snapshot({});')).output.ok).toBe(false);

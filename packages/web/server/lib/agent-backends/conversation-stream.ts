@@ -14,11 +14,15 @@ const replayFrame = z.object({ payload: z.json(), directory: z.string().optional
 
 export type ConversationEventHub = Pick<GlobalMessageStreamHub, 'subscribeEvent' | 'subscribeStatus' | 'injectEvent' | 'flushPending' | 'cursor' | 'replayAfter'>;
 
-export function createConversationStream(hub: ConversationEventHub, processForwardedEventPayload?: ForwardEventPayload, record?: (event: SyncEvent) => void, project?: (event: SyncEvent) => SyncEvent) {
+export function createConversationStream(hub: ConversationEventHub, processForwardedEventPayload?: ForwardEventPayload, record?: (event: SyncEvent) => void, project?: (event: SyncEvent) => SyncEvent | undefined) {
   const listeners = new Set<Listener>();
   const frameFor = (payload: JsonValue, directory: string | undefined, eventId: string): Frame => {
-    const frame = injectedConversationPayload(payload) ?? classifyStreamPayload(payload, directory, undefined, 'host');
-    if (frame.kind === 'events') for (const item of frame.events) item.event = project?.(item.event) ?? item.event;
+    const injected = injectedConversationPayload(payload);
+    const frame = injected ?? classifyStreamPayload(payload, directory, undefined, 'host');
+    if (frame.kind === 'events') frame.events = frame.events.flatMap(item => {
+      const event = project && !injected ? project(item.event) : item.event;
+      return event ? [{ ...item, event }] : [];
+    });
     return { type: 'event', eventId, payload: { ...frame, hostNow: Date.now() } };
   };
   const broadcast = (frame: Frame) => {

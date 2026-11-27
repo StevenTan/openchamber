@@ -4,12 +4,12 @@ import type { createRoutingRuntime } from '../routing/runtime.js';
 import type { createExistingSessionTasks } from '../scheduled-tasks/existing-session.js';
 import type { createSessionGoal } from '../session-goal/create.js';
 import type { QueuedItem, MessageQueueSessionSnapshot } from './runtime.js';
-import type { ConversationPrompt } from '@openchamber/sdk/conversations/http';
+import type { ConversationDelivery } from '../agent-backends/conversation-delivery.js';
 
 export interface MessageQueueOptions {
-  sendPrompt(sessionID: string, directory: string, item: QueuedItem & { prompt: ConversationPrompt }): Promise<void>;
+  deliver(sessionID: string, directory: string, input: ConversationDelivery): Promise<void>;
   onPromptCancelled?(sessionID: string, item: QueuedItem, directory: string): void;
-  backendForSession?: (sessionID: string) => { isIdle(): Promise<boolean>; send(directory: string, item: QueuedItem): Promise<void> } | undefined;
+  backendForSession?: (sessionID: string) => { isIdle(): Promise<boolean> } | undefined;
   globalEventHub: Pick<GlobalMessageStreamHub, 'subscribeEvent' | 'subscribeStatus'>;
   buildOpenCodeUrl: (route: string, query: string) => string | URL;
   getOpenCodeAuthHeaders: () => Record<string, string>;

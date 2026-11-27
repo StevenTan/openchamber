@@ -11,7 +11,7 @@ const jsonObject = (value: NonNullable<CallToolResult['structuredContent']>) => 
 
 export function createToolActivity(options: {
   dataDir: string;
-  anchor(sessionID: string): { turnID?: string | undefined; updateIndex: number };
+  anchor(sessionID: string): { turnID?: string | undefined; messageID?: string | undefined };
   changed(sessionID: string, call: AgentToolCall, turnID: string | undefined): Promise<void>;
 }) {
   const root = path.join(options.dataDir, 'tool-activity');
@@ -21,13 +21,15 @@ export function createToolActivity(options: {
     await fs.appendFile(path.join(root, `${sessionID}.jsonl`), JSON.stringify({ turnID, call }) + '\n', { mode: 0o600 });
     await options.changed(sessionID, call, turnID);
   };
-  const record = (sessionID: string, callID: string): NonNullable<McpCallContext['record']> => async (namespace, name, input, execute) => {
-    const { turnID, updateIndex } = options.anchor(sessionID);
+  const record = (sessionID: string, callID: string, source?: Pick<McpCallContext, 'messageID' | 'partID'>): NonNullable<McpCallContext['record']> => async (namespace, name, input, execute) => {
+    const anchor = options.anchor(sessionID);
+    const { turnID } = anchor;
+    const messageID = source?.messageID ?? anchor.messageID;
     const parsedInput = jsonObject(input);
-    const call: AgentToolCall = { id: randomUUID(), callID, namespace, name, input: parsedInput, started: Date.now(), updateIndex };
+    const call: AgentToolCall = { id: randomUUID(), callID, namespace, name, input: parsedInput, started: Date.now(), ...messageID && { messageID }, ...source?.partID && { partID: source.partID } };
     await save(sessionID, turnID, call);
     try {
-      const result = await execute();
+      const result = await execute(metadata => save(sessionID, turnID, { ...call, metadata: jsonObject(metadata) }));
       const { structuredContent, _meta, ...rest } = result;
       const recorded = { ...rest, content: result.content, ...structuredContent && { structuredContent: jsonObject(structuredContent) }, ..._meta && { _meta: jsonObject(_meta) } };
       await save(sessionID, turnID, { ...call, completed: Date.now(), result: recorded, ...recorded.structuredContent && !result.isError && { metadata: jsonObject(toolResultMetadata(namespace, name, recorded.structuredContent, parsedInput)) } });

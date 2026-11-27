@@ -435,7 +435,7 @@ export const createSharePagesRuntime = ({
   };
 
   const deliver = async (group: ShareGroup, recipient: ShareRecipient, delivery: NonNullable<ShareRecipient['delivery']>) => {
-    const message = {
+    const message: SyntheticMessage = {
       id: delivery.messageId,
       text: buildShareAnswerText(group, recipient),
       description: `Answer from ${recipient.label}`,

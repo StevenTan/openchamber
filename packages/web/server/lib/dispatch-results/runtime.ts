@@ -3,6 +3,8 @@ import path from 'path';
 import { z } from 'zod';
 import { unwrapOpenCodeResponse } from '../opencode/response-envelope.js';
 import { createSessionActivityProbe } from '../opencode/session-activity.js';
+import type { ConversationInput } from '../agent-backends/conversation-input.js';
+import { controlErrorFields } from '../openchamber-control/error.js';
 
 const FILE_NAME = 'dispatch-results.json';
 const FILE_VERSION = 1;
@@ -105,6 +107,7 @@ export interface DispatchResultsOptions {
   buildOpenCodeUrl: (fetchPath: string, query: string) => string | URL;
   getOpenCodeAuthHeaders: () => Record<string, string>;
   dataDir: string;
+  deliver: ConversationInput['deliver'];
   isSessionArchived?: (sessionId: string) => boolean | Promise<boolean>;
   fetchImpl?: typeof fetch;
   now?: () => number;
@@ -219,6 +222,7 @@ export function createDispatchResultsRuntime({
   buildOpenCodeUrl,
   getOpenCodeAuthHeaders,
   dataDir,
+  deliver: deliverInput,
   isSessionArchived = async () => false,
   fetchImpl = fetch,
   now = Date.now,
@@ -290,23 +294,17 @@ export function createDispatchResultsRuntime({
     return write;
   };
 
-  const openCodeRequest = async <Schema extends z.ZodType>(fetchPath: string, schema: Schema, { method = 'GET', body, query }: {
-    method?: string;
-    body?: { id: DispatchEntry['messageId']; delivery: 'steer'; resume: boolean } & DispatchResultMessage;
+  const openCodeRequest = async <Schema extends z.ZodType>(fetchPath: string, schema: Schema, { query }: {
     query?: Record<string, string>;
   } = {}) => {
     const base = buildOpenCodeUrl(fetchPath, '');
     const search = new URLSearchParams(query || {}).toString();
     const headers = { Accept: 'application/json', ...getOpenCodeAuthHeaders() };
-    const init: RequestInit = { method, headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) };
-    if (body) {
-      Object.assign(headers, { 'Content-Type': 'application/json' });
-      init.body = JSON.stringify(body);
-    }
+    const init: RequestInit = { method: 'GET', headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) };
     const response = await fetchImpl(search ? `${base}?${search}` : base, init);
     if (!response.ok) {
       const detail = await response.text().catch(() => '');
-      throw httpError(`OpenCode ${method} ${fetchPath} failed with ${response.status}${detail ? `: ${detail.slice(0, 200)}` : ''}`, response.status);
+      throw httpError(`OpenCode GET ${fetchPath} failed with ${response.status}${detail ? `: ${detail.slice(0, 200)}` : ''}`, response.status);
     }
     return parsedData(schema.safeParse(unwrapOpenCodeResponse(await response.json().catch(() => null))));
   };
@@ -335,14 +333,13 @@ export function createDispatchResultsRuntime({
     const archived = await Promise.resolve(isSessionArchived(entry.parentSessionId)).catch(() => false);
     const resume = archived !== true;
     try {
-      await openCodeRequest(`/api/session/${encodeURIComponent(entry.parentSessionId)}/synthetic`, z.unknown().transform(() => undefined), {
-        method: 'POST',
-        body: { id: entry.messageId, ...message, delivery: 'steer', resume },
-      });
+      await deliverInput(entry.parentSessionId, undefined, { type: 'context', context: { id: entry.messageId, ...message, delivery: 'steer', resume } }, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
       return true;
     } catch (error) {
-      if (hasStatus(error) && error.status === 409) return true;
-      if (hasStatus(error) && error.status === 404) {
+      const fields = controlErrorFields(error);
+      const status = fields?.status ?? fields?.statusCode;
+      if (status === 409) return true;
+      if (status === 404) {
         console.log(`[dispatch-results] dropping the result of ${entry.sessionId}: session ${entry.parentSessionId} no longer exists`);
         return true;
       }

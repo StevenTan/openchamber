@@ -12,8 +12,8 @@ export function recordHistoryEvent(store: ConversationStorage, event: SyncEvent)
   }
   return store.session(sessionID, db => {
     if (event.type === 'session.revert.committed') {
-      db.run(`DELETE FROM messages WHERE session_id = ? AND turn_sequence >=
-        (SELECT turn_sequence FROM messages WHERE session_id = ? AND id = ?)`, [sessionID, sessionID, event.properties.to]);
+      db.run(`DELETE FROM messages WHERE session_id = ? AND (turn_sequence, ordinal) >=
+        (SELECT turn_sequence, ordinal FROM messages WHERE session_id = ? AND id = ?)`, [sessionID, sessionID, event.properties.to]);
       return;
     }
     if (event.type === 'message.compaction.delta') {

@@ -65,8 +65,9 @@ mobile clients use the host routes; the VS Code extension uses OpenCode.
   remain native.
   Startup reads native session metadata and
   the latest small turn summary for each model; message bodies remain on disk.
-  Active turns retain their streamed content until completion. History reads
-  persist the active snapshot before querying the requested messages. The latest
+  Active turns retain native updates for context mapping until completion.
+  `conversation-runtime.ts` records normalized message events and their insertion
+  order before publishing them. History reads query these same messages. The latest
   assistant message includes refreshed native token and context measurements.
   User-attached context is stored with its text, identity and metadata as synthetic
   records immediately before its user message, including in copied histories.
@@ -83,7 +84,7 @@ mobile clients use the host routes; the VS Code extension uses OpenCode.
   direction. HTTP lists and application session readers query the same index.
 - Managed backends publish normalized SDK events through
   `/api/conversations/events` and `/api/conversations/events/ws`. OpenCode wire
-  events, native turn updates and host broadcasts share the global hub's replay
+  events, native text deltas and host broadcasts share the global hub's replay
   cursor. A missing cursor or an upstream reconnect requests history repair.
   Native streaming starts independently of the OpenCode upstream connection.
 - Titles, archive timestamps and metadata belong to the host conversation
@@ -91,6 +92,10 @@ mobile clients use the host routes; the VS Code extension uses OpenCode.
   backend metadata. Live and replayed native events preserve these owned fields.
 - Antigravity prompt steering admits additional user messages and asynchronous
   answers into the running turn. The latest prompt's completion ends that turn.
+  Each admitted input starts an assistant message in the shared runtime. Streamed
+  text appends to that message; tool completion updates the message that recorded
+  its start. Live events, history reads and forks retain this insertion order.
+  Existing stored projections are updated once per session database.
 - Conversation input uses the host message queue for `delivery: queue` and
   dispatches `steer` immediately through the owning adapter. Queued input retains
   message and context identities, attachments, mentions, metadata and the selected
@@ -99,6 +104,16 @@ mobile clients use the host routes; the VS Code extension uses OpenCode.
   its pending messages through the shared event stream. Context attachments are
   admitted with their prompt in both adapters. Queue deliveries appear in the
   conversation timeline; composer queue controls operate on their own rows.
+- Synthetic context retains its identity, description and metadata. `resume: false`
+  stages it in the conversation database for the next dispatched input; `queue`
+  uses the host dispatcher and `steer` admits it immediately. Staged entries are
+  consumed after successful dispatch. Active-session events update the common
+  runtime before notifying queue idleness and stream subscribers.
+- `ConversationInput.deliver` sends prepared prompts, slash commands and synthetic
+  context through the owning conversation adapter. Chat, composer queues,
+  scheduled tasks and asynchronous answers share this entry. Model and agent
+  selection accompanies queued prompts; background prompts retain their synthetic
+  source. OpenCode input serialization uses the official SDK.
 - The custom main agent uses the supplied MCP servers. OpenChamber's MCP services
   perform approvals; ACP permission callbacks admit the call to those services.
 - The custom agent's system prompt is loaded from `antigravity-agent-prompt.txt`.
@@ -121,13 +136,19 @@ mobile clients use the host routes; the VS Code extension uses OpenCode.
   `RetrieveUserQuotaSummary` endpoint. A native session-list request starts the
   worker without a model turn; the front and worker logs identify its HTTP port.
 - Native turn creation and completion anchor the host's shared file diff runtime.
-  File mutations persist the reference on the native turn and publish it with
+  File mutations persist the reference on the host tool part and publish it with
   live updates. Conversation deletion deletes its host diff records; archiving
   retains them.
 - Shared MCP handlers persist tool inputs, results and activity metadata under
-  `tool-activity/<session-id>.jsonl`. Native turns retain these host records for
-  live and history projection, including file patches and interaction answers.
+  `tool-activity/<session-id>.jsonl`. The common runtime writes their message parts
+  for live and history reads, including file patches and interaction answers.
   The original MCP call ID identifies card callbacks.
+  Managed OpenCode calls carry their original message and part IDs through MCP.
+  The host recorder updates that same part and marks its result ownership in
+  metadata. Subsequent native tool events cannot replace that recorded result.
+  Imports preserve host parts by exact identity. External OpenCode tools retain
+  their normalized backend events. Code Mode child calls have independent part
+  IDs and retain the outer call's owning message.
 - Session creation applies the host's default approval mode. Draft submission
   awaits the selected mode before dispatching the first prompt.
 - History edits use the shared stage, clear and commit routes. Antigravity stores

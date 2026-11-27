@@ -8,8 +8,10 @@ shared history-truncation event with the conversation's existing identity.
 
 The `@openchamber/sdk/conversations/*` entries own shared conversation, message,
 catalog and interaction types. The Antigravity projection supplies identical
-message identities and parts for stored history and live UI updates. Shared
-event entries also own wire projection, shell and space event shapes, and the
+message identities and parts for stored history and live UI updates.
+Steering inputs separate assistant activity at their recorded update and tool
+boundaries. Only the final assistant segment carries turn usage and errors.
+Shared event entries also own wire projection, shell and space event shapes, and the
 managed stream envelope. Host stream timestamps use the host clock; clients
 translate turn start times with the envelope's current `hostNow` value.
 `conversations/message-updates` applies message patches and tool transitions for

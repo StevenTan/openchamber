@@ -1,3 +1,5 @@
+import { createAntigravityHistoryFixture } from './antigravity-storage.fixture.js';
+import { createConversationRuntime } from './conversation-runtime.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -7,15 +9,44 @@ import { randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import { createAntigravityBackend } from './antigravity.js';
-import { createAntigravityStorage, type StoredConversation } from './antigravity-storage.js';
+import type { StoredConversation } from './antigravity-storage.js';
 import { createConversationStorage } from './conversation-storage.js';
 import { antigravityEvents } from './antigravity-events.js';
+import { copyAntigravityHistory } from './antigravity-fork.js';
+
+test('forked steering records retain the identities used by subsequent projection', async t => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'antigravity-steering-fork-'));
+  t.after(() => fs.rm(directory, { recursive: true }));
+  const storage = createConversationStorage(directory);
+  t.after(() => storage.close());
+  const history = createAntigravityHistoryFixture(storage);
+  const source: StoredConversation = { id: 'source', nativeID: 'native', directory, title: 'Source', created: 1, updated: 4, draft: false, config: [], forms: [], turns: [] };
+  history.save(source, { id: 'user', assistantID: 'assistant', modelID: 'model', text: 'Files', created: 1, completed: 4, files: [],
+    updates: [{ sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'Before' } }, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'After' } }],
+    followups: [{ id: 'steer', text: 'Browser too', files: [], created: 2, updateIndex: 1, toolCallCount: 0 }] });
+  const original = storage.message(source.id, 'assistant');
+  assert.ok(original);
+  storage.saveMessages([{ ...original, parts: [...original.parts, { id: 'failed_diff', messageID: 'assistant', sessionID: source.id, type: 'tool', tool: 'file_edit', callID: 'file_call', state: { status: 'error', input: {}, error: 'Capture failed', metadata: { openchamberTurnDiff: { error: 'Capture failed' } }, time: { start: 1, end: 2 } } }] }]);
+  copyAntigravityHistory(storage, source.id, 'fork', '');
+  const records = history.messages('fork', { order: 'asc' }).items;
+  const [first, , steering, reply] = records;
+  assert.ok(first && steering && reply);
+  const turn = history.turn('fork', first.info.id);
+  assert.ok(turn);
+  assert.deepEqual(records.map(record => record.info.role), ['user', 'assistant', 'user', 'assistant']);
+  assert.equal(records[1]?.parts[0]?.type === 'reasoning' && records[1].parts[0].text, 'Before');
+  const failed = records[1]?.parts.find(part => part.type === 'tool');
+  assert.deepEqual(failed?.type === 'tool' && failed.state.status === 'error' && failed.state.metadata?.openchamberTurnDiff, { error: 'Capture failed' });
+  assert.equal(reply.parts[0]?.type === 'text' && reply.parts[0].text, 'After');
+  assert.equal(reply.info.id, `${steering.info.id}_assistant`);
+  assert.equal(records.some(record => ['user', 'assistant', 'steer', 'steer_assistant'].includes(record.info.id)), false);
+});
 
 test('native forks copy history and file diffs with independent identities and leave a running parent active', async t => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'antigravity-fork-'));
   t.after(() => fs.rm(directory, { recursive: true }));
   const storage = createConversationStorage(directory);
-  const history = createAntigravityStorage(storage);
+  const history = createAntigravityHistoryFixture(storage);
   const source: StoredConversation = { id: 'ses_ag_parent', nativeID: randomUUID(), directory, title: 'Parent', created: 1, updated: 2, draft: false, config: [], metadata: { pinned: true }, forms: [], turns: [] };
   for (let index = 0; index < 2; index++) history.save(source, {
     id: `user_${index}`, assistantID: `assistant_${index}`, modelID: 'fixture', text: `Prompt ${index}`, files: [], created: index, completed: index + 1, followups: [],
@@ -47,7 +78,8 @@ test('native forks copy history and file diffs with independent identities and l
   const inherited: Array<[string, string | undefined]> = [];
   const forks: string[] = [];
   let streamed = () => {};
-  const backend = createAntigravityBackend({ storage, dataDir: directory, turnDiffs: { begin: async () => {}, finish: async () => {}, remove: async () => {} },
+  const runtime = createConversationRuntime(storage);
+  const backend = createAntigravityBackend({ runtime, storage, dataDir: directory, turnDiffs: { begin: async () => {}, finish: async () => {}, remove: async () => {} },
     environment: () => process.env, mcpServers: () => [], reassignSession: () => {}, initializeSession: async (id, _folder, parent) => { inherited.push([id, parent?.id]); }, readInstructions: async () => [],
     publish: event => {
       if (event.type === 'update' && event.update.sessionUpdate === 'agent_message_chunk') streamed();
@@ -90,7 +122,7 @@ test('native forks copy history and file diffs with independent identities and l
   const quoteMetadata = { openchamberContext: { kind: 'chat-quote', quote: 'Quoted source', text: 'About this quote' } };
   await backend.send(source.id, { id: 'running', text: 'working', files: [], context: [{ id: 'quote', text: 'Quoted source', metadata: quoteMetadata }] });
   await update;
-  await backend.recordToolCall(source.id, { id: 'active_call', callID: 'active_mcp', namespace: 'file', name: 'edit', input: {}, started: 3, completed: 4, updateIndex: 1, result: { content: [{ type: 'text', text: 'Edited during active turn' }] } }, 'running');
+  runtime.tool(source.id, { id: 'active_call', callID: 'active_mcp', namespace: 'file', name: 'edit', input: {}, started: 3, completed: 4, updateIndex: 1, result: { content: [{ type: 'text', text: 'Edited during active turn' }] } }, directory);
   const parentHistory = (await backend.messages(source.id, { order: 'asc' })).items;
   const btw = await backend.fork(source.id);
   assert.equal(backend.statuses()[source.id]?.type, 'busy');
@@ -132,7 +164,7 @@ test('native forks copy history and file diffs with independent identities and l
   assert.ok(original);
   assert.deepEqual(original.followups, []);
   assert.deepEqual(original.updates.filter(item => item.sessionUpdate === 'agent_message_chunk').map(item => item.content), [{ type: 'text', text: 'Quoted sourceworking' }]);
-  assert.equal(original.toolCalls?.[0]?.result?.content[0]?.text, 'Edited during active turn');
+  assert.equal((await backend.messages(source.id, {})).items.flatMap(record => record.parts).some(part => part.type === 'tool' && part.state.status === 'completed' && part.state.output === 'Edited during active turn'), true);
   assert.equal((await backend.messages(source.id, {})).items.length, 7);
   assert.equal(native.prepare('SELECT COUNT(*) AS count FROM steps').get()?.count, 6);
   await backend.send(source.id, { id: 'edited', text: 'Edited follow-up', files: [], context: [] });

@@ -49,7 +49,7 @@ const diffFile = async (baseline: Baseline, file: string, directory: string, emp
   return { file: display, status, patch: `diff --git a/${display} b/${display}\n--- ${oldPath}\n+++ ${newPath}\n${body}`, additions, deletions };
 };
 
-export function createTurnDiffRuntime(dataDir: string, changed: (sessionID: string, reference: TurnDiffReference) => Promise<void>, storage: ConversationStorage) {
+export function createTurnDiffRuntime(dataDir: string, storage: ConversationStorage) {
   const root = path.join(dataDir, 'turn-diffs');
   const active = new Map<string, TurnContext>();
   const turns = new Map<string, Turn>();
@@ -147,7 +147,6 @@ export function createTurnDiffRuntime(dataDir: string, changed: (sessionID: stri
         reference = { error: (error instanceof Error ? error.message : String(error)), ...turn && { turnID: turn.turnID,
           files: Object.keys(turn.files).map(file => ({ file: displayPath(file, turn.directory), status: 'modified' as const })) } };
       }
-      await changed(capture.sessionID, reference);
       return reference;
     }),
     read: (sessionID: string, turnID: string) => serial(sessionID, async () => {

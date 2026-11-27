@@ -5,3 +5,4 @@ export const AGENT_MCP_SERVERS = {
   browser: { name: 'browser', path: '/api/openchamber/browser-tool/mcp' },
   request: { name: 'request', path: '/api/openchamber/async-question/mcp' },
 } as const;
+

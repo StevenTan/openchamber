@@ -3,13 +3,14 @@ import { projectSession, projectMessages, projectInboxMessage, projectAgent, pro
 import { compact } from '@openchamber/sdk/conversations/identities';
 import type { ConversationApi, ConversationContextOptions } from './conversation-contract.js';
 import { shellMessageRecords } from '../opencode/message-shells.js';
-import type { OpenCodeHistory } from './opencode-history.js';
+import type { ConversationRuntime } from './conversation-runtime.js';
+import { createOpenCodeInput } from './opencode-input.js';
 import { OpenChamberControlError } from '../openchamber-control/error.js';
 
 const cursor = (value: { previous?: string | null | undefined; next?: string | null | undefined }) => ({ ...value.previous != null && { previous: value.previous }, ...value.next != null && { next: value.next } });
 const spacesSchema = z.object({ spaces: z.array(z.object({ id: z.string(), name: z.string(), taskTitle: z.object({ title: z.string(), by: z.enum(['user', 'agent']) }).nullish(), state: z.enum(['complete', 'partial', 'stale', 'unknown']), projectDirectory: z.string().nullable(), directory: z.string().nullable() })).optional() });
 
-export function createOpenCodeConversations({ client, directory }: ConversationContextOptions, history: OpenCodeHistory): ConversationApi {
+export function createOpenCodeConversations({ client, directory }: ConversationContextOptions, history: ConversationRuntime): ConversationApi {
   const importHistory = (id: string) => history.importSession(id, async options => {
     const page = await client.message.list({ sessionID: id, limit: options.limit, cursor: options.cursor, order: 'asc' });
     return { items: projectMessages(page.data, id).map(item => ({ info: item.message, parts: item.parts })), cursor: cursor(page.cursor) };
@@ -41,11 +42,7 @@ export function createOpenCodeConversations({ client, directory }: ConversationC
     cancelInbox: async (id, messageID) => { await client.session.inbox.cancel({ sessionID: id, inboxID: messageID }); },
     model: async (id, model) => { await client.session.switchModel({ sessionID: id, model: { id: model.id, providerID: model.providerID, ...model.variant != null && { variant: model.variant } } }); },
     agent: async (id, agent) => { await client.session.switchAgent({ sessionID: id, agent }); },
-    async prompt(id, input) {
-      for (const context of input.context) await client.session.synthetic({ sessionID: id, ...context, resume: false });
-      await client.session.prompt({ sessionID: id, id: input.id, text: input.text, files: input.files.length ? input.files.map(file => ({ uri: file.url, ...file.filename !== undefined && { name: file.filename } })) : undefined, agents: input.agents.length ? input.agents.map(agent => ({ name: agent.name, ...agent.mention !== undefined && { mention: agent.mention } })) : undefined, skills: input.skills.length ? input.skills : undefined, metadata: input.metadata, delivery: input.delivery });
-      return input.id;
-    },
+    ...createOpenCodeInput(client, history, directory),
     interrupt: async id => { await client.session.interrupt({ sessionID: id }); },
     async catalog(_sessionID, includeProviders = true) {
       const [models, fallback, providers] = await Promise.all([client.model.list({ types: ['chat', 'image'] }), client.model.default().catch(() => undefined), includeProviders ? client.provider.list().then(result => result.data) : []]);
@@ -67,7 +64,7 @@ export function createOpenCodeConversations({ client, directory }: ConversationC
     vcs: async () => projectVcs((await client.vcs.get()).data),
     async statuses() {
       const active = z.record(z.string().min(1), z.object({ type: z.literal('running') })).parse(await client.session.active());
-      return Object.fromEntries(Object.keys(active).map(id => [id, { type: 'busy' as const }]));
+      return history.replaceStatuses('opencode', Object.fromEntries(Object.keys(active).map(id => [id, { type: 'busy' as const }])));
     },
     stageRevert: (id, messageID) => client.session.revert.stage({ sessionID: id, messageID }),
     clearRevert: async id => { await client.session.revert.clear({ sessionID: id }); },

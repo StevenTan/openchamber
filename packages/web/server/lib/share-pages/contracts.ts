@@ -15,6 +15,7 @@ export interface SyntheticMessage {
   text: string;
   description: string;
   metadata: Record<string, string>;
-  delivery: string;
+  delivery: 'steer';
   resume: boolean;
+  id: string;
 }

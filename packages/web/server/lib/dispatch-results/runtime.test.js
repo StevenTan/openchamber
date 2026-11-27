@@ -94,6 +94,10 @@ const createRuntime = async ({ dataDir, openCode = createOpenCode(), ...override
     getOpenCodeAuthHeaders: () => ({}),
     dataDir: directory,
     fetchImpl: openCode.fetchImpl,
+    deliver: async (sessionID, _directory, delivery) => {
+      const response = await openCode.fetchImpl(`http://opencode.test/api/session/${sessionID}/synthetic`, { method: 'POST', body: JSON.stringify(delivery.context) });
+      if (!response.ok) throw Object.assign(new Error(`Delivery failed: ${response.status}`), { status: response.status });
+    },
     quietMs: 0,
     retryDelayMs: () => 10,
     settleRecheckMs: 10,

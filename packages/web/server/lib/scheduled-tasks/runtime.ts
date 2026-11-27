@@ -621,17 +621,12 @@ export const createScheduledTasksRuntime = (deps: ScheduledTasksDependencies) =>
     ? sessionKnowledgeRuntime.sync(sessionID, projectPath, '')
     : Promise.resolve(false));
 
-  const runPrompt = async ({ client, sessionID, projectPath, task }: RunContext & { sessionID: string }) => {
+  const runPrompt = async ({ sessionID, projectPath, task }: RunContext & { sessionID: string }) => {
     await syncKnowledge(sessionID, projectPath);
-
-    if (task.execution.goalEnabled) {
-      await client.session.synthetic({ sessionID, text: buildGoalIntroText(task.execution.goalTokenBudget), resume: false });
-    }
-
-    await client.session.prompt({
-      sessionID,
-      text: expandSnippets(task.execution.prompt, projectPath),
-    });
+    await deps.deliver(sessionID, projectPath, { type: 'prompt', source: 'synthetic', prompt: {
+      id: createMessageId(Date.now()), text: expandSnippets(task.execution.prompt, projectPath), files: [], agents: [], skills: [],
+      context: task.execution.goalEnabled ? [{ text: buildGoalIntroText(task.execution.goalTokenBudget) }] : [],
+    } });
   };
 
   const resolveScheduledCommand = async ({ client, projectPath, task }: RunContext) => {
@@ -653,15 +648,14 @@ export const createScheduledTasksRuntime = (deps: ScheduledTasksDependencies) =>
     return command ? { ...parsed, template: isString(template) ? template : undefined } : null;
   };
 
-  const runScheduledCommand = async ({ client, sessionID, projectPath, command }: {
+  const runScheduledCommand = async ({ sessionID, projectPath, command }: {
     client: RunContext['client']; sessionID: string; projectPath: string;
     command: { command: string; arguments: string };
   }) => {
     await syncKnowledge(sessionID, projectPath);
-    await client.session.command({
-      sessionID,
-      name: command.command,
-      text: command.arguments,
+    await deps.deliver(sessionID, projectPath, { type: 'prompt', source: 'synthetic',
+      command: { name: command.command, text: command.arguments },
+      prompt: { id: createMessageId(Date.now()), text: '', files: [], agents: [], skills: [], context: [] },
     });
   };
 
@@ -949,14 +943,8 @@ export const createScheduledTasksRuntime = (deps: ScheduledTasksDependencies) =>
         });
       }
 
-      if (native) {
-        await syncKnowledge(sessionID, runDirectory);
-        await native.send(sessionID, { id: createMessageId(Date.now()), text: expandSnippets(task.execution.prompt, runDirectory), files: [], context: [] }, 'synthetic');
-      } else if (scheduledCommand) {
-        await runScheduledCommand({ client, sessionID, projectPath: runDirectory, command: scheduledCommand });
-      } else {
-        await runPrompt({ client, sessionID, projectPath: runDirectory, task });
-      }
+      if (scheduledCommand) await runScheduledCommand({ client, sessionID, projectPath: runDirectory, command: scheduledCommand });
+      else await runPrompt({ client, sessionID, projectPath: runDirectory, task });
 
       const finishedAt = Date.now();
       const result: DispatchResult = {

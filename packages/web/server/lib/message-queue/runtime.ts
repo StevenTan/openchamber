@@ -3,8 +3,7 @@ export type { MessageQueueOptions } from './options.js';
 import fs from 'fs';
 import path from 'path';
 import { z } from 'zod';
-import { isRecord, isString } from '../shared/object-guards.js';
-import type { Application, Response as HttpResponse } from '../shared/http-contracts.js';
+import { isString } from '../shared/object-guards.js';
 import type { GlobalStreamEvent } from '../event-stream/global-hub.js';
 import type { ScheduledTaskProvenance } from '../scheduled-tasks/existing-session.js';
 import type { ScheduledTaskInput, ScheduledTaskStatus } from '../projects/contracts.js';
@@ -14,20 +13,25 @@ import { assertPromptResponse } from '../opencode/prompt-response.js';
 import { unwrapOpenCodeResponse } from '../opencode/response-envelope.js';
 import { attachmentHint } from '../routing/runtime.js';
 import { buildGoalIntroText, createSessionGoal } from '../session-goal/create.js';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import type { JsonObject, JsonValue } from '../shared/json-values.js';
 import type { ModelCatalogEntry } from './opencode-types.js';
-import { conversationPrompt } from '../agent-backends/prompt-schema.js';
-import type { QueueSendConfig, QueuedGoal, QueuedAttachment, QueuedContextPart, QueuedItemInput, QueuedItem, PublicQueuedItem, SessionQueue, MessageQueueSessionSnapshot } from './contracts.js';
+import { conversationContext } from '../agent-backends/prompt-schema.js';
+import type { QueuedAttachment, QueuedContextPart, QueuedItem, SessionQueue, MessageQueueSessionSnapshot } from './contracts.js';
 export type { QueueSendConfig, QueuedGoal, QueuedAttachment, QueuedContextPart, QueuedItemInput, QueuedItem, PublicQueuedItem, SessionQueue, MessageQueueSessionSnapshot } from './contracts.js';
+
+import { asNonEmptyString, asRecord, asList, asCount, hasReadableFields, isList, textSchema, listSchema, queuedItemInputSchema, parseStoredItem, toPublicItem, extractSessionStatus, extractAssistantMessageUpdate, extractAbortedSessionId, extractDeletedSessionId, extractSessionDirectoryUpdate, type QueueRecord, parseQueuedItemInput } from './records.js';
+export { parseQueuedItemInput } from './records.js';
+export type { QueueRecord } from './records.js';
+export { registerMessageQueueRoutes } from './routes.js';
 
 const QUEUE_FILE_NAME = 'message-queue.json';
 const QUEUE_FILE_VERSION = 1;
 
 const MAX_SESSIONS = 50;
 const MAX_ITEMS_PER_SESSION = 20;
-const CONTENT_CHAR_LIMIT = 200_000;
+const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{4,128}$/;
 
 const DISPATCH_QUIET_MS = 500;
 const ABORT_HOLD_MS = 2_000;
@@ -36,29 +40,9 @@ const RETRY_MAX_DELAY_MS = 60_000;
 const FETCH_TIMEOUT_MS = 15_000;
 const MESSAGE_TAIL_LIMIT = 2;
 
-const ATTACHMENT_SOURCES = new Set(['local', 'server', 'vscode']);
-const CONTEXT_PART_KINDS = new Set(['context', 'instruction', 'synthetic']);
-const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{4,128}$/;
-const MESSAGE_ID_PATTERN = /^msg_[A-Za-z0-9]{8,64}$/;
-
 const getQueuedSendRetryDelayMs = (failures: number) =>
   Math.min(RETRY_BASE_DELAY_MS * 2 ** Math.max(failures - 1, 0), RETRY_MAX_DELAY_MS);
 
-const textSchema = z.unknown().transform((value) => isString(value) ? value : '');
-const asNonEmptyString = z.unknown().transform((value) => isString(value) && value.trim() ? value.trim() : '').parse;
-const asText = textSchema.parse;
-const recordSchema = z.unknown().transform((value) => isRecord(value) ? value : null);
-const asRecord = recordSchema.parse;
-export type QueueRecord = NonNullable<z.output<typeof recordSchema>>;
-const isList = (value: unknown): value is unknown[] => Array.isArray(value);
-const listSchema = z.unknown().transform((value) => isList(value) ? value : null);
-const asList = listSchema.parse;
-const isFiniteNumber = (value: unknown): value is number => Number.isFinite(value);
-const asCount = z.unknown().transform((value) => isFiniteNumber(value) && value >= 0 ? Math.floor(value) : null).parse;
-const hasReadableFields = (value: unknown): value is { agent?: unknown; message?: unknown; status?: unknown; statusCode?: unknown } => value !== null && value !== undefined;
-const isInteger = (value: unknown): value is number => Number.isInteger(value);
-const hasQueueBody = (value: unknown): value is { item?: unknown; directory?: unknown; itemIds?: unknown } => value !== null && value !== undefined;
-const hasScheduledTaskField = (value: unknown): value is { scheduledTask?: unknown } => value !== null && value !== undefined;
 const isScheduledItem = (item: QueuedItem): item is QueuedItem & { scheduledTask: ScheduledTaskProvenance } => Boolean(item.scheduledTask);
 
 interface QueueModel {
@@ -69,25 +53,14 @@ interface QueueModel {
 
 type PromptFile = {
   uri: string;
+  mime: string;
   name?: string;
 };
-
-interface CommandBody {
-  name: string;
-  text: string;
-  files?: PromptFile[];
-}
-
-interface PromptBody {
-  text: string;
-  files?: PromptFile[];
-  agents?: { name: string }[];
-}
 
 interface OpenCodeFetchOptions {
   directory?: string | undefined;
   method?: string;
-  body?: QueueRecord | CommandBody | PromptBody | Uint8Array<ArrayBuffer>;
+  body?: QueueRecord | Uint8Array<ArrayBuffer>;
   query?: Record<string, string>;
 }
 
@@ -96,200 +69,6 @@ const hasSelectedModel = (model: QueueModel): model is QueueModel & RoutingModel
 const isValidSessionId = (value: string | undefined): value is string => SESSION_ID_PATTERN.test(asNonEmptyString(value));
 
 const httpError = (message: string, status: number) => Object.assign(new Error(message), { status });
-
-const sendConfigSchema = z.unknown().transform((value): QueueSendConfig | null => {
-  const raw = asRecord(value);
-  if (!raw) return null;
-  const providerID = asNonEmptyString(raw.providerID);
-  const modelID = asNonEmptyString(raw.modelID);
-  if (!providerID || !modelID) return null;
-  const sendConfig: QueueSendConfig = { providerID, modelID };
-  const agent = asNonEmptyString(raw.agent);
-  if (agent) sendConfig.agent = agent;
-  const variant = asNonEmptyString(raw.variant);
-  if (variant) sendConfig.variant = variant;
-  return sendConfig;
-});
-const parseSendConfig = sendConfigSchema.parse;
-
-const goalSchema = z.unknown().transform((value): QueuedGoal | null => {
-  if (value === undefined) return null;
-  const raw = asRecord(value);
-  if (!raw) throw new TypeError('invalid goal');
-  const tokenBudget = raw.tokenBudget ?? null;
-  if (tokenBudget !== null && !(isInteger(tokenBudget) && tokenBudget > 0)) throw new TypeError('invalid goal tokenBudget');
-  const goal: QueuedGoal = { tokenBudget };
-  const objective = asNonEmptyString(raw.objective);
-  if (objective) goal.objective = objective;
-  return goal;
-});
-const parseGoal = goalSchema.parse;
-
-const isAttachmentSource = (value: unknown): value is QueuedAttachment['source'] => isString(value) && ATTACHMENT_SOURCES.has(value);
-const isContextKind = (value: unknown): value is QueuedContextPart['kind'] => isString(value) && CONTEXT_PART_KINDS.has(value);
-
-const attachmentSchema = z.unknown().transform((value): QueuedAttachment | null => {
-  const raw = asRecord(value);
-  if (!raw) return null;
-  const filename = asNonEmptyString(raw.filename);
-  const mimeType = asNonEmptyString(raw.mimeType);
-  const dataUrl = asText(raw.dataUrl);
-  if (!filename || !mimeType || !dataUrl) return null;
-  const attachment: Omit<QueuedAttachment, 'dataUrl'> = {
-    id: asNonEmptyString(raw.id) || `attachment-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-    filename,
-    mimeType,
-    size: asCount(raw.size) ?? 0,
-    source: isAttachmentSource(raw.source) ? raw.source : 'local',
-  };
-  const serverPath = asNonEmptyString(raw.serverPath);
-  if (serverPath) attachment.serverPath = serverPath;
-  const agentPath = asNonEmptyString(raw.agentPath);
-  if (agentPath) attachment.agentPath = agentPath;
-  return Object.assign(attachment, { dataUrl });
-});
-const parseAttachment = attachmentSchema.parse;
-
-const contextPartSchema = z.unknown().transform((value): QueuedContextPart | null => {
-  const raw = asRecord(value);
-  if (!raw || !isContextKind(raw.kind)) return null;
-  const text = asText(raw.text);
-  if (raw.kind !== 'context') return { kind: raw.kind, text };
-  const metadata = asRecord(raw.metadata);
-  if (!metadata) return null;
-  const part: QueuedContextPart = { kind: 'context', text, metadata };
-  const instructions = asNonEmptyString(raw.instructions);
-  if (instructions) part.instructions = instructions;
-  return part;
-});
-const parseContextPart = contextPartSchema.parse;
-
-const queuedItemInputSchema = z.unknown().transform((value): QueuedItemInput => {
-  const raw = asRecord(value);
-  if (!raw) throw new TypeError('item is required');
-  const content = asText(raw.content).replace(/^\n+|\n+$/g, '');
-  if (content.length > CONTENT_CHAR_LIMIT) throw new TypeError('item content is too long');
-  const text = raw.text === undefined ? content : asText(raw.text);
-  const prompt = raw.prompt === undefined ? undefined : conversationPrompt.parse(raw.prompt);
-  const attachments = (asList(raw.attachments) ?? []).map((entry) => parseAttachment(entry));
-  if (!attachments.every((attachment) => attachment !== null)) throw new TypeError('invalid attachment');
-  const context = (asList(raw.context) ?? []).map((entry) => parseContextPart(entry));
-  if (!context.every((part) => part !== null)) throw new TypeError('invalid context part');
-  if (!text.trim() && attachments.length === 0 && context.length === 0 && !prompt) {
-    throw new TypeError('item needs text, attachments, or context');
-  }
-  const sendConfig = parseSendConfig(raw.sendConfig);
-  const provenance = asRecord(raw.scheduledTask);
-  const projectId = asNonEmptyString(provenance?.projectId);
-  const taskId = asNonEmptyString(provenance?.taskId);
-  if (provenance && (!projectId || !taskId)) throw new TypeError('invalid scheduledTask provenance');
-  if (!sendConfig && !provenance && !prompt) throw new TypeError('item sendConfig with providerID and modelID is required');
-  const goal = parseGoal(raw.goal);
-  if (goal && !text.trim()) throw new TypeError('a goal needs message text');
-  const item: Omit<QueuedItemInput, 'attachments' | 'context' | 'sendConfig'> & Partial<Pick<QueuedItemInput, 'attachments' | 'context' | 'sendConfig'>> = { content, text };
-  const agentMention = asNonEmptyString(raw.agentMention);
-  if (agentMention) item.agentMention = agentMention;
-  item.attachments = attachments;
-  item.context = context;
-  const contextPreview = asNonEmptyString(raw.contextPreview).slice(0, 103);
-  if (contextPreview) item.contextPreview = contextPreview;
-  item.sendConfig = sendConfig ?? {};
-  if (prompt) {
-    item.prompt = prompt;
-    const agent = asNonEmptyString(asRecord(raw.sendConfig)?.agent);
-    if (agent) item.sendConfig.agent = agent;
-  }
-  if (goal) item.goal = goal;
-  if (provenance) {
-    item.scheduledTask = { projectId, taskId };
-    const agent = asNonEmptyString(hasReadableFields(raw.sendConfig) ? raw.sendConfig.agent : undefined);
-    if (agent) item.sendConfig.agent = agent;
-  }
-  return Object.assign(item, { attachments: item.attachments, context: item.context, sendConfig: item.sendConfig });
-});
-export const parseQueuedItemInput = queuedItemInputSchema.parse;
-
-const storedItemSchema = z.unknown().transform((value): QueuedItem | null => {
-  const raw = asRecord(value);
-  const id = raw ? asNonEmptyString(raw.id) : '';
-  if (!raw || !id) return null;
-  try {
-    const item: QueuedItem = { id, createdAt: asCount(raw.createdAt) ?? Date.now(), ...parseQueuedItemInput(raw) };
-    const syntheticIds = asList(raw.syntheticIds) ?? [];
-    if (syntheticIds.length > 0 && syntheticIds.every((entry): entry is string => MESSAGE_ID_PATTERN.test(asText(entry)))) item.syntheticIds = syntheticIds;
-    return item;
-  } catch {
-    return null;
-  }
-});
-const parseStoredItem = storedItemSchema.parse;
-
-const toPublicAttachment = ({ dataUrl: _dataUrl, ...attachment }: QueuedAttachment) => attachment;
-
-const toPublicItem = (item: QueuedItem) => {
-  const publicItem: Omit<PublicQueuedItem, 'attachments' | 'sendConfig'> & Partial<Pick<PublicQueuedItem, 'attachments' | 'sendConfig'>> = { id: item.id, createdAt: item.createdAt, content: item.content, text: item.text };
-  if (item.agentMention) publicItem.agentMention = item.agentMention;
-  publicItem.attachments = item.attachments.map(toPublicAttachment);
-  const contextPreview = item.contextPreview || item.context
-    .filter((part) => part.kind !== 'instruction')
-    .map((part) => asNonEmptyString(asRecord(part.metadata?.openchamberContext)?.text) || part.text.trim())
-    .find(Boolean);
-  if (contextPreview) {
-    const [firstLine = ''] = contextPreview.split('\n', 1);
-    publicItem.contextPreview = firstLine.slice(0, 100)
-      + (contextPreview.length > firstLine.length || firstLine.length > 100 ? '...' : '');
-  }
-  publicItem.sendConfig = { ...item.sendConfig };
-  if (item.goal) publicItem.goal = { ...item.goal };
-  if (item.scheduledTask) publicItem.scheduledTask = { ...item.scheduledTask };
-  return Object.assign(publicItem, { attachments: publicItem.attachments, sendConfig: publicItem.sendConfig });
-};
-
-const extractSessionStatus = (payload: QueueRecord) => {
-  if (payload.type !== 'session.status') return null;
-  const properties = asRecord(payload.properties) ?? {};
-  const status = asRecord(properties.status) ?? {};
-  const info = asRecord(properties.info) ?? {};
-  const sessionId = asNonEmptyString(properties.sessionID);
-  const type = asNonEmptyString(status.type) || asNonEmptyString(info.type);
-  if (!sessionId || !type) return null;
-  return { sessionId, type };
-};
-
-const extractAssistantMessageUpdate = (payload: QueueRecord) => {
-  if (payload.type !== 'message.updated') return null;
-  const info = asRecord(asRecord(payload.properties)?.info);
-  if (!info || info.role !== 'assistant') return null;
-  const sessionId = asNonEmptyString(info.sessionID);
-  if (!sessionId) return null;
-  return {
-    sessionId,
-    completed: asCount(asRecord(info.time)?.completed) !== null,
-  };
-};
-
-const extractAbortedSessionId = (payload: QueueRecord) => {
-  if (payload.type !== 'session.idle') return null;
-  const properties = asRecord(payload.properties) ?? {};
-  if (properties.aborted !== true) return null;
-  return asNonEmptyString(properties.sessionID);
-};
-
-const extractDeletedSessionId = (payload: QueueRecord) => {
-  if (payload.type !== 'session.deleted') return null;
-  const properties = asRecord(payload.properties) ?? {};
-  return asNonEmptyString(asRecord(properties.info)?.id) || asNonEmptyString(properties.sessionID) || null;
-};
-
-const extractSessionDirectoryUpdate = (payload: QueueRecord) => {
-  if (payload.type !== 'session.updated') return null;
-  const properties = asRecord(payload.properties) ?? {};
-  const info = asRecord(properties.info) ?? {};
-  const sessionId = asNonEmptyString(info.id) || asNonEmptyString(properties.sessionID);
-  const directory = asNonEmptyString(info.directory);
-  const projectID = asNonEmptyString(info.projectID);
-  return sessionId && directory && projectID ? { sessionId, directory } : null;
-};
 
 export function createMessageQueueRuntime({
   globalEventHub,
@@ -312,7 +91,7 @@ export function createMessageQueueRuntime({
   abortHoldMs = ABORT_HOLD_MS,
   retryDelayMs = getQueuedSendRetryDelayMs,
   backendForSession,
-  sendPrompt,
+  deliver,
   onPromptCancelled,
 }: MessageQueueOptions) {
   const filePath = path.join(dataDir, QUEUE_FILE_NAME);
@@ -403,7 +182,7 @@ export function createMessageQueueRuntime({
     return {
       sessionId,
       directory: queue?.directory ?? directories.get(sessionId) ?? '',
-      items: (queue?.items ?? []).filter(item => !item.prompt).map(toPublicItem),
+      items: (queue?.items ?? []).filter(item => !(item.prompt || item.contextInput)).map(toPublicItem),
       sendingId: sending.get(sessionId) ?? null,
     };
   };
@@ -436,7 +215,7 @@ export function createMessageQueueRuntime({
   const setQueueItems = (sessionId: string, directory: string | undefined, items: QueuedItem[], status: ScheduledTaskStatus = 'cancelled', cause?: unknown) => {
     for (const item of queues.get(sessionId)?.items ?? []) {
       if (item.scheduledTask && !items.some((entry) => entry.id === item.id)) reportScheduledResult(item, status, cause);
-      if (item.prompt && status === 'cancelled' && !items.some(entry => entry.id === item.id)) onPromptCancelled?.(sessionId, item, directory ?? '');
+      if ((item.prompt || item.contextInput) && status === 'cancelled' && !items.some(entry => entry.id === item.id)) onPromptCancelled?.(sessionId, item, directory ?? '');
     }
     directories.set(sessionId, directory);
     if (items.length === 0) {
@@ -511,7 +290,7 @@ export function createMessageQueueRuntime({
   };
 
   const toPromptFile = (attachment: QueuedAttachment) => {
-    const file: PromptFile = { uri: attachment.dataUrl };
+    const file: PromptFile = { uri: attachment.dataUrl, mime: attachment.mimeType };
     if (attachment.agentPath || attachment.filename) file.name = attachment.agentPath || attachment.filename;
     return file;
   };
@@ -542,7 +321,7 @@ export function createMessageQueueRuntime({
         if (!filePath) throw new Error('OpenCode did not return the saved attachment path');
       }
       const note = `File on disk: ${filePath}. Read this file with your tools. Its binary content is not included in this message.\n`;
-      return { uri: `data:text/plain;base64,${Buffer.from(note).toString('base64')}`, name: filePath };
+      return { uri: `data:text/plain;base64,${Buffer.from(note).toString('base64')}`, name: filePath, mime: 'text/plain' };
     }));
   };
 
@@ -568,9 +347,18 @@ export function createMessageQueueRuntime({
   };
 
   const sendItem = async (sessionId: string, directory: string, item: QueuedItem) => {
-    if (item.prompt) return sendPrompt(sessionId, directory, { ...item, prompt: item.prompt });
-    const backend = backendForSession?.(sessionId);
-    if (backend) return backend.send(directory, item);
+    if (item.contextInput) return deliver(sessionId, directory, { type: 'context', context: { ...item.contextInput, delivery: 'steer' } });
+    if (item.prompt) return deliver(sessionId, directory, { type: 'prompt', prompt: { ...item.prompt, delivery: undefined }, selection: item.sendConfig });
+    if (backendForSession?.(sessionId)) {
+      if (item.goal) throw httpError('This backend does not support goal mode', 400);
+      const { agent: _agent, ...selection } = item.sendConfig;
+      if (sessionKnowledgeRuntime) await sessionKnowledgeRuntime.sync(sessionId, directory);
+      return deliver(sessionId, directory, { type: 'prompt', source: 'synthetic', selection, prompt: {
+        id: item.id, text: item.text, agents: [], skills: [],
+        context: item.context.flatMap(toContextMessages).map(part => conversationContext.parse(part)),
+        files: item.attachments.map(file => { const filename = file.agentPath ?? file.serverPath; return { mime: file.mimeType, filename: file.filename, url: filename ? pathToFileURL(filename).href : file.dataUrl }; }),
+      } });
+    }
     const { providerID, modelID, variant } = item.sendConfig;
     let agent = item.sendConfig.agent;
     let model: QueueModel = { id: modelID, providerID };
@@ -593,19 +381,6 @@ export function createMessageQueueRuntime({
       agent = routed.agent ?? agent;
     }
     promptFiles = await preparePromptFiles(item.attachments, model, directory);
-
-    if (!item.scheduledTask || (providerID && modelID)) await openCodeFetch(`/api/session/${encodeURIComponent(sessionId)}/model`, {
-      directory,
-      method: 'POST',
-      body: { model },
-    });
-    if (agent) {
-      await openCodeFetch(`/api/session/${encodeURIComponent(sessionId)}/agent`, {
-        directory,
-        method: 'POST',
-        body: { agent },
-      });
-    }
 
     const command = await resolveSlashCommand(item.text, directory);
 
@@ -633,33 +408,20 @@ export function createMessageQueueRuntime({
       });
     }
 
-    for (const [index, synthetic] of synthetics.entries()) {
-      if (!item.syntheticIds) throw new Error('Queued synthetic IDs are missing');
-      await openCodeFetch(`/api/session/${encodeURIComponent(sessionId)}/synthetic`, {
-        directory,
-        method: 'POST',
-        body: { id: item.syntheticIds[index], ...synthetic },
-      });
-    }
-
-    if (command) {
-      const body: CommandBody = { name: command.name, text: command.arguments };
-      if (promptFiles.length > 0) body.files = promptFiles;
-      await openCodeFetch(`/api/session/${encodeURIComponent(sessionId)}/command`, {
-        directory,
-        method: 'POST',
-        body,
-      });
-    } else {
-      const body: PromptBody = { text: item.text };
-      if (promptFiles.length > 0) body.files = promptFiles;
-      if (item.agentMention) body.agents = [{ name: item.agentMention }];
-      await openCodeFetch(`/api/session/${encodeURIComponent(sessionId)}/prompt`, {
-        directory,
-        method: 'POST',
-        body,
-      });
-    }
+    await deliver(sessionId, directory, {
+      type: 'prompt', source: 'synthetic',
+      selection: { ...model.providerID && { providerID: model.providerID }, ...model.id && { modelID: model.id }, ...model.variant && { variant: model.variant }, ...agent && { agent } },
+      ...command && { command: { name: command.name, text: command.arguments } },
+      prompt: {
+        id: createMessageId(now()), text: item.text, skills: [],
+        files: promptFiles.map(file => ({ url: file.uri, mime: file.mime, ...file.name && { filename: file.name } })),
+        agents: item.agentMention ? [{ name: item.agentMention }] : [],
+        context: synthetics.map((synthetic, index) => {
+          if (!item.syntheticIds) throw new Error('Queued synthetic IDs are missing');
+          return conversationContext.parse({ ...synthetic, id: item.syntheticIds[index] });
+        }),
+      },
+    });
   };
 
   const clearTimer = (sessionId: string) => {
@@ -851,9 +613,9 @@ export function createMessageQueueRuntime({
     const queue = queues.get(sessionId);
     if (!queue) return { revision, session: sessionSnapshot(sessionId), items: [] };
     const sendingId = sending.get(sessionId) ?? null;
-    const items = queue.items.filter((item) => item.id !== sendingId && !item.scheduledTask && !item.prompt);
+    const items = queue.items.filter((item) => item.id !== sendingId && !item.scheduledTask && !(item.prompt || item.contextInput));
     if (items.length === 0) return { revision, session: sessionSnapshot(sessionId), items: [] };
-    setQueueItems(sessionId, queue.directory, queue.items.filter((item) => item.id === sendingId || item.scheduledTask || item.prompt));
+    setQueueItems(sessionId, queue.directory, queue.items.filter((item) => item.id === sendingId || item.scheduledTask || item.prompt || item.contextInput));
     return { ...commit(sessionId), items };
   };
 
@@ -865,14 +627,14 @@ export function createMessageQueueRuntime({
     await load();
     const queue = queues.get(sessionId);
     if (!queue) return { revision, session: sessionSnapshot(sessionId) };
-    const byId = new Map(queue.items.filter(item => !item.prompt).map((item) => [item.id, item]));
+    const byId = new Map(queue.items.filter(item => !(item.prompt || item.contextInput)).map((item) => [item.id, item]));
     const hasQueuedId = (id: unknown): id is string => isString(id) && byId.has(id);
     if (itemIds.length !== byId.size || new Set(itemIds).size !== itemIds.length || !itemIds.every(hasQueuedId)) {
       throw new TypeError('itemIds must list every queued message exactly once');
     }
     const order = itemIds[Symbol.iterator]();
     queues.set(sessionId, { directory: queue.directory, items: queue.items.map((entry) => {
-      if (entry.prompt) return entry;
+      if (entry.prompt || entry.contextInput) return entry;
       const item = byId.get(String(order.next().value));
       if (!item) throw new Error('Queued message is missing');
       return item;
@@ -886,7 +648,7 @@ export function createMessageQueueRuntime({
     const queue = queues.get(sessionId);
     if (!queue) return { revision, session: sessionSnapshot(sessionId) };
     const sendingId = sending.get(sessionId) ?? null;
-    setQueueItems(sessionId, queue.directory, queue.items.filter((item) => item.id === sendingId || item.prompt));
+    setQueueItems(sessionId, queue.directory, queue.items.filter((item) => item.id === sendingId || item.prompt || item.contextInput));
     clearTimer(sessionId);
     armDispatch(sessionId);
     return commit(sessionId);
@@ -987,7 +749,7 @@ export function createMessageQueueRuntime({
     sessionStatus: (sessionID: string, type: 'idle' | 'busy') => processPayload({ type: 'session.status', properties: { sessionID, status: { type } } }),
     snapshot,
     sessionSnapshot,
-    pendingPrompts: (sessionID: string) => (queues.get(sessionID)?.items ?? []).filter(item => item.prompt),
+    pendingPrompts: (sessionID: string) => (queues.get(sessionID)?.items ?? []).filter(item => item.prompt || item.contextInput),
     enqueue,
     cancelScheduledTask,
     remove,
@@ -1003,69 +765,3 @@ export function createMessageQueueRuntime({
   };
 }
 
-export function registerMessageQueueRoutes(app: Application, runtime: ReturnType<typeof createMessageQueueRuntime>) {
-  const respondError = (res: HttpResponse, cause: unknown, fallback: string) => {
-    const statusValue = hasReadableFields(cause) ? cause.status : undefined;
-    const status = cause instanceof TypeError ? 400 : (isInteger(statusValue) ? statusValue : 500);
-    res.status(status).json({ error: (hasReadableFields(cause) ? cause.message : undefined) ?? fallback });
-  };
-
-  app.get('/api/message-queue', async (_req, res) => {
-    try {
-      await runtime.load();
-      res.json(runtime.snapshot());
-    } catch (error) {
-      respondError(res, error, 'Failed to load message queue');
-    }
-  });
-
-  app.post('/api/message-queue/sessions/:sessionId/items', async (req, res) => {
-    try {
-      const body = req.body;
-      if (hasQueueBody(body) && hasScheduledTaskField(body.item) && body.item.scheduledTask) throw new TypeError('scheduledTask is server-owned');
-      res.json(await runtime.enqueue(req.params.sessionId, hasQueueBody(body) ? body.directory : undefined, hasQueueBody(body) ? body.item : undefined));
-    } catch (error) {
-      respondError(res, error, 'Failed to queue message');
-    }
-  });
-
-  app.post('/api/message-queue/sessions/:sessionId/take', async (req, res) => {
-    try {
-      res.json(await runtime.takeAll(req.params.sessionId));
-    } catch (error) {
-      respondError(res, error, 'Failed to take queued messages');
-    }
-  });
-
-  app.put('/api/message-queue/sessions/:sessionId/order', async (req, res) => {
-    try {
-      res.json(await runtime.reorder(req.params.sessionId, hasQueueBody(req.body) ? req.body.itemIds : undefined));
-    } catch (error) {
-      respondError(res, error, 'Failed to reorder queue');
-    }
-  });
-
-  app.delete('/api/message-queue/sessions/:sessionId', async (req, res) => {
-    try {
-      res.json(await runtime.clear(req.params.sessionId));
-    } catch (error) {
-      respondError(res, error, 'Failed to clear queue');
-    }
-  });
-
-  app.post('/api/message-queue/sessions/:sessionId/items/:itemId/take', async (req, res) => {
-    try {
-      res.json(await runtime.take(req.params.sessionId, req.params.itemId));
-    } catch (error) {
-      respondError(res, error, 'Failed to take queued message');
-    }
-  });
-
-  app.delete('/api/message-queue/sessions/:sessionId/items/:itemId', async (req, res) => {
-    try {
-      res.json(await runtime.remove(req.params.sessionId, req.params.itemId));
-    } catch (error) {
-      respondError(res, error, 'Failed to remove queued message');
-    }
-  });
-}

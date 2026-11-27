@@ -34,6 +34,9 @@ and owner-readable permissions. A missing file starts empty; a malformed or
 unreadable file rejects writes so pending work cannot be overwritten.
 Its client factory may resolve asynchronously so the host can restore session
 ownership before reading forms or delivering an answer.
+Form operations use the backend question API. Answer admission uses the injected
+delivery callback, wired to `ConversationInput.deliver` with the original message
+identity, metadata, delivery mode and resume flag.
 
 The runtime, binding address and configured listener port identify the owning server across
 restarts. Servers sharing a data folder use separate files, so a desktop process

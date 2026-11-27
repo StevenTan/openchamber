@@ -31,33 +31,49 @@ export function acpCatalog(session: AcpConversation): ProviderCatalog {
 }
 
 export function acpMessages(session: Pick<AcpConversation, 'id'>, turn: AcpTurn): Array<{ info: Message; parts: Part[] }> {
-  const base = { sessionID: session.id, messageID: turn.assistantID };
-  const parts: Part[] = [];
+  const inputs = [{ id: turn.id, text: turn.text, files: turn.files, created: turn.created, inputContext: turn.inputContext, updateIndex: 0, toolCallCount: 0 }, ...turn.followups];
+  const replies = inputs.map((input, index) => {
+    const completed = inputs[index + 1]?.created ?? turn.completed;
+    const last = index === inputs.length - 1;
+    const parts: Part[] = [];
+    return { info: { id: index === 0 ? turn.assistantID : `${input.id}_assistant`, sessionID: session.id, role: 'assistant', agent: 'antigravity', providerID: 'antigravity', modelID: turn.modelID, ...turn.variant && { variant: turn.variant },
+      time: { created: input.created, ...completed && { completed } }, ...completed && { finish: last && turn.error ? 'error' as const : 'stop' as const },
+      ...last && turn.error && { error: { type: 'AntigravityError', message: turn.error } }, ...last && turn.tokens && { tokens: turn.tokens }, context: last ? turn.context : undefined } satisfies Extract<Message, { role: 'assistant' }>, parts };
+  });
+  const replyAt = (updateIndex: number, toolCallCount: number) => replies[inputs.reduce((position, input, index) => input.updateIndex <= updateIndex && input.toolCallCount <= toolCallCount ? index : position, 0)]!;
   const tools = new Map<string, ToolPart>();
-  const recorded = (call: AgentToolCall): ToolPart => {
+  const recorded = (call: AgentToolCall, messageID: string): ToolPart => {
+    const base = { sessionID: session.id, messageID };
     const output = call.result?.content.filter(item => item.type === 'text').map(item => item.text).join('\n') ?? '';
     const metadata = z.record(z.string(), z.json()).parse({ ...call.result?._meta, ...call.metadata });
     const error = call.error ?? (call.result?.isError ? output : undefined);
-    return { ...base, id: `${turn.assistantID}_${call.id}`, callID: call.callID, type: 'tool', tool: `${call.namespace}_${call.name}`,
+    return { ...base, id: `${messageID}_${call.id}`, callID: call.callID, type: 'tool', tool: `${call.namespace}_${call.name}`,
       state: error !== undefined ? { status: 'error', input: z.record(z.string(), z.json()).parse(call.input), error, metadata, time: { start: call.started, end: call.completed! } }
         : call.completed ? { status: 'completed', input: z.record(z.string(), z.json()).parse(call.input), output, metadata, time: { start: call.started, end: call.completed }, attachments: call.result?.content.filter(item => item.type === 'image').map((item, index) => ({ ...base, type: 'file' as const, id: `${call.id}_${index}`, mime: item.mimeType!, url: `data:${item.mimeType};base64,${item.data}` })) }
           : { status: 'running', input: z.record(z.string(), z.json()).parse(call.input), metadata, time: { start: call.started } } };
   };
+  let toolCallCount = 0;
   for (let index = 0; index <= turn.updates.length; index++) {
-    parts.push(...(turn.toolCalls ?? []).filter(call => call.updateIndex === index).map(recorded));
+    for (const call of (turn.toolCalls ?? []).filter(call => call.updateIndex === index)) {
+      const reply = replyAt(index, toolCallCount++);
+      reply.parts.push(recorded(call, reply.info.id));
+    }
     const update = turn.updates[index];
     if (!update) break;
+    const reply = replyAt(index, toolCallCount);
+    const parts = reply.parts;
+    const base = { sessionID: session.id, messageID: reply.info.id };
     if ((update.sessionUpdate === 'agent_message_chunk' || update.sessionUpdate === 'agent_thought_chunk') && update.content.type === 'text') {
       const type = update.sessionUpdate === 'agent_message_chunk' ? 'text' : 'reasoning';
       const last = parts.at(-1);
       if (last?.type === type) last.text += update.content.text;
-      else parts.push({ ...base, id: `${turn.assistantID}_${parts.length}`, type, text: update.content.text, time: { start: turn.created, ...turn.completed && { end: turn.completed } } });
+      else parts.push({ ...base, id: `${reply.info.id}_${parts.length}`, type, text: update.content.text, time: { start: reply.info.time.created, ...reply.info.time.completed && { end: reply.info.time.completed } } });
     }
     if (update.sessionUpdate === 'tool_call' || update.sessionUpdate === 'tool_call_update') {
       if (turn.toolCalls) continue;
       let tool = tools.get(update.toolCallId);
       if (!tool) {
-        tool = { ...base, id: `${turn.assistantID}_${update.toolCallId}`, callID: update.toolCallId, type: 'tool', tool: update.title ?? 'tool', state: { status: 'running', input: {}, time: { start: turn.created } } };
+        tool = { ...base, id: `${reply.info.id}_${update.toolCallId}`, callID: update.toolCallId, type: 'tool', tool: update.title ?? 'tool', state: { status: 'running', input: {}, time: { start: reply.info.time.created } } };
         tools.set(update.toolCallId, tool);
         parts.push(tool);
       }
@@ -70,10 +86,9 @@ export function acpMessages(session: Pick<AcpConversation, 'id'>, turn: AcpTurn)
       else tool.state = { status: 'running', input, time: { start: turn.created } };
     }
   }
-  const changed = parts.filter(part => part.type === 'tool' && ['file_write', 'file_edit', 'file_patch', 'openchamber_execute'].includes(part.tool)).at(-1);
+  const changed = replies.flatMap(reply => reply.parts).filter(part => part.type === 'tool' && ['file_write', 'file_edit', 'file_patch', 'openchamber_execute'].includes(part.tool)).at(-1);
   if (turn.fileDiff && changed?.type === 'tool' && changed.state.status !== 'pending') changed.state.metadata = { ...changed.state.metadata, openchamberTurnDiff: turn.fileDiff };
-  return [
-    ...[{ id: turn.id, text: turn.text, files: turn.files, created: turn.created, inputContext: turn.inputContext }, ...turn.followups].flatMap(input => [
+  return inputs.flatMap((input, index) => [
       ...(input.inputContext ?? []).map(item => ({
         info: { id: z.string().parse(item.id), sessionID: session.id, role: 'synthetic' as const, time: { created: input.created }, text: item.text, ...item.description && { description: item.description }, ...item.metadata && { metadata: item.metadata } },
         parts: [],
@@ -84,9 +99,6 @@ export function acpMessages(session: Pick<AcpConversation, 'id'>, turn: AcpTurn)
           ...input.files.map((file, index) => ({ ...file, id: partIds.userFile(input.id, index), sessionID: session.id, messageID: input.id, type: 'file' as const })),
         ],
       },
-    ]),
-    { info: { id: turn.assistantID, sessionID: session.id, role: 'assistant', agent: 'antigravity', providerID: 'antigravity', modelID: turn.modelID, ...turn.variant && { variant: turn.variant }, time: { created: turn.created, ...turn.completed && { completed: turn.completed } },
-      ...turn.completed && { finish: turn.error ? 'error' as const : 'stop' as const }, ...turn.error && { error: { type: 'AntigravityError', message: turn.error } },
-      ...turn.tokens && { tokens: turn.tokens }, context: turn.context }, parts },
-  ];
+      replies[index]!,
+    ]);
 }

@@ -23,7 +23,7 @@ UI-side queue and foreground auto-send hook.
 
 ## TypeScript boundaries
 
-`runtime.ts` owns the parsed queue item and public snapshot contracts. Its input
+`records.ts` owns the parsed queue item and public snapshot contracts. Its input
 types come from boundary schemas, which retain the existing defaults and
 TypeError refusals. Context metadata is checked only as a non-array object and
 passed through by reference; its properties remain unchecked until read.
@@ -47,7 +47,9 @@ reads enforce these invariants without casts or non-null assertions.
 ## Files
 
 - `runtime.ts` — `createMessageQueueRuntime(...)` (state, persistence,
-  dispatch loop, event handling) and `registerMessageQueueRoutes(app, runtime)`.
+  dispatch loop, event handling).
+- `records.ts` — input parsing, stored records, public snapshots and event readers.
+- `routes.ts` — `registerMessageQueueRoutes(app, runtime)`, re-exported by the runtime.
 - `runtime.test.js` — delivery, idleness gates, retries, held delivery, persistence,
   concurrency with in-flight sends, slash commands, and project knowledge.
 
@@ -58,6 +60,11 @@ JSON bodies enabled in `server-frame/core-routes.js`; stopped by
 `server-frame/shutdown-runtime.js`.
 
 ## Auto routing
+
+The queue prepares attachments, context identities, goals and command expansion,
+then calls `ConversationInput.deliver`. The owning conversation adapter admits
+the prepared input. Queue persistence, idle detection and retry policy stay with
+this runtime.
 
 `resolveAutoSelection` (the routing runtime) runs right before the send when
 the queued send config names `openchamber/auto`, and answers with the real
@@ -297,7 +304,9 @@ OpenCode events. Queue deliveries are synthetic prompts and leave pending
 interaction cards waiting for the user.
 
 Conversation `delivery: queue` inputs use this same persisted dispatcher with a
-complete `prompt` payload and captured send configuration. The shared conversation
+complete `prompt` payload and captured send configuration. Background context uses
+`contextInput`, retaining its description and metadata without changing the
+session's model or agent. The shared conversation
 inbox projects these entries into pending timeline messages. Composer snapshots,
 take-all, clear and reorder operate on composer rows while retaining inbox inputs.
 The conversation input service dispatches a queued prompt through its owning

@@ -1,6 +1,17 @@
 import type { AcpConversationEvent } from '@openchamber/sdk/agent-backends';
-import { acpMessages, acpSession } from '@openchamber/sdk/conversations/antigravity';
+import { acpSession } from '@openchamber/sdk/conversations/antigravity';
 import type { SyncEvent } from '@openchamber/sdk/conversations/events';
+import type { MessageRecord } from '@openchamber/sdk/conversations/http';
+import type { SessionNotification } from '@agentclientprotocol/sdk';
+
+export function antigravityChunk(message: MessageRecord, update: SessionNotification['update']): SyncEvent[] {
+  if ((update.sessionUpdate !== 'agent_message_chunk' && update.sessionUpdate !== 'agent_thought_chunk') || update.content.type !== 'text') return [];
+  const type = update.sessionUpdate === 'agent_message_chunk' ? 'text' : 'reasoning';
+  const { sessionID, id: messageID } = message.info;
+  const last = message.parts.at(-1);
+  if (last?.type === type) return [{ type: 'message.part.delta', properties: { sessionID, messageID, partID: last.id, field: 'text', delta: update.content.text } }];
+  return [{ type: 'message.part.updated', properties: { sessionID, part: { id: `${messageID}_${message.parts.length}`, sessionID, messageID, type, text: update.content.text, time: { start: Date.now() } } } }];
+}
 
 export function antigravityEvents(event: Exclude<AcpConversationEvent, { type: 'control' | 'deleted' }>): SyncEvent[] {
   const { session } = event;
@@ -11,13 +22,6 @@ export function antigravityEvents(event: Exclude<AcpConversationEvent, { type: '
   if (event.type === 'reverted') return [
     { type: 'session.revert.committed', properties: { sessionID: session.id, to: event.messageID } },
     { type: 'session.patched', properties: { sessionID: session.id, patch: { revert: null } } },
-    ...event.turn ? [
-      { type: 'message.removed' as const, properties: { sessionID: session.id, messageID: event.turn.assistantID } },
-      ...acpMessages(session, event.turn).flatMap(message => [
-        { type: 'message.updated' as const, properties: { info: message.info } },
-        ...message.parts.map(part => ({ type: 'message.part.updated' as const, properties: { sessionID: session.id, part } })),
-      ]),
-    ] : [],
   ];
   if (event.type === 'session') {
     const info = acpSession(session);
@@ -25,12 +29,5 @@ export function antigravityEvents(event: Exclude<AcpConversationEvent, { type: '
       type: 'session.patched', properties: { sessionID: info.id, patch: { title: info.title, ...info.model && { model: info.model }, time: { ...info.time, archived: session.archived ?? null }, tokens: info.tokens, ...info.metadata && { metadata: info.metadata }, revert: session.revert ?? null } },
     }];
   }
-  const { turn } = event;
-  const events: SyncEvent[] = acpMessages(session, turn).flatMap(message => [
-    { type: 'message.updated', properties: { info: message.info } },
-    ...message.parts.map(part => ({ type: 'message.part.updated' as const, properties: { sessionID: session.id, part } })),
-  ]);
-  events.push({ type: 'session.status', properties: { sessionID: session.id, status: { type: turn.completed ? 'idle' : 'busy' } } });
-  if (turn.completed) events.push({ type: 'session.idle', properties: { sessionID: session.id } });
-  return events;
+  return [];
 }

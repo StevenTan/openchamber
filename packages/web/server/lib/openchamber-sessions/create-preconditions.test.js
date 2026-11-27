@@ -40,6 +40,7 @@ const fixture = (overrides = {}) => {
   const createWorktree = vi.fn(async () => ({ path: directory, name: 'task', branch: 'task' }));
   const createClient = vi.fn(() => sdk);
   const service = createOpenChamberSessionService({
+    deliver: async (sessionID, _directory, delivery) => (await sdk.session.prompt({ sessionID, text: delivery.prompt.text })).id,
     archiveStore: {}, sessionMetadataStore: {},
     readSettingsFromDiskMigrated: async () => ({
       projects: [{ id: 'test', path: '/fixture/project' }, { id: 'checkout', path: directory }],

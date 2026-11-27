@@ -38,10 +38,12 @@ export interface AgentToolCall {
   input: Record<string, z.infer<ReturnType<typeof z.json>> | undefined>;
   started: number;
   completed?: number;
-  updateIndex: number;
+  updateIndex?: number;
   metadata?: Record<string, z.infer<ReturnType<typeof z.json>> | undefined>;
   result?: { content: Array<{ type: string; text?: string | undefined; data?: string | undefined; mimeType?: string | undefined }>; structuredContent?: Record<string, z.infer<ReturnType<typeof z.json>> | undefined> | undefined; _meta?: Record<string, z.infer<ReturnType<typeof z.json>> | undefined> | undefined; isError?: boolean | undefined };
   error?: string;
+  messageID?: string;
+  partID?: string;
 }
 
 export interface AcpConversation {
@@ -74,6 +76,9 @@ export interface AcpSend {
   id: string;
   files: AcpTurn['files'];
   context: ConversationContext[];
+  metadata?: ConversationContext['metadata'];
+  description?: string | undefined;
+  role?: 'synthetic';
 }
 
 export type AcpPrompt = ContentBlock[];

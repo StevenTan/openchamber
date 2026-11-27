@@ -8,6 +8,7 @@ import { z } from 'zod';
 import type { SessionApi } from '@opencode/client/promise/api';
 import type { FormField, FormRequest } from '@openchamber/sdk/conversations/requests';
 import type { MessageListOptions } from '@openchamber/sdk/conversations/http';
+import { createMessageId } from '../dispatch-results/runtime.js';
 
 type NativeForm = Parameters<SessionApi['form']['create']>[0];
 
@@ -71,7 +72,12 @@ export function createAntigravityConversations(backend: ReturnType<typeof create
     cancelInbox: async () => { throw new OpenChamberControlError('Pending input not found', 404); },
     model: (id, model) => backend.model(id, model.id, model.variant),
     agent: async (_id, agent) => { if (agent !== 'antigravity') throw new OpenChamberControlError(`Unsupported Antigravity agent: ${agent}`, 400); },
-    prompt: (id, input) => backend.send(id, input),
+    prompt: (id, input, source) => backend.send(id, input, source),
+    command: async () => { throw new OpenChamberControlError('This backend does not support slash commands', 400); },
+    context: async (sessionID, input, options) => {
+      options?.signal.throwIfAborted();
+      await backend.send(sessionID, { ...input, role: 'synthetic', id: input.id ?? createMessageId(Date.now()), files: [], context: input.context ?? [] }, 'synthetic');
+    },
     interrupt: id => backend.abort(id),
     catalog: async sessionID => acpCatalog(await (sessionID ? backend.get(sessionID) : backend.prepare(directory ?? os.homedir()))),
     providers: async () => [{ id: 'antigravity', name: 'Antigravity', activation: 'enabled', package: 'antigravity' }],

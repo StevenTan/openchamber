@@ -43,7 +43,7 @@ import { createSessionWorktreeMover } from './worktree-move.js';
 import { restoreArchivedAfterSend } from './archived-subsessions.js';
 import { createStartDirectoryResolver } from './worktree-start-directory.js';
 import { hasMessage } from './contracts.js';
-import type { AgentInfo, ModelInfo, SessionPromptInput, SessionForkInput, SessionSwitchModelInput } from '@opencode/client';
+import type { AgentInfo, ModelInfo, SessionForkInput, SessionSwitchModelInput } from '@opencode/client';
 import type { SessionClient } from './opencode-client-contract.js';
 import type { SessionMetadata, MetadataDecider } from './session-metadata-store.js';
 import type { SessionMoveWorktree } from './worktree-move.js';
@@ -54,6 +54,9 @@ import type { createChatsScope } from '../scheduled-tasks/chats-scope.js';
 import type { createFeatureRoutesRuntime } from '../server-frame/feature-routes-runtime.js';
 import type { createRoutingRuntime } from '../routing/runtime.js';
 import type { createWorktreeBootstrapStore } from '../git/worktree-bootstrap-storage.js';
+import type { ConversationInput } from '../agent-backends/conversation-input.js';
+import type { ConversationPrompt } from '@openchamber/sdk/conversations/http';
+import { createMessageId } from '../dispatch-results/runtime.js';
 
 interface WorktreeFields {
   name?: unknown;
@@ -118,6 +121,7 @@ export interface SessionServiceDependencies {
   resolveAutoSelection?: ReturnType<typeof createRoutingRuntime>['resolveAutoSelection'] | null;
   isAutoReady?: (() => Promise<boolean>) | null;
   readProjectSetup?: ((projectID: string) => Promise<WorktreeSetupInput>) | null;
+  deliver: ConversationInput['deliver'];
 }
 
 export interface SessionCreatedEvent {
@@ -206,7 +210,6 @@ interface PullRequestInput { number: number; name?: string; branchName?: string 
 interface ServiceErrorBody extends Pick<ControlErrorDetails, 'partial' | 'partialAction' | 'sessionId' | 'directory'> { error: string }
 interface SetupInput { startCommand?: string; createCommand?: string }
 interface WorktreeInput extends SetupInput { mode: 'new'; name: string; branchName?: string; startRef?: string; setUpstream?: boolean }
-type PromptInput = { -readonly [Key in keyof SessionPromptInput]: SessionPromptInput[Key] };
 type ForkInput = { -readonly [Key in keyof SessionForkInput]: SessionForkInput[Key] };
 type SwitchModel = { -readonly [Key in keyof SessionSwitchModelInput['model']]: SessionSwitchModelInput['model'][Key] };
 
@@ -662,6 +665,7 @@ export const createOpenChamberSessionService = (dependencies: SessionServiceDepe
     resolveAutoSelection = null,
     isAutoReady = null,
     readProjectSetup = null,
+    deliver,
   } = dependencies;
 
   if ((!injectedArchiveStore || !injectedSessionMetadataStore) && !dataDir) {
@@ -1026,30 +1030,18 @@ export const createOpenChamberSessionService = (dependencies: SessionServiceDepe
 
     if (resolvedCommand) {
       try {
-        await client.session.command({
-          sessionID,
-          name: resolvedCommand.command,
-          text: resolvedCommand.arguments || '',
-        });
+        await deliver(sessionID, directory, { type: 'prompt', prompt: { id: createMessageId(Date.now()), text: '', files: [], context: [], agents: [], skills: [] }, command: { name: resolvedCommand.command, text: resolvedCommand.arguments || '' } });
       } catch (error) {
         throw markGoalPartial(error);
       }
     } else {
       let landedMessageID = null;
       try {
-        const promptInput: PromptInput = { sessionID, text: expandedPrompt };
+        const promptInput: ConversationPrompt = { id: createMessageId(Date.now()), text: expandedPrompt, files: [], context: goalInput.enabled ? [{ text: buildGoalIntroText(goalInput.tokenBudget) }] : [], agents: [], skills: [] };
         if (promptedBySessionId) {
           promptInput.metadata = { openchamber: { promptedBy: await readPromptOrigin(client, promptedBySessionId) } };
         }
-        const sent = await client.session.prompt(promptInput);
-        landedMessageID = asNonEmptyString(sent?.id);
-        if (goalInput.enabled) {
-          await client.session.synthetic({
-            sessionID,
-            text: buildGoalIntroText(goalInput.tokenBudget),
-            resume: false,
-          });
-        }
+        landedMessageID = asNonEmptyString(await deliver(sessionID, directory, { type: 'prompt', prompt: promptInput }));
       } catch (error) {
         throw markGoalPartial(error);
       }
@@ -1585,8 +1577,8 @@ const sendServiceError = (res: Response, cause: unknown, fallback: string) => {
   return res.status(controlError.statusCode).json(body);
 };
 
-export const registerOpenChamberSessionRoutes = (app: Application, dependencies: SessionServiceDependencies & { sessionService?: ReturnType<typeof createOpenChamberSessionService> }) => {
-  const service = dependencies.sessionService || createOpenChamberSessionService(dependencies);
+export const registerOpenChamberSessionRoutes = (app: Application, dependencies: (SessionServiceDependencies & { sessionService?: ReturnType<typeof createOpenChamberSessionService> }) | (Omit<SessionServiceDependencies, 'deliver'> & { sessionService: ReturnType<typeof createOpenChamberSessionService> })) => {
+  const service = 'deliver' in dependencies ? dependencies.sessionService || createOpenChamberSessionService(dependencies) : dependencies.sessionService;
 
   app.post('/api/openchamber/sessions', express.json({ limit: '1mb' }), async (req, res) => {
     try {

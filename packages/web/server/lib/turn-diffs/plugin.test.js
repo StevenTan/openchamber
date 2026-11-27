@@ -20,7 +20,7 @@ const harness = async (storage = new Map(), directory) => {
   const dataDir = path.join(directory, '.host');
   const history = createConversationStorage(dataDir);
   cleanups.push(async () => history.close());
-  const runtime = createTurnDiffRuntime(dataDir, async () => {}, history);
+  const runtime = createTurnDiffRuntime(dataDir, history);
   const app = express();
   registerTurnDiffRoutes(app, express, runtime, req => req.headers.authorization === 'Bearer test');
   const listener = await new Promise(resolve => { const server = app.listen(0, '127.0.0.1', () => resolve(server)); });

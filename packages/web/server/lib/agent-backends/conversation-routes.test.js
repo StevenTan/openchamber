@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import express from 'express';
 import { createOpenCodeClient } from '../openchamber-sessions/opencode-client.js';
 import { createAntigravityBackend } from './antigravity.js';
@@ -17,7 +17,7 @@ import { registerToolPermissionRoutes } from '../agent-tool/permission-routes.js
 import { createQuestionRuntime } from '../agent-question/src/runtime.js';
 import { registerQuestionFormRoutes } from '../agent-question/src/mcp.js';
 import { createConversationStorage } from './conversation-storage.js';
-import { createOpenCodeHistory } from './opencode-history.js';
+import { createConversationRuntime } from './conversation-runtime.js';
 import { createConversationCatalog } from './conversation-catalog.js';
 import { createConversationInput, createConversationQueue } from './conversation-input.js';
 
@@ -30,7 +30,7 @@ test('conversation HTTP normalizes both backends and adopts the prepared native 
   const storage = createConversationStorage(directory);
   let queue;
   const native = createAntigravityBackend({
-    storage,
+    runtime: createConversationRuntime(storage), storage,
     dataDir: directory, initializeSession: async () => {}, readInstructions: async () => [],
     environment: () => process.env, mcpServers: () => [], reassignSession: () => {},
     publish: event => {
@@ -40,7 +40,7 @@ test('conversation HTTP normalizes both backends and adopts the prepared native 
       if (event.turn.text.includes('cancelled')) cancellation.resolve(event.turn.text);
     }, publishForm: () => {},
     registerSession: (id, previous) => { owners.delete(previous); owners.set(id, 'antigravity'); },
-    turnDiffs: createTurnDiffRuntime(directory, async () => {}, storage),
+    turnDiffs: createTurnDiffRuntime(directory, storage),
   });
   t.after(() => native.close());
   const executable = path.join(directory, 'agy');
@@ -86,7 +86,7 @@ test('conversation HTTP normalizes both backends and adopts the prepared native 
   const upstreamServer = upstream.listen(0, '127.0.0.1');
   await new Promise(resolve => upstreamServer.once('listening', resolve));
   t.after(() => new Promise(resolve => upstreamServer.close(resolve)));
-  const openCodeHistory = createOpenCodeHistory(storage);
+  const openCodeHistory = createConversationRuntime(storage);
   t.after(() => openCodeHistory.close());
   const app = express();
   const client = folder => createOpenCodeClient({ baseUrl: `http://127.0.0.1:${upstreamServer.address().port}`, directory: folder });
@@ -100,17 +100,17 @@ test('conversation HTTP normalizes both backends and adopts the prepared native 
     buildOpenCodeUrl: route => `http://127.0.0.1:${upstreamServer.address().port}${route}`, getOpenCodeAuthHeaders: () => ({}),
     input: () => input, dispatchQuietMs: 0,
     onPromptSent: queuedSent.resolve,
-    backendForSession: id => owners.has(id) ? { isIdle: async () => !(await inputApi(id, directory).statuses())[id], send: async () => { throw new Error('Composer queue is not used'); } } : undefined,
+    backendForSession: id => owners.has(id) ? { isIdle: async () => !(await inputApi(id, directory).statuses())[id] } : undefined,
   };
   queue = createConversationQueue(queueOptions);
-  let input = createConversationInput({ queue, api: inputApi, publish: changes => events.push(...changes) });
+  let input = createConversationInput({ queue, runtime: openCodeHistory, api: inputApi, publish: changes => events.push(...changes) });
   t.after(async () => { queue.stop(); await queue.flush(); });
   const permissions = createToolPermissions({ file: path.join(directory, 'permissions.json'), readPolicy: async sessionID => ({ directory: sessionID === 'elsewhere' ? '/elsewhere' : directory, projectDirectory: directory, rules: [] }), publish: () => {} });
-  const questions = createQuestionRuntime({ dataDir: directory, client: () => ({ session: native.questionSession }), globalEventHub: { subscribeEvent: () => () => {}, subscribeStatus: () => () => {} }, isSessionArchived: async () => false, isEnabled: () => true, retryMs: 1 });
+  const questions = createQuestionRuntime({ dataDir: directory, client: () => ({ session: native.questionSession }), globalEventHub: { subscribeEvent: () => () => {}, subscribeStatus: () => () => {} }, deliver: async ({ sessionID, ...context }, options) => { await input.deliver(sessionID, directory, { type: 'context', context }, options); }, isSessionArchived: async () => false, isEnabled: () => true, retryMs: 1 });
   t.after(() => questions.stop());
   registerQuestionFormRoutes(questions, app, express);
   registerToolPermissionRoutes(app, express, { permissions, directory: async req => req.query.directory, listNative: async () => ({ location: { directory }, data: [upstreamPermission] }) });
-  for (const phase of ['native', 'opencode']) registerConversationRoutes(app, express, { registry, client, phase, abortTools: () => {}, permissions, input: { prompt: (...args) => input.prompt(...args), inbox: (...args) => input.inbox(...args), cancel: (...args) => input.cancel(...args), send: (...args) => input.send(...args), cancelled: (...args) => input.cancelled(...args) } });
+  for (const phase of ['native', 'opencode']) registerConversationRoutes(app, express, { registry, client, phase, abortTools: () => {}, permissions, input: { prompt: (...args) => input.prompt(...args), inbox: (...args) => input.inbox(...args), cancel: (...args) => input.cancel(...args), deliver: (...args) => input.deliver(...args), cancelled: (...args) => input.cancelled(...args) } });
   const listener = app.listen(0, '127.0.0.1');
   await new Promise(resolve => listener.once('listening', resolve));
   t.after(() => new Promise(resolve => listener.close(resolve)));
@@ -239,7 +239,7 @@ test('conversation HTTP normalizes both backends and adopts the prepared native 
     await queue.flush();
     queue.stop();
     queue = createConversationQueue(queueOptions);
-    input = createConversationInput({ queue, api: inputApi, publish: changes => events.push(...changes) });
+    input = createConversationInput({ queue, runtime: openCodeHistory, api: inputApi, publish: changes => events.push(...changes) });
     assert.deepEqual(await request(`${root}/${created.id}/inbox`), inbox);
     queue.start();
     const composer = text => ({ content: text, text, attachments: [], context: [], sendConfig: { providerID: 'antigravity', modelID: 'second' } });
@@ -267,10 +267,59 @@ test('conversation HTTP normalizes both backends and adopts the prepared native 
     queue.stop();
     await queue.flush();
   });
+  await t.test('composer queue delivers native attachments and context through the shared input', async () => {
+    const sent = Promise.withResolvers();
+    queue = createConversationQueue({ ...queueOptions, onPromptSent: sent.resolve });
+    input = createConversationInput({ queue, runtime: openCodeHistory, api: inputApi, publish: changes => events.push(...changes) });
+    queue.start();
+    const filename = path.join(directory, 'queued-note.txt');
+    await queue.enqueue(created.id, directory, {
+      content: 'Composer input', text: 'Composer input',
+      sendConfig: { providerID: 'antigravity', modelID: 'second', agent: 'build' },
+      context: [{ kind: 'context', text: 'Quoted context', metadata: { quote: true }, instructions: 'Context instruction' }],
+      attachments: [{ id: 'note', filename: 'queued-note.txt', mimeType: 'text/plain', size: 2, source: 'server', serverPath: filename, dataUrl: 'data:text/plain;base64,SGk=' }],
+    });
+    await sent.promise;
+    await native.wait(created.id, new AbortController().signal);
+    const messages = (await request(`${root}/${created.id}/message?limit=100&order=asc`)).items;
+    const index = messages.findIndex(message => message.parts?.some(part => part.type === 'text' && part.text === 'Composer input'));
+    assert.ok(index >= 2);
+    assert.equal(messages[index - 2].info.text, 'Context instruction');
+    assert.equal(messages[index - 1].info.text, 'Quoted context');
+    assert.deepEqual(messages[index - 1].info.metadata, { quote: true });
+    assert.equal(messages[index].parts.find(part => part.type === 'file').url, pathToFileURL(filename).href);
+    assert.equal((await inputApi(created.id, directory).get(created.id)).model.id, 'second');
+    queue.stop();
+    await queue.flush();
+  });
+
+  await t.test('queued background context retains its description and metadata on native admission', async () => {
+    const sent = Promise.withResolvers();
+    queue = createConversationQueue({ ...queueOptions, onPromptSent: sent.resolve });
+    input = createConversationInput({ queue, runtime: openCodeHistory, api: inputApi, publish: changes => events.push(...changes) });
+    await native.send(created.id, { id: 'msg_context_busy', text: 'working', files: [], context: [] });
+    queue.start();
+    const context = { id: 'msg_context_answer', text: 'Background answer', description: 'Question answer', metadata: { question: 'retained' }, delivery: 'queue' };
+    await input.deliver(created.id, directory, { type: 'context', context });
+    const pending = await request(`${root}/${created.id}/inbox`);
+    assert.equal(pending[0].info.id, context.id);
+    assert.equal(pending[0].info.role, 'synthetic');
+    assert.deepEqual(pending[0].info.metadata, context.metadata);
+    await native.abort(created.id);
+    await sent.promise;
+    await native.wait(created.id, new AbortController().signal);
+    const message = (await native.messages(created.id, {})).items.find(item => item.info.id === context.id);
+    assert.equal(message.info.role, 'synthetic');
+    assert.equal(message.info.description, context.description);
+    assert.deepEqual(message.info.metadata, context.metadata);
+    assert.deepEqual(await request(`${root}/${created.id}/inbox`), []);
+    queue.stop();
+    await queue.flush();
+  });
   await t.test('OpenCode queues complete input in the host and admits steering immediately', async () => {
     const sent = Promise.withResolvers();
     queue = createConversationQueue({ ...queueOptions, onPromptSent: sent.resolve });
-    input = createConversationInput({ queue, api: inputApi, publish: changes => events.push(...changes) });
+    input = createConversationInput({ queue, runtime: openCodeHistory, api: inputApi, publish: changes => events.push(...changes) });
     queue.start();
     const before = calls.length;
     const context = await request(`${root}/${standard.id}/context`, 'POST', { text: 'OpenCode context', metadata: { retained: true } });

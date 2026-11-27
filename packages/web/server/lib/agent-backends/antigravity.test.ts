@@ -1,3 +1,5 @@
+import { createAntigravityConversations } from './antigravity-conversations.js';
+import { deliverConversation } from './conversation-delivery.js';
 import { afterEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -34,7 +36,7 @@ import type { BackendID } from './contracts.js';
 import { createWorktreeBootstrapStore } from '../git/worktree-bootstrap-storage.js';
 import { createServer } from 'node:http';
 import { createConversationStorage } from './conversation-storage.js';
-import { createOpenCodeHistory } from './opencode-history.js';
+import { createConversationRuntime } from './conversation-runtime.js';
 import { createConversationCatalog } from './conversation-catalog.js';
 
 const cleanups: Array<() => Promise<void>> = [];
@@ -60,8 +62,9 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
   let userInputs = 0;
   let userInputDirectory: string | undefined;
   const owners = new Map<string, BackendID>();
-  const turnDiffs = createTurnDiffRuntime(directory, async (id, reference) => backend.recordFileDiff(id, reference), storage);
-  const make = () => createAntigravityBackend({ storage, dataDir: directory, initializeSession: async () => {},
+  const conversationRuntime = createConversationRuntime(storage);
+  const turnDiffs = createTurnDiffRuntime(directory, storage);
+  const make = () => createAntigravityBackend({ runtime: conversationRuntime, storage, dataDir: directory, initializeSession: async () => {},
       registerSession: (id, previous) => { if (previous) owners.delete(previous); owners.set(id, 'antigravity'); },
       onUserInput: (_id, inputDirectory) => { userInputs++; userInputDirectory = inputDirectory; }, readInstructions: instructions.read, turnDiffs, environment: () => process.env, mcpServers: id => { identity.token(id); return []; }, reassignSession: identity.reassign, publish, publishForm: () => {} });
   const backend = make();
@@ -94,8 +97,11 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
   assert.ok(activeHistory.items[1]?.parts.some(part => part.type === 'text' && part.text === 'working'));
   const file = path.join(directory, 'code.txt');
   await fs.writeFile(file, 'before\n');
-  const permissions = createToolPermissions({ file: path.join(directory, 'permissions.json'), readPolicy: async () => ({ directory, projectDirectory: directory, rules: [{ action: '*', resource: '*', effect: 'allow' }] }), publish: () => {} });
-  const activity = createToolActivity({ dataDir: directory, anchor: () => ({ turnID: 'msg_first', updateIndex: session.turns[0]?.updates.length ?? 0 }), changed: backend.recordToolCall });
+  const permissions = createToolPermissions({ file: path.join(directory, 'permissions.json'), readPolicy: async () => {
+    await activity.record(session.id, 'other-file-call')('file', 'write', {}, async () => ({ content: [] }));
+    return { directory, projectDirectory: directory, rules: [{ action: '*', resource: '*', effect: 'allow' }] };
+  }, publish: () => {} });
+  const activity = createToolActivity({ dataDir: directory, anchor: () => ({ turnID: 'msg_first', updateIndex: session.turns[0]?.updates.length ?? 0 }), changed: async (id, call) => conversationRuntime.tool(id, call, directory) });
   const files = createFileMcpRuntime(permissions, request => ({ sessionID: session.id, callID: String(request.requestId), signal: request.signal, record: activity.record(session.id, String(request.requestId)) }), turnDiffs);
   const fileServer = await files.createServer();
   const fileClient = new Client({ name: 'file-test', version: '1' });
@@ -104,11 +110,12 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
   await fileClient.connect(local);
   cleanups.push(async () => { await fileClient.close(); await files.close(); });
   await fileClient.callTool({ name: 'edit', arguments: { path: 'code.txt', oldString: 'before', newString: 'after' } });
-  const call = session.turns[0]?.toolCalls?.[0];
-  assert.equal(call?.namespace, 'file');
-  assert.equal(call?.name, 'edit');
-  assert.equal(call?.result?.isError, undefined);
-  assert.ok(Array.isArray(call?.metadata?.files));
+  const call = conversationRuntime.current(session.id)?.parts.find(part => part.type === 'tool');
+  assert.equal(call?.type === 'tool' && call.tool, 'file_edit');
+  assert.equal(call?.type === 'tool' && call.state.status, 'completed');
+  const other = conversationRuntime.current(session.id)?.parts.find(part => part.type === 'tool' && part.callID === 'other-file-call');
+  assert.equal(other?.type === 'tool' && other.state.status !== 'pending' && other.state.metadata?.openchamberTurnDiff, undefined);
+  assert.ok(Array.isArray(call?.type === 'tool' && call.state.status !== 'pending' && call.state.metadata?.files));
   const records = (await fs.readFile(path.join(directory, 'tool-activity', `${session.id}.jsonl`), 'utf8')).trim().split('\n').map(line => JSON.parse(line));
   assert.match(records.at(-1).call.result.structuredContent.files[0].patch, /-before\n\+after/);
   const memory = createAgentMemoryActions({
@@ -122,10 +129,10 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
   });
   assert.ok('saved' in saved.structuredContent.data);
   assert.equal(saved.structuredContent.data.saved, true);
-  assert.equal(session.turns[0]?.toolCalls?.at(-1)?.result?.isError, undefined);
-  assert.deepEqual(session.turns[0]?.toolCalls?.at(-1)?.metadata, { openchamber: { schemaVersion: 1, action: 'memory.save', description: 'Remember something', ok: true } });
-  assert.deepEqual(session.turns[0]?.fileDiff, { turnID: 'msg_first', revision: 1, files: [{ file: 'code.txt', status: 'modified', additions: 1, deletions: 1 }] });
-  await backend.questionSession.synthetic({ sessionID: session.id, id: 'msg_answer', text: 'answer', delivery: 'steer', resume: true });
+  const memoryCall = conversationRuntime.current(session.id)?.parts.at(-1);
+  assert.deepEqual(memoryCall?.type === 'tool' && memoryCall.state.status !== 'pending' && memoryCall.state.metadata?.openchamber, { schemaVersion: 1, action: 'memory.save', description: 'Remember something', ok: true });
+  assert.deepEqual(call?.type === 'tool' && call.state.status !== 'pending' && call.state.metadata?.openchamberTurnDiff, { turnID: 'msg_first', revision: 1, files: [{ file: 'code.txt', status: 'modified', additions: 1, deletions: 1 }] });
+  await deliverConversation(createAntigravityConversations(backend, directory), session.id, { type: 'context', context: { id: 'msg_answer', text: 'answer', delivery: 'steer', resume: true } });
   await completed;
   assert.match((await turnDiffs.read(session.id, 'msg_first')).files?.[0]?.patch ?? '', /-before\n\+after/);
   await assert.rejects(fs.stat(path.join(directory, 'turn-diffs', session.id, 'active', 'msg_first')));
@@ -148,6 +155,7 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
   await instructions.remove(session.id, directory, 'project');
   assert.deepEqual(await instructions.read(session.id), []);
   const openCodeService = createOpenChamberSessionService({
+    deliver: async () => { throw new Error('This test dispatches Antigravity sessions'); },
     dataDir: directory,
     readSettingsFromDiskMigrated: async () => ({}), sanitizeProjects: () => [],
     validateDirectoryPath: async value => ({ ok: true, directory: value ?? directory }),
@@ -155,13 +163,13 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
     worktreeBootstrapStore: createWorktreeBootstrapStore({ filePath: path.join(directory, 'bootstrap.json') }),
     hydrateWorktreeCheckout: async () => { throw new Error('Worktree hydration is unused'); },
   });
-  const openCodeHistory = createOpenCodeHistory(storage);
+  const openCodeHistory = createConversationRuntime(storage);
   const conversationCatalog = createConversationCatalog(storage.catalog, {
     opencode: createOpenCodeAdapter(openCodeHistory),
     antigravity: createAntigravityAdapter(backend),
   }, () => createOpenCodeClient({ baseUrl: 'http://127.0.0.1:1' }), () => {});
   const registry = createBackendRegistry(conversationCatalog.adapters, owners, backend.ready, conversationCatalog.list);
-  const service = createBackendSessionService(openCodeService, registry, async () => true, createChatsScope(path.join(directory, 'chats')));
+  const service = createBackendSessionService(openCodeService, registry, async () => true, createChatsScope(path.join(directory, 'chats')), async (id, _directory, delivery) => deliverConversation(createAntigravityConversations(backend, directory), id, delivery));
   const selected = await service.create({ backendID: 'opencode', model: 'antigravity/second', directory });
   assert.equal(selected.agent, 'antigravity');
   assert.deepEqual(selected.model, { providerID: 'antigravity', modelID: 'second' });
@@ -186,6 +194,7 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
     name: 'Scheduled prompt', enabled: false, schedule: { kind: 'daily', times: ['03:00'], timezone: 'UTC' }, execution: { prompt: 'scheduled input', useDefaults: true },
   });
   const scheduler = createScheduledTasksRuntime({
+    deliver: (id, folder, input) => deliverConversation(registry.forSession(id).conversations({ directory: folder, client: createOpenCodeClient({ baseUrl: 'http://127.0.0.1:1' }) }), id, input),
     projectConfigRuntime, listProjects: async () => [{ id: 'project', path: directory }], antigravity: backend,
     buildOpenCodeUrl: route => `http://127.0.0.1:1${route}`, getOpenCodeAuthHeaders: () => ({}),
     waitForOpenCodeReady: async () => { throw new Error('OpenCode is unavailable'); },
@@ -212,7 +221,7 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
   const listener = createServer();
   await new Promise<void>(resolve => listener.listen(0, '127.0.0.1', resolve));
   cleanups.push(() => new Promise<void>((resolve, reject) => listener.close(error => error ? reject(error) : resolve())));
-  const queue = createMessageQueueRuntime({ dataDir: directory, globalEventHub: { subscribeEvent: () => () => {}, subscribeStatus: () => () => {} }, buildOpenCodeUrl: route => `http://127.0.0.1${route}`, getOpenCodeAuthHeaders: () => ({}), sendPrompt: (...args) => host.input.send(...args) });
+  const queue = createMessageQueueRuntime({ dataDir: directory, globalEventHub: { subscribeEvent: () => () => {}, subscribeStatus: () => () => {} }, buildOpenCodeUrl: route => `http://127.0.0.1${route}`, getOpenCodeAuthHeaders: () => ({}), deliver: async (...args) => { await host.input.deliver(...args); } });
   cleanups.push(async () => { queue.stop(); await queue.flush(); });
   const host = createAgentBackendHost({
     queue,
@@ -285,8 +294,8 @@ test('Antigravity keeps five recent idle workers and retains running sessions un
   const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
   await fs.writeFile(executable, `#!/bin/sh\nexec ${quote(process.execPath)} ${quote(source)} "$@"\n`, { mode: 0o700 });
   const backend = createAntigravityBackend({
-    storage, dataDir: directory, initializeSession: async () => {}, readInstructions: async () => [],
-    turnDiffs: createTurnDiffRuntime(directory, async () => {}, storage), environment: () => process.env,
+    runtime: createConversationRuntime(storage), storage, dataDir: directory, initializeSession: async () => {}, readInstructions: async () => [],
+    turnDiffs: createTurnDiffRuntime(directory, storage), environment: () => process.env,
     mcpServers: () => [], reassignSession: () => {}, publish: () => {}, publishForm: () => {},
   });
   cleanups.push(() => backend.close());
@@ -352,8 +361,8 @@ test('Google sign-in exposes its URL, accepts a code and verifies ACP access in 
   await fs.writeFile(executable, `#!/bin/sh\nexec ${quote(process.execPath)} ${quote(source)} "$@"\n`, { mode: 0o700 });
   let rejectAccount = false;
   const events = new EventEmitter();
-  const make = () => createAntigravityBackend({ storage, dataDir: directory, initializeSession: async () => {},
-      onUserInput: () => {}, readInstructions: async () => [], turnDiffs: createTurnDiffRuntime(directory, async () => {}, storage), environment: () => ({ ...process.env, AGY_FIXTURE_REJECT_ACCOUNT: rejectAccount ? '1' : '0' }), mcpServers: () => [], reassignSession: () => {}, publish: () => { events.emit('authentication'); }, publishForm: () => {} });
+  const make = () => createAntigravityBackend({ runtime: createConversationRuntime(storage), storage, dataDir: directory, initializeSession: async () => {},
+      onUserInput: () => {}, readInstructions: async () => [], turnDiffs: createTurnDiffRuntime(directory, storage), environment: () => ({ ...process.env, AGY_FIXTURE_REJECT_ACCOUNT: rejectAccount ? '1' : '0' }), mcpServers: () => [], reassignSession: () => {}, publish: () => { events.emit('authentication'); }, publishForm: () => {} });
   const backend = make();
   cleanups.push(() => backend.close());
   await backend.configure({ binary: executable });

@@ -1,7 +1,8 @@
 import { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { turnDiffReferenceSchema, type AcpTurn } from '@openchamber/sdk/agent-backends';
+import type { AcpTurn } from '@openchamber/sdk/agent-backends';
+import { turnDiffReferenceSchema } from '@openchamber/sdk/agent-backends';
 import type { MessageRecord } from '@openchamber/sdk/conversations/http';
 import type { ConversationStorage } from './conversation-storage.js';
 import { createMessageId } from '../dispatch-results/runtime.js';
@@ -46,9 +47,13 @@ export function copyAntigravityHistory(storage: ConversationStorage, from: strin
       ids.set(z.string().parse(row.id), createMessageId(timestamp));
     }
     const remap = (id: string) => z.string().parse(ids.get(id));
+    for (const row of db.iterate('SELECT data FROM turns ORDER BY sequence')) {
+      const turn: AcpTurn = JSON.parse(z.string().parse(row.data));
+      for (const input of turn.followups) ids.set(`${input.id}_assistant`, `${remap(input.id)}_assistant`);
+    }
     db.transaction(() => {
       db.run('DELETE FROM turn_diffs WHERE turn_id NOT IN (SELECT id FROM turns)');
-      for (const row of db.iterate('SELECT id, data FROM turns ORDER BY sequence')) {
+      for (const row of db.iterate('SELECT id, sequence, data FROM turns ORDER BY sequence')) {
         const turn: AcpTurn = JSON.parse(z.string().parse(row.data));
         const originalID = turn.id;
         turn.id = remap(turn.id);
@@ -56,30 +61,31 @@ export function copyAntigravityHistory(storage: ConversationStorage, from: strin
         turn.inputContext = turn.inputContext?.map(item => ({ ...item, id: remap(z.string().parse(item.id)) }));
         turn.followups = turn.followups.map(item => ({ ...item, id: remap(item.id), inputContext: item.inputContext?.map(context => ({ ...context, id: remap(z.string().parse(context.id)) })) }));
         if (turn.fileDiff) turn.fileDiff = { ...turn.fileDiff, turnID: turn.id };
-        const { text: _text, files: _files, updates: _updates, followups: _followups, toolCalls: _toolCalls, inputContext: _inputContext, ...summary } = turn;
-        db.run('UPDATE turns SET session_id = ?, id = ?, summary = ?, data = ? WHERE id = ?', [to, turn.id, JSON.stringify({ ...summary, text: '', files: [], updates: [], followups: [], toolCalls: [], inputContext: [] }), JSON.stringify(turn), originalID]);
+        const summary = { ...turn, text: '', files: [], updates: [], followups: turn.followups.map(input => ({ ...input, text: '', files: [], inputContext: [] })), toolCalls: [], inputContext: [] };
+        db.run('UPDATE turns SET session_id = ?, id = ?, summary = ?, data = ? WHERE id = ?', [to, turn.id, JSON.stringify(summary), JSON.stringify(turn), originalID]);
         const diff = storage.diff(to, originalID);
         if (diff) {
           db.run('DELETE FROM turn_diffs WHERE turn_id = ?', [originalID]);
           storage.saveDiff({ ...diff, sessionID: to, turnID: turn.id });
         }
       }
-      for (const row of db.iterate('SELECT id, data FROM messages ORDER BY turn_sequence, ordinal')) {
+      const records = db.all('SELECT id, data FROM messages ORDER BY turn_sequence, ordinal');
+      db.run('DELETE FROM messages');
+      for (const row of records) {
         const record: MessageRecord = JSON.parse(z.string().parse(row.data));
-        record.info = { ...record.info, id: remap(record.info.id), sessionID: to };
+        const messageID = remap(record.info.id);
+        record.info = { ...record.info, id: messageID, sessionID: to };
         record.parts = record.parts.map(part => {
-          const projected = { ...part, id: `${record.info.id}_${part.id}`, messageID: record.info.id, sessionID: to };
-          if (projected.type === 'tool' && projected.state.status !== 'pending') {
-            const reference = projected.state.metadata?.openchamberTurnDiff;
-            if (reference) {
-              const diff = turnDiffReferenceSchema.parse(reference);
-              projected.state.metadata = { ...projected.state.metadata, openchamberTurnDiff: z.json().parse({ ...diff, ...diff.turnID && { turnID: remap(diff.turnID) } }) };
-            }
-            if (projected.state.status === 'completed' && projected.state.attachments) projected.state.attachments = projected.state.attachments.map(file => ({ ...file, id: `${record.info.id}_${file.id}`, messageID: record.info.id, sessionID: to }));
+          const base = { ...part, id: `${messageID}_${part.id}`, messageID, sessionID: to };
+          if (base.type !== 'tool' || base.state.status === 'pending') return base;
+          const metadata = { ...base.state.metadata };
+          if (metadata.openchamberTurnDiff) {
+            const reference = turnDiffReferenceSchema.parse(metadata.openchamberTurnDiff);
+            metadata.openchamberTurnDiff = z.record(z.string(), z.json()).parse({ ...reference, ...reference.turnID && { turnID: remap(reference.turnID) } });
           }
-          return projected;
+          return { ...base, state: { ...base.state, metadata: z.record(z.string(), z.json()).parse(metadata), ...base.state.status === 'completed' && base.state.attachments && { attachments: base.state.attachments.map(file => ({ ...file, id: `${messageID}_${file.id}`, sessionID: to, messageID })) } } };
         });
-        db.run('UPDATE messages SET session_id = ?, id = ?, data = ? WHERE id = ?', [to, record.info.id, JSON.stringify(record), z.string().parse(row.id)]);
+        storage.saveMessages([record]);
       }
     });
   });

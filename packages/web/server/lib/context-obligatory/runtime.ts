@@ -1,7 +1,7 @@
 import { isRecord } from '../shared/guards.js';
-import { assertPromptResponse } from '../opencode/prompt-response.js';
 import { unwrapOpenCodeResponse } from '../opencode/response-envelope.js';
 import { sessionParentId } from '../session-lineage.js';
+import type { ConversationInput } from '../agent-backends/conversation-input.js';
 const FETCH_TIMEOUT_MS = 15_000;
 const MESSAGE_FETCH_LIMIT = 20;
 
@@ -19,6 +19,7 @@ interface ContextEntry {
 export interface ContextObligatoryOptions {
   buildOpenCodeUrl: (path: string, query: string) => string | URL;
   getOpenCodeAuthHeaders: () => Record<string, string>;
+  deliver: ConversationInput['deliver'];
   persistContextCursor?: ((sessionId: string, directory: string, patch: {
     openchamber: { context_obligatory_last_compaction_message_id: unknown };
   }) => Promise<StoredMetadata | void>) | null;
@@ -46,8 +47,6 @@ interface BoundaryFields extends StoredMetadata {
 
 interface FetchOptions {
   directory: string;
-  method?: string;
-  body?: { text: string; resume: boolean };
   query?: Record<string, string>;
 }
 
@@ -94,13 +93,14 @@ const buildContextPrompt = (entries: ContextEntry[]) => {
 export const createContextObligatoryRuntime = ({
   buildOpenCodeUrl,
   getOpenCodeAuthHeaders,
+  deliver,
   persistContextCursor = null,
   readSessionMetadata = null,
 }: ContextObligatoryOptions) => {
   const inflight = new Set<string>();
   let stopped = false;
 
-  const openCodeFetch = async (fetchPath: string, { directory, method = 'GET', body, query }: FetchOptions) => {
+  const openCodeFetch = async (fetchPath: string, { directory, query }: FetchOptions) => {
     const params = new URLSearchParams(query || {});
     if (directory) params.set('directory', directory);
     const search = params.toString();
@@ -108,19 +108,15 @@ export const createContextObligatoryRuntime = ({
     const headers = {
       Accept: 'application/json',
     };
-    if (body) Object.assign(headers, { 'Content-Type': 'application/json' });
     Object.assign(headers, getOpenCodeAuthHeaders());
     const init: RequestInit = {
-      method,
+      method: 'GET',
       headers,
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     };
-    if (body) init.body = JSON.stringify(body);
     const response = await fetch(url, init);
-    if (method === 'POST' && fetchPath.endsWith('/synthetic')) {
-      await assertPromptResponse(response, 'session.synthetic');
-    } else if (!response.ok) {
-      throw new Error(`OpenCode ${method} ${fetchPath} failed with ${response.status}`);
+    if (!response.ok) {
+      throw new Error(`OpenCode GET ${fetchPath} failed with ${response.status}`);
     }
     const value: unknown = unwrapOpenCodeResponse(await response.json().catch(() => null));
     return isMetadataRecord(value) ? value : null;
@@ -171,14 +167,7 @@ export const createContextObligatoryRuntime = ({
       .sort((left, right) => left.pinned.createdAt - right.pinned.createdAt);
     if (entries.length === 0) return;
 
-    await openCodeFetch(`/api/session/${encodeURIComponent(sessionId)}/synthetic`, {
-      directory,
-      method: 'POST',
-      body: {
-        text: buildContextPrompt(entries),
-        resume: false,
-      },
-    });
+    await deliver(sessionId, directory, { type: 'context', context: { text: buildContextPrompt(entries), resume: false } }, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
 
     await persistContextCursor(sessionId, directory, {
       openchamber: { context_obligatory_last_compaction_message_id: summary.id },

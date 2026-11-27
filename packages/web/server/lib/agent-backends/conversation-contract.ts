@@ -1,16 +1,17 @@
 import type { OpenCodeClient } from '@opencode/client';
 import type { Agent, Provider } from '@openchamber/sdk/conversations/catalog';
 import type { Session, ModelSelection, Project, Vcs, SessionStatus } from '@openchamber/sdk/conversations/model';
-import type { ConversationPrompt, CreateConversation, MessageListOptions, MessagePage, MessageRecord, ProviderCatalog, SessionListOptions, SessionPage } from '@openchamber/sdk/conversations/http';
+import type { CreateConversation, MessageListOptions, MessagePage, MessageRecord, ProviderCatalog, SessionListOptions, SessionPage } from '@openchamber/sdk/conversations/http';
 import type { FormRequest, FormValue, PermissionRequest } from '@openchamber/sdk/conversations/requests';
 import type { ConversationConfiguration, ConversationLocation } from '@openchamber/sdk/conversations/http';
+import type { ConversationDeliveryApi } from './conversation-delivery.js';
 
 export interface ConversationContextOptions {
   client: OpenCodeClient;
   directory?: string | undefined;
 }
 
-export interface ConversationApi {
+export interface ConversationApi extends ConversationDeliveryApi {
   create(input: CreateConversation): Promise<Session>;
   list(input: SessionListOptions): Promise<SessionPage>;
   get(id: string): Promise<Session>;
@@ -22,7 +23,6 @@ export interface ConversationApi {
   cancelInbox(id: string, messageID: string): Promise<void>;
   model(id: string, model: ModelSelection): Promise<void>;
   agent(id: string, agent: string): Promise<void>;
-  prompt(id: string, input: ConversationPrompt): Promise<string>;
   interrupt(id: string): Promise<void>;
   catalog(sessionID?: string, includeProviders?: boolean): Promise<ProviderCatalog>;
   providers(): Promise<Provider[]>;

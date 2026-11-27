@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { SessionApi } from "@opencode/client/promise/api";
 import { createMessageId } from "../../dispatch-results/runtime.js";
 import { createQuestionPluginSource, questionInput } from "./plugin.js";
+import type { ConversationContext } from "../../agent-backends/conversation-delivery.js";
 
 const entrySchema = z.object({
   id: z.string().min(1),
@@ -43,6 +44,7 @@ interface Dependencies {
   isSessionArchived(sessionID: string): Promise<boolean>;
   isEnabled(): boolean;
   retryMs?: number;
+  deliver(input: ConversationContext & { sessionID: string }, options: { signal: AbortSignal }): Promise<void>;
 }
 export interface QuestionSessionApi {
   get(input: { sessionID: string }, options?: { signal: AbortSignal }): Promise<void>;
@@ -52,9 +54,8 @@ export interface QuestionSessionApi {
     reply(input: Parameters<SessionApi['form']['reply']>[0], options?: { signal: AbortSignal }): Promise<void>;
     cancel(input: Parameters<SessionApi['form']['cancel']>[0], options?: { signal: AbortSignal }): Promise<void>;
   };
-  synthetic(input: Parameters<SessionApi['synthetic']>[0], options?: { signal: AbortSignal }): Promise<void>;
 }
-export function createOpenCodeQuestionSession(api: Pick<SessionApi, 'get' | 'form' | 'synthetic'>): QuestionSessionApi {
+export function createOpenCodeQuestionSession(api: Pick<SessionApi, 'get' | 'form'>): QuestionSessionApi {
   return {
     get: async (input, options) => { await api.get(input, options); },
     form: {
@@ -63,7 +64,6 @@ export function createOpenCodeQuestionSession(api: Pick<SessionApi, 'get' | 'for
       reply: async (input, options) => { await api.form.reply(input, options); },
       cancel: async (input, options) => { await api.form.cancel(input, options); },
     },
-    synthetic: async (input, options) => { await api.synthetic(input, options); },
   };
 }
 const settlementEvent = z.discriminatedUnion("type", [
@@ -83,7 +83,7 @@ export const questionStoreDirectory = (dataDir: string, runtime: string, host: s
   return path.join(dataDir, "async-questions", owner);
 };
 
-export function createQuestionRuntime({ dataDir, client, globalEventHub, isSessionArchived, isEnabled, retryMs = 2000 }: Dependencies) {
+export function createQuestionRuntime({ dataDir, client, globalEventHub, isSessionArchived, isEnabled, retryMs = 2000, deliver: deliverResponse }: Dependencies) {
   const filename = path.join(dataDir, "async-questions.json");
   let entries = new Map<string, Entry>();
   let loaded = false;
@@ -189,7 +189,7 @@ export function createQuestionRuntime({ dataDir, client, globalEventHub, isSessi
       return { question_id: entry.id, status: reply.status };
     });
     try {
-      await api.synthetic({
+      await deliverResponse({
         sessionID: first.sessionID, id: resolution.messageID,
         text: JSON.stringify({ type: "async_question_response", ...(responses.length === 1 ? responses[0] : { responses }) }),
         description: first.input.questions[0].title,

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createSessionGoalRuntime, normalizeMaxAutoTurns } from './runtime.js';
+import { assertPromptResponse } from '../opencode/prompt-response.js';
 
 /**
  * The goal record — status, turns, token accounting — lives in
@@ -41,6 +42,10 @@ const makeRuntime = (overrides = {}) => {
   const runtime = createSessionGoalRuntime({
     buildOpenCodeUrl,
     getOpenCodeAuthHeaders: () => ({}),
+    deliver: async (sessionID, _directory, delivery) => {
+      const response = await fetch(`http://opencode.test/api/session/${sessionID}/prompt`, { method: 'POST', body: JSON.stringify({ text: delivery.prompt.text }) });
+      await assertPromptResponse(response, 'session.prompt');
+    },
     getSmallModelService,
     emitGoalNotification,
     isEnabled: () => true,

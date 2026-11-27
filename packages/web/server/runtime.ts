@@ -1117,6 +1117,7 @@ const sessionAssistRuntime = createSessionAssistRuntime({
 });
 
 const sessionGoalRuntime = createSessionGoalRuntime({
+  deliver: (...args) => agentBackendHost.input.deliver(...args),
   buildOpenCodeUrl,
   getOpenCodeAuthHeaders,
   getSmallModelService: async () => import('./lib/small-model/index.js'),
@@ -1208,6 +1209,7 @@ const sessionKnowledgeRuntime = createManagedSessionKnowledgeRuntime({
 });
 
 const contextObligatoryRuntime = createContextObligatoryRuntime({
+  deliver: (...args) => agentBackendHost.input.deliver(...args),
   buildOpenCodeUrl,
   getOpenCodeAuthHeaders,
   readSessionMetadata: readStoredSessionMetadata,
@@ -1326,6 +1328,7 @@ const messageQueueRuntime = createConversationQueue({
 });
 
 const dispatchResultsRuntime = createDispatchResultsRuntime({
+  deliver: (...args) => agentBackendHost.input.deliver(...args),
   globalEventHub: globalMessageStreamHub,
   buildOpenCodeUrl,
   getOpenCodeAuthHeaders,
@@ -1358,8 +1361,7 @@ const extensionWaitsRuntime = createExtensionWaitsRuntime({
 extensionWaitsRuntime.start(globalMessageStreamHub);
 const laterPagesRuntime = createLaterPages({
   dataDir: OPENCHAMBER_DATA_DIR,
-  buildOpenCodeUrl,
-  getOpenCodeAuthHeaders,
+  deliver: (...args) => agentBackendHost.input.deliver(...args),
   broadcastUiEvent: broadcastOpenChamberUiEvent,
   readArchiveState: (sessionID, options) => openChamberSessionService.sessionArchive.archiveState(sessionID, options),
 });
@@ -1370,16 +1372,7 @@ const mergeFollowRuntime = createMergeFollowRuntime({
 });
 
 const postShareAnswer = async (sessionId: string, body: SyntheticMessage) => {
-  const response = await fetch(buildOpenCodeUrl(`/api/session/${encodeURIComponent(sessionId)}/synthetic`, ''), {
-    method: 'POST',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...getOpenCodeAuthHeaders() },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!response.ok) {
-    const detail = await response.text().catch(() => '');
-    throw Object.assign(new Error(`OpenCode refused the synthetic message with ${response.status}${detail ? `: ${detail.slice(0, 200)}` : ''}`), { status: response.status });
-  }
+  await agentBackendHost.input.deliver(sessionId, undefined, { type: 'context', context: body }, { signal: AbortSignal.timeout(15_000) });
 };
 const sharePagesRuntime = createSharePagesRuntime({
   crypto,
@@ -1919,7 +1912,7 @@ const scheduledChatsScope = createChatsScope(OPENCHAMBER_CHATS_DIR, {
 });
 const scheduledWorktreeBridge = createUnregisteredScheduledWorktreeBridge();
 const scheduledTasksRuntime = createScheduledTasksRuntime({
-  antigravity: agentBackendHost.backend,
+  antigravity: agentBackendHost.backend, deliver: (...args) => agentBackendHost.input.deliver(...args),
   readSession: sessionID => createApplicationSessions({ openCode: async () => openCodeSessionClient(''), registry: agentBackendHost.registry }).get(sessionID),
   waitApplicationCommands: async sessionID => { await agentToolRuntime?.waitCommands(sessionID); },
   projectConfigRuntime,
@@ -2039,6 +2032,7 @@ const scheduledTaskService = createScheduledTaskService({
   readModelCatalog: createBackendModelCatalog(agentBackendHost.registry, readModelCatalog),
 });
 const openChamberSessionService = createOpenChamberSessionService({
+  deliver: (...args) => agentBackendHost.input.deliver(...args),
   onSessionArchived: (sessionID, archivedAt) => extensionSessionEvents.processPayload({
     type: 'openchamber:session-archived',
     properties: { sessionID, archivedAt },
@@ -2169,7 +2163,7 @@ function executeServiceControl(action: string, input?: ControlInput, contextDire
   return openChamberControlService.execute(action, input, contextDirectory, options);
 }
 
-const applicationSessionService = createBackendSessionService(openChamberSessionService, agentBackendHost.registry, sessionKnowledgeRuntime.sync, scheduledChatsScope);
+const applicationSessionService = createBackendSessionService(openChamberSessionService, agentBackendHost.registry, sessionKnowledgeRuntime.sync, scheduledChatsScope, (...args) => agentBackendHost.input.deliver(...args));
 const openChamberControlService = createOpenChamberControlService({
   backendRegistry: agentBackendHost.registry,
   replyToolPermission: async input => agentToolRuntime?.permissions.reply(input.sessionID, input.requestID, input.decision, input.message) ?? false,

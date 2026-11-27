@@ -18,6 +18,7 @@ const titles = Object.fromEntries([
 
 
 export function toolResultMetadata(namespace: string, name: string, value: Schema.Json, args: Schema.Json): Schema.JsonObject {
+  if (namespace === 'openchamber' && name === 'execute') return {};
   if (namespace === 'file') return name === 'view_image' ? {} : object({ files: object(value).files, openchamberTurnDiff: object(value).openchamberTurnDiff });
   if (namespace === 'request') return object({ questionID: object(value).question_id });
   if (namespace === 'openchamber' || namespace === 'browser' && name === 'panel') {

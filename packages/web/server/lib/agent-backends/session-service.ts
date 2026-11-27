@@ -2,8 +2,8 @@ import type { SessionPayload } from '../openchamber-sessions/routes.js';
 import type { BackendRegistry } from './registry.js';
 import type { DispatchContext } from './contracts.js';
 
-export function createBackendSessionService(openCode: DispatchContext['openCode'], registry: BackendRegistry, syncKnowledge: DispatchContext['syncKnowledge'], chatsScope: DispatchContext['chatsScope']) {
-  const context = { openCode, syncKnowledge, chatsScope };
+export function createBackendSessionService(openCode: DispatchContext['openCode'], registry: BackendRegistry, syncKnowledge: DispatchContext['syncKnowledge'], chatsScope: DispatchContext['chatsScope'], deliver: DispatchContext['deliver']) {
+  const context = { openCode, syncKnowledge, chatsScope, deliver };
   const forSession = (sessionID?: string) => registry.forSession(sessionID).dispatch(context);
   return {
     ...openCode,

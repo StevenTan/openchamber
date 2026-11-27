@@ -2,7 +2,6 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-import { assertPromptResponse } from '../opencode/prompt-response.js';
 import { GOAL_OBJECTIVE_CHAR_LIMIT, readObjective } from './objectives.js';
 import { buildContinuationPrompt } from './continuation.js';
 import { createGoalInterruptions, type GoalTick, type PersistSessionGoal } from './interruption.js';
@@ -20,6 +19,8 @@ import { isOperatorChildSession, sessionParentId } from '../session-lineage.js';
 import { isRecord, isString } from '../shared/object-guards.js';
 import type { JsonObject, JsonValue } from '../shared/json-values.js';
 import type { SessionActivityOptions } from '../opencode/session-activity.js';
+import { createMessageId } from '../dispatch-results/runtime.js';
+import type { ConversationInput } from '../agent-backends/conversation-input.js';
 import type { ClassifierEndpoint } from '../routing/classifier.js';
 import type { createJevClient } from '../routing/jev.js';
 import type { generateSmallModelText, GeneratedTextResult } from '../small-model/index.js';
@@ -80,6 +81,7 @@ interface GoalRuntimeOptions extends Pick<SessionActivityOptions, 'buildOpenCode
   getMaxAutoTurns?: () => number;
   persistSessionGoal?: PersistSessionGoal | null;
   readSessionMetadata?: ((sessionId: string) => Promise<SessionMetadataInput>) | null;
+  deliver: ConversationInput['deliver'];
 }
 
 type SessionMetadataInput = SessionMetadata | null | undefined;
@@ -93,14 +95,7 @@ export interface SessionGoalRuntime {
 
 interface GoalFetchOptions {
   directory?: string;
-  method?: 'GET' | 'POST';
-  body?: { text: string };
   query?: Record<string, string>;
-}
-
-interface GoalRequestHeaders {
-  Accept: string;
-  'Content-Type'?: string;
 }
 
 type TimerEntry = { timer: ReturnType<typeof setTimeout>; armedAt: number }
@@ -381,6 +376,7 @@ const hasRepeatedLengthTail = (messages: LoopMessage[], latestAssistant: LoopMes
 export const createSessionGoalRuntime = ({
   buildOpenCodeUrl,
   getOpenCodeAuthHeaders,
+  deliver,
   getSmallModelService,
   classifierEndpoint = async () => null,
   jev = null,
@@ -410,27 +406,20 @@ export const createSessionGoalRuntime = ({
     }
   };
 
-  const openCodeFetch = async (fetchPath: string, { directory, method = 'GET', body, query }: GoalFetchOptions = {}) => {
+  const openCodeFetch = async (fetchPath: string, { directory, query }: GoalFetchOptions = {}) => {
     const base = buildOpenCodeUrl(fetchPath, '');
     const params = new URLSearchParams(query || {});
     if (directory) params.set('directory', directory);
     const search = params.toString();
     const url = search ? `${base}?${search}` : base;
-    const acceptHeaders: GoalRequestHeaders = { Accept: 'application/json' };
-    if (body) acceptHeaders['Content-Type'] = 'application/json';
-    const headers = { ...acceptHeaders, ...getOpenCodeAuthHeaders() };
-    const requestBody: Pick<RequestInit, 'body'> = {};
-    if (body) requestBody.body = JSON.stringify(body);
+    const headers = { Accept: 'application/json', ...getOpenCodeAuthHeaders() };
     const response = await fetch(url, {
-      method,
+      method: 'GET',
       headers,
-      ...requestBody,
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
-    if (method === 'POST' && fetchPath.endsWith('/prompt')) {
-      await assertPromptResponse(response, 'session.prompt');
-    } else if (!response.ok) {
-      throw new Error(`OpenCode ${method} ${fetchPath} failed with ${response.status}`);
+    if (!response.ok) {
+      throw new Error(`OpenCode GET ${fetchPath} failed with ${response.status}`);
     }
     const payload: JsonValue = await response.json().catch(() => null);
     return unwrapOpenCodeResponse(payload);
@@ -578,11 +567,7 @@ export const createSessionGoalRuntime = ({
   };
 
   const sendContinuation = async ({ sessionId, directory, goal }: GoalSession) => {
-    await openCodeFetch(`/api/session/${encodeURIComponent(sessionId)}/prompt`, {
-      directory,
-      method: 'POST',
-      body: { text: buildContinuationPrompt(goal) },
-    });
+    await deliver(sessionId, directory, { type: 'prompt', prompt: { id: createMessageId(Date.now()), text: buildContinuationPrompt(goal), files: [], context: [], agents: [], skills: [] } }, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
   };
 
   const tick = async (sessionId: string, directory: string) => {

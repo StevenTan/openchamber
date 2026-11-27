@@ -39,7 +39,7 @@ async function fixture() {
   const archived = vi.fn(async () => false);
   const runtime = (client = () => ({ session })) => {
     const result = createQuestionRuntime({
-      dataDir, client, isSessionArchived: archived, isEnabled: () => true, retryMs: 5,
+      dataDir, client, deliver: (...args) => session.synthetic(...args), isSessionArchived: archived, isEnabled: () => true, retryMs: 5,
       globalEventHub: {
         subscribeEvent: listener => { eventListener = listener; return () => { eventListener = undefined; }; },
         subscribeStatus: listener => { statusListener = listener; return () => { statusListener = undefined; }; },

@@ -5,13 +5,11 @@ import { OpenChamberControlError } from '../openchamber-control/error.js';
 import type { SessionPayload, ExistingResult, CreateResult } from '../openchamber-sessions/routes.js';
 import type { createAntigravityBackend } from './antigravity.js';
 import { CHATS_SCOPE_PUBLIC_ID } from '../scheduled-tasks/chats-scope.js';
-import { pathToFileURL } from 'node:url';
-import type { QueuedItem } from '../message-queue/runtime.js';
 import { z } from 'zod';
 import type { BackendAdapter, BackendRuntime, DispatchContext } from './contracts.js';
 import { createAntigravityConversations } from './antigravity-conversations.js';
 
-function createDispatch(backend: ReturnType<typeof createAntigravityBackend>, { openCode, syncKnowledge, chatsScope }: DispatchContext): ReturnType<BackendAdapter['dispatch']> {
+function createDispatch(backend: ReturnType<typeof createAntigravityBackend>, { openCode, syncKnowledge, chatsScope, deliver }: DispatchContext): ReturnType<BackendAdapter['dispatch']> {
   const selection = async (sessionID: string, payload: SessionPayload) => {
     const model = resolveRequestedModel(payload);
     const variant = asNonEmptyString(payload.variant);
@@ -27,10 +25,12 @@ function createDispatch(backend: ReturnType<typeof createAntigravityBackend>, { 
     const prompt = asNonEmptyString(payload.prompt);
     if (!prompt) throw new OpenChamberControlError('prompt is required', 400);
     const model = await selection(sessionID, payload);
-    const baselineAssistantMessageId = session.turns.at(-1)?.assistantID;
+    const turn = session.turns.at(-1);
+    const followup = turn?.followups.at(-1);
+    const baselineAssistantMessageId = followup ? `${followup.id}_assistant` : turn?.assistantID;
     if (session.archived) await backend.archive.setArchived(sessionID, false);
     await syncKnowledge(sessionID, session.directory);
-    await backend.send(sessionID, { id: asNonEmptyString(payload.messageId) ?? createMessageId(Date.now()), text: prompt, files: [], context: [] }, payload.promptedBySessionId ? 'synthetic' : 'user');
+    await deliver(sessionID, session.directory, { type: 'prompt', prompt: { id: asNonEmptyString(payload.messageId) ?? createMessageId(Date.now()), text: prompt, files: [], context: [], agents: [], skills: [] }, source: payload.promptedBySessionId ? 'synthetic' : 'user' });
     return { action: 'send', sessionId: sessionID, directory: session.directory, model, agent: 'antigravity', promptDispatched: true, dispatchedAsCommand: false,
       ...baselineAssistantMessageId && { baselineAssistantMessageId } };
   };
@@ -59,21 +59,6 @@ function createDispatch(backend: ReturnType<typeof createAntigravityBackend>, { 
     },
     queueBackend: sessionID => ({
       isIdle: async () => { await backend.get(sessionID); return !backend.statuses()[sessionID]; },
-      async send(directory: string, item: QueuedItem) {
-        if (item.goal) throw new OpenChamberControlError('This backend does not support goal mode', 400);
-        await selection(sessionID, item.sendConfig);
-        await syncKnowledge(sessionID, directory);
-        await backend.send(sessionID, {
-          id: item.id,
-          text: item.text,
-          files: item.attachments.map(file => { const path = file.agentPath ?? file.serverPath; return { mime: file.mimeType, filename: file.filename, url: path ? pathToFileURL(path).href : file.dataUrl }; }),
-          context: item.context.flatMap(part => {
-            if (part.kind !== 'context') return [{ text: part.text }];
-            const context = { text: part.text, metadata: z.record(z.string(), z.json()).parse(part.metadata) };
-            return part.instructions ? [{ text: part.instructions }, context] : [context];
-          }),
-        }, 'synthetic');
-      },
     }),
   };
 }

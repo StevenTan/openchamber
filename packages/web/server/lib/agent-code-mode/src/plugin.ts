@@ -51,11 +51,16 @@ export default {
     const endpoint = new URL(AGENT_MCP_SERVERS.openchamber.path, process.env.OPENCHAMBER_AGENT_TOOL_URL);
     const headers = { authorization: 'Bearer ' + process.env.OPENCHAMBER_AGENT_TOOL_TOKEN };
     yield* ctx.mcp.transform(servers => servers.set(AGENT_MCP_SERVERS.openchamber.name, { type: 'remote', url: endpoint.href, oauth: false, codemode: false, headers }));
-    const client = yield* Effect.acquireRelease(Effect.tryPromise(async () => {
+    const connect = (url: URL) => Effect.acquireRelease(Effect.tryPromise(async () => {
       const client = new Client({ name: 'openchamber-opencode', version: '1.0.0' });
-      await client.connect(new StreamableHTTPClientTransport(endpoint, { requestInit: { headers } }));
+      await client.connect(new StreamableHTTPClientTransport(url, { requestInit: { headers } }));
       return client;
     }), client => Effect.promise(() => client.close()));
+    const client = yield* connect(endpoint);
+    const sources: Array<{ name: string; path: string; client: Client }> = [{ ...AGENT_MCP_SERVERS.openchamber, client }];
+    for (const server of Object.values(AGENT_MCP_SERVERS).slice(1)) {
+      sources.push({ ...server, client: yield* connect(new URL(server.path, endpoint)) });
+    }
     const pagesWaitingForChat = new Map<string, Set<AbortController>>();
     const pendingByUser = new Map<string, string>();
     const endWaits = (sessionID: string) => {
@@ -99,6 +104,7 @@ export default {
               try {
                 const result = CallToolResultSchema.parse(await client.callTool({ name: tool.id.slice('openchamber_'.length), arguments: object(args), _meta: {
                   'ai.opencode/sessionID': context.sessionID, 'openchamber/callID': context.id,
+                  'openchamber/source': { messageID: context.messageID, id: context.id },
                 } }, CallToolResultSchema, { signal: AbortSignal.any([signal, chat.signal]), timeout: 43_200_000 }));
                 if (result.isError) throw new Error(result.content.filter(part => part.type === 'text').map(part => part.text).join('\n'));
                 output = object(result.structuredContent);
@@ -114,17 +120,18 @@ export default {
             }, catch: error => new Tool.Error({ message: String(error) }) });
             return;
           }
-          if (tool.id !== executeName) return;
-          value.options = { ...value.options, permission: 'execute' };
+          const source = sources.findLast(server => tool.id.startsWith(`${server.name}_`));
+          if (!source) return;
+          if (tool.id === executeName) value.options = { ...value.options, permission: 'execute' };
           value.execute = (input, context) => Effect.tryPromise({ try: async signal => {
-            const result = CallToolResultSchema.parse(await client.callTool({ name: 'execute', arguments: object(input), _meta: {
+            const result = CallToolResultSchema.parse(await source.client.callTool({ name: tool.id.slice(source.name.length + 1), arguments: object(input), _meta: {
               'ai.opencode/sessionID': context.sessionID,
               'openchamber/source': { sessionID: context.sessionID, messageID: context.messageID, id: context.id, directory: ctx.location.directory },
             } }, CallToolResultSchema, { signal, timeout: 43_200_000,
               onprogress: progress => { if (progress.message) void Effect.runPromise(context.progress(object(JSON.parse(progress.message)))); },
             }));
             if (result.isError) throw new Error(result.content.filter(part => part.type === 'text').map(part => part.text).join('\n'));
-            return { output: result.structuredContent, metadata: object(result._meta), content: result.content.flatMap<Tool.Content>(part =>
+            return { output: result.structuredContent, metadata: object(result._meta ?? {}), content: result.content.flatMap<Tool.Content>(part =>
               part.type === 'text' ? [{ type: 'text' as const, text: part.text }]
                 : part.type === 'image' ? [{ type: 'file' as const, uri: `data:${part.mimeType};base64,${part.data}`, mime: part.mimeType }] : []),
             };

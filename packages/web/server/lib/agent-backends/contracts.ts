@@ -10,6 +10,7 @@ import type { QuestionSessionApi } from '../agent-question/src/runtime.js';
 import type { SessionClient } from '../openchamber-sessions/opencode-client-contract.js';
 import type { FormField } from '../openchamber-control/form-answer.js';
 import type { ConversationApi, ConversationContextOptions } from './conversation-contract.js';
+import type { ConversationInput } from './conversation-input.js';
 
 export type BackendID = 'opencode' | 'antigravity';
 export type SessionClientFactory = (directory?: string | null) => Promise<ControlClient>;
@@ -40,6 +41,7 @@ export interface DispatchContext {
   openCode: ReturnType<typeof createOpenChamberSessionService>;
   syncKnowledge(sessionID: string, directory: string): Promise<boolean>;
   chatsScope: ReturnType<typeof createChatsScope>;
+  deliver: ConversationInput['deliver'];
 }
 export type ModelCatalogReader = NonNullable<Parameters<typeof createScheduledTaskService>[0]['readModelCatalog']>;
 export type CatalogModel = Pick<ModelInfo, 'id' | 'providerID' | 'name'> & Partial<Pick<ModelInfo, 'family' | 'time' | 'cost' | 'status'>> & { variants: readonly { id: string }[] };

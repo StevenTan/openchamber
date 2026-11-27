@@ -40,7 +40,8 @@ export function createConversationStorage(dataDir: string) {
           UNIQUE(session_id, id)
         );
         CREATE INDEX IF NOT EXISTS turn_model ON turns(session_id, model_id, sequence);
-        CREATE TABLE IF NOT EXISTS turn_diffs (turn_id TEXT PRIMARY KEY, data TEXT NOT NULL);`);
+        CREATE TABLE IF NOT EXISTS turn_diffs (turn_id TEXT PRIMARY KEY, data TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS context_inputs (id TEXT PRIMARY KEY, data TEXT NOT NULL);`);
     }
     connections.delete(id);
     connections.set(id, db);

@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { MessageRecord } from '@openchamber/sdk/conversations/http';
 import { createConversationStorage } from './conversation-storage.js';
-import { createOpenCodeHistory } from './opencode-history.js';
+import { createConversationRuntime } from './conversation-runtime.js';
 import { shellMessageRecords } from '../opencode/message-shells.js';
 
 test('OpenCode display history pages snapshots, retains live output and reopens from disk', async t => {
@@ -14,7 +14,7 @@ test('OpenCode display history pages snapshots, retains live output and reopens 
   const id = 'ses_history';
   const user: MessageRecord = { info: { id: 'msg_z', sessionID: id, role: 'user', time: { created: 10 } }, parts: [] };
   const assistant: MessageRecord = { info: { id: 'msg_a', sessionID: id, role: 'assistant', time: { created: 2 }, providerID: 'codex', modelID: 'gpt', agent: 'build' }, parts: [] };
-  let history = createOpenCodeHistory(createConversationStorage(directory));
+  let history = createConversationRuntime(createConversationStorage(directory));
   t.after(() => history.close());
   let pages = 0;
   await history.importSession(id, async input => {
@@ -51,7 +51,7 @@ test('OpenCode display history pages snapshots, retains live output and reopens 
   assert.deepEqual(shell?.type === 'tool' && shell.state.status === 'completed' && shell.state.metadata?.openchamberContentShell, { chars: 10 });
   assert.deepEqual(history.message(id, assistant.info.id), exact);
   history.close();
-  history = createOpenCodeHistory(createConversationStorage(directory));
+  history = createConversationRuntime(createConversationStorage(directory));
   assert.deepEqual(history.message(id, assistant.info.id), exact);
   await assert.rejects(history.importSession(id, async () => { throw new Error('OpenCode unavailable'); }), /OpenCode unavailable/);
   assert.deepEqual(history.message(id, assistant.info.id), exact);
@@ -64,7 +64,7 @@ test('OpenCode display history pages snapshots, retains live output and reopens 
 test('display history admits queued messages, compaction and revert in event order', async t => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'opencode-history-events-'));
   t.after(() => fs.rm(directory, { recursive: true }));
-  const history = createOpenCodeHistory(createConversationStorage(directory));
+  const history = createConversationRuntime(createConversationStorage(directory));
   t.after(() => history.close());
   const id = 'ses_events';
   history.record({ type: 'message.updated', properties: { info: { id: 'queued', sessionID: id, role: 'synthetic', time: { created: 1 }, text: 'follow-up', pending: true } } });
@@ -90,4 +90,24 @@ test('display history admits queued messages, compaction and revert in event ord
   const shell = history.message(id, 'shell-message');
   assert.deepEqual(shell?.info.role === 'shell' && shell.info.output, output);
   assert.equal(shell?.info.role === 'shell' && shell.info.time.completed, 7);
+});
+
+test('host tool results keep their message and position across OpenCode history imports', async t => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'conversation-tools-'));
+  t.after(() => fs.rm(directory, { recursive: true }));
+  const history = createConversationRuntime(createConversationStorage(directory));
+  t.after(() => history.close());
+  const id = 'ses_tools';
+  const assistant: MessageRecord = { info: { id: 'assistant', sessionID: id, role: 'assistant', providerID: 'codex', modelID: 'gpt', agent: 'build', time: { created: 1 } }, parts: [] };
+  history.record({ type: 'message.updated', properties: { info: assistant.info } });
+  history.tool(id, { id: 'host', callID: 'native', partID: 'native', messageID: 'assistant', namespace: 'file', name: 'edit', input: { path: 'code.txt' }, started: 2 }, directory);
+  history.record({ type: 'message.updated', properties: { info: { ...assistant.info, id: 'after-steer', time: { created: 3 } } } });
+  history.tool(id, { id: 'host', callID: 'native', partID: 'native', messageID: 'assistant', namespace: 'file', name: 'edit', input: { path: 'code.txt' }, started: 2, completed: 4, result: { content: [{ type: 'text', text: 'Edited' }] } }, directory);
+  const stored = history.message(id, 'assistant');
+  assert.equal(stored?.parts[0]?.type === 'tool' && stored.parts[0].state.status === 'completed' && stored.parts[0].state.output, 'Edited');
+  const afterSteer = history.message(id, 'after-steer');
+  assert.ok(afterSteer);
+  assert.deepEqual(afterSteer.parts, []);
+  await history.importSession(id, async () => ({ items: [{ ...assistant, parts: [{ id: 'native', type: 'tool', sessionID: id, messageID: 'assistant', callID: 'native', tool: 'file_edit', state: { status: 'running', input: {}, time: { start: 2 } } }] }, afterSteer], cursor: {} }));
+  assert.deepEqual(history.message(id, 'assistant'), stored);
 });

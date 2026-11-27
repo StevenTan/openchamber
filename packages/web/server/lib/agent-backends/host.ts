@@ -29,7 +29,7 @@ import type { ForwardEventPayload } from '../event-stream/contracts.js';
 import { listConversationSkills, conversationSkillGuidance, registerSkillCatalogRoute } from './skills.js';
 import { readProjectRules } from './project-rules.js';
 import { createConversationStorage } from './conversation-storage.js';
-import { createOpenCodeHistory } from './opencode-history.js';
+import { createConversationRuntime } from './conversation-runtime.js';
 import { createConversationCatalog } from './conversation-catalog.js';
 import { createConversationInput } from './conversation-input.js';
 import type { createMessageQueueRuntime } from '../message-queue/runtime.js';
@@ -51,20 +51,19 @@ interface Options {
 }
 export function createAgentBackendHost(options: Options) {
   const storage = createConversationStorage(options.dataDir);
-  const history = createOpenCodeHistory(storage);
+  const history = createConversationRuntime(storage, (events, directory) => stream.publish(events, directory), (id, status) => options.queue.sessionStatus(id, status.type === 'idle' ? 'idle' : 'busy'));
   const stream = createConversationStream(options.hub, options.processForwardedEventPayload, event => {
     const recorded = storage.catalog.record(event);
     history.record(recorded);
-  }, storage.catalog.project);
+  }, event => history.project(storage.catalog.project(event)));
   const unsubscribeHistory = options.hub.subscribeStatus(status => { if (status.type === 'connect') { history.reset(); catalog.reset(); } });
   const identity = createBackendMcpIdentity();
   const owners = new Map<string, BackendID>(storage.catalog.owners());
-  const turnDiffs = createTurnDiffRuntime(options.dataDir, async (sessionID, reference) => {
-    if (backend.lookup(sessionID)) await backend.recordFileDiff(sessionID, reference);
-  }, storage);
+  const turnDiffs = createTurnDiffRuntime(options.dataDir, storage);
   const backend = createAntigravityBackend({
     ...options,
     storage,
+    runtime: history,
     readInstructions: async sessionID => {
       const session = await backend.get(sessionID);
       const skills = await listConversationSkills(session.directory, options.skillDirectories?.());
@@ -76,6 +75,7 @@ export function createAgentBackendHost(options: Options) {
     publish: event => {
       options.publish({ type: 'openchamber:acp', properties: event });
       if (event.type === 'control') return;
+      if (event.type === 'turn' || event.type === 'update') return;
       if (event.type === 'deleted') stream.publish([{ type: 'session.deleted', properties: { sessionID: event.sessionID } }], event.directory);
       else stream.publish(antigravityEvents(event).map(storage.catalog.record), event.session.directory);
     },
@@ -90,19 +90,19 @@ export function createAgentBackendHost(options: Options) {
   configureAntigravityQuotaReader(() => backend.quota());
   const activity = createToolActivity({
     dataDir: options.dataDir,
-    anchor: sessionID => ({ turnID: turnDiffs.current(sessionID)?.turnID, updateIndex: backend.lookup(sessionID)?.turns.at(-1)?.updates.length ?? 0 }),
-    changed: async (sessionID, call, turnID) => { if (backend.lookup(sessionID)) await backend.recordToolCall(sessionID, call, turnID); },
+    anchor: sessionID => ({ turnID: turnDiffs.current(sessionID)?.turnID, messageID: history.current(sessionID)?.info.id }),
+    changed: async (sessionID, call) => { history.tool(sessionID, call, storage.catalog.get(sessionID)?.directory ?? ''); },
   });
   let conversationFetch: typeof fetch | undefined;
   const catalog = createConversationCatalog(storage.catalog, { opencode: createOpenCodeAdapter(history), antigravity: createAntigravityAdapter(backend) }, () => options.openCodeClient(undefined, conversationFetch), stream.publish);
   const registry = createBackendRegistry(catalog.adapters, owners, backend.ready, catalog.list);
-  const input = createConversationInput({ queue: options.queue, api: (sessionID, directory) => registry.forSession(sessionID).conversations({ directory, client: options.openCodeClient(directory, conversationFetch) }), publish: stream.publish });
+  const input = createConversationInput({ queue: options.queue, runtime: history, api: (sessionID, directory) => registry.forSession(sessionID).conversations({ directory, client: options.openCodeClient(directory, conversationFetch) }), publish: stream.publish });
   const applicationDirectory = (sessionID: string) => backend.lookup(sessionID)?.directory;
   const toolOptions = {
     turnDiffs,
     applicationContext: (request: Parameters<typeof resolveOpenCodeMcpContext>[0]) => {
       const context = identity.resolve(request) ?? resolveOpenCodeMcpContext(request);
-      return { ...context, record: activity.record(context.sessionID, context.callID) };
+      return { ...context, record: activity.record(context.sessionID, context.callID, context) };
     },
     applicationDirectory,
     authorizeMcpRequest: (request: { headers: Record<string, string | string[] | undefined> }) => identity.authorize(request.headers),
@@ -131,17 +131,18 @@ export function createAgentBackendHost(options: Options) {
     close: async () => { await backend.close(); await turnDiffs.close(); stream.close(); unsubscribeHistory(); history.close(); },
     toolOptions,
     applicationPolicy,
-    createTools(input: ToolOptions): AgentBackendTools {
+    createTools(toolInput: ToolOptions): AgentBackendTools {
       const questionRuntime = createQuestionRuntime({
-        dataDir: input.questionDataDir, globalEventHub: options.hub,
-        isSessionArchived: input.isSessionArchived, isEnabled: input.isEnabled,
-        client: async sessionID => { await registry.ready; return { session: registry.forSession(sessionID).question(input.client) }; },
+        dataDir: toolInput.questionDataDir, globalEventHub: options.hub,
+        isSessionArchived: toolInput.isSessionArchived, isEnabled: toolInput.isEnabled,
+        client: async sessionID => { await registry.ready; return { session: registry.forSession(sessionID).question(toolInput.client) }; },
+        deliver: async ({ sessionID, ...context }, requestOptions) => { await input.deliver(sessionID, undefined, { type: 'context', context }, requestOptions); },
       });
       const agentToolRuntime = createManagedAgentTools({
-        instanceDir: input.instanceDir, control: input.control, client: input.client,
+        instanceDir: toolInput.instanceDir, control: toolInput.control, client: toolInput.client,
         server: options.server, getCommandEnvironment: options.environment,
         ...toolOptions, questionRuntime,
-        permissionOptions: { ...input.permissionOptions, applicationPolicy },
+        permissionOptions: { ...toolInput.permissionOptions, applicationPolicy },
       });
       return { questionRuntime, agentToolRuntime };
     },
@@ -157,7 +158,6 @@ export function createManagedAgentBackendHost(options: Omit<Options, 'initialize
     ...options,
     publish: event => {
       if (event.properties.type === 'control') options.publish(event);
-      if (event.properties.type === 'turn') options.queue.sessionStatus(event.properties.sessionID, event.properties.turn.completed ? 'idle' : 'busy');
     },
     initializeSession: async (sessionID, directory, source) => {
       await options.initializePermission(sessionID, source);

@@ -5,6 +5,10 @@
 This module owns shared MCP services and their tool catalog. The host injects
 calling identity, session-directory resolution, pending-input reads and permissions.
 `configureTools()` selects the catalog independently of backend plugin files.
+MCP activity records belong to the host conversation runtime for both backends.
+Tool start fixes the owning assistant message; completion updates that same part
+with its result, metadata and image attachments. Native history imports preserve
+these host-owned parts.
 The OpenCode adapter in `../opencode/managed-agent-tools.ts` supplies those host
 dependencies; `../opencode/agent-tool-plugin.ts` writes its policy plugins.
 Session control and browser operations are independently enabled:

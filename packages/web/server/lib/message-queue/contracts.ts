@@ -1,5 +1,6 @@
 import type { ScheduledTaskProvenance } from '../scheduled-tasks/existing-session.js';
 import type { ConversationPrompt } from '@openchamber/sdk/conversations/http';
+import type { ConversationContext } from '../agent-backends/conversation-delivery.js';
 import type { QueueRecord } from './runtime.js';
 
 export interface QueueSendConfig {
@@ -40,6 +41,7 @@ export interface QueuedItemInput {
   goal?: QueuedGoal;
   scheduledTask?: ScheduledTaskProvenance;
   prompt?: ConversationPrompt;
+  contextInput?: ConversationContext;
 }
 
 export interface QueuedItem extends QueuedItemInput {
@@ -48,7 +50,7 @@ export interface QueuedItem extends QueuedItemInput {
   syntheticIds?: string[];
 }
 
-export interface PublicQueuedItem extends Omit<QueuedItem, 'context' | 'syntheticIds' | 'attachments' | 'prompt'> {
+export interface PublicQueuedItem extends Omit<QueuedItem, 'context' | 'syntheticIds' | 'attachments' | 'prompt' | 'contextInput'> {
   attachments: Omit<QueuedAttachment, 'dataUrl'>[];
 }
 

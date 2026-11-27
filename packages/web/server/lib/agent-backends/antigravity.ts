@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import { ClientSideConnection, ndJsonStream, PROTOCOL_VERSION, type McpServer, type SessionNotification, type RequestPermissionRequest } from '@agentclientprotocol/sdk';
 import { z } from 'zod';
-import type { AcpConversation, AcpConversationEvent, AcpSend, AcpTurn, AcpPrompt, AgentToolCall } from '@openchamber/sdk/agent-backends';
+import type { AcpConversation, AcpConversationEvent, AcpSend, AcpTurn, AcpPrompt } from '@openchamber/sdk/agent-backends';
 import type { QuestionSessionApi } from '../agent-question/src/runtime.js';
 import { createMessageId } from '../dispatch-results/runtime.js';
 import { isEnterpriseMode } from '../enterprise-mode.js';
@@ -16,7 +16,6 @@ import { createAntigravityAuthentication } from './antigravity-auth.js';
 import { readAntigravityUsage } from './antigravity-usage.js';
 import { readAntigravityQuota } from './antigravity-quota.js';
 import type { createTurnDiffRuntime } from '../turn-diffs/runtime.js';
-import type { TurnDiffReference } from '@openchamber/sdk/agent-backends';
 import { createAntigravityStorage, type StoredConversation } from './antigravity-storage.js';
 import type { MessageListOptions, MessageRecord } from '@openchamber/sdk/conversations/http';
 import type { ConversationStorage } from './conversation-storage.js';
@@ -24,10 +23,13 @@ import { acpSession } from '@openchamber/sdk/conversations/antigravity';
 import { rewindAntigravityHistory } from './antigravity-history.js';
 import { OpenChamberControlError } from '../openchamber-control/error.js';
 import { copyAntigravityDatabase, copyAntigravityHistory } from './antigravity-fork.js';
+import type { ConversationRuntime } from './conversation-runtime.js';
+import { antigravityChunk } from './antigravity-events.js';
 
 interface Options {
   dataDir: string;
   storage: ConversationStorage;
+  runtime: ConversationRuntime;
   turnDiffs: Pick<ReturnType<typeof createTurnDiffRuntime>, 'begin' | 'finish' | 'remove'>;
   environment(): NodeJS.ProcessEnv;
   mcpServers(sessionID: string): McpServer[];
@@ -95,7 +97,8 @@ export function createAntigravityBackend(options: Options) {
   };
   const withUsage = (session: StoredConversation, message: MessageRecord) => {
     const turn = session.turns.at(-1);
-    if (message.info.role === 'assistant' && message.info.id === turn?.assistantID) {
+    const followup = turn?.followups.at(-1);
+    if (turn && message.info.role === 'assistant' && message.info.id === (followup ? `${followup.id}_assistant` : turn.assistantID)) {
       message.info = { ...message.info, ...turn.tokens && { tokens: turn.tokens }, ...turn.context && { context: turn.context } };
     }
     return message;
@@ -112,6 +115,8 @@ export function createAntigravityBackend(options: Options) {
     const turn = active.get(session.id);
     if (!turn) return;
     turn.updates.push(notification.update);
+    const message = options.runtime.current(session.id);
+    if (message) options.runtime.publish(antigravityChunk(message, notification.update), session.directory);
     options.publish({ type: 'update', sessionID: session.id, directory: session.directory, turnID: turn.id, update: notification.update, turn, session });
   };
   const requestPermission = async (request: RequestPermissionRequest) => {
@@ -240,6 +245,15 @@ export function createAntigravityBackend(options: Options) {
       }
       session.updated = Date.now();
       await save(session, turn);
+      const previous = options.runtime.current(sessionID);
+      const created = Date.now();
+      const assistantID = turn.followups.at(-1) ? `${input.id}_assistant` : turn.assistantID;
+      options.runtime.admit(sessionID, { ...input, context: inputContext }, input.role ?? 'user', session.directory, created);
+      options.runtime.publish([
+        ...previous?.info.role === 'assistant' && !previous.info.time.completed ? [{ type: 'message.updated' as const, properties: { info: { ...previous.info, finish: 'stop' as const, time: { ...previous.info.time, completed: created } } } }] : [],
+        { type: 'message.updated', properties: { info: { id: assistantID, sessionID, role: 'assistant', agent: 'antigravity', providerID: 'antigravity', modelID: turn.modelID, ...turn.variant && { variant: turn.variant }, time: { created } } } },
+        { type: 'session.status', properties: { sessionID, status: { type: 'busy' }, turnStart: { at: turn.created, source: 'live' } } },
+      ], session.directory);
       publishTurn(session, turn);
       const instructions = await options.readInstructions(sessionID);
       const prompt: AcpPrompt = [...instructions, ...input.context].map(item => ({ type: 'text' as const, text: item.text }));
@@ -258,6 +272,12 @@ export function createAntigravityBackend(options: Options) {
         prompts.delete(sessionID);
         refreshUsage(session);
         await save(session, turn);
+        const message = options.runtime.current(sessionID);
+        if (message?.info.role === 'assistant') options.runtime.publish([
+          { type: 'message.updated', properties: { info: { ...message.info, time: { ...message.info.time, completed: turn.completed }, finish: turn.error ? 'error' : 'stop', ...turn.error && { error: { type: 'AntigravityError', message: turn.error } }, ...turn.tokens && { tokens: turn.tokens }, ...turn.context && { context: turn.context } } } },
+          { type: 'session.status', properties: { sessionID, status: { type: 'idle' } } },
+          { type: 'session.idle', properties: { sessionID } },
+        ], session.directory);
         options.publish({ type: 'session', session });
         publishTurn(session, turn);
         session.turns = history().summaries(sessionID);
@@ -345,27 +365,6 @@ export function createAntigravityBackend(options: Options) {
       await Promise.race([pending, stopped]).finally(() => signal.removeEventListener('abort', abort));
     },
     lookup: (id: string) => conversations.get(id),
-    async recordToolCall(id: string, call: AgentToolCall, turnID: string | undefined) {
-      const session = await get(id);
-      const turn = active.get(id)?.id === turnID ? active.get(id) : turnID && history().turn(id, turnID);
-      if (turn) {
-        const calls = turn.toolCalls ?? [];
-        const index = calls.findIndex(item => item.id === call.id);
-        if (index === -1) calls.push(call);
-        else calls[index] = call;
-        turn.toolCalls = calls;
-        await save(session, turn);
-        publishTurn(session, turn);
-      }
-    },
-    async recordFileDiff(id: string, reference: TurnDiffReference) {
-      const session = await get(id);
-      const turn = active.get(id);
-      if (!turn) throw new Error('File change has no active turn');
-      turn.fileDiff = reference;
-      await save(session, turn);
-      publishTurn(session, turn);
-    },
     async list(directory?: string) { await ready; return [...conversations.values()].filter(item => !item.draft && (!directory || item.directory === directory)).map(history().metadata); },
     async create(directory: string, title?: string, id?: string) {
       const session = await prepare(directory);
@@ -443,7 +442,7 @@ export function createAntigravityBackend(options: Options) {
       options.publish({ type: 'session', session });
     },
     commitRevert,
-    statuses: () => Object.fromEntries([...active.keys()].map(id => [id, { type: 'busy' as const }])),
+    statuses: () => Object.fromEntries(Object.keys(options.runtime.statuses()).filter(id => conversations.has(id)).map(id => [id, { type: 'busy' as const }])),
     async quota() {
       const acp = await connect();
       await acp.listSessions({});
@@ -503,7 +502,6 @@ export function createAntigravityBackend(options: Options) {
           options.publishForm('form.cancelled', { id: input.formID, sessionID: session.id }, session.directory);
         },
       },
-      synthetic: async input => { await send(input.sessionID, { id: input.id ?? createMessageId(Date.now()), text: input.text, files: [], context: [] }, 'synthetic'); },
     } satisfies QuestionSessionApi,
     async close() {
       await authentication.close();

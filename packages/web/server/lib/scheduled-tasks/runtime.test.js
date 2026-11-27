@@ -1,3 +1,6 @@
+import { OpenCode } from '@opencode/client';
+import { createOpenCodeInput } from '../agent-backends/opencode-input.js';
+import { deliverConversation } from '../agent-backends/conversation-delivery.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import os from 'os';
 import path from 'path';
@@ -16,6 +19,11 @@ import { loopFingerprint, parseLoopDefinition } from './loops.js';
 import { createOpenCodeSessionMetadata, createSessionMetadataStore } from '../openchamber-sessions/session-metadata-store.js';
 import { readProcessInstance } from './process-instance.js';
 
+const testDelivery = deps => (id, directory, delivery) => {
+  const client = OpenCode.make({ baseUrl: new URL(deps.buildOpenCodeUrl('/api/info', '')).origin, headers: { ...deps.getOpenCodeAuthHeaders(), 'x-opencode-directory': encodeURIComponent(directory) } });
+  return deliverConversation(createOpenCodeInput(client, { admit() {} }), id, delivery);
+};
+
 const createScheduledTasksRuntime = (deps) => {
   const cleanups = new Map();
   return createRuntime({
@@ -23,6 +31,7 @@ const createScheduledTasksRuntime = (deps) => {
     readProcessInstance: async (pid) => pid === process.pid ? 'test-process-instance' : null,
     readWorktreeIdentity: async () => 'fixture-directory',
     ...deps,
+    deliver: testDelivery(deps),
     projectConfigRuntime: {
       listScheduledWorktreeCleanups: async () => [...cleanups.values()],
       saveScheduledWorktreeCleanup: async (projectID, value) => {
@@ -913,7 +922,7 @@ describe('scheduled-tasks runtime prompt dispatch', () => {
       },
       logger: { info: (message, entry) => logs.push({ message, entry }), warn: (message, entry) => logs.push({ message, entry }), error() {} },
     };
-    const first = createRuntime(dependencies);
+    const first = createRuntime({ ...dependencies, deliver: testDelivery(dependencies) });
     let second;
     try {
       await first.start();

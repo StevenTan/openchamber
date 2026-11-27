@@ -1448,12 +1448,7 @@ describe('render.page with answerLater', () => {
     const posts = [];
     const laterPages = createLaterPages({
       dataDir,
-      buildOpenCodeUrl: (fetchPath) => `http://opencode${fetchPath}`,
-      getOpenCodeAuthHeaders: () => ({}),
-      fetchImpl: async (url, init) => {
-        posts.push(JSON.parse(init.body));
-        return { ok: true, status: 200, body: null };
-      },
+      deliver: async (_sessionID, _directory, delivery) => { posts.push(delivery.context); },
       warn: () => {},
     });
     return { laterPages, posts, dataDir };

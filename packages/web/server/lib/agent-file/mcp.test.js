@@ -21,7 +21,7 @@ async function fixture() {
   let listener;
   const history = createConversationStorage(directory);
   cleanup.push(async () => history.close());
-  const turnDiffs = createTurnDiffRuntime(directory, async () => {}, history);
+  const turnDiffs = createTurnDiffRuntime(directory, history);
   cleanup.push(() => turnDiffs.close());
   await turnDiffs.begin({ sessionID: 'session', turnID: 'user-1', directory });
   const runtime = createAgentToolRuntime({ resolveMcpContext: resolveOpenCodeMcpContext, crypto,

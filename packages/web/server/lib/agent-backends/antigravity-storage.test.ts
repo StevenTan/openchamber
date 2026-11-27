@@ -1,3 +1,5 @@
+import { createAntigravityHistoryFixture } from './antigravity-storage.fixture.js';
+import { createConversationRuntime } from './conversation-runtime.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -11,6 +13,37 @@ import { createConversationStorage } from './conversation-storage.js';
 import { antigravityEvents } from './antigravity-events.js';
 import type { AcpConversationEvent } from '@openchamber/sdk/agent-backends';
 import { fileURLToPath } from 'node:url';
+import { acpMessages } from '@openchamber/sdk/conversations/antigravity';
+
+test('stored steering activity is projected in admission order across reopen and pagination', async t => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'antigravity-steering-history-'));
+  t.after(() => fs.rm(directory, { recursive: true }));
+  const storage = createConversationStorage(directory);
+  const history = createAntigravityHistoryFixture(storage);
+  const session: StoredConversation = { id: 'ses_ag_steer', nativeID: 'native', directory, title: 'Steering', created: 1, updated: 4, draft: false, config: [], forms: [], turns: [] };
+  const turn: AcpTurn = { id: 'user', assistantID: 'assistant', modelID: 'model', text: 'Files', created: 1, completed: 4, files: [],
+    updates: [{ sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'Before' } }, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'After' } }],
+    followups: [{ id: 'steer', text: 'Browser too', files: [], created: 2, updateIndex: 1, toolCallCount: 0 }] };
+  history.save(session, turn);
+  const expected = JSON.parse(JSON.stringify(acpMessages(session, turn)));
+  storage.session(session.id, db => {
+    db.run('DELETE FROM messages');
+    storage.saveMessages([expected[0], expected[2], acpMessages(session, { ...turn, followups: [] })[1]], 1);
+    db.run('UPDATE turns SET summary = ?', [JSON.stringify({ ...turn, text: '', files: [], updates: [], followups: [] })]);
+    db.exec('PRAGMA user_version = 0');
+  });
+  storage.close();
+  const reopened = createConversationStorage(directory);
+  t.after(() => reopened.close());
+  const restored = createAntigravityStorage(reopened);
+  assert.equal(restored.summaries(session.id)[0]?.followups[0]?.id, 'steer');
+  assert.deepEqual(restored.messages(session.id, { order: 'asc' }).items, expected);
+  const first = restored.messages(session.id, { order: 'asc', limit: 2 });
+  const next = restored.messages(session.id, { cursor: first.cursor.next, limit: 2 });
+  assert.deepEqual([...first.items, ...next.items], expected);
+  assert.deepEqual(restored.message(session.id, 'steer_assistant'), expected[3]);
+  assert.equal(restored.summaries(session.id)[0]?.followups[0]?.text, '');
+});
 
 test('disk history pages preserve messages while startup retains only model summaries', async t => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'antigravity-storage-'));
@@ -18,7 +51,7 @@ test('disk history pages preserve messages while startup retains only model summ
   const folder = path.join(directory, 'agent-backends', 'antigravity');
   await fs.mkdir(folder, { recursive: true });
   const initial = createConversationStorage(directory);
-  const store = createAntigravityStorage(initial);
+  const store = createAntigravityHistoryFixture(initial);
   const session: StoredConversation = { id: 'ses_ag_stored', nativeID: 'native-stored', directory, title: 'Stored', created: 1, updated: 2, draft: false, config: [], forms: [], turns: [] };
   const payload = 'large output '.repeat(1024);
   for (let index = 0; index < 150; index++) {
@@ -28,7 +61,7 @@ test('disk history pages preserve messages while startup retains only model summ
   initial.close();
   const storage = createConversationStorage(directory);
   const owners: string[] = [];
-  const backend = createAntigravityBackend({ storage, dataDir: directory, turnDiffs: { begin: async () => {}, finish: async () => {}, remove: async () => {} }, environment: () => process.env, mcpServers: () => [], reassignSession: () => {}, initializeSession: async () => {}, readInstructions: async () => [], publish: () => {}, publishForm: () => {}, registerSession: id => owners.push(id) });
+  const backend = createAntigravityBackend({ runtime: createConversationRuntime(storage), storage, dataDir: directory, turnDiffs: { begin: async () => {}, finish: async () => {}, remove: async () => {} }, environment: () => process.env, mcpServers: () => [], reassignSession: () => {}, initializeSession: async () => {}, readInstructions: async () => [], publish: () => {}, publishForm: () => {}, registerSession: id => owners.push(id) });
   t.after(async () => { await backend.close(); storage.close(); });
   await backend.ready;
   assert.deepEqual(owners, [session.id]);
@@ -82,7 +115,7 @@ test('staged history edits survive restart and commit native and display history
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'antigravity-rewind-'));
   t.after(() => fs.rm(directory, { recursive: true }));
   const storage = createConversationStorage(directory);
-  const history = createAntigravityStorage(storage);
+  const history = createAntigravityHistoryFixture(storage);
   const session: StoredConversation = { id: 'ses_ag_rewind', nativeID: 'native-rewind', directory, title: 'Rewind', created: 1, updated: 2, draft: false, config: [], forms: [], turns: [] };
   for (let index = 0; index < 3; index++) history.save(session, {
     id: `user_${index}`, assistantID: `assistant_${index}`, modelID: 'model', text: `Prompt ${index}`, files: [],
@@ -103,7 +136,7 @@ test('staged history edits survive restart and commit native and display history
   const file = path.join(directory, 'edited.txt');
   await fs.writeFile(file, 'Current workspace content');
   const events: AcpConversationEvent[] = [];
-  const make = () => createAntigravityBackend({ storage, dataDir: directory, turnDiffs: { begin: async () => {}, finish: async () => {}, remove: async () => {} }, environment: () => process.env, mcpServers: () => [], reassignSession: () => {}, initializeSession: async () => {}, readInstructions: async () => [], publish: event => events.push(event), publishForm: () => {} });
+  const make = () => createAntigravityBackend({ runtime: createConversationRuntime(storage), storage, dataDir: directory, turnDiffs: { begin: async () => {}, finish: async () => {}, remove: async () => {} }, environment: () => process.env, mcpServers: () => [], reassignSession: () => {}, initializeSession: async () => {}, readInstructions: async () => [], publish: event => events.push(event), publishForm: () => {} });
   const backend = make();
   assert.deepEqual(await backend.stageRevert(session.id, 'user_1'), { messageID: 'user_1' });
   assert.equal((await backend.messages(session.id, {})).items.length, 6);

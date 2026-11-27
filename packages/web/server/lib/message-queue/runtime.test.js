@@ -1,3 +1,8 @@
+import { createOpenCodeClient } from '../openchamber-sessions/opencode-client.js';
+import { createOpenCodeInput } from '../agent-backends/opencode-input.js';
+import { deliverConversation } from '../agent-backends/conversation-delivery.js';
+import { createConversationRuntime } from '../agent-backends/conversation-runtime.js';
+import { createConversationStorage } from '../agent-backends/conversation-storage.js';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -16,6 +21,7 @@ const item = (overrides = {}) => ({
 });
 
 const tempDirs = [];
+const histories = [];
 const makeDataDir = () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'openchamber-message-queue-'));
   tempDirs.push(dir);
@@ -24,6 +30,7 @@ const makeDataDir = () => {
 
 afterEach(() => {
   vi.useRealTimers();
+  for (const history of histories.splice(0)) history.close();
   for (const dir of tempDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -100,7 +107,7 @@ const createOpenCode = () => {
       if (pathname.endsWith('/synthetic') && state.admitted.has(body.id)) return wrapped({ id: body.id });
       if (pathname.endsWith('/synthetic')) state.admitted.add(body.id);
       state.sent.push({ path: pathname, body });
-      return wrapped({ id: `msg_${state.sent.length}` });
+      return pathname.endsWith('/command') ? new Response(null, { status: 204 }) : wrapped({ id: `msg_${state.sent.length}` });
     }
     return new Response('not found', { status: 404 });
   });
@@ -108,6 +115,8 @@ const createOpenCode = () => {
 };
 
 const createRuntime = ({ dataDir = makeDataDir(), openCode = createOpenCode(), knowledge = null, retryDelayMs, resolveAutoSelection, now, beforeScheduledTaskSend, onScheduledTaskResult, persistSessionGoal, isDeliveryHeld, deliveryHoldReady } = {}) => {
+  const history = createConversationRuntime(createConversationStorage(dataDir));
+  histories.push(history);
   let eventHandler = () => {};
   let statusHandler = () => {};
   const broadcasts = [];
@@ -122,6 +131,13 @@ const createRuntime = ({ dataDir = makeDataDir(), openCode = createOpenCode(), k
     sessionKnowledgeRuntime: knowledge,
     broadcastGlobalUiEvent: (event) => broadcasts.push(event),
     onPromptSent: (sessionId) => promptSent.push(sessionId),
+    deliver: (id, directory, delivery) => {
+      const client = createOpenCodeClient({ baseUrl: 'http://opencode.test', directory, fetch: openCode.fetchImpl });
+      return deliverConversation({ ...createOpenCodeInput(client, history),
+        model: (sessionID, model) => client.session.switchModel({ sessionID, model }),
+        agent: (sessionID, agent) => client.session.switchAgent({ sessionID, agent }),
+      }, id, delivery);
+    },
     dataDir,
     fetchImpl: openCode.fetchImpl,
     dispatchQuietMs: 0,
@@ -198,7 +214,7 @@ describe('scheduled task items', () => {
     await vi.waitFor(() => {
       expect(openCode.state.switched).toEqual([]);
       expect(openCode.state.sent).toHaveLength(1);
-      expect(openCode.state.sent[0].body).toEqual({ text: 'follow up' });
+      expect(openCode.state.sent[0].body).toEqual({ id: expect.stringMatching(/^msg_/), text: 'follow up' });
       expect(runtime.sessionSnapshot(SESSION).items).toEqual([]);
       expect(results).toEqual([{ task: { projectId: 'project-1', taskId: 'task-1' }, status: 'sent' }]);
     });
@@ -206,12 +222,12 @@ describe('scheduled task items', () => {
     await runtime.flush();
   });
 
-  it('applies explicit selection and keeps the existing directory query', async () => {
+  it('applies explicit selection and scopes delivery to the session directory', async () => {
     const { runtime, openCode } = createRuntime();
     await runtime.enqueue(SESSION, DIRECTORY, scheduled('project-1', { sendConfig: { providerID: 'openai', modelID: 'chosen', agent: 'plan' } }));
     await vi.waitFor(() => expect(openCode.state.switched.map((entry) => entry.body)).toEqual([{ model: { providerID: 'openai', id: 'chosen' } }, { agent: 'plan' }]));
     const promptCall = openCode.fetchImpl.mock.calls.find(([url]) => new URL(url).pathname.endsWith('/prompt'));
-    expect(new URL(promptCall[0]).searchParams.get('directory')).toBe(DIRECTORY);
+    expect(new Headers(promptCall[1].headers).get('x-opencode-directory')).toBe(encodeURIComponent(DIRECTORY));
     runtime.stop();
     await runtime.flush();
   });
@@ -491,7 +507,7 @@ describe('a message queued as a goal', () => {
     // The briefing goes ahead of the message, as for a scheduled goal.
     expect(openCode.state.sent.slice(1).map((entry) => [entry.path, entry.body])).toEqual([
       [`/api/session/${SESSION}/synthetic`, { id: expect.stringMatching(/^msg_/), text: expect.stringContaining('Goal mode is active'), resume: false }],
-      [`/api/session/${SESSION}/prompt`, { text: 'build the parser' }],
+      [`/api/session/${SESSION}/prompt`, { id: expect.stringMatching(/^msg_/), text: 'build the parser' }],
     ]);
     expect(openCode.state.sent[1].body.text).toContain('A token budget of 5000 tokens');
   });
@@ -560,7 +576,7 @@ describe('message queue runtime', () => {
       expect(openCode.state.sent[0].path).toBe(`/api/session/${SESSION}/prompt`);
       // v2 selects model and agent on the session, so the prompt carries text
       // and attachments only.
-      expect(openCode.state.sent[0].body).toEqual({ text: 'first' });
+      expect(openCode.state.sent[0].body).toEqual({ id: expect.stringMatching(/^msg_/), text: 'first' });
       expect(promptSent).toEqual([SESSION]);
       expect(runtime.sessionSnapshot(SESSION).items.map((entry) => entry.content)).toEqual(['second']);
       // Clients learned about the in-flight item and then the removal.
@@ -601,11 +617,9 @@ describe('message queue runtime', () => {
     await settle();
 
     expect(openCode.state.sent).toHaveLength(1);
-    expect(openCode.state.sent[0].body).toEqual({ text: 'after the move' });
-    const promptUrls = openCode.fetchImpl.mock.calls
-      .map(([url]) => new URL(url))
-      .filter((url) => url.pathname === `/api/session/${SESSION}/prompt`);
-    expect(promptUrls.map((url) => url.searchParams.get('directory'))).toEqual(['/repo/moved']);
+    expect(openCode.state.sent[0].body).toEqual({ id: expect.stringMatching(/^msg_/), text: 'after the move' });
+    const promptCalls = openCode.fetchImpl.mock.calls.filter(([url]) => new URL(url).pathname === `/api/session/${SESSION}/prompt`);
+    expect(promptCalls.map(([, init]) => decodeURIComponent(new Headers(init.headers).get('x-opencode-directory')))).toEqual(['/repo/moved']);
     expect(runtime.sessionSnapshot(SESSION)).toMatchObject({ directory: '/repo/moved', items: [], sendingId: null });
 
     // A later idle finds nothing left to send.
@@ -638,7 +652,7 @@ describe('message queue runtime', () => {
     emit({ type: 'session.status', properties: { sessionID: SESSION, status: { type: 'idle' } } });
     await vi.waitFor(() => {
       expect(openCode.state.sent).toHaveLength(1);
-      expect(openCode.state.sent[0].body).toEqual({ text: 'next' });
+      expect(openCode.state.sent[0].body).toEqual({ id: expect.stringMatching(/^msg_/), text: 'next' });
     });
     runtime.stop();
   });
@@ -811,10 +825,10 @@ describe('message queue runtime', () => {
     second.connect();
     await vi.waitFor(() => {
       expect(second.openCode.state.sent).toHaveLength(1);
-      expect(second.openCode.state.sent[0].body).toEqual({ text: 'persisted' });
+      expect(second.openCode.state.sent[0].body).toEqual({ id: expect.stringMatching(/^msg_/), text: 'persisted' });
     });
     await second.replayAfterSend();
-    expect(sendPosts(second.openCode)).toEqual([{ path: `/api/session/${SESSION}/prompt`, body: { text: 'persisted' } }]);
+    expect(sendPosts(second.openCode)).toEqual([{ path: `/api/session/${SESSION}/prompt`, body: { id: expect.stringMatching(/^msg_/), text: 'persisted' } }]);
   });
 
   it('moves an unreadable queue file aside instead of treating it as empty', async () => {
@@ -915,10 +929,12 @@ describe('message queue runtime', () => {
     const { runtime } = createRuntime();
     runtime.start();
     const a = await runtime.enqueue(SESSION, DIRECTORY, item({ content: 'a' }));
+    await runtime.enqueue(SESSION, DIRECTORY, item({ content: 'Answer', contextInput: { id: 'answer', text: 'Answer', description: 'Question answer', metadata: { question: 'first' } } }));
     const b = await runtime.enqueue(SESSION, DIRECTORY, item({ content: 'b' }));
     await expect(runtime.reorder(SESSION, [b.itemId])).rejects.toThrow(TypeError);
     await runtime.reorder(SESSION, [b.itemId, a.itemId]);
     expect(runtime.sessionSnapshot(SESSION).items.map((entry) => entry.content)).toEqual(['b', 'a']);
+    expect(runtime.pendingPrompts(SESSION).map(entry => entry.contextInput.id)).toEqual(['answer']);
   });
 
   it('drops the queue of a deleted session', async () => {

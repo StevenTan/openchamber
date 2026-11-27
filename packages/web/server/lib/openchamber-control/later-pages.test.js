@@ -52,26 +52,23 @@ const manualTimers = () => {
   };
 };
 
-const response = (status) => ({ ok: status >= 200 && status < 300, status, body: null });
-
 const createPages = (dataDir, { statuses = [], otherwise = 200, broadcastUiEvent = vi.fn(), readArchiveState, archiveReadTimeoutMs } = {}) => {
   const { timers, run, delays, delivered } = manualTimers();
   const posts = [];
-  const fetchImpl = vi.fn(async (url, init) => {
-    posts.push({ url, body: JSON.parse(init.body) });
-    return response(statuses.length > 0 ? statuses.shift() : otherwise);
+  const deliver = vi.fn(async (sessionID, directory, delivery) => {
+    posts.push({ sessionID, directory, body: delivery.context });
+    const status = statuses.length > 0 ? statuses.shift() : otherwise;
+    if (status < 200 || status >= 300) throw Object.assign(new Error(`Delivery failed: ${status}`), { status });
   });
   const pages = createLaterPages({
     dataDir,
-    buildOpenCodeUrl: (fetchPath) => `http://opencode${fetchPath}`,
-    getOpenCodeAuthHeaders: () => ({}),
+    deliver,
     broadcastUiEvent: (event) => {
       broadcastUiEvent(event);
       if (event.properties.pages.every((page) => page.status !== 'open' && !page.undelivered)) delivered();
     },
     readArchiveState,
     archiveReadTimeoutMs,
-    fetchImpl,
     timers,
     retryDelayMs: () => 0,
     slowRetryMs: 300_000,
@@ -103,8 +100,9 @@ describe('later pages', () => {
     await run();
 
     expect(posts).toHaveLength(1);
-    const { url, body } = posts[0];
-    expect(url).toBe('http://opencode/api/session/ses_1/synthetic');
+    const { sessionID, directory, body } = posts[0];
+    expect(sessionID).toBe('ses_1');
+    expect(directory).toBe('/repo');
     expect(body).toMatchObject({ delivery: 'steer', resume: true, description: 'Pick a layout: Layout B' });
     expect(body.id).toMatch(/^msg_/);
     expect(body.metadata).toEqual({ source: LATER_PAGE_ANSWER_SOURCE, callId: 'call_1', title: 'Pick a layout', outcome: 'answered' });

@@ -7,7 +7,7 @@ import { createMessageId, escapeAttribute } from '../dispatch-results/runtime.js
 import { OpenChamberControlError, controlErrorFields } from './error.js';
 import { readPageAnswer } from './render-page.js';
 import type { PrWatchEventHub } from '../pr-watch/runtime.js';
-import type { DispatchResultsOptions } from '../dispatch-results/runtime.js';
+import type { ConversationInput } from '../agent-backends/conversation-input.js';
 import type { ControlErrorFields } from './error.js';
 
 const FILE_NAME = 'render-later-pages.json';
@@ -61,12 +61,10 @@ interface PublicLaterPage {
 
 export interface LaterPagesOptions {
   dataDir: string;
-  buildOpenCodeUrl: DispatchResultsOptions['buildOpenCodeUrl'];
-  getOpenCodeAuthHeaders: DispatchResultsOptions['getOpenCodeAuthHeaders'];
+  deliver: ConversationInput['deliver'];
   broadcastUiEvent?: ((event: { type: 'openchamber:render-later.updated'; properties: { revision: number; sessionID: string; pages: ReturnType<typeof toPublicPage>[] } }) => void) | null;
   readArchiveState?: (sessionId: string, options: { signal: AbortSignal }) => Promise<'active' | 'archived' | 'unknown'>;
   archiveReadTimeoutMs?: number;
-  fetchImpl?: typeof fetch;
   now?: () => number;
   timers?: { setTimeout: (handler: () => void, delay: number) => NodeJS.Timeout; clearTimeout: (timer: NodeJS.Timeout) => void };
   retryDelayMs?: (failures: number) => number;
@@ -126,12 +124,10 @@ const toPublicPage = (page: LaterPage, undelivered: boolean) => {
 
 export function createLaterPages({
   dataDir,
-  buildOpenCodeUrl,
-  getOpenCodeAuthHeaders,
+  deliver: deliverInput,
   broadcastUiEvent = null,
   readArchiveState = async () => 'active',
   archiveReadTimeoutMs = FETCH_TIMEOUT_MS,
-  fetchImpl = fetch,
   now = Date.now,
   timers = { setTimeout, clearTimeout },
   retryDelayMs = retryDelay,
@@ -336,16 +332,15 @@ export function createLaterPages({
         retry(key, page, 'the archive state of the session could not be read');
         return;
       }
-      const response = await fetchImpl(buildOpenCodeUrl(`/api/session/${encodeURIComponent(page.sessionId)}/synthetic`, ''), {
-        method: 'POST',
-        headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...getOpenCodeAuthHeaders() },
-        body: JSON.stringify({ id: page.messageID, ...buildLaterAnswerMessage(page), delivery: 'steer', resume: archive === 'active' }),
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      }).catch((error) => ({ ok: false, status: 0, error, body: undefined }));
-      await response.body?.cancel?.().catch(() => undefined);
-      if (!response.ok && response.status !== 409 && response.status !== 404) {
-        retry(key, page, controlErrorFields('error' in response ? response.error : undefined)?.message ?? `OpenCode answered ${response.status}`);
-        return;
+      try {
+        await deliverInput(page.sessionId, page.directory ?? undefined, { type: 'context', context: { id: page.messageID, ...buildLaterAnswerMessage(page), delivery: 'steer', resume: archive === 'active' } }, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+      } catch (error) {
+        const fields = controlErrorFields(error);
+        const status = fields?.status ?? fields?.statusCode;
+        if (status !== 409 && status !== 404) {
+          retry(key, page, fields?.message ?? String(error));
+          return;
+        }
       }
       deliveryFailures.delete(key);
       await markDelivered(page).catch((error) => retry(key, page, `the delivery could not be saved: ${controlErrorFields(error)?.message ?? error}`));

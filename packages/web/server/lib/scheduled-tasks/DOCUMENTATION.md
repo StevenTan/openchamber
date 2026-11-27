@@ -34,6 +34,9 @@ Server-owned scheduled task runtime and routes for OpenChamber-only automation.
 - Run defaults are resolved before selecting a backend. Native model validation,
   creation, prompt dispatch and completion use the selected backend. Shared
   knowledge, approvals, queueing and worktree lifecycle belong to the host.
+- Prepared prompts and slash commands use `ConversationInput.deliver` with a
+  synthetic source. Session creation, goal setup and completion tracking belong
+  to the scheduler.
 
 ## Decisions
 

@@ -196,6 +196,13 @@ const createMemoryArchiveStore = () => {
   };
 };
 
+const deliverInput = vi.fn(async (sessionID, _directory, delivery) => {
+  if (delivery.type === 'context') return (await sessionSyntheticMock({ sessionID, ...delivery.context }))?.id;
+  if (delivery.command) return sessionCommandMock({ sessionID, ...delivery.command });
+  for (const context of delivery.prompt.context) await sessionSyntheticMock({ sessionID, ...context, resume: false });
+  return (await sessionPromptMock({ sessionID, text: delivery.prompt.text, ...delivery.prompt.metadata && { metadata: delivery.prompt.metadata } }))?.id;
+});
+
 const createApp = (overrides = {}, options = {}) => {
   const app = express();
   if (options.globalJson !== false) {
@@ -206,6 +213,7 @@ const createApp = (overrides = {}, options = {}) => {
   const sessionMetadataStore = overrides.sessionMetadataStore ?? createMemorySessionMetadataStore();
   const broadcastGlobalUiEvent = overrides.broadcastGlobalUiEvent ?? vi.fn();
   registerOpenChamberSessionRoutes(app, {
+    deliver: deliverInput,
     archiveStore,
     sessionMetadataStore,
     broadcastGlobalUiEvent,
@@ -229,6 +237,7 @@ describe('openchamber session routes', () => {
   });
 
   beforeEach(() => {
+    deliverInput.mockClear();
     resolvePrimaryWorktreeRootMock.mockReset();
     resolvePrimaryWorktreeRootMock.mockImplementation(defaultPrimaryWorktreeRoot);
     createWorktreeMock.mockClear();
@@ -829,6 +838,7 @@ describe('openchamber session routes', () => {
 
   it('does not claim user ownership for a title from the agent service', async () => {
     const service = createOpenChamberSessionService({
+      deliver: deliverInput,
       archiveStore: createMemoryArchiveStore(),
       sessionMetadataStore: createMemorySessionMetadataStore(),
       readSettingsFromDiskMigrated: async () => ({ projects: [{ id: 'proj_1', path: '/repo/app' }] }),
@@ -1370,12 +1380,11 @@ describe('openchamber session routes', () => {
     }));
     expect(createSessionGoal.mock.invocationCallOrder[0])
       .toBeLessThan(sessionPromptMock.mock.invocationCallOrder[0]);
-    // v2 cannot append to a message, so the goal reminder follows the prompt as
-    // its own synthetic message.
     expect(sessionPromptMock).toHaveBeenCalledWith({ sessionID: 'ses_123', text: 'Finish and verify the migration' });
     expect(sessionSyntheticMock).toHaveBeenCalledWith(expect.objectContaining({ sessionID: 'ses_123', resume: false }));
-    expect(sessionPromptMock.mock.invocationCallOrder[0])
-      .toBeLessThan(sessionSyntheticMock.mock.invocationCallOrder[0]);
+    expect(sessionSyntheticMock.mock.invocationCallOrder[0])
+      .toBeLessThan(sessionPromptMock.mock.invocationCallOrder[0]);
+    expect(deliverInput).toHaveBeenCalledWith('ses_123', '/repo/app', expect.objectContaining({ type: 'prompt', prompt: expect.objectContaining({ context: [expect.objectContaining({ text: expect.any(String) })] }) }));
     expect(response.body).toMatchObject({ goalEnabled: true, goalTokenBudget: 200000, promptDispatched: true });
   });
 
@@ -1495,6 +1504,7 @@ describe('openchamber session routes', () => {
   it('moves a session to the folder of the project that holds it, also from a subfolder, when projects share a repository', async () => {
     const resolveWorktreeTopLevel = vi.fn(async (directory) => ({ root: '/repo', prefix: directory.replace('/repo/', '') }));
     const service = createOpenChamberSessionService({
+      deliver: deliverInput,
       readSettingsFromDiskMigrated: async () => ({ projects: [
         { id: 'proj_web', path: '/repo/web' },
         { id: 'proj_ai', path: '/repo/ai' },
@@ -1533,6 +1543,7 @@ describe('openchamber session routes', () => {
         : { root: '/repo', prefix: directory.replace(/^\/repo\/?/, '') }
     ));
     const service = createOpenChamberSessionService({
+      deliver: deliverInput,
       readSettingsFromDiskMigrated: async () => ({ projects: [
         { id: 'proj_repo', path: '/repo' },
         { id: 'proj_ai', path: '/repo/ai' },
@@ -1706,6 +1717,7 @@ describe('openchamber session routes', () => {
     it('runs them in the worktree a session moves into, from the project that holds the session', async () => {
       const readProjectSetup = vi.fn(async () => setupView({ shared: ['pnpm install'], trusted: false }));
       const service = createOpenChamberSessionService({
+      deliver: deliverInput,
         readSettingsFromDiskMigrated: async () => ({ projects: [{ id: 'proj_ai', path: '/repo/ai' }] }),
         sanitizeProjects: (projects) => projects,
         validateDirectoryPath: async (directory) => ({ ok: true, directory }),
@@ -1730,6 +1742,7 @@ describe('openchamber session routes', () => {
 
   describe('waiting for the worktree bootstrap', () => {
     const serviceWith = (getWorktreeBootstrapStatus, bootstrap) => createOpenChamberSessionService({
+      deliver: deliverInput,
       readSettingsFromDiskMigrated: async () => ({ projects: [{ id: 'proj_1', path: '/repo/app' }] }),
       sanitizeProjects: (projects) => projects,
       validateDirectoryPath: async (directory) => ({ ok: true, directory }),
@@ -2547,6 +2560,7 @@ describe('openchamber session service directory resolution', () => {
   const createService = async (overrides = {}) => {
     const { createOpenChamberSessionService } = await import('./routes.js');
     return createOpenChamberSessionService({
+      deliver: deliverInput,
       archiveStore: createMemoryArchiveStore(),
       sessionMetadataStore: createMemorySessionMetadataStore(),
       readSettingsFromDiskMigrated: async () => ({ projects: [{ id: 'proj_1', path: '/repo/app' }] }),

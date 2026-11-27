@@ -8,6 +8,12 @@ import { computeContextUsage, computeLastReplyCacheHit } from '../../components/
 import { projectTurnChangedFiles } from '../../components/chat/lib/turns/projectTurnSummary';
 import { readContextPart } from '../messages/contextParts';
 import { antigravityEvents } from '../../../../web/server/lib/agent-backends/antigravity-events';
+import type { SyncEvent } from '@openchamber/sdk/conversations/events';
+
+const turnEvents = (session: AcpConversation, turn: AcpTurn): SyncEvent[] => [
+  ...acpMessages(session, turn).flatMap(({ info, parts }): SyncEvent[] => [{ type: 'message.updated', properties: { info } }, ...parts.map(part => ({ type: 'message.part.updated' as const, properties: { sessionID: session.id, part } }))]),
+  { type: 'session.status', properties: { sessionID: session.id, status: { type: turn.completed ? 'idle' : 'busy' } } },
+];
 
 test('native context and cache counters feed the shared usage display', () => {
   const tokens = { input: 2536, output: 595, reasoning: 90, cache: { read: 15729, write: 0 } };
@@ -29,7 +35,8 @@ test('native context and cache counters feed the shared usage display', () => {
 
 test('ACP tool patches retain completed output and the original response model', () => {
   const turn: AcpTurn = {
-    id: 'user', assistantID: 'assistant', modelID: 'first', text: 'Run command', files: [], created: 1, completed: 4, followups: [],
+    id: 'user', assistantID: 'assistant', modelID: 'first', text: 'Run command', files: [], created: 1, completed: 4,
+    followups: [{ id: 'steer', text: 'Continue', files: [], created: 2, updateIndex: 2, toolCallCount: 0 }],
     updates: [
       { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Done' } },
       { sessionUpdate: 'tool_call', toolCallId: 'call', title: 'Run command', name: 'mcp_openchamber_commands_exec_command', status: 'in_progress', rawInput: { cmd: 'pwd' } },
@@ -41,6 +48,7 @@ test('ACP tool patches retain completed output and the original response model',
   const assistant = acpMessages(session, turn).find(message => message.info.role === 'assistant');
   expect(assistant?.info.role === 'assistant' && assistant.info.modelID).toBe('first');
   expect(assistant?.parts[1]).toMatchObject({ type: 'tool', tool: 'openchamber_commands_exec_command', state: { status: 'completed', input: { cmd: 'pwd' }, output: '/project' } });
+  expect(acpMessages(session, turn).at(-1)?.parts).toEqual([]);
   expect(acpMessages(session, JSON.parse(JSON.stringify(turn)))).toEqual(acpMessages(session, turn));
 });
 
@@ -90,14 +98,59 @@ test('same-turn rewind replaces the retained reply in live and history message o
     updates: [{ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Before input' } }, { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'After input' } }],
     followups: [{ id: 'followup', text: 'Change', files: [], created: 2, updateIndex: 1, toolCallCount: 0, inputContext: [{ id: 'quote', text: 'Follow-up quote' }] }] };
   const session: AcpConversation = { id: 'session', nativeID: 'native', title: 'Test', directory: '/project', created: 1, updated: 3, draft: false, config: [], turns: [turn] };
-  for (const order of [['user', 'assistant', 'quote', 'followup'], ['user', 'quote', 'followup', 'assistant']]) {
+  {
     const state: State = { ...INITIAL_STATE, message: {}, part: {} };
-    for (const event of antigravityEvents({ type: 'turn', sessionID: session.id, directory: session.directory, session, turn })) applyDirectoryEvent(state, event);
-    state.message.session.sort((left, right) => order.indexOf(left.id) - order.indexOf(right.id));
+    for (const event of turnEvents(session, turn)) applyDirectoryEvent(state, event);
     const retained = { ...turn, updates: turn.updates.slice(0, 1), followups: [] };
     for (const event of antigravityEvents({ type: 'reverted', session, messageID: 'quote', turn: retained })) applyDirectoryEvent(state, event);
     expect(state.message.session.map(message => message.id)).toEqual(['user', 'assistant']);
     expect(state.part.assistant.map(part => part.type === 'text' && part.text)).toEqual(['Before input']);
     expect(state.part.followup).toBeUndefined();
   }
+  turn.followups.push({ id: 'second', text: 'Change again', files: [], created: 3, updateIndex: 2, toolCallCount: 0 });
+  turn.updates.push({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'After second input' } });
+  const state: State = { ...INITIAL_STATE, message: {}, part: {} };
+  for (const event of turnEvents(session, turn)) applyDirectoryEvent(state, event);
+  const retained = { ...turn, updates: turn.updates.slice(0, 2), followups: turn.followups.slice(0, 1) };
+  for (const event of antigravityEvents({ type: 'reverted', session, messageID: 'second', turn: retained })) applyDirectoryEvent(state, event);
+  expect(state.message.session.map(message => message.id)).toEqual(['user', 'assistant', 'quote', 'followup', 'followup_assistant']);
+  expect(state.part.assistant.map(part => part.type === 'text' && part.text)).toEqual(['Before input']);
+  expect(state.part.followup_assistant).toMatchObject([{ type: 'reasoning', text: 'After input' }]);
+  expect(state.part.second_assistant).toBeUndefined();
+});
+
+test('steering separates preceding activity from subsequent text and tool calls in live and stored transcripts', () => {
+  const session: AcpConversation = { id: 'session', nativeID: 'native', title: 'Test', directory: '/project', created: 1, updated: 5, draft: false, config: [], turns: [] };
+  const turn: AcpTurn = { id: 'user', assistantID: 'assistant', modelID: 'model', text: 'Test files', files: [], created: 1, updates: [], followups: [], toolCalls: [] };
+  const state: State = { ...INITIAL_STATE, message: {}, part: {} };
+  const publish = () => {
+    for (const event of turnEvents(session, turn)) applyDirectoryEvent(state, event);
+  };
+  turn.updates.push({ sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'Before steering' } });
+  turn.toolCalls!.push({ id: 'first', callID: 'first', namespace: 'file', name: 'write', input: {}, started: 1, updateIndex: 1 });
+  publish();
+  turn.followups.push({ id: 'steer', text: 'Also test browser', files: [], created: 2, updateIndex: 1, toolCallCount: 1 });
+  publish();
+  turn.toolCalls![0].completed = 3;
+  turn.toolCalls![0].result = { content: [{ type: 'text', text: 'Written' }] };
+  turn.toolCalls!.push({ id: 'second', callID: 'second', namespace: 'browser', name: 'snapshot', input: {}, started: 3, completed: 4, updateIndex: 1 });
+  turn.updates.push({ sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'After steering' } });
+  publish();
+  turn.followups.push({ id: 'answer', text: 'Question answer', files: [], created: 4, updateIndex: 2, toolCallCount: 2, inputContext: [{ id: 'context', text: 'Answer metadata' }] });
+  turn.updates.push({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Done' } });
+  turn.completed = 5;
+  turn.tokens = { input: 10, output: 5, reasoning: 2, cache: { read: 3, write: 0 } };
+  publish();
+  const history = acpMessages(session, JSON.parse(JSON.stringify(turn)));
+  expect(history.map(record => record.info.id)).toEqual(['user', 'assistant', 'steer', 'steer_assistant', 'context', 'answer', 'answer_assistant']);
+  expect(state.message.session.map(message => message.id)).toEqual(history.map(record => record.info.id));
+  for (const record of history) expect(state.part[record.info.id] ?? []).toMatchObject(record.parts);
+  expect(history[1].parts.map(part => part.type)).toEqual(['reasoning', 'tool']);
+  expect(history[1].parts[1]).toMatchObject({ messageID: 'assistant', state: { status: 'completed', output: 'Written' } });
+  expect(history[3].parts.map(part => part.type)).toEqual(['tool', 'reasoning']);
+  expect(history[3].parts[1]).toMatchObject({ text: 'After steering', messageID: 'steer_assistant' });
+  expect(history[1].info).toMatchObject({ time: { completed: 2 } });
+  expect(history[3].info).toMatchObject({ time: { completed: 4 } });
+  expect(history[1].info).not.toHaveProperty('tokens');
+  expect(history[6].info).toMatchObject({ tokens: turn.tokens, time: { completed: 5 } });
 });

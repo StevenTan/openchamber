@@ -9,6 +9,7 @@ import type { SessionMetadata } from '../openchamber-sessions/session-metadata-s
 import type { createOpenCodeLifecycleRuntime } from '../opencode/lifecycle.js';
 import type { createPermissionAutoAcceptRuntime } from '../permission-auto-accept/runtime.js';
 import type { createAntigravityBackend } from '../agent-backends/antigravity.js';
+import type { ConversationInput } from '../agent-backends/conversation-input.js';
 
 export interface ScheduledTasksDependencies extends Omit<ExistingSessionDependencies, 'createClient' | 'messageQueueRuntime' | 'projectConfigRuntime'> {
   projectConfigRuntime: ScheduledTaskStore;
@@ -34,6 +35,7 @@ export interface ScheduledTasksDependencies extends Omit<ExistingSessionDependen
   maxProjectConcurrency?: number;
   maxRunDurationMs?: number;
   antigravity?: ReturnType<typeof createAntigravityBackend>;
+  deliver: ConversationInput['deliver'];
   waitApplicationCommands?: (sessionID: string) => Promise<void>;
 }
 
