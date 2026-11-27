@@ -92,5 +92,6 @@ export function createAntigravityConversations(backend: ReturnType<typeof create
     stageRevert: (id, messageID) => backend.stageRevert(id, messageID),
     clearRevert: id => backend.clearRevert(id),
     commitRevert: id => backend.commitRevert(id),
+    fork: async (id, before) => acpSession(await backend.fork(id, before)),
   };
 }

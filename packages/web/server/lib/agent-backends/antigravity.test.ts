@@ -267,6 +267,7 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
   await reopened.send(session.id, { id: 'msg_stop', text: 'working', files: [], context: [] });
   await reopened.abort(session.id);
   await stopped;
+  assert.equal((await reopened.turn(session.id, 'msg_stop'))?.modelID, 'second');
   assert.deepEqual(reopened.statuses(), {});
 });
 

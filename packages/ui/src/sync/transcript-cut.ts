@@ -3,7 +3,8 @@ import { readShellCompletion } from "@/lib/opencode/background-shell"
 import { readSubagentRun } from "@/lib/opencode/subagent-run"
 import { readDispatchedSessionResult } from "@/lib/opencode/dispatched-session"
 import { readShareAnswer } from "@/lib/share-pages/answer"
-import { isOpencodeNotFound, opencodeClient } from "@/lib/opencode/client"
+import { isOpencodeNotFound } from "@/lib/opencode/client"
+import { conversationClient } from "@/lib/agent/active"
 import { getRuntimeKey } from "@/lib/runtime-switch"
 
 export async function forkAtTranscriptCut(
@@ -14,7 +15,7 @@ export async function forkAtTranscriptCut(
 ) {
   const fork = () => {
     if (getRuntimeKey() !== expectedRuntimeKey) throw new Error("runtime changed")
-    return opencodeClient.forkSession(sessionID, { before, directory })
+    return conversationClient.forkSession(sessionID, { before, directory })
   }
   try {
     return await fork()

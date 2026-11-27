@@ -98,7 +98,11 @@ export function useComposerSelection({
         ? pinnedComposerSelection.variant
         : currentVariantSelection.override === null ? null : currentVariantSelection.override ?? configVariant;
 
-    const effectiveBtwSelection = React.useMemo(() => resolveBtwSelection({
+    const effectiveBtwSelection = React.useMemo(() => backend.backendID === 'antigravity' ? {
+        agent: 'antigravity',
+        model: backend.modelID ? { providerId: 'antigravity', modelId: backend.modelID } : null,
+        variant: backend.variant,
+    } : resolveBtwSelection({
         agents,
         savedAgent: btwAgentSelection,
         isModelAvailable: btwModelAvailability(providerCatalog, autoReady),
@@ -106,7 +110,7 @@ export function useComposerSelection({
         savedVariant: btwSavedVariant,
         composerModel: currentProviderId && currentModelId ? { providerId: currentProviderId, modelId: currentModelId } : null,
         composerVariant: btwComposerVariant,
-    }), [agents, autoReady, btwAgentSelection, btwComposerVariant, btwModelSelection, btwSavedVariant, currentModelId, currentProviderId, providerCatalog]);
+    }), [backend.backendID, backend.modelID, backend.variant, agents, autoReady, btwAgentSelection, btwComposerVariant, btwModelSelection, btwSavedVariant, currentModelId, currentProviderId, providerCatalog]);
 
     React.useEffect(() => {
         const { model, agent, variant } = effectiveBtwSelection;

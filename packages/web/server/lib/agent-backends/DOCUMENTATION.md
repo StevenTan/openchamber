@@ -68,6 +68,8 @@ mobile clients use the host routes; the VS Code extension uses OpenCode.
   Active turns retain their streamed content until completion. History reads
   persist the active snapshot before querying the requested messages. The latest
   assistant message includes refreshed native token and context measurements.
+  User-attached context is stored with its text, identity and metadata as synthetic
+  records immediately before its user message, including in copied histories.
 - Startup converts backend `history.sqlite` files and host turn diff JSON
   records into this storage. Each source is deleted after its data has been
   copied. Active manifests and original file baselines remain on disk.
@@ -124,8 +126,18 @@ mobile clients use the host routes; the VS Code extension uses OpenCode.
   the staged user-message boundary in host metadata. Commit closes that native
   worker, truncates its SQLite steps and generation metadata together with the
   host display history, and reloads the same native identity on the next prompt.
+  Rewinding an input added during a running turn retains the earlier portion of
+  that turn using its recorded update and tool-call boundaries.
   Workspace files and recorded file diffs stay unchanged. OpenCode delegates
   these operations to its native revert API; VS Code retains direct SDK calls.
+- Forks use `/api/conversations/:id/fork`. The Antigravity adapter copies native
+  SQLite history with fresh conversation and trajectory identities, and copies
+  host messages and file diffs with fresh message identities. A message boundary
+  cuts the copied history; a running parent's HEAD fork includes the current user
+  message and all content produced so far in its active turn.
+  The parent keeps running. Fork permissions inherit the source's effective mode.
+  BTW creates a fork through this route and uses the shared side-chat metadata
+  and prompt flow. Workspace files stay unchanged.
 - The application session service routes ordinary create, send, status, history
   and interruption to the session's backend. Queued messages and scheduled runs
   select that same service. Native scheduled runs use the host's worktree
@@ -163,11 +175,12 @@ limit, idle sessions close through ACP while their stored history remains
 available. Running prompts and native requests stay resident until they finish.
 Reading host history does not start a worker; the next prompt or model change
 loads a closed native session with its existing identity.
+Loading restores the host's selected model and thinking level before running
+the requested operation.
 
-Native forks, side conversations and subagent management are separate backend
-capabilities. The application conversation client covers ordinary conversations;
-OpenCode-specific configuration and advanced session operations stay in its
-adapter. The ACP wire types have a separate `@openchamber/sdk/agent-backends`
+Subagent management and OpenCode-specific configuration stay in their backend
+adapters. The application conversation client includes forks and side
+conversations. The ACP wire types have a separate `@openchamber/sdk/agent-backends`
 entry point, independent of guest panel APIs.
 
 ### Why ownership comes from session records

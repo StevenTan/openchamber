@@ -1,6 +1,7 @@
 import type { NewSessionResponse, SessionNotification, ContentBlock } from '@agentclientprotocol/sdk';
 import type { TurnDiffReference } from './turn-diffs.js';
 import type { z } from 'zod';
+import type { ConversationContext } from './conversations/http.js';
 export { recordedTurnDiffSchema, turnDiffReferenceSchema, type TurnDiffReference } from './turn-diffs.js';
 
 export interface AcpTokenUsage {
@@ -21,11 +22,12 @@ export interface AcpTurn {
   error?: string;
   variant?: string;
   updates: SessionNotification['update'][];
-  followups: Array<{ id: string; text: string; files: AcpTurn['files']; created: number }>;
+  followups: Array<{ id: string; text: string; files: AcpTurn['files']; created: number; updateIndex: number; toolCallCount: number; inputContext?: ConversationContext[] | undefined }>;
   tokens?: AcpTokenUsage;
   context?: { used: number; limit: number };
   fileDiff?: TurnDiffReference;
   toolCalls?: AgentToolCall[];
+  inputContext?: ConversationContext[] | undefined;
 }
 
 export interface AgentToolCall {
@@ -64,13 +66,14 @@ export type AcpConversationEvent =
   | { type: 'turn'; sessionID: string; directory: string; turn: AcpTurn; session: AcpConversation }
   | { type: 'update'; sessionID: string; directory: string; turnID: string; update: SessionNotification['update']; turn: AcpTurn; session: AcpConversation }
   | { type: 'control'; payload: unknown; directory: string }
-  | { type: 'reverted'; session: AcpConversation; messageID: string };
+  | { type: 'reverted'; session: AcpConversation; messageID: string; turn?: AcpTurn | undefined }
+  | { type: 'forked'; session: AcpConversation; parentID: string };
 
 export interface AcpSend {
   text: string;
   id: string;
   files: AcpTurn['files'];
-  context: Array<{ text: string }>;
+  context: ConversationContext[];
 }
 
 export type AcpPrompt = ContentBlock[];

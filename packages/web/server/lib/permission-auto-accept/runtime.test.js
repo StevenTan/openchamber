@@ -48,6 +48,16 @@ const flush = async () => {
 };
 
 describe('permission auto-accept runtime', () => {
+  it('initializes a native fork without querying its source in OpenCode', async () => {
+    const fetchImpl = vi.fn(async () => new Response('not found', { status: 404 }));
+    const { runtime, emit } = createRuntime({ stored: { permissionAutoAccept: { sessions: {} }, permissionDefaultMode: 'auto' }, fetchImpl });
+    await runtime.initializeSession('ses_ag_fork', { id: 'ses_ag_source', directory: '/native' });
+    emit({ type: 'session.created', properties: { info: { id: 'ses_ag_fork', directory: '/native' } } }, '/native');
+    emit({ type: 'session.forked', properties: { sessionID: 'ses_ag_fork', parentID: 'ses_ag_source' } }, '/native');
+    await flush();
+    expect(runtime.snapshot().modes.ses_ag_fork).toBe('ask');
+    expect(fetchImpl).not.toHaveBeenCalledWith('http://opencode.test/api/session/ses_ag_source', expect.anything());
+  });
   it.each(['ask', 'safety', 'auto'])('inherits %s through the real wire-event translator', async (mode) => {
     const broadcastGlobalUiEvent = vi.fn();
     const { runtime, emitWire } = createRuntime({

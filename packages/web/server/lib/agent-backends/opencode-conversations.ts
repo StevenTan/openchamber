@@ -71,5 +71,6 @@ export function createOpenCodeConversations({ client, directory }: ConversationC
     stageRevert: (id, messageID) => client.session.revert.stage({ sessionID: id, messageID }),
     clearRevert: async id => { await client.session.revert.clear({ sessionID: id }); },
     commitRevert: async id => { await client.session.revert.commit({ sessionID: id }); },
+    fork: async (id, before) => projectSession(await client.session.fork({ sessionID: id, before })),
   };
 }

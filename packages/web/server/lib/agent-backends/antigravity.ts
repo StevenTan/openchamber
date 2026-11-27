@@ -23,6 +23,7 @@ import type { ConversationStorage } from './conversation-storage.js';
 import { acpSession } from '@openchamber/sdk/conversations/antigravity';
 import { rewindAntigravityHistory } from './antigravity-history.js';
 import { OpenChamberControlError } from '../openchamber-control/error.js';
+import { copyAntigravityDatabase, copyAntigravityHistory } from './antigravity-fork.js';
 
 interface Options {
   dataDir: string;
@@ -31,7 +32,7 @@ interface Options {
   environment(): NodeJS.ProcessEnv;
   mcpServers(sessionID: string): McpServer[];
   reassignSession(from: string, to: string): void;
-  initializeSession(sessionID: string, directory: string): Promise<void>;
+  initializeSession(sessionID: string, directory: string, source?: { id: string; directory: string }): Promise<void>;
   readInstructions(sessionID: string): Promise<Array<{ text: string }>>;
   onUserInput?(sessionID: string, directory: string): void;
   publish(event: AcpConversationEvent): void;
@@ -165,8 +166,13 @@ export function createAntigravityBackend(options: Options) {
     inUse.set(session.id, (inUse.get(session.id) ?? 0) + 1);
     try {
       if (!loaded.has(session.id)) {
+        const selected = session.config.filter(option => option.category === 'model' || option.category === 'thought_level');
         const state = await acp.loadSession({ sessionId: session.nativeID, cwd: session.directory, mcpServers: options.mcpServers(session.id) });
         session.config = state.configOptions ?? [];
+        for (const category of ['model', 'thought_level']) {
+          const option = selected.find(item => item.category === category);
+          if (option?.type === 'select') session.config = (await acp.setSessionConfigOption({ sessionId: session.nativeID, configId: option.id, value: option.currentValue })).configOptions;
+        }
       }
       loaded.delete(session.id);
       loaded.set(session.id, session.nativeID);
@@ -204,7 +210,7 @@ export function createAntigravityBackend(options: Options) {
       await acp.closeSession({ sessionId: session.nativeID });
       loaded.delete(id);
     }
-    options.storage.session(id, db => rewindAntigravityHistory(db,
+    const reverted = options.storage.session(id, db => rewindAntigravityHistory(db,
       path.join(root, 'profile', 'antigravity-acp', 'conversations', `${session.nativeID}.db`), boundary.messageID));
     session.turns = history().summaries(id);
     delete session.revert;
@@ -212,7 +218,7 @@ export function createAntigravityBackend(options: Options) {
     refreshUsage(session);
     session.updated = Date.now();
     await save(session);
-    options.publish({ type: 'reverted', session, messageID: boundary.messageID });
+    options.publish({ type: 'reverted', session, ...reverted });
     options.publish({ type: 'session', session });
   };
   const send = async (sessionID: string, input: AcpSend, source: 'user' | 'synthetic' = 'user') => {
@@ -221,11 +227,12 @@ export function createAntigravityBackend(options: Options) {
     return withSession(session, async acp => {
       if (source === 'user') options.onUserInput?.(sessionID, session.directory);
       let turn = active.get(sessionID);
-      if (turn) turn.followups.push({ id: input.id, text: input.text, files: input.files, created: Date.now() });
+      const inputContext = input.context.map(item => ({ ...item, id: item.id ?? createMessageId(Date.now()) }));
+      if (turn) turn.followups.push({ id: input.id, text: input.text, files: input.files, created: Date.now(), updateIndex: turn.updates.length, toolCallCount: turn.toolCalls?.length ?? 0, inputContext });
       else {
         const model = session.config.find(option => option.category === 'model' && option.type === 'select');
         const thought = session.config.find(option => option.category === 'thought_level' && option.type === 'select');
-        turn = { id: input.id, assistantID: createMessageId(Date.now() + 1), modelID: model?.type === 'select' ? model.currentValue : '', ...thought?.type === 'select' && { variant: thought.currentValue }, text: input.text, files: input.files, created: Date.now(), updates: [], followups: [], toolCalls: [] };
+        turn = { id: input.id, assistantID: createMessageId(Date.now() + 1), modelID: model?.type === 'select' ? model.currentValue : '', ...thought?.type === 'select' && { variant: thought.currentValue }, text: input.text, files: input.files, created: Date.now(), updates: [], followups: [], toolCalls: [], inputContext };
         const modelID = turn.modelID;
         session.turns = [...history().summaries(sessionID).filter(item => item.modelID !== modelID), turn];
         active.set(sessionID, turn);
@@ -295,6 +302,25 @@ export function createAntigravityBackend(options: Options) {
   });
   return {
     get, prepare, send, ready,
+    async fork(id: string, before?: string) {
+      const source = await get(id);
+      flushActive(source);
+      const nativeID = randomUUID();
+      const nativeDirectory = path.join(root, 'profile', 'antigravity-acp', 'conversations');
+      const nativePath = path.join(nativeDirectory, `${nativeID}.db`);
+      copyAntigravityDatabase(path.join(nativeDirectory, `${source.nativeID}.db`), nativePath, nativeID);
+      const now = Date.now();
+      const session: StoredConversation = { id: `ses_ag_${randomUUID().replaceAll('-', '')}`, nativeID, directory: source.directory, title: source.title, created: now, updated: now, draft: false, config: structuredClone(source.config), metadata: structuredClone(source.metadata), forms: [], turns: [] };
+      copyAntigravityHistory(options.storage, id, session.id, nativePath, before);
+      session.turns = history().summaries(session.id);
+      refreshUsage(session);
+      await save(session);
+      conversations.set(session.id, session);
+      options.registerSession?.(session.id);
+      await options.initializeSession(session.id, session.directory, { id, directory: source.directory });
+      options.publish({ type: 'forked', session, parentID: id });
+      return session;
+    },
     async messages(id: string, input: MessageListOptions) {
       const session = await get(id);
       flushActive(session);

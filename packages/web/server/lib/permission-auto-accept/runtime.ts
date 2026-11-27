@@ -395,7 +395,11 @@ export function createPermissionAutoAcceptRuntime({
     snapshot,
     load,
     setSessionPolicy,
-    initializeSession: applyDefaultMode,
+    initializeSession(sessionID: string, source?: { id: string; directory: string }) {
+      if (!source) return applyDefaultMode(sessionID);
+      rememberSession({ ...source, parentID: null }, source.directory, { complete: true });
+      return inheritForkMode(sessionID, source.id, source.directory);
+    },
     resolveSessionMode,
     isSessionAutoAccepting,
     isPermissionAutoAnswered,

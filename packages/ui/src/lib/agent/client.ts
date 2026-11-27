@@ -68,4 +68,5 @@ export interface ConversationClient {
   stageRevert(id: string, messageID: string, options?: { directory?: string | null }): Promise<NonNullable<Session['revert']>>;
   clearRevert(id: string, directory?: string | null): Promise<void>;
   commitRevert(id: string, directory?: string | null): Promise<void>;
+  forkSession(id: string, options?: { before?: string; directory?: string | null }): Promise<Session>;
 }

@@ -40,7 +40,7 @@ interface Options {
   publish(event: { type: 'openchamber:acp'; properties: AcpConversationEvent }): void;
   hub: ConversationEventHub;
   openCodeClient(directory?: string, requestFetch?: typeof fetch): OpenCodeClient;
-  initializeSession(sessionID: string, directory: string): Promise<void>;
+  initializeSession(sessionID: string, directory: string, source?: { id: string; directory: string }): Promise<void>;
   readInstructions(sessionID: string): Promise<Array<{ text: string }>>;
   onUserInput(sessionID: string, directory: string): void;
   processForwardedEventPayload?: ForwardEventPayload;
@@ -145,7 +145,7 @@ export function createAgentBackendHost(options: Options) {
 }
 
 export function createManagedAgentBackendHost(options: Omit<Options, 'initializeSession' | 'readInstructions'> & {
-  initializePermission(sessionID: string): Promise<void>;
+  initializePermission(sessionID: string, source?: { id: string; directory: string }): Promise<void>;
   syncKnowledge: ReturnType<typeof createManagedSessionKnowledgeRuntime>['sync'];
   readInstructions(sessionID: string): Promise<Array<{ text: string }>>;
   sessionStatus(sessionID: string, type: 'idle' | 'busy'): void;
@@ -156,8 +156,8 @@ export function createManagedAgentBackendHost(options: Omit<Options, 'initialize
       if (event.properties.type === 'control') options.publish(event);
       if (event.properties.type === 'turn') options.sessionStatus(event.properties.sessionID, event.properties.turn.completed ? 'idle' : 'busy');
     },
-    initializeSession: async (sessionID, directory) => {
-      await options.initializePermission(sessionID);
+    initializeSession: async (sessionID, directory, source) => {
+      await options.initializePermission(sessionID, source);
       await options.syncKnowledge(sessionID, directory);
     },
     readInstructions: async sessionID => {

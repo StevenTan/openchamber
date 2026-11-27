@@ -2796,7 +2796,7 @@ export async function forkFromMessage(sessionId: string, messageId: string): Pro
     .trim()
   const fileParts = parts.filter((part): part is FilePart => part.type === "file")
 
-  const forkedSession = await opencodeClient.forkSession(sessionId, {
+  const forkedSession = await conversationClient.forkSession(sessionId, {
     before: transcriptCutForMessage(state.message[sessionId] ?? [], messageId),
     directory,
   })

@@ -95,6 +95,7 @@ export function registerConversationRoutes(app: Application, express: Pick<Expre
   router.post(`${sessionRoot}/:id/revert/stage`, express.json({ limit: '1mb' }), handle((api, req) => api.stageRevert(req.params.id, z.object({ messageID: z.string() }).parse(req.body).messageID)));
   router.post(`${sessionRoot}/:id/revert/clear`, handle(async (api, req) => { await api.clearRevert(req.params.id); return null; }));
   router.post(`${sessionRoot}/:id/revert/commit`, handle(async (api, req) => { await api.commitRevert(req.params.id); return null; }));
+  router.post(`${sessionRoot}/:id/fork`, express.json({ limit: '1mb' }), handle((api, req) => api.fork(req.params.id, z.object({ before: z.string().optional() }).parse(req.body).before)));
   router.post(`${sessionRoot}/:id/skills`, express.json({ limit: '1mb' }), handle(async (api, req) => {
     const { names } = z.object({ names: z.array(z.string()) }).parse(req.body);
     if (!names.length) return { attached: [], unresolved: [] };

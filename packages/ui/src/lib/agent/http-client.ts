@@ -21,7 +21,7 @@ const root = '/api/conversations'
 const catalogRoot = '/api/conversation-catalog'
 const runtimeRoot = '/api/conversation-runtime'
 type RuntimeClient = Pick<AgentRuntime, 'listPendingForms' | 'listPendingPermissions' | 'getLocation' | 'getConfiguration' | 'listProjects' | 'getVcs' | 'getActiveSessionStatuses'>
-type ConversationBody = CreateConversation | ModelSelection | ConversationContext | ConversationPrompt | { title: string } | { agent: string } | { names: readonly string[] } | { decision: 'once' | 'always' | 'reject'; message?: string } | { answer: Record<string, FormValue> } | { message?: string } | { messageID: string }
+type ConversationBody = CreateConversation | ModelSelection | ConversationContext | ConversationPrompt | { title: string } | { agent: string } | { names: readonly string[] } | { decision: 'once' | 'always' | 'reject'; message?: string } | { answer: Record<string, FormValue> } | { message?: string } | { messageID: string } | { before?: string }
 
 export function createConversationHttpClient(backendID: string, runtime: AgentRuntime): ConversationClient & RuntimeClient {
   const catalogs = new Map<string, Promise<ProviderCatalog>>()
@@ -71,6 +71,7 @@ export function createConversationHttpClient(backendID: string, runtime: AgentRu
     createSession: (params, directory) => request(root, directoryOf(directory), 'POST', { ...params, backendID: params?.backendID ?? backendID, model: params?.model && !isAutoModel(params.model.providerID, params.model.id) ? params.model : undefined }),
     getSession: (id, directory, signal) => request(sessionPath(id), directoryOf(directory), 'GET', undefined, undefined, signal),
     getSessionUnscoped: id => request(sessionPath(id), undefined),
+    forkSession: (id, options) => request(sessionPath(id, '/fork'), directoryOf(options?.directory), 'POST', { before: options?.before }),
     async captureSessionCleanup(directory, key) {
       const cleanup = await captureRuntimeCleanup(key)
       const folder = directoryOf(directory)

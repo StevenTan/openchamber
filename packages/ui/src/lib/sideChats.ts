@@ -1,13 +1,12 @@
 import { conversationClient } from "@/lib/agent/active"
-import { isOpencodeNotFound, opencodeClient } from '@/lib/opencode/client';
+import { isOpencodeNotFound } from '@/lib/opencode/client';
 import { getRuntimeKey } from '@/lib/runtime-switch';
-import { findLastCompletedAssistantMessageID, insertForkIntoDirectoryStore, serverCutAfterAnswer } from '@/lib/btw';
-import { findMessagePageItem } from '@/lib/opencode/messagePaging';
+import { insertForkIntoDirectoryStore } from '@/lib/btw';
 import { getSideChat, getSideChatSessionIDs, isTemporarySideChat, sideChatMetadata, withSideChatSaved, withSideChatSessionLink } from '@/lib/sessionSideChatMetadata';
-import { getSyncMessages } from '@/sync/sync-refs';
-import { forkAtTranscriptCut, transcriptCutAfterMessage } from '@/sync/transcript-cut';
+import { forkAtTranscriptCut } from '@/sync/transcript-cut';
 import { createSession, deleteSession, patchSessionMetadata, updateSessionTitle, waitForConnectionOrThrow, type SessionCreateSelection } from '@/sync/session-actions';
 import type { Session } from '@/lib/opencode/model';
+import { useSelectionStore } from '@/sync/selection-store';
 
 const sideChatActions = new Map<string, Promise<unknown>>();
 
@@ -25,20 +24,16 @@ function runSideChatAction<T>(sessionID: string, runtime: string, action: () => 
 export async function createSideChat(parentSessionId: string | null, directory: string, selection: SessionCreateSelection, runtime: string, title: string): Promise<Session> {
   await waitForConnectionOrThrow();
   if (getRuntimeKey() !== runtime) throw new Error('runtime changed');
-  const cleanup = await opencodeClient.captureSessionCleanup(directory, runtime);
+  const cleanup = await conversationClient.captureSessionCleanup(directory, runtime, selection.backendID);
   let session: Session | null = null;
   try {
-    const messages = parentSessionId ? getSyncMessages(parentSessionId, directory) : [];
-    const localAnswer = findLastCompletedAssistantMessageID(messages);
-    const answer = localAnswer ?? (parentSessionId ? (await findMessagePageItem(parentSessionId, ({ info }) => info.role === 'assistant' && info.time.completed !== undefined && info.finish === 'stop', { limit: 30 }, directory))?.info.id : null);
-    if (parentSessionId && answer) {
-      const before = (localAnswer ? transcriptCutAfterMessage(messages, answer) : undefined) ?? await serverCutAfterAnswer(parentSessionId, answer, directory);
-      session = await forkAtTranscriptCut(parentSessionId, before, directory, runtime);
+    if (parentSessionId) {
+      session = await forkAtTranscriptCut(parentSessionId, undefined, directory, runtime);
       if (getRuntimeKey() !== runtime) throw new Error('runtime changed');
+      await conversationClient.applySendSelection(session.id, selection, session.directory ?? directory, runtime);
       const tail = await conversationClient.getSessionMessages(session.id, { limit: 1 }, session.directory ?? directory);
       const last = tail.items.at(-1)?.info;
-      if (!last) throw new Error('Inherited transcript boundary is missing');
-      const metadata = sideChatMetadata(parentSessionId, { id: last.id, created: last.time.created, synthetic: last.role === 'synthetic' });
+      const metadata = sideChatMetadata(parentSessionId, last ? { id: last.id, created: last.time.created, synthetic: last.role === 'synthetic' } : null);
       session = await patchSessionMetadata(session.id, session.directory ?? directory, () => metadata, runtime);
       insertForkIntoDirectoryStore(session, session.directory ?? directory);
       await updateSessionTitle(session.id, title, { directory: session.directory ?? directory, expectedRuntimeKey: runtime });
@@ -46,6 +41,13 @@ export async function createSideChat(parentSessionId: string | null, directory: 
       session = await createSession(title, directory, sideChatMetadata(parentSessionId, null), undefined, selection, 'preserve', undefined, runtime);
       if (!session) throw new Error('Could not create side chat');
     }
+    const selections = useSelectionStore.getState();
+    if (selection.model) {
+      const { providerID, id, variant } = selection.model;
+      selections.saveSessionModelSelection(session.id, providerID, id);
+      if (selection.agent) selections.saveAgentModelVariantForSession(session.id, selection.agent, providerID, id, variant);
+    }
+    if (selection.agent) selections.saveSessionAgentSelection(session.id, selection.agent);
     const id = session.id;
     if (parentSessionId) await patchSessionMetadata(parentSessionId, directory, (metadata) => withSideChatSessionLink(metadata, id, true), runtime);
     return session;

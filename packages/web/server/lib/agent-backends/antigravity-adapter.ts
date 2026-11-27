@@ -50,7 +50,13 @@ function createDispatch(backend: ReturnType<typeof createAntigravityBackend>, { 
       return { sessionId: session.id, directory, model: selected, agent: 'antigravity', promptDispatched: false, dispatchedAsCommand: false, ...title && { title } };
     },
     send: (sessionID, payload) => send(asNonEmptyString(sessionID) ?? '', payload ?? {}),
-    fork: async () => { throw new OpenChamberControlError('This backend does not support session forks', 400); },
+    async fork(sessionID, payload = {}) {
+      const input = payload ?? {};
+      const sourceID = asNonEmptyString(sessionID) ?? '';
+      const session = await backend.fork(sourceID, asNonEmptyString(input.messageId) ?? undefined);
+      const result = await send(session.id, input);
+      return { ...result, action: 'fork', sourceSessionId: sourceID };
+    },
     queueBackend: sessionID => ({
       isIdle: async () => { await backend.get(sessionID); return !backend.statuses()[sessionID]; },
       async send(directory: string, item: QueuedItem) {
@@ -61,7 +67,11 @@ function createDispatch(backend: ReturnType<typeof createAntigravityBackend>, { 
           id: item.id,
           text: item.text,
           files: item.attachments.map(file => { const path = file.agentPath ?? file.serverPath; return { mime: file.mimeType, filename: file.filename, url: path ? pathToFileURL(path).href : file.dataUrl }; }),
-          context: item.context.flatMap(part => part.kind === 'context' && part.instructions ? [{ text: part.instructions }, { text: part.text }] : [{ text: part.text }]),
+          context: item.context.flatMap(part => {
+            if (part.kind !== 'context') return [{ text: part.text }];
+            const context = { text: part.text, metadata: z.record(z.string(), z.json()).parse(part.metadata) };
+            return part.instructions ? [{ text: part.instructions }, context] : [context];
+          }),
         }, 'synthetic');
       },
     }),

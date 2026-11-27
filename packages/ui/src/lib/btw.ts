@@ -1,8 +1,8 @@
-import { conversationClient } from "@/lib/agent/active"
+import { conversationClient, getSessionBackend } from "@/lib/agent/active"
 import { permissionModeForNewSession, type PermissionMode } from '@/stores/utils/permissionAutoAccept';
 import { useUIStore } from '@/stores/useUIStore';
 import type { Message, Part, Session } from '@/lib/opencode/model';
-import { opencodeClient, type SkillMentions } from '@/lib/opencode/client';
+import type { SkillMentions } from '@/lib/opencode/client';
 import * as sessionActions from '@/sync/session-actions';
 import { withBtwSessionLink, withBtwSessionMarker, withoutBtwSessionLink, withoutBtwSessionMarker } from '@/lib/sessionBtwMetadata';
 import { useBtwStore } from '@/stores/useBtwStore';
@@ -13,8 +13,6 @@ import { Binary } from '@/sync/binary';
 import type { ContextPartMetadata } from '@/lib/messages/contextParts';
 import type { AttachedFile } from '@/stores/types/sessionTypes';
 import { getRuntimeKey } from '@/lib/runtime-switch';
-import { findMessagePageItem } from '@/lib/opencode/messagePaging';
-import { transcriptCutAfterMessage } from '@/sync/transcript-cut';
 
 export const btwPendingComposerKey = (parentSessionId: string): string => `btw-pending:${parentSessionId}`;
 
@@ -128,27 +126,6 @@ export function insertForkIntoDirectoryStore(session: Session, directory: string
   }
 }
 
-/** The last completed answer that can bound a side chat's inherited history. */
-export const findLastCompletedAssistantMessageID = (messages: readonly Message[]): string | null => {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index];
-    if (message?.role === 'assistant' && message.time.completed !== undefined && message.finish === 'stop') return message.id;
-  }
-  return null;
-};
-
-/** Reads the server's transcript boundary after a completed answer. */
-export async function serverCutAfterAnswer(sessionID: string, answerID: string, directory: string): Promise<string | undefined> {
-  const newestFirst: Message[] = [];
-  const answer = await findMessagePageItem(sessionID, ({ info }) => {
-    if (info.id === answerID) return true;
-    newestFirst.push(info);
-    return false;
-  }, { limit: 10 }, directory);
-  if (!answer) throw new Error('No safe transcript boundary to fork from');
-  return transcriptCutAfterMessage([answer.info, ...newestFirst.reverse()], answerID);
-}
-
 /** Preparation can be discarded until the server-side fork starts. */
 export async function preparePendingBtwSend(
   parentSessionId: string,
@@ -188,11 +165,13 @@ export async function startBtwSession(input: StartBtwInput): Promise<Session> {
   try {
     await sessionActions.waitForConnectionOrThrow();
     if (getRuntimeKey() !== expectedRuntimeKey) throw new Error('runtime changed');
-    // external: https://github.com/anomalyco/opencode/tree/v2.3.0/packages/core/src/session Fork at HEAD copies settled records only; unfinished work reaches the first question as fresh server-read text.
-    const parentTail = await conversationClient.getSessionMessages(input.parentSessionId, { limit: IN_FLIGHT_TAIL_LIMIT }, input.directory);
-    if (getRuntimeKey() !== expectedRuntimeKey) throw new Error('runtime changed');
-    const inFlightNote = buildBtwInFlightNote(parentTail.items);
-    const forked = await opencodeClient.forkSession(input.parentSessionId, { directory: input.directory });
+    let inFlightNote: string | null = null;
+    if (getSessionBackend(input.parentSessionId).id === 'opencode') {
+      const parentTail = await conversationClient.getSessionMessages(input.parentSessionId, { limit: IN_FLIGHT_TAIL_LIMIT }, input.directory);
+      if (getRuntimeKey() !== expectedRuntimeKey) throw new Error('runtime changed');
+      inFlightNote = buildBtwInFlightNote(parentTail.items);
+    }
+    const forked = await conversationClient.forkSession(input.parentSessionId, { directory: input.directory });
 
     const sessionDirectory = forked.directory || input.directory;
     try {

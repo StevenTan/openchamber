@@ -40,4 +40,5 @@ export interface ConversationApi {
   stageRevert(id: string, messageID: string): Promise<NonNullable<Session['revert']>>;
   clearRevert(id: string): Promise<void>;
   commitRevert(id: string): Promise<void>;
+  fork(id: string, before?: string): Promise<Session>;
 }

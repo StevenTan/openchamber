@@ -24,6 +24,7 @@ const childStoreSessions: Session[] = [];
 const currentSessionSwitches: string[] = [];
 const metadataPatches: Array<{ sessionId: string; result: Record<string, unknown> }> = [];
 const sessionMessageReads: string[] = [];
+let backendID = 'opencode';
 
 mock.module('@/lib/opencode/client', () => ({
   isOpencodeNotFound: (error: Error) => error === forkBeforeNotFound,
@@ -35,6 +36,14 @@ mock.module('@/lib/opencode/client', () => ({
     },
   },
 }));
+const conversation = {
+  forkSession: (id: string, options?: ForkOptions) => forkSessionImpl(id, options),
+  getSessionMessages: (id: string, options?: { limit?: number }, directory?: string | null) => {
+    sessionMessageReads.push(id);
+    return getSessionMessagesImpl(id, options, directory);
+  },
+};
+mock.module('@/lib/agent/active', () => ({ conversationClient: conversation, getAgentBackend: () => ({ client: conversation }), getSessionBackend: () => ({ id: backendID }) }));
 mock.module('@/sync/session-actions', () => ({
   waitForConnectionOrThrow: () => Promise.resolve(),
   deleteSession: (sessionId: string) => deleteSessionImpl(sessionId),
@@ -114,6 +123,7 @@ const startInput = {
 };
 
 beforeEach(() => {
+  backendID = 'opencode';
   registeredDirectories.length = 0;
   upsertedSessions.length = 0;
   childStoreSessions.length = 0;
@@ -304,6 +314,16 @@ describe('startBtwSession', () => {
     expect(sentParts?.[0]).toEqual({ text: BTW_BOUNDARY_INSTRUCTION, synthetic: true });
     expect(sentParts?.[1]?.synthetic).toBe(true);
     expect(sentParts?.[1]?.text).toContain('- shell (running): {"command":"sleep 45"}');
+  });
+
+  test('an Antigravity fork uses inherited active history without a missing-step snapshot', async () => {
+    backendID = 'antigravity';
+    forkSessionImpl = () => Promise.resolve(makeSession('fork-1', '/project'));
+    let sentParts: unknown;
+    sendMessageImpl = (...args) => { sentParts = args[6]; return Promise.resolve(); };
+    await startBtwSession(startInput);
+    expect(sessionMessageReads).toEqual(['fork-1']);
+    expect(sentParts).toEqual([{ text: BTW_BOUNDARY_INSTRUCTION, synthetic: true }]);
   });
 
   test('a failed read of the parent forks nothing', async () => {

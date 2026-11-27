@@ -53,6 +53,8 @@ test('managed requests share directory-scoped transport and recover pending card
     expect(calls.at(-1)?.path).toBe('/api/conversations/ses_ag_native/revert/clear');
     await native.client.commitRevert(form.sessionID, '/repo');
     expect(calls.at(-1)?.path).toBe('/api/conversations/ses_ag_native/revert/commit');
+    await native.client.forkSession(form.sessionID, { directory: '/repo', before: 'msg_cut' });
+    expect(calls.at(-1)).toEqual({ path: '/api/conversations/ses_ag_native/fork', directory: '/repo', method: 'POST', body: { before: 'msg_cut' } });
     const store = createStore<DirectoryStore>()(set => ({ ...INITIAL_STATE, form: { [form.sessionID]: [form] }, permission: { [permission.sessionID]: [permission] }, patch: partial => set(partial), replace: next => set(next) }));
     expect(await resyncBlockingRequestsForDirectory('/repo', store)).toBe(true);
     expect(store.getState().form[form.sessionID]).toEqual([form]);

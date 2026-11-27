@@ -2,7 +2,7 @@ import '../agentBackends'
 import type { ConversationClient } from "./client"
 import { getAgentBackend, getSessionBackend, rememberSessionBackend } from './registry'
 
-export { getAgentBackend } from './registry'
+export { getAgentBackend, getSessionBackend } from './registry'
 
 export const conversationClient: ConversationClient = {
   async listSessionsPage(options) {
@@ -50,4 +50,9 @@ export const conversationClient: ConversationClient = {
   stageRevert: (id, messageID, options) => getSessionBackend(id).client.stageRevert(id, messageID, options),
   clearRevert: (id, directory) => getSessionBackend(id).client.clearRevert(id, directory),
   commitRevert: (id, directory) => getSessionBackend(id).client.commitRevert(id, directory),
+  async forkSession(id, options) {
+    const session = await getSessionBackend(id).client.forkSession(id, options)
+    rememberSessionBackend(session)
+    return session
+  },
 }

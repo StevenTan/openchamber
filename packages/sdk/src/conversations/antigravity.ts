@@ -30,7 +30,7 @@ export function acpCatalog(session: AcpConversation): ProviderCatalog {
   };
 }
 
-export function acpMessages(session: AcpConversation, turn: AcpTurn): Array<{ info: Message; parts: Part[] }> {
+export function acpMessages(session: Pick<AcpConversation, 'id'>, turn: AcpTurn): Array<{ info: Message; parts: Part[] }> {
   const base = { sessionID: session.id, messageID: turn.assistantID };
   const parts: Part[] = [];
   const tools = new Map<string, ToolPart>();
@@ -73,12 +73,18 @@ export function acpMessages(session: AcpConversation, turn: AcpTurn): Array<{ in
   const changed = parts.filter(part => part.type === 'tool' && ['file_write', 'file_edit', 'file_patch', 'openchamber_execute'].includes(part.tool)).at(-1);
   if (turn.fileDiff && changed?.type === 'tool' && changed.state.status !== 'pending') changed.state.metadata = { ...changed.state.metadata, openchamberTurnDiff: turn.fileDiff };
   return [
-    ...[{ id: turn.id, text: turn.text, files: turn.files, created: turn.created }, ...turn.followups].map(input => ({
-      info: { id: input.id, sessionID: session.id, role: 'user' as const, time: { created: input.created } }, parts: [
-        { id: partIds.userText(input.id), sessionID: session.id, messageID: input.id, type: 'text' as const, text: input.text },
-        ...input.files.map((file, index) => ({ ...file, id: partIds.userFile(input.id, index), sessionID: session.id, messageID: input.id, type: 'file' as const })),
-      ],
-    })),
+    ...[{ id: turn.id, text: turn.text, files: turn.files, created: turn.created, inputContext: turn.inputContext }, ...turn.followups].flatMap(input => [
+      ...(input.inputContext ?? []).map(item => ({
+        info: { id: z.string().parse(item.id), sessionID: session.id, role: 'synthetic' as const, time: { created: input.created }, text: item.text, ...item.description && { description: item.description }, ...item.metadata && { metadata: item.metadata } },
+        parts: [],
+      })),
+      {
+        info: { id: input.id, sessionID: session.id, role: 'user' as const, time: { created: input.created } }, parts: [
+          { id: partIds.userText(input.id), sessionID: session.id, messageID: input.id, type: 'text' as const, text: input.text },
+          ...input.files.map((file, index) => ({ ...file, id: partIds.userFile(input.id, index), sessionID: session.id, messageID: input.id, type: 'file' as const })),
+        ],
+      },
+    ]),
     { info: { id: turn.assistantID, sessionID: session.id, role: 'assistant', agent: 'antigravity', providerID: 'antigravity', modelID: turn.modelID, ...turn.variant && { variant: turn.variant }, time: { created: turn.created, ...turn.completed && { completed: turn.completed } },
       ...turn.completed && { finish: turn.error ? 'error' as const : 'stop' as const }, ...turn.error && { error: { type: 'AntigravityError', message: turn.error } },
       ...turn.tokens && { tokens: turn.tokens }, context: turn.context }, parts },

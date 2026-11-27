@@ -1,4 +1,5 @@
-import { opencodeClient, type MessagePage } from './client';
+import { conversationClient } from '@/lib/agent/active';
+import type { MessagePage } from '@/lib/agent/client';
 import type { Message, Part } from './model';
 
 export type MessagePageItem = { info: Message; parts: Part[] };
@@ -17,7 +18,7 @@ export async function findMessagePageItem(
   const seenCursors = new Set<string>();
   let cursor: string | undefined;
   for (;;) {
-    const page: MessagePage = await opencodeClient.getSessionMessages(
+    const page: MessagePage = await conversationClient.getSessionMessages(
       sessionId,
       cursor ? { cursor } : { limit: options.limit, order: options.order },
       directory,

@@ -6,7 +6,7 @@ import type { ConversationStorage } from './conversation-storage.js';
 
 export type StoredConversation = AcpConversation & { forms: Array<Parameters<QuestionSessionApi['form']['create']>[0] & { state: { status: 'pending' | 'answered' | 'cancelled'; answer?: Record<string, string> } }> };
 
-const summary = (turn: AcpTurn): AcpTurn => ({ ...turn, text: '', files: [], updates: [], followups: [], toolCalls: [] });
+const summary = (turn: AcpTurn): AcpTurn => ({ ...turn, text: '', files: [], updates: [], followups: [], toolCalls: [], inputContext: [] });
 
 export function createAntigravityStorage(messages: ConversationStorage) {
   const metadata = (session: StoredConversation) => {

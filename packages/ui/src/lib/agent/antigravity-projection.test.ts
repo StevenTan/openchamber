@@ -6,6 +6,8 @@ import { applyDirectoryEvent } from '../../sync/event-reducer';
 import { INITIAL_STATE, type State } from '../../sync/types';
 import { computeContextUsage, computeLastReplyCacheHit } from '../../components/chat/work-status/contextUsage';
 import { projectTurnChangedFiles } from '../../components/chat/lib/turns/projectTurnSummary';
+import { readContextPart } from '../messages/contextParts';
+import { antigravityEvents } from '../../../../web/server/lib/agent-backends/antigravity-events';
 
 test('native context and cache counters feed the shared usage display', () => {
   const tokens = { input: 2536, output: 595, reasoning: 90, cache: { read: 15729, write: 0 } };
@@ -59,7 +61,8 @@ test('ACP file activity carries the persisted turn diff reference through histor
 
 test('ACP user messages reconcile optimistic text and attachments in place', () => {
   const file = { mime: 'image/png', filename: 'image.png', url: 'data:image/png;base64,AA==' };
-  const turn: AcpTurn = { id: 'user', assistantID: 'assistant', modelID: 'model', text: 'Test MCP tools', files: [file], created: 1, updates: [], followups: [{ id: 'followup', text: 'Continue', files: [file], created: 2 }] };
+  const metadata = { openchamberContext: { kind: 'chat-quote', quote: 'Original answer', text: 'Explain this' } };
+  const turn: AcpTurn = { id: 'user', assistantID: 'assistant', modelID: 'model', text: 'Test MCP tools', files: [file], created: 1, inputContext: [{ id: 'quote', text: 'Original answer', metadata }], updates: [], followups: [{ id: 'followup', text: 'Continue', files: [file], created: 2, updateIndex: 0, toolCallCount: 0, inputContext: [{ id: 'followup_quote', text: 'Original answer', metadata }] }] };
   const session: AcpConversation = { id: 'session', nativeID: 'native', title: 'Test', directory: '/project', created: 1, updated: 2, draft: false, config: [], turns: [turn] };
   const state: State = { ...INITIAL_STATE, message: { session: [] }, part: {} };
   for (const input of [turn, ...turn.followups]) {
@@ -77,5 +80,24 @@ test('ACP user messages reconcile optimistic text and attachments in place', () 
   for (const input of [turn, ...turn.followups]) {
     expect(state.part[input.id]).toHaveLength(2);
     expect(state.part[input.id].filter(part => part.type === 'text').map(part => part.text)).toEqual([input.text]);
+    const index = state.message.session.findIndex(message => message.id === input.id);
+    expect(readContextPart(state.message.session[index - 1])).toMatchObject({ kind: 'chat-quote', quote: 'Original answer', text: 'Explain this' });
+  }
+});
+
+test('same-turn rewind replaces the retained reply in live and history message order', () => {
+  const turn: AcpTurn = { id: 'user', assistantID: 'assistant', modelID: 'model', text: 'Start', files: [], created: 1, completed: 3,
+    updates: [{ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Before input' } }, { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'After input' } }],
+    followups: [{ id: 'followup', text: 'Change', files: [], created: 2, updateIndex: 1, toolCallCount: 0, inputContext: [{ id: 'quote', text: 'Follow-up quote' }] }] };
+  const session: AcpConversation = { id: 'session', nativeID: 'native', title: 'Test', directory: '/project', created: 1, updated: 3, draft: false, config: [], turns: [turn] };
+  for (const order of [['user', 'assistant', 'quote', 'followup'], ['user', 'quote', 'followup', 'assistant']]) {
+    const state: State = { ...INITIAL_STATE, message: {}, part: {} };
+    for (const event of antigravityEvents({ type: 'turn', sessionID: session.id, directory: session.directory, session, turn })) applyDirectoryEvent(state, event);
+    state.message.session.sort((left, right) => order.indexOf(left.id) - order.indexOf(right.id));
+    const retained = { ...turn, updates: turn.updates.slice(0, 1), followups: [] };
+    for (const event of antigravityEvents({ type: 'reverted', session, messageID: 'quote', turn: retained })) applyDirectoryEvent(state, event);
+    expect(state.message.session.map(message => message.id)).toEqual(['user', 'assistant']);
+    expect(state.part.assistant.map(part => part.type === 'text' && part.text)).toEqual(['Before input']);
+    expect(state.part.followup).toBeUndefined();
   }
 });

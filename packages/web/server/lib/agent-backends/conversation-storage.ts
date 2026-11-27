@@ -52,6 +52,7 @@ export function createConversationStorage(dataDir: string) {
     catalog,
     session,
     readSession,
+    copy(from: string, to: string) { session(from, db => db.run('VACUUM INTO ?', [file(to)])); },
     saveMessages(records: MessageRecord[], sequence?: number) {
       for (const [ordinal, record] of records.entries()) {
         session(record.info.sessionID, db => db.run(`INSERT INTO messages(session_id, id, turn_sequence, ordinal, data)

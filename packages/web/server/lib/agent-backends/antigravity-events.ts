@@ -4,9 +4,20 @@ import type { SyncEvent } from '@openchamber/sdk/conversations/events';
 
 export function antigravityEvents(event: Exclude<AcpConversationEvent, { type: 'control' | 'deleted' }>): SyncEvent[] {
   const { session } = event;
+  if (event.type === 'forked') return [
+    { type: 'session.created', properties: { info: acpSession(session) } },
+    { type: 'session.forked', properties: { sessionID: session.id, parentID: event.parentID } },
+  ];
   if (event.type === 'reverted') return [
     { type: 'session.revert.committed', properties: { sessionID: session.id, to: event.messageID } },
     { type: 'session.patched', properties: { sessionID: session.id, patch: { revert: null } } },
+    ...event.turn ? [
+      { type: 'message.removed' as const, properties: { sessionID: session.id, messageID: event.turn.assistantID } },
+      ...acpMessages(session, event.turn).flatMap(message => [
+        { type: 'message.updated' as const, properties: { info: message.info } },
+        ...message.parts.map(part => ({ type: 'message.part.updated' as const, properties: { sessionID: session.id, part } })),
+      ]),
+    ] : [],
   ];
   if (event.type === 'session') {
     const info = acpSession(session);

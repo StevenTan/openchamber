@@ -78,7 +78,7 @@ const connection = new AgentSideConnection(client => ({
       db.close();
       await client.sessionUpdate({ sessionId: input.sessionId, update: { sessionUpdate: 'usage_update', used: 32, size: 128 } });
     }
-    const waiting = text === 'working' ? new Promise(resolve => { pending.set(input.sessionId, resolve); }) : undefined;
+    const waiting = command === 'working' ? new Promise(resolve => { pending.set(input.sessionId, resolve); }) : undefined;
     await client.sessionUpdate({ sessionId: input.sessionId, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text } } });
     if (waiting) return waiting;
     pending.get(input.sessionId)?.({ stopReason: 'end_turn' });

@@ -2072,8 +2072,9 @@ independently of animation frames across all chat runtimes.
 
 The Chat rail entry and tab-strip plus create temporary side conversations
 through `createSideChat`, without changing the main selection. A side chat
-forks its source chat column after that session's last completed answer; a parent without a
-completed answer starts an empty side chat. Text selection can initialize its
+forks its source chat column at the current transcript end, including before the
+first answer completes, and adopts that composer's model, agent and effort.
+An empty parent has a null inherited boundary. Text selection can initialize its
 persisted composer draft. Its panel owner is the host main session; its
 transcript and API requests use the side session's own directory.
 Session metadata keeps the inherited message boundary separately from the

@@ -81,6 +81,7 @@ export function createConversationCatalog(index: ConversationIndex, runtimes: Re
             const info = await api.create(input);
             return index.save(info, runtime.id);
           },
+          async fork(id, before) { return index.save(await api.fork(id, before), runtime.id); },
           list: input => list({ ...input, directory: options.directory, backendID: runtime.id }),
           get: id => get(id, runtime.id),
           rename,
