@@ -133,7 +133,7 @@ import { createPushRuntime } from './lib/notifications/push-runtime.js';
 import { createApnsRuntime } from './lib/notifications/apns-runtime.js';
 import { createNotificationTemplateRuntime } from './lib/notifications/template-runtime.js';
 import { createPermissionAutoAcceptRuntime } from './lib/permission-auto-accept/runtime.js';
-import { createMessageQueueRuntime } from './lib/message-queue/runtime.js';
+import { createConversationQueue } from './lib/agent-backends/conversation-input.js';
 import { createAutoReviewRuntime } from './lib/auto-review/runtime.js';
 import { createDispatchResultsRuntime } from './lib/dispatch-results/runtime.js';
 import { createPrWatchRuntime } from './lib/pr-watch/runtime.js';
@@ -1306,7 +1306,8 @@ const autoReviewRuntime = createAutoReviewRuntime({
 });
 autoReviewRuntime.start();
 
-const messageQueueRuntime = createMessageQueueRuntime({
+const messageQueueRuntime = createConversationQueue({
+  input: () => agentBackendHost.input,
   backendForSession: sessionID => applicationSessionService.queueBackend(sessionID),
   globalEventHub: globalMessageStreamHub,
   buildOpenCodeUrl,
@@ -1323,7 +1324,6 @@ const messageQueueRuntime = createMessageQueueRuntime({
   onScheduledTaskResult: (...args) => scheduledTasksRuntime.onScheduledTaskResult(...args),
   dataDir: OPENCHAMBER_DATA_DIR,
 });
-messageQueueRuntime.start();
 
 const dispatchResultsRuntime = createDispatchResultsRuntime({
   globalEventHub: globalMessageStreamHub,
@@ -1650,7 +1650,7 @@ const agentBackendHost = createManagedAgentBackendHost({
   tools: () => { if (!agentToolRuntime) throw new Error('Agent tools are unavailable'); return agentToolRuntime; },
   environment: () => overlayEnvironment({ ...process.env, PATH: buildAugmentedPath() }, environmentRuntime.forOpenCode()),
   publish: broadcastOpenChamberUiEvent, hub: globalMessageStreamHub, processForwardedEventPayload,
-  sessionStatus: messageQueueRuntime.sessionStatus,
+  queue: messageQueueRuntime,
   initializePermission: permissionAutoAcceptRuntime.initializeSession,
   syncKnowledge: sessionKnowledgeRuntime.sync,
   readInstructions: sessionInstructions.read, skillDirectories: () => managedConfigRuntime?.skillDirectories() ?? [],

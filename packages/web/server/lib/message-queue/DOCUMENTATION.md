@@ -296,6 +296,14 @@ The owning backend supplies idle reads and prompt dispatch through
 OpenCode events. Queue deliveries are synthetic prompts and leave pending
 interaction cards waiting for the user.
 
+Conversation `delivery: queue` inputs use this same persisted dispatcher with a
+complete `prompt` payload and captured send configuration. The shared conversation
+inbox projects these entries into pending timeline messages. Composer snapshots,
+take-all, clear and reorder operate on composer rows while retaining inbox inputs.
+The conversation input service dispatches a queued prompt through its owning
+adapter when idle. Inbox cancellation removes its queued entry and publishes
+message removals; native admission records delegate cancellation to the adapter.
+
 Limits: 20 items per session, 50 sessions (oldest evicted, never one with an
 item in flight), 200k characters of content; attachment payloads are bounded
 by the route family's 50 MB JSON limit.

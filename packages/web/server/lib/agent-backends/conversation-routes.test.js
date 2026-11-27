@@ -19,6 +19,7 @@ import { registerQuestionFormRoutes } from '../agent-question/src/mcp.js';
 import { createConversationStorage } from './conversation-storage.js';
 import { createOpenCodeHistory } from './opencode-history.js';
 import { createConversationCatalog } from './conversation-catalog.js';
+import { createConversationInput, createConversationQueue } from './conversation-input.js';
 
 test('conversation HTTP normalizes both backends and adopts the prepared native session', async t => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'conversation-http-'));
@@ -27,11 +28,13 @@ test('conversation HTTP normalizes both backends and adopts the prepared native 
   const delivered = Promise.withResolvers();
   const cancellation = Promise.withResolvers();
   const storage = createConversationStorage(directory);
+  let queue;
   const native = createAntigravityBackend({
     storage,
     dataDir: directory, initializeSession: async () => {}, readInstructions: async () => [],
     environment: () => process.env, mcpServers: () => [], reassignSession: () => {},
     publish: event => {
+      if (event.type === 'turn') queue?.sessionStatus(event.sessionID, event.turn.completed ? 'idle' : 'busy');
       if (event.type !== 'turn' || !event.turn.completed) return;
       if (event.turn.text.includes('Blue')) delivered.resolve(event.turn.text);
       if (event.turn.text.includes('cancelled')) cancellation.resolve(event.turn.text);
@@ -47,18 +50,23 @@ test('conversation HTTP normalizes both backends and adopts the prepared native 
   await native.configure({ binary: executable });
   const draft = await native.prepare(directory);
   const nativeID = draft.nativeID;
-  const wire = { id: 'ses_standard', projectID: 'project', title: 'Standard', location: { directory }, agent: 'build', cost: 0, tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } }, time: { created: 1, updated: 1 } };
+  const wire = { id: 'ses_standard', projectID: 'project', title: 'Standard', location: { directory }, agent: 'build', model: { providerID: 'codex', id: 'gpt' }, cost: 0, tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } }, time: { created: 1, updated: 1 } };
   const user = { id: 'msg_standard', type: 'user', text: 'Hello', files: [], time: { created: 2 } };
   const calls = [];
   const upstreamForm = { id: 'frm_native', sessionID: wire.id, title: 'Choose', fields: [{ key: 'color', type: 'string' }], state: { status: 'pending' } };
   const upstreamPermission = { id: 'per_native', sessionID: wire.id, action: 'shell', resources: ['pwd'] };
   let pendingFailure = false;
   let statusFailure = false;
+  let standardBusy = true;
+  let nativeInbox = [];
   const upstream = express();
   upstream.use(express.json());
   upstream.use((req, res) => {
     calls.push({ path: req.path, query: req.query, body: req.body, directory: req.get('x-opencode-directory') });
-    if (req.path === '/api/session/active') return statusFailure ? res.status(503).json({ _tag: 'ServiceUnavailableError', message: 'Statuses unavailable' }) : res.json({ data: { [wire.id]: { type: 'running' } } });
+    if (req.path === '/api/session/active') return statusFailure ? res.status(503).json({ _tag: 'ServiceUnavailableError', message: 'Statuses unavailable' }) : res.json({ data: standardBusy ? { [wire.id]: { type: 'running' } } : {} });
+    if (req.path.endsWith('/inbox')) return res.json({ data: nativeInbox });
+    if (req.path.includes('/inbox/') && req.method === 'DELETE') { nativeInbox = nativeInbox.filter(item => item.id !== req.path.split('/').at(-1)); return res.status(204).end(); }
+    if (/\/(model|agent)$/.test(req.path) && req.method === 'POST') return res.status(204).end();
     if (req.path === '/api/location') return res.json({ directory, project: { id: 'project', directory, canonical: directory } });
     if (req.path === '/api/config') return res.json([{ type: 'document', info: { default_agent: 'build', model: 'codex/gpt' } }, { type: 'document', info: { default_agent: 'codex' } }]);
     if (req.path === '/api/project') return res.json([{ id: 'project', canonical: directory, time: { created: 1, updated: 2 }, sandboxes: [] }]);
@@ -84,12 +92,25 @@ test('conversation HTTP normalizes both backends and adopts the prepared native 
   const client = folder => createOpenCodeClient({ baseUrl: `http://127.0.0.1:${upstreamServer.address().port}`, directory: folder });
   const catalog = createConversationCatalog(storage.catalog, { opencode: createOpenCodeAdapter(openCodeHistory), antigravity: createAntigravityAdapter(native) }, client, () => {});
   const registry = createBackendRegistry(catalog.adapters, owners, native.ready, catalog.list);
+  const inputApi = (id, directory) => registry.forSession(id).conversations({ directory, client: client(directory) });
+  const events = [];
+  const queuedSent = Promise.withResolvers();
+  const queueOptions = {
+    dataDir: directory, globalEventHub: { subscribeEvent: () => () => {}, subscribeStatus: () => () => {} },
+    buildOpenCodeUrl: route => `http://127.0.0.1:${upstreamServer.address().port}${route}`, getOpenCodeAuthHeaders: () => ({}),
+    input: () => input, dispatchQuietMs: 0,
+    onPromptSent: queuedSent.resolve,
+    backendForSession: id => owners.has(id) ? { isIdle: async () => !(await inputApi(id, directory).statuses())[id], send: async () => { throw new Error('Composer queue is not used'); } } : undefined,
+  };
+  queue = createConversationQueue(queueOptions);
+  let input = createConversationInput({ queue, api: inputApi, publish: changes => events.push(...changes) });
+  t.after(async () => { queue.stop(); await queue.flush(); });
   const permissions = createToolPermissions({ file: path.join(directory, 'permissions.json'), readPolicy: async sessionID => ({ directory: sessionID === 'elsewhere' ? '/elsewhere' : directory, projectDirectory: directory, rules: [] }), publish: () => {} });
   const questions = createQuestionRuntime({ dataDir: directory, client: () => ({ session: native.questionSession }), globalEventHub: { subscribeEvent: () => () => {}, subscribeStatus: () => () => {} }, isSessionArchived: async () => false, isEnabled: () => true, retryMs: 1 });
   t.after(() => questions.stop());
   registerQuestionFormRoutes(questions, app, express);
   registerToolPermissionRoutes(app, express, { permissions, directory: async req => req.query.directory, listNative: async () => ({ location: { directory }, data: [upstreamPermission] }) });
-  for (const phase of ['native', 'opencode']) registerConversationRoutes(app, express, { registry, client, phase, abortTools: () => {}, permissions });
+  for (const phase of ['native', 'opencode']) registerConversationRoutes(app, express, { registry, client, phase, abortTools: () => {}, permissions, input: { prompt: (...args) => input.prompt(...args), inbox: (...args) => input.inbox(...args), cancel: (...args) => input.cancel(...args), send: (...args) => input.send(...args), cancelled: (...args) => input.cancelled(...args) } });
   const listener = app.listen(0, '127.0.0.1');
   await new Promise(resolve => listener.once('listening', resolve));
   t.after(() => new Promise(resolve => listener.close(resolve)));
@@ -183,25 +204,102 @@ test('conversation HTTP normalizes both backends and adopts the prepared native 
   await request(`${root}/${created.id}/prompt`, 'POST', { id: 'msg_native', text: 'Hello', files: [], context, agents: [], skills: [{ id: 'http-skill' }] });
   await native.wait(created.id, new AbortController().signal);
   const history = await request(`${root}/${created.id}/message`);
-  assert.deepEqual(history.items.map(item => item.info.role), ['assistant', 'user']);
+  assert.deepEqual(history.items.map(item => item.info.role), ['assistant', 'user', 'synthetic', 'synthetic']);
   assert.ok(history.items[0].parts[0].text.startsWith('Context: Skill: http-skill'));
   assert.ok(history.items[0].parts[0].text.includes('HTTP_SKILL_BODY'));
   assert.ok(history.items[0].parts[0].text.includes(skillFile));
   assert.deepEqual(await request(`${root}/${created.id}/message/${history.items[0].info.id}`), history.items[0]);
   await t.test('native message pages retain direction and insertion order', async () => {
     for (const order of ['asc', 'desc']) {
-      const first = await request(`${root}/${created.id}/message?limit=1&order=${order}`);
-      assert.equal(first.items.length, 1);
-      assert.ok(first.cursor.next);
-      const second = await request(`${root}/${created.id}/message?limit=1&cursor=${first.cursor.next}`);
-      assert.equal(second.items.length, 1);
-      assert.equal(second.cursor.next, undefined);
-      assert.deepEqual([...first.items, ...second.items], order === 'desc' ? history.items : history.items.toReversed());
+      const records = [];
+      let cursor;
+      do {
+        const query = new URLSearchParams({ limit: '1', order, ...cursor && { cursor } });
+        const page = await request(`${root}/${created.id}/message?${query}`);
+        assert.equal(page.items.length, 1);
+        records.push(...page.items);
+        cursor = page.cursor.next;
+      } while (cursor);
+      assert.deepEqual(records, order === 'desc' ? history.items : history.items.toReversed());
     }
     const trimmed = Buffer.from(JSON.stringify({ id: history.items[0].info.id, order: 'desc', direction: 'next' })).toString('base64url');
-    const restored = await request(`${root}/${created.id}/message?limit=1&cursor=${trimmed}`);
+    const restored = await request(`${root}/${created.id}/message?limit=10&cursor=${trimmed}`);
     assert.deepEqual(restored.items, history.items.slice(1));
     assert.equal(restored.cursor.next, undefined);
+  });
+  await t.test('host inbox restores queued input and dispatches it after the running native turn', async () => {
+    await native.send(created.id, { id: 'msg_queue_working', text: 'working', files: [], context: [], agents: [], skills: [] });
+    const queued = { id: 'msg_queue_delivery', text: 'After working', files: [{ mime: 'text/plain', filename: 'note.txt', url: 'data:text/plain;base64,SGk=' }], context: [{ text: 'Queued context: ', metadata: { queue: true } }], agents: [], skills: [], metadata: { retained: true }, delivery: 'queue' };
+    await request(`${root}/${created.id}/prompt`, 'POST', queued);
+    const inbox = await request(`${root}/${created.id}/inbox`);
+    assert.deepEqual(inbox.map(item => item.info.role), ['synthetic', 'user']);
+    assert.equal(inbox[1].parts[1].url, queued.files[0].url);
+    assert.deepEqual(inbox[1].info.metadata, queued.metadata);
+    assert.equal(queue.sessionSnapshot(created.id).items.length, 0);
+    await queue.flush();
+    queue.stop();
+    queue = createConversationQueue(queueOptions);
+    input = createConversationInput({ queue, api: inputApi, publish: changes => events.push(...changes) });
+    assert.deepEqual(await request(`${root}/${created.id}/inbox`), inbox);
+    queue.start();
+    const composer = text => ({ content: text, text, attachments: [], context: [], sendConfig: { providerID: 'antigravity', modelID: 'second' } });
+    const first = await queue.enqueue(created.id, directory, composer('First queued row'));
+    const second = await queue.enqueue(created.id, directory, composer('Second queued row'));
+    await queue.reorder(created.id, [second.itemId, first.itemId]);
+    assert.deepEqual((await queue.takeAll(created.id)).items.map(item => item.text), ['Second queued row', 'First queued row']);
+    await queue.enqueue(created.id, directory, composer('Clear this row'));
+    await queue.clear(created.id);
+    assert.deepEqual(await request(`${root}/${created.id}/inbox`), inbox);
+    const cancellation = { ...queued, id: 'msg_queue_cancelled', text: 'Cancel this' };
+    await request(`${root}/${created.id}/prompt`, 'POST', cancellation);
+    await request(`${root}/${created.id}/inbox/${cancellation.id}`, 'DELETE');
+    assert.deepEqual((await request(`${root}/${created.id}/inbox`)).map(item => item.info.id), inbox.map(item => item.info.id));
+    assert.ok(events.some(event => event.type === 'message.removed' && event.properties.messageID === cancellation.id));
+    await native.send(created.id, { id: 'msg_queue_finish', text: 'Finish working', files: [], context: [], agents: [], skills: [] });
+    await native.wait(created.id, AbortSignal.timeout(5_000));
+    await queuedSent.promise;
+    await native.wait(created.id, AbortSignal.timeout(5_000));
+    const sent = await request(`${root}/${created.id}/message`);
+    assert.ok(sent.items.some(item => item.info.id === queued.id));
+    assert.ok(sent.items.some(item => item.info.id === inbox[0].info.id && item.info.role === 'synthetic' && item.info.text === queued.context[0].text));
+    assert.equal(sent.items.some(item => item.info.id === cancellation.id), false);
+    assert.deepEqual(await request(`${root}/${created.id}/inbox`), []);
+    queue.stop();
+    await queue.flush();
+  });
+  await t.test('OpenCode queues complete input in the host and admits steering immediately', async () => {
+    const sent = Promise.withResolvers();
+    queue = createConversationQueue({ ...queueOptions, onPromptSent: sent.resolve });
+    input = createConversationInput({ queue, api: inputApi, publish: changes => events.push(...changes) });
+    queue.start();
+    const before = calls.length;
+    const context = await request(`${root}/${standard.id}/context`, 'POST', { text: 'OpenCode context', metadata: { retained: true } });
+    assert.equal(calls.slice(before).some(call => call.path.endsWith('/synthetic')), false);
+    const prompt = { id: 'msg_standard_queued', text: 'Queued OpenCode', files: [{ mime: 'image/png', filename: 'image.png', url: 'data:image/png;base64,eA==' }], context, agents: [{ name: 'build' }], skills: [], metadata: { retained: true }, delivery: 'queue' };
+    await request(`${root}/${standard.id}/prompt`, 'POST', prompt);
+    const inbox = await request(`${root}/${standard.id}/inbox`);
+    assert.deepEqual(inbox.map(item => item.info.role), ['synthetic', 'user']);
+    assert.equal(calls.slice(before).some(call => call.path.endsWith('/prompt')), false);
+    nativeInbox = [{ id: 'msg_backend_pending', type: 'user', payload: { text: 'Native steering' }, time: { created: 1 }, delivery: 'steer' }];
+    assert.equal((await request(`${root}/${standard.id}/inbox`))[0].info.id, 'msg_backend_pending');
+    await request(`${root}/${standard.id}/inbox/msg_backend_pending`, 'DELETE');
+    assert.deepEqual(nativeInbox, []);
+    await request(`${root}/${standard.id}/prompt`, 'POST', { ...prompt, id: 'msg_standard_steer', text: 'Steer now', context: [], delivery: 'steer' });
+    assert.equal(calls.findLast(call => call.path.endsWith('/prompt')).body.id, 'msg_standard_steer');
+    standardBusy = false;
+    queue.sessionStatus(standard.id, 'idle');
+    await sent.promise;
+    const delivered = calls.findLast(call => call.path.endsWith('/prompt')).body;
+    assert.equal(delivered.id, prompt.id);
+    assert.equal(delivered.delivery, undefined);
+    assert.deepEqual(delivered.files, [{ uri: prompt.files[0].url, name: 'image.png' }]);
+    assert.deepEqual(delivered.agents, prompt.agents);
+    assert.deepEqual(delivered.metadata, prompt.metadata);
+    assert.equal(calls.findLast(call => call.path.endsWith('/synthetic')).body.id, inbox[0].info.id);
+    assert.deepEqual(calls.findLast(call => call.path.endsWith('/model')).body.model, wire.model);
+    assert.deepEqual(await request(`${root}/${standard.id}/inbox`), []);
+    standardBusy = true;
+    queue.stop();
   });
   await native.send(created.id, { id: 'msg_working', text: 'working', files: [], context: [], agents: [], skills: [] });
   assert.deepEqual(await request(`${runtime}/statuses${folder}`), { [wire.id]: { type: 'busy' }, [created.id]: { type: 'busy' } });

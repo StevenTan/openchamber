@@ -18,6 +18,9 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import type { JsonObject, JsonValue } from '../shared/json-values.js';
 import type { ModelCatalogEntry } from './opencode-types.js';
+import { conversationPrompt } from '../agent-backends/prompt-schema.js';
+import type { QueueSendConfig, QueuedGoal, QueuedAttachment, QueuedContextPart, QueuedItemInput, QueuedItem, PublicQueuedItem, SessionQueue, MessageQueueSessionSnapshot } from './contracts.js';
+export type { QueueSendConfig, QueuedGoal, QueuedAttachment, QueuedContextPart, QueuedItemInput, QueuedItem, PublicQueuedItem, SessionQueue, MessageQueueSessionSnapshot } from './contracts.js';
 
 const QUEUE_FILE_NAME = 'message-queue.json';
 const QUEUE_FILE_VERSION = 1;
@@ -37,67 +40,6 @@ const ATTACHMENT_SOURCES = new Set(['local', 'server', 'vscode']);
 const CONTEXT_PART_KINDS = new Set(['context', 'instruction', 'synthetic']);
 const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{4,128}$/;
 const MESSAGE_ID_PATTERN = /^msg_[A-Za-z0-9]{8,64}$/;
-
-export interface QueueSendConfig {
-  providerID?: string;
-  modelID?: string;
-  agent?: string;
-  variant?: string;
-}
-
-export interface QueuedGoal {
-  tokenBudget: number | null;
-  objective?: string;
-}
-
-export interface QueuedAttachment {
-  id: string;
-  filename: string;
-  mimeType: string;
-  size: number;
-  source: 'local' | 'server' | 'vscode';
-  serverPath?: string;
-  agentPath?: string;
-  dataUrl: string;
-}
-
-export type QueuedContextPart =
-  | { kind: 'context'; text: string; metadata: QueueRecord; instructions?: string }
-  | { kind: 'instruction' | 'synthetic'; text: string; metadata?: never };
-
-export interface QueuedItemInput {
-  content: string;
-  text: string;
-  agentMention?: string;
-  attachments: QueuedAttachment[];
-  context: QueuedContextPart[];
-  contextPreview?: string;
-  sendConfig: QueueSendConfig;
-  goal?: QueuedGoal;
-  scheduledTask?: ScheduledTaskProvenance;
-}
-
-export interface QueuedItem extends QueuedItemInput {
-  id: string;
-  createdAt: number;
-  syntheticIds?: string[];
-}
-
-export interface PublicQueuedItem extends Omit<QueuedItem, 'context' | 'syntheticIds' | 'attachments'> {
-  attachments: Omit<QueuedAttachment, 'dataUrl'>[];
-}
-
-export interface SessionQueue {
-  directory: string;
-  items: QueuedItem[];
-}
-
-export interface MessageQueueSessionSnapshot {
-  sessionId: string;
-  directory: string;
-  items: PublicQueuedItem[];
-  sendingId: string | null;
-}
 
 const getQueuedSendRetryDelayMs = (failures: number) =>
   Math.min(RETRY_BASE_DELAY_MS * 2 ** Math.max(failures - 1, 0), RETRY_MAX_DELAY_MS);
@@ -228,11 +170,12 @@ const queuedItemInputSchema = z.unknown().transform((value): QueuedItemInput => 
   const content = asText(raw.content).replace(/^\n+|\n+$/g, '');
   if (content.length > CONTENT_CHAR_LIMIT) throw new TypeError('item content is too long');
   const text = raw.text === undefined ? content : asText(raw.text);
+  const prompt = raw.prompt === undefined ? undefined : conversationPrompt.parse(raw.prompt);
   const attachments = (asList(raw.attachments) ?? []).map((entry) => parseAttachment(entry));
   if (!attachments.every((attachment) => attachment !== null)) throw new TypeError('invalid attachment');
   const context = (asList(raw.context) ?? []).map((entry) => parseContextPart(entry));
   if (!context.every((part) => part !== null)) throw new TypeError('invalid context part');
-  if (!text.trim() && attachments.length === 0 && context.length === 0) {
+  if (!text.trim() && attachments.length === 0 && context.length === 0 && !prompt) {
     throw new TypeError('item needs text, attachments, or context');
   }
   const sendConfig = parseSendConfig(raw.sendConfig);
@@ -240,7 +183,7 @@ const queuedItemInputSchema = z.unknown().transform((value): QueuedItemInput => 
   const projectId = asNonEmptyString(provenance?.projectId);
   const taskId = asNonEmptyString(provenance?.taskId);
   if (provenance && (!projectId || !taskId)) throw new TypeError('invalid scheduledTask provenance');
-  if (!sendConfig && !provenance) throw new TypeError('item sendConfig with providerID and modelID is required');
+  if (!sendConfig && !provenance && !prompt) throw new TypeError('item sendConfig with providerID and modelID is required');
   const goal = parseGoal(raw.goal);
   if (goal && !text.trim()) throw new TypeError('a goal needs message text');
   const item: Omit<QueuedItemInput, 'attachments' | 'context' | 'sendConfig'> & Partial<Pick<QueuedItemInput, 'attachments' | 'context' | 'sendConfig'>> = { content, text };
@@ -251,6 +194,11 @@ const queuedItemInputSchema = z.unknown().transform((value): QueuedItemInput => 
   const contextPreview = asNonEmptyString(raw.contextPreview).slice(0, 103);
   if (contextPreview) item.contextPreview = contextPreview;
   item.sendConfig = sendConfig ?? {};
+  if (prompt) {
+    item.prompt = prompt;
+    const agent = asNonEmptyString(asRecord(raw.sendConfig)?.agent);
+    if (agent) item.sendConfig.agent = agent;
+  }
   if (goal) item.goal = goal;
   if (provenance) {
     item.scheduledTask = { projectId, taskId };
@@ -364,6 +312,8 @@ export function createMessageQueueRuntime({
   abortHoldMs = ABORT_HOLD_MS,
   retryDelayMs = getQueuedSendRetryDelayMs,
   backendForSession,
+  sendPrompt,
+  onPromptCancelled,
 }: MessageQueueOptions) {
   const filePath = path.join(dataDir, QUEUE_FILE_NAME);
 
@@ -453,7 +403,7 @@ export function createMessageQueueRuntime({
     return {
       sessionId,
       directory: queue?.directory ?? directories.get(sessionId) ?? '',
-      items: (queue?.items ?? []).map(toPublicItem),
+      items: (queue?.items ?? []).filter(item => !item.prompt).map(toPublicItem),
       sendingId: sending.get(sessionId) ?? null,
     };
   };
@@ -486,6 +436,7 @@ export function createMessageQueueRuntime({
   const setQueueItems = (sessionId: string, directory: string | undefined, items: QueuedItem[], status: ScheduledTaskStatus = 'cancelled', cause?: unknown) => {
     for (const item of queues.get(sessionId)?.items ?? []) {
       if (item.scheduledTask && !items.some((entry) => entry.id === item.id)) reportScheduledResult(item, status, cause);
+      if (item.prompt && status === 'cancelled' && !items.some(entry => entry.id === item.id)) onPromptCancelled?.(sessionId, item, directory ?? '');
     }
     directories.set(sessionId, directory);
     if (items.length === 0) {
@@ -617,6 +568,7 @@ export function createMessageQueueRuntime({
   };
 
   const sendItem = async (sessionId: string, directory: string, item: QueuedItem) => {
+    if (item.prompt) return sendPrompt(sessionId, directory, { ...item, prompt: item.prompt });
     const backend = backendForSession?.(sessionId);
     if (backend) return backend.send(directory, item);
     const { providerID, modelID, variant } = item.sendConfig;
@@ -899,9 +851,9 @@ export function createMessageQueueRuntime({
     const queue = queues.get(sessionId);
     if (!queue) return { revision, session: sessionSnapshot(sessionId), items: [] };
     const sendingId = sending.get(sessionId) ?? null;
-    const items = queue.items.filter((item) => item.id !== sendingId && !item.scheduledTask);
+    const items = queue.items.filter((item) => item.id !== sendingId && !item.scheduledTask && !item.prompt);
     if (items.length === 0) return { revision, session: sessionSnapshot(sessionId), items: [] };
-    setQueueItems(sessionId, queue.directory, queue.items.filter((item) => item.id === sendingId || item.scheduledTask));
+    setQueueItems(sessionId, queue.directory, queue.items.filter((item) => item.id === sendingId || item.scheduledTask || item.prompt));
     return { ...commit(sessionId), items };
   };
 
@@ -913,13 +865,15 @@ export function createMessageQueueRuntime({
     await load();
     const queue = queues.get(sessionId);
     if (!queue) return { revision, session: sessionSnapshot(sessionId) };
-    const byId = new Map(queue.items.map((item) => [item.id, item]));
+    const byId = new Map(queue.items.filter(item => !item.prompt).map((item) => [item.id, item]));
     const hasQueuedId = (id: unknown): id is string => isString(id) && byId.has(id);
     if (itemIds.length !== byId.size || new Set(itemIds).size !== itemIds.length || !itemIds.every(hasQueuedId)) {
       throw new TypeError('itemIds must list every queued message exactly once');
     }
-    queues.set(sessionId, { directory: queue.directory, items: itemIds.map((id) => {
-      const item = byId.get(id);
+    const order = itemIds[Symbol.iterator]();
+    queues.set(sessionId, { directory: queue.directory, items: queue.items.map((entry) => {
+      if (entry.prompt) return entry;
+      const item = byId.get(String(order.next().value));
       if (!item) throw new Error('Queued message is missing');
       return item;
     }) });
@@ -932,8 +886,9 @@ export function createMessageQueueRuntime({
     const queue = queues.get(sessionId);
     if (!queue) return { revision, session: sessionSnapshot(sessionId) };
     const sendingId = sending.get(sessionId) ?? null;
-    setQueueItems(sessionId, queue.directory, queue.items.filter((item) => item.id === sendingId));
+    setQueueItems(sessionId, queue.directory, queue.items.filter((item) => item.id === sendingId || item.prompt));
     clearTimer(sessionId);
+    armDispatch(sessionId);
     return commit(sessionId);
   };
 
@@ -1032,6 +987,7 @@ export function createMessageQueueRuntime({
     sessionStatus: (sessionID: string, type: 'idle' | 'busy') => processPayload({ type: 'session.status', properties: { sessionID, status: { type } } }),
     snapshot,
     sessionSnapshot,
+    pendingPrompts: (sessionID: string) => (queues.get(sessionID)?.items ?? []).filter(item => item.prompt),
     enqueue,
     cancelScheduledTask,
     remove,

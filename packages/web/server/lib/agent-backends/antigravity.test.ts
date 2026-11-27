@@ -9,6 +9,7 @@ import { createAntigravityBackend } from './antigravity.js';
 import { createBackendMcpIdentity } from './mcp-identity.js';
 import { EventEmitter, once } from 'node:events';
 import { createAgentBackendHost } from './host.js';
+import { createMessageQueueRuntime } from '../message-queue/runtime.js';
 import { createTurnDiffRuntime } from '../turn-diffs/runtime.js';
 import { createOpenCodeClient } from '../openchamber-sessions/opencode-client.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -211,7 +212,10 @@ test('ACP sessions retain streamed history and admit an async answer during a ru
   const listener = createServer();
   await new Promise<void>(resolve => listener.listen(0, '127.0.0.1', resolve));
   cleanups.push(() => new Promise<void>((resolve, reject) => listener.close(error => error ? reject(error) : resolve())));
+  const queue = createMessageQueueRuntime({ dataDir: directory, globalEventHub: { subscribeEvent: () => () => {}, subscribeStatus: () => () => {} }, buildOpenCodeUrl: route => `http://127.0.0.1${route}`, getOpenCodeAuthHeaders: () => ({}), sendPrompt: (...args) => host.input.send(...args) });
+  cleanups.push(async () => { queue.stop(); await queue.flush(); });
   const host = createAgentBackendHost({
+    queue,
     dataDir: directory, initializeSession: async () => {},
     onUserInput: () => {}, readInstructions: async () => [], environment: () => process.env, server: () => listener,
     tools: () => { throw new Error('Tool runtime is unused'); }, publish: () => {},

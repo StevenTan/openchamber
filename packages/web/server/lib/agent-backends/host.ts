@@ -31,6 +31,8 @@ import { readProjectRules } from './project-rules.js';
 import { createConversationStorage } from './conversation-storage.js';
 import { createOpenCodeHistory } from './opencode-history.js';
 import { createConversationCatalog } from './conversation-catalog.js';
+import { createConversationInput } from './conversation-input.js';
+import type { createMessageQueueRuntime } from '../message-queue/runtime.js';
 
 interface Options {
   dataDir: string;
@@ -45,6 +47,7 @@ interface Options {
   onUserInput(sessionID: string, directory: string): void;
   processForwardedEventPayload?: ForwardEventPayload;
   skillDirectories?(): readonly string[];
+  queue: ReturnType<typeof createMessageQueueRuntime>;
 }
 export function createAgentBackendHost(options: Options) {
   const storage = createConversationStorage(options.dataDir);
@@ -93,6 +96,7 @@ export function createAgentBackendHost(options: Options) {
   let conversationFetch: typeof fetch | undefined;
   const catalog = createConversationCatalog(storage.catalog, { opencode: createOpenCodeAdapter(history), antigravity: createAntigravityAdapter(backend) }, () => options.openCodeClient(undefined, conversationFetch), stream.publish);
   const registry = createBackendRegistry(catalog.adapters, owners, backend.ready, catalog.list);
+  const input = createConversationInput({ queue: options.queue, api: (sessionID, directory) => registry.forSession(sessionID).conversations({ directory, client: options.openCodeClient(directory, conversationFetch) }), publish: stream.publish });
   const applicationDirectory = (sessionID: string) => backend.lookup(sessionID)?.directory;
   const toolOptions = {
     turnDiffs,
@@ -107,9 +111,9 @@ export function createAgentBackendHost(options: Options) {
     const directory = applicationDirectory(sessionID);
     return directory ? { directory, projectDirectory: directory, rules: [] } : undefined;
   };
-  const conversations = { registry, client: options.openCodeClient, abortTools: (id: string) => options.tools().abortSession(id), permissions: { list: (directory?: string) => options.tools().permissions.list(directory) }, skillDirectories: () => options.skillDirectories?.() ?? [] };
+  const conversations = { registry, client: options.openCodeClient, abortTools: (id: string) => options.tools().abortSession(id), permissions: { list: (directory?: string) => options.tools().permissions.list(directory) }, skillDirectories: () => options.skillDirectories?.() ?? [], input };
   return {
-    backend, registry, stream,
+    backend, registry, stream, input,
     registerRoutes(app: Application) {
       registerSkillCatalogRoute(app, express, { authorize: req => options.tools().authorizeRequest(req), directories: () => options.skillDirectories?.() ?? [] });
       stream.registerRoutes(app);
@@ -148,13 +152,12 @@ export function createManagedAgentBackendHost(options: Omit<Options, 'initialize
   initializePermission(sessionID: string, source?: { id: string; directory: string }): Promise<void>;
   syncKnowledge: ReturnType<typeof createManagedSessionKnowledgeRuntime>['sync'];
   readInstructions(sessionID: string): Promise<Array<{ text: string }>>;
-  sessionStatus(sessionID: string, type: 'idle' | 'busy'): void;
 }) {
   const host = createAgentBackendHost({
     ...options,
     publish: event => {
       if (event.properties.type === 'control') options.publish(event);
-      if (event.properties.type === 'turn') options.sessionStatus(event.properties.sessionID, event.properties.turn.completed ? 'idle' : 'busy');
+      if (event.properties.type === 'turn') options.queue.sessionStatus(event.properties.sessionID, event.properties.turn.completed ? 'idle' : 'busy');
     },
     initializeSession: async (sessionID, directory, source) => {
       await options.initializePermission(sessionID, source);
@@ -165,6 +168,7 @@ export function createManagedAgentBackendHost(options: Omit<Options, 'initialize
       return options.readInstructions(sessionID);
     },
   });
+  options.queue.start();
   return host;
 }
 

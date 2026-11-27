@@ -8,12 +8,12 @@ import { OpenChamberControlError } from '../openchamber-control/error.js';
 import { AntigravityNotInstalledError } from './antigravity-executable.js';
 import type { createToolPermissions } from '../agent-tool/permissions.js';
 import { listConversationSkills, resolveConversationSkills, readConversationSkills } from './skills.js';
-import type { ConversationSkills } from '@openchamber/sdk/conversations/http';
+import type { ConversationSkills, ConversationContext } from '@openchamber/sdk/conversations/http';
+import { conversationContext, conversationPrompt } from './prompt-schema.js';
+import type { ConversationInput } from './conversation-input.js';
 
 const metadata = z.record(z.string(), z.json());
 const model = z.object({ id: z.string(), providerID: z.string(), variant: z.string().nullable().optional() });
-const context = z.object({ id: z.string().optional(), text: z.string(), description: z.string().optional(), metadata: metadata.optional(), delivery: z.enum(['steer', 'queue']).optional() });
-const prompt = z.object({ id: z.string(), text: z.string(), files: z.array(z.object({ mime: z.string(), filename: z.string().optional(), url: z.string() })), context: z.array(context), agents: z.array(z.object({ name: z.string(), mention: z.object({ start: z.number(), end: z.number(), text: z.string() }).optional() })), skills: z.array(z.object({ id: z.string() })), metadata: metadata.optional(), delivery: z.enum(['steer', 'queue']).optional() });
 const listing = z.object({ global: z.enum(['true', 'false']).optional().transform(value => value === 'true'), limit: z.coerce.number().optional(), cursor: z.string().optional(), order: z.enum(['asc', 'desc']).optional(), search: z.string().optional(), parentID: z.string().nullable().optional() });
 const page = z.object({ limit: z.coerce.number().optional(), cursor: z.string().optional(), order: z.enum(['asc', 'desc']).optional(), partShells: z.enum(['true', 'false']).optional().transform(value => value === 'true') });
 const catalogQuery = z.object({ backendID: z.enum(['opencode', 'antigravity']).optional(), sessionID: z.string().optional(), includeProviders: z.enum(['true', 'false']).optional() });
@@ -27,7 +27,7 @@ const formCancel = z.object({ message: z.string().optional() });
 const runtimeRoot = '/api/conversation-runtime';
 
 type ConversationRequest = Request<unknown, { id: string; messageID: string; requestID: string; formID: string }>;
-type ConversationResponse = Exclude<Awaited<ReturnType<ConversationApi[keyof ConversationApi]>>, void> | boolean | null | { id: string } | ConversationSkills;
+type ConversationResponse = Exclude<Awaited<ReturnType<ConversationApi[keyof ConversationApi]>>, void> | boolean | null | { id: string } | ConversationSkills | ConversationContext[];
 
 interface Options {
   registry: BackendRegistry;
@@ -37,6 +37,7 @@ interface Options {
   fetch?: typeof fetch;
   permissions: Pick<ReturnType<typeof createToolPermissions>, 'list'>;
   skillDirectories?(): readonly string[];
+  input: ConversationInput;
 }
 
 export function registerConversationRoutes(app: Application, express: Pick<ExpressFactory, 'json' | 'Router'>, options: Options) {
@@ -78,18 +79,19 @@ export function registerConversationRoutes(app: Application, express: Pick<Expre
   router.patch(`${sessionRoot}/:id`, express.json({ limit: '1mb' }), handle(async (api, req) => { await api.rename(req.params.id, z.object({ title: z.string() }).parse(req.body).title); return null; }));
   router.get(`${sessionRoot}/:id/message`, handle((api, req) => api.messages(req.params.id, page.parse(req.query))));
   router.get(`${sessionRoot}/:id/message/:messageID`, handle((api, req) => api.message(req.params.id, req.params.messageID)));
-  router.get(`${sessionRoot}/:id/inbox`, handle((api, req) => api.inbox(req.params.id)));
+  router.get(`${sessionRoot}/:id/inbox`, handle((api, req) => options.input.inbox(api, req.params.id)));
+  router.delete(`${sessionRoot}/:id/inbox/:messageID`, handle(async (api, req) => { await options.input.cancel(api, req.params.id, req.params.messageID); return true; }));
   router.post(`${sessionRoot}/:id/model`, express.json({ limit: '1mb' }), handle(async (api, req) => { await api.model(req.params.id, model.parse(req.body)); return null; }));
   router.post(`${sessionRoot}/:id/agent`, express.json({ limit: '1mb' }), handle(async (api, req) => { await api.agent(req.params.id, z.object({ agent: z.string() }).parse(req.body).agent); return null; }));
-  router.post(`${sessionRoot}/:id/context`, express.json({ limit: '50mb' }), handle((api, req) => api.context(req.params.id, context.parse(req.body))));
+  router.post(`${sessionRoot}/:id/context`, express.json({ limit: '50mb' }), handle(async (_api, req) => [conversationContext.parse(req.body)]));
   router.post(`${sessionRoot}/:id/prompt`, express.json({ limit: '50mb' }), handle(async (api, req) => {
-    const input = prompt.parse(req.body);
+    const input = conversationPrompt.parse(req.body);
     if (input.skills.length) {
       const session = await api.get(req.params.id);
       const skills = await listConversationSkills(session.directory, options.skillDirectories?.());
-      for (const item of await readConversationSkills(skills, input.skills)) input.context.push(...await api.context(req.params.id, item));
+      input.context.push(...await readConversationSkills(skills, input.skills));
     }
-    return { id: await api.prompt(req.params.id, { ...input, skills: [] }) };
+    return { id: await options.input.prompt(api, req.params.id, { ...input, skills: [] }) };
   }));
   router.post(`${sessionRoot}/:id/interrupt`, handle(async (api, req) => { options.abortTools(req.params.id); await api.interrupt(req.params.id); return true; }));
   router.post(`${sessionRoot}/:id/revert/stage`, express.json({ limit: '1mb' }), handle((api, req) => api.stageRevert(req.params.id, z.object({ messageID: z.string() }).parse(req.body).messageID)));

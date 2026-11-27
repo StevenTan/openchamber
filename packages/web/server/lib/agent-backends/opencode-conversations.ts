@@ -38,10 +38,11 @@ export function createOpenCodeConversations({ client, directory }: ConversationC
       const message = projectInboxMessage(item, { sessionID: id, messageID: item.id, created: item.time.created });
       return message ? [message] : [];
     }),
+    cancelInbox: async (id, messageID) => { await client.session.inbox.cancel({ sessionID: id, inboxID: messageID }); },
     model: async (id, model) => { await client.session.switchModel({ sessionID: id, model: { id: model.id, providerID: model.providerID, ...model.variant != null && { variant: model.variant } } }); },
     agent: async (id, agent) => { await client.session.switchAgent({ sessionID: id, agent }); },
-    context: async (id, input) => { await client.session.synthetic({ sessionID: id, ...input, resume: false }); return []; },
     async prompt(id, input) {
+      for (const context of input.context) await client.session.synthetic({ sessionID: id, ...context, resume: false });
       await client.session.prompt({ sessionID: id, id: input.id, text: input.text, files: input.files.length ? input.files.map(file => ({ uri: file.url, ...file.filename !== undefined && { name: file.filename } })) : undefined, agents: input.agents.length ? input.agents.map(agent => ({ name: agent.name, ...agent.mention !== undefined && { mention: agent.mention } })) : undefined, skills: input.skills.length ? input.skills : undefined, metadata: input.metadata, delivery: input.delivery });
       return input.id;
     },

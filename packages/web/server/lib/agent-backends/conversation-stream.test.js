@@ -11,6 +11,7 @@ import { createAgentBackendHost } from './host.js';
 import { createGlobalMessageStreamHub } from '../event-stream/global-hub.js';
 import { createMessageStreamWsRuntime, createGlobalUiEventBroadcaster } from '../event-stream/runtime.js';
 import { createConversationStorage } from './conversation-storage.js';
+import { createMessageQueueRuntime } from '../message-queue/runtime.js';
 
 test('shared SSE and WebSocket streams deliver native and OpenCode events with resumable history identities', async t => {
   const changes = new EventEmitter();
@@ -26,7 +27,10 @@ test('shared SSE and WebSocket streams deliver native and OpenCode events with r
   const server = app.listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
   cleanup(() => new Promise(resolve => { server.closeAllConnections(); server.close(resolve); }));
+  const queue = createMessageQueueRuntime({ dataDir: directory, globalEventHub: hub, buildOpenCodeUrl: route => `http://127.0.0.1${route}`, getOpenCodeAuthHeaders: () => ({}), sendPrompt: (...args) => host.input.send(...args) });
+  cleanup(async () => { queue.stop(); await queue.flush(); });
   const host = createAgentBackendHost({
+    queue,
     dataDir: directory, server: () => server, environment: () => process.env, hub,
     initializeSession: async () => {}, readInstructions: async () => [], onUserInput: () => {}, publish: () => {},
     tools: () => { throw new Error('This test does not execute MCP tools'); },

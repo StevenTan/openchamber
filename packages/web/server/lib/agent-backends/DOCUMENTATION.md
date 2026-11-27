@@ -91,6 +91,14 @@ mobile clients use the host routes; the VS Code extension uses OpenCode.
   backend metadata. Live and replayed native events preserve these owned fields.
 - Antigravity prompt steering admits additional user messages and asynchronous
   answers into the running turn. The latest prompt's completion ends that turn.
+- Conversation input uses the host message queue for `delivery: queue` and
+  dispatches `steer` immediately through the owning adapter. Queued input retains
+  message and context identities, attachments, mentions, metadata and the selected
+  model and agent in `message-queue.json`. The conversation inbox combines these
+  pending records with backend admission records; canceling a host input removes
+  its pending messages through the shared event stream. Context attachments are
+  admitted with their prompt in both adapters. Queue deliveries appear in the
+  conversation timeline; composer queue controls operate on their own rows.
 - The custom main agent uses the supplied MCP servers. OpenChamber's MCP services
   perform approvals; ACP permission callbacks admit the call to those services.
 - The custom agent's system prompt is loaded from `antigravity-agent-prompt.txt`.
