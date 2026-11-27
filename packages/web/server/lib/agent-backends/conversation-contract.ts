@@ -37,4 +37,7 @@ export interface ConversationApi {
   projects(): Promise<Project[]>;
   vcs(): Promise<Vcs>;
   statuses(): Promise<Record<string, SessionStatus>>;
+  stageRevert(id: string, messageID: string): Promise<NonNullable<Session['revert']>>;
+  clearRevert(id: string): Promise<void>;
+  commitRevert(id: string): Promise<void>;
 }

@@ -21,6 +21,8 @@ import { createAntigravityStorage, type StoredConversation } from './antigravity
 import type { MessageListOptions, MessageRecord } from '@openchamber/sdk/conversations/http';
 import type { ConversationStorage } from './conversation-storage.js';
 import { acpSession } from '@openchamber/sdk/conversations/antigravity';
+import { rewindAntigravityHistory } from './antigravity-history.js';
+import { OpenChamberControlError } from '../openchamber-control/error.js';
 
 interface Options {
   dataDir: string;
@@ -192,7 +194,29 @@ export function createAntigravityBackend(options: Options) {
     await releaseIdleSessions(acp, id);
     return session;
   };
+  const commitRevert = async (id: string) => {
+    const session = await get(id);
+    const boundary = session.revert;
+    if (!boundary) return;
+    await prompts.get(id);
+    if (loaded.has(id)) {
+      const acp = await connect();
+      await acp.closeSession({ sessionId: session.nativeID });
+      loaded.delete(id);
+    }
+    options.storage.session(id, db => rewindAntigravityHistory(db,
+      path.join(root, 'profile', 'antigravity-acp', 'conversations', `${session.nativeID}.db`), boundary.messageID));
+    session.turns = history().summaries(id);
+    delete session.revert;
+    delete session.tokens;
+    refreshUsage(session);
+    session.updated = Date.now();
+    await save(session);
+    options.publish({ type: 'reverted', session, messageID: boundary.messageID });
+    options.publish({ type: 'session', session });
+  };
   const send = async (sessionID: string, input: AcpSend, source: 'user' | 'synthetic' = 'user') => {
+    await commitRevert(sessionID);
     const session = await get(sessionID);
     return withSession(session, async acp => {
       if (source === 'user') options.onUserInput?.(sessionID, session.directory);
@@ -376,6 +400,23 @@ export function createAntigravityBackend(options: Options) {
       });
     },
     async abort(id: string) { const session = await get(id); await withSession(session, acp => acp.cancel({ sessionId: session.nativeID })); },
+    async stageRevert(id: string, messageID: string) {
+      const session = await get(id);
+      await prompts.get(id);
+      const message = history().message(id, messageID);
+      if (message?.info.role !== 'user') throw new OpenChamberControlError('Rewind requires a user message', 400);
+      session.revert = { messageID };
+      await save(session);
+      options.publish({ type: 'session', session });
+      return session.revert;
+    },
+    async clearRevert(id: string) {
+      const session = await get(id);
+      delete session.revert;
+      await save(session);
+      options.publish({ type: 'session', session });
+    },
+    commitRevert,
     statuses: () => Object.fromEntries([...active.keys()].map(id => [id, { type: 'busy' as const }])),
     async quota() {
       const acp = await connect();

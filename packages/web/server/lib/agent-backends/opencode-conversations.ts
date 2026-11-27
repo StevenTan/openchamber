@@ -68,5 +68,8 @@ export function createOpenCodeConversations({ client, directory }: ConversationC
       const active = z.record(z.string().min(1), z.object({ type: z.literal('running') })).parse(await client.session.active());
       return Object.fromEntries(Object.keys(active).map(id => [id, { type: 'busy' as const }]));
     },
+    stageRevert: (id, messageID) => client.session.revert.stage({ sessionID: id, messageID }),
+    clearRevert: async id => { await client.session.revert.clear({ sessionID: id }); },
+    commitRevert: async id => { await client.session.revert.commit({ sessionID: id }); },
   };
 }

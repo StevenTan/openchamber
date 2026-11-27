@@ -6,7 +6,7 @@ import { Window } from 'happy-dom';
 import { OpenCode } from '@opencode/client';
 import type { AssistantMessage, Part, Session, SyntheticMessage, UserMessage } from '@/lib/opencode/model';
 import { CONTEXT_METADATA_KEY } from '@/lib/messages/contextParts';
-import { opencodeClient } from '@/lib/opencode/client';
+import { conversationClient } from '@/lib/agent/active';
 import { I18nProvider } from '@/lib/i18n';
 import { SyncProvider } from '@/sync/sync-context';
 import { getSyncChildStores } from '@/sync/sync-refs';
@@ -109,8 +109,8 @@ describe('RevertedMessagesStrip', () => {
   });
 
   test('Restore clears the staged revert', async () => {
-    const clear = spyOn(opencodeClient, 'clearRevert').mockResolvedValue(undefined);
-    const getSession = spyOn(opencodeClient, 'getSession').mockResolvedValue(session);
+    const clear = spyOn(conversationClient, 'clearRevert').mockResolvedValue(undefined);
+    const getSession = spyOn(conversationClient, 'getSession').mockResolvedValue(session);
     try {
       await stage(['Try the other approach']);
       await act(async () => button('Restore')?.click());

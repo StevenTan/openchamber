@@ -589,7 +589,7 @@ function descendantRevertCutoff(state: { session: readonly Session[] }, target: 
 async function stageAndReadRevert(sessionId: string, messageId: string, directory: string | null | undefined, assertRuntime: () => void): Promise<Session> {
   const key = revertKey(sessionId)
   unreconciledReverts.add(key)
-  await opencodeClient.stageRevert(sessionId, messageId, { directory })
+  await conversationClient.stageRevert(sessionId, messageId, { directory })
   assertRuntime()
   const reverted = await conversationClient.getSession(sessionId, directory)
   assertRuntime()
@@ -625,13 +625,13 @@ async function clearStagedRevertNow(sessionId: string): Promise<void> {
   for (const descendant of getDescendantSessions(sessionId)) {
     if (!descendant.session.revert) continue
     try {
-      await opencodeClient.clearRevert(descendant.session.id, descendant.directory)
+      await conversationClient.clearRevert(descendant.session.id, descendant.directory)
       mirrorSessionIntoLiveStores(await conversationClient.getSession(descendant.session.id, descendant.directory), descendant.directory)
     } catch (error) {
       console.error(`[session-actions] Failed to clear revert in descendant ${descendant.session.id}:`, error)
     }
   }
-  await opencodeClient.clearRevert(sessionId, directory)
+  await conversationClient.clearRevert(sessionId, directory)
   mirrorSessionIntoLiveStores(await conversationClient.getSession(sessionId, directory), directory)
   if (directory) {
     sessionEvents.requestGitRefresh({ directory })
@@ -709,12 +709,12 @@ export async function commitStagedRevert(sessionId: string, directory?: string |
   await waitForPendingRevert(sessionId, directory)
   await runRevertOperation(sessionId, async () => {
     if (!findLiveSession(sessionId)?.revert) return
-    await opencodeClient.commitRevert(sessionId, directory)
+    await conversationClient.commitRevert(sessionId, directory)
   }, false)
 }
 
 export function commitSessionRevert(sessionId: string, directory?: string | null): Promise<void> {
-  return runRevertOperation(sessionId, () => opencodeClient.commitRevert(sessionId, directory), false)
+  return runRevertOperation(sessionId, () => conversationClient.commitRevert(sessionId, directory), false)
 }
 
 function getGlobalSessionSnapshot(sessionId: string): Session | null {

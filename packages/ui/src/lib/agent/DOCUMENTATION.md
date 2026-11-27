@@ -63,6 +63,9 @@ conversations retain their stored backend.
 - Historical file patches use the shared host turn-diff endpoint. Antigravity
   turn references project into the same tool metadata used by OpenCode's changed
   file pills and per-turn diff view.
+- History edits stage, clear and commit through the conversation's owning
+  client. Managed clients use the host routes, and VS Code uses OpenCode's SDK.
+  Antigravity commits conversation history without restoring workspace files.
 
 ## Decisions
 

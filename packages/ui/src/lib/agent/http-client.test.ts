@@ -47,6 +47,12 @@ test('managed requests share directory-scoped transport and recover pending card
     expect(calls.at(-1)?.path).toBe('/api/conversations/ses_ag_native/form/frm_1/reply');
     expect(await native.client.cancelForm(form.sessionID, form.id, '/repo', 'Skip')).toBe(true);
     expect(calls.at(-1)?.body).toEqual({ message: 'Skip' });
+    await native.client.stageRevert(form.sessionID, 'msg_edit', { directory: '/repo' });
+    expect(calls.at(-1)).toEqual({ path: '/api/conversations/ses_ag_native/revert/stage', directory: '/repo', method: 'POST', body: { messageID: 'msg_edit' } });
+    await native.client.clearRevert(form.sessionID, '/repo');
+    expect(calls.at(-1)?.path).toBe('/api/conversations/ses_ag_native/revert/clear');
+    await native.client.commitRevert(form.sessionID, '/repo');
+    expect(calls.at(-1)?.path).toBe('/api/conversations/ses_ag_native/revert/commit');
     const store = createStore<DirectoryStore>()(set => ({ ...INITIAL_STATE, form: { [form.sessionID]: [form] }, permission: { [permission.sessionID]: [permission] }, patch: partial => set(partial), replace: next => set(next) }));
     expect(await resyncBlockingRequestsForDirectory('/repo', store)).toBe(true);
     expect(store.getState().form[form.sessionID]).toEqual([form]);

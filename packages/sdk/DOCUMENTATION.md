@@ -3,6 +3,8 @@
 The separate `@openchamber/sdk/agent-backends` entry point supplies the host ACP
 conversation wire types for web, desktop and mobile clients. These records are
 independent of the guest panel protocol.
+Staged history edits carry a user-message boundary; committed edits publish the
+shared history-truncation event with the conversation's existing identity.
 
 The `@openchamber/sdk/conversations/*` entries own shared conversation, message,
 catalog and interaction types. The Antigravity projection supplies identical

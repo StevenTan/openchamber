@@ -120,6 +120,12 @@ mobile clients use the host routes; the VS Code extension uses OpenCode.
   The original MCP call ID identifies card callbacks.
 - Session creation applies the host's default approval mode. Draft submission
   awaits the selected mode before dispatching the first prompt.
+- History edits use the shared stage, clear and commit routes. Antigravity stores
+  the staged user-message boundary in host metadata. Commit closes that native
+  worker, truncates its SQLite steps and generation metadata together with the
+  host display history, and reloads the same native identity on the next prompt.
+  Workspace files and recorded file diffs stay unchanged. OpenCode delegates
+  these operations to its native revert API; VS Code retains direct SDK calls.
 - The application session service routes ordinary create, send, status, history
   and interruption to the session's backend. Queued messages and scheduled runs
   select that same service. Native scheduled runs use the host's worktree

@@ -8,6 +8,9 @@ import { createAntigravityBackend } from './antigravity.js';
 import type { AcpTurn } from '@openchamber/sdk/agent-backends';
 import { DatabaseSync } from 'node:sqlite';
 import { createConversationStorage } from './conversation-storage.js';
+import { antigravityEvents } from './antigravity-events.js';
+import type { AcpConversationEvent } from '@openchamber/sdk/agent-backends';
+import { fileURLToPath } from 'node:url';
 
 test('disk history pages preserve messages while startup retains only model summaries', async t => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'antigravity-storage-'));
@@ -73,4 +76,65 @@ test('disk history pages preserve messages while startup retains only model summ
   assert.deepEqual(reopened.sessions(), []);
   assert.equal(reopened.message(session.id, 'reply_149'), undefined);
   assert.equal(reopened.turn(session.id, 'prompt_149'), undefined);
+});
+
+test('staged history edits survive restart and commit native and display history without changing files', async t => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'antigravity-rewind-'));
+  t.after(() => fs.rm(directory, { recursive: true }));
+  const storage = createConversationStorage(directory);
+  const history = createAntigravityStorage(storage);
+  const session: StoredConversation = { id: 'ses_ag_rewind', nativeID: 'native-rewind', directory, title: 'Rewind', created: 1, updated: 2, draft: false, config: [], forms: [], turns: [] };
+  for (let index = 0; index < 3; index++) history.save(session, {
+    id: `user_${index}`, assistantID: `assistant_${index}`, modelID: 'model', text: `Prompt ${index}`, files: [],
+    created: index, completed: index + 1, updates: [], followups: [],
+  });
+  const nativeFile = path.join(directory, 'agent-backends', 'antigravity', 'profile', 'antigravity-acp', 'conversations', `${session.nativeID}.db`);
+  await fs.mkdir(path.dirname(nativeFile), { recursive: true });
+  const native = new DatabaseSync(nativeFile);
+  t.after(() => native.close());
+  native.exec('CREATE TABLE steps (idx INTEGER PRIMARY KEY, step_type INTEGER, metadata BLOB); CREATE TABLE gen_metadata (idx INTEGER PRIMARY KEY, data BLOB); CREATE TABLE executor_metadata (idx INTEGER PRIMARY KEY, data BLOB)');
+  for (let index = 0; index < 3; index++) {
+    const metadata = Uint8Array.from([162, 1, 2, 24, index]);
+    native.prepare('INSERT INTO steps VALUES (?, 14, ?)').run(index * 2, metadata);
+    native.prepare('INSERT INTO steps VALUES (?, 15, ?)').run(index * 2 + 1, metadata);
+    native.prepare('INSERT INTO gen_metadata VALUES (?, ?)').run(index, new Uint8Array());
+    native.prepare('INSERT INTO executor_metadata VALUES (?, ?)').run(index, metadata);
+  }
+  const file = path.join(directory, 'edited.txt');
+  await fs.writeFile(file, 'Current workspace content');
+  const events: AcpConversationEvent[] = [];
+  const make = () => createAntigravityBackend({ storage, dataDir: directory, turnDiffs: { begin: async () => {}, finish: async () => {}, remove: async () => {} }, environment: () => process.env, mcpServers: () => [], reassignSession: () => {}, initializeSession: async () => {}, readInstructions: async () => [], publish: event => events.push(event), publishForm: () => {} });
+  const backend = make();
+  assert.deepEqual(await backend.stageRevert(session.id, 'user_1'), { messageID: 'user_1' });
+  assert.equal((await backend.messages(session.id, {})).items.length, 6);
+  assert.equal(native.prepare('SELECT COUNT(*) AS count FROM steps').get()?.count, 6);
+  await backend.clearRevert(session.id);
+  assert.equal((await backend.get(session.id)).revert, undefined);
+  await backend.stageRevert(session.id, 'user_1');
+  await backend.close();
+  const reopened = make();
+  t.after(async () => { await reopened.close(); storage.close(); });
+  assert.deepEqual((await reopened.get(session.id)).revert, { messageID: 'user_1' });
+  await reopened.commitRevert(session.id);
+  assert.deepEqual((await reopened.messages(session.id, { order: 'asc' })).items.map(item => item.info.id), ['user_0', 'assistant_0']);
+  assert.equal((await reopened.get(session.id)).nativeID, session.nativeID);
+  assert.equal((await reopened.get(session.id)).revert, undefined);
+  assert.deepEqual(native.prepare('SELECT idx FROM steps ORDER BY idx').all().map(row => row.idx), [0, 1]);
+  assert.deepEqual(native.prepare('SELECT idx FROM gen_metadata').all().map(row => row.idx), [0]);
+  assert.deepEqual(native.prepare('SELECT idx FROM executor_metadata').all().map(row => row.idx), [0]);
+  assert.equal(await fs.readFile(file, 'utf8'), 'Current workspace content');
+  const committed = events.find(event => event.type === 'reverted');
+  assert.ok(committed?.type === 'reverted');
+  assert.equal(antigravityEvents(committed)[0]?.type, 'session.revert.committed');
+  await reopened.stageRevert(session.id, 'user_0');
+  const executable = path.join(directory, 'agy');
+  const fixture = fileURLToPath(new URL('./antigravity.fixture.mjs', import.meta.url));
+  const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
+  await fs.writeFile(executable, `#!/bin/sh\nexec ${quote(process.execPath)} ${quote(fixture)} "$@"\n`, { mode: 0o700 });
+  await reopened.configure({ binary: executable });
+  await reopened.send(session.id, { id: 'replacement', text: 'Edited prompt', files: [], context: [] });
+  await reopened.wait(session.id, AbortSignal.timeout(5000));
+  assert.deepEqual((await reopened.messages(session.id, { order: 'asc' })).items.map(item => item.info.id), ['replacement', (await reopened.turn(session.id, 'replacement'))?.assistantID]);
+  assert.equal((await reopened.get(session.id)).revert, undefined);
+  assert.equal(native.prepare('SELECT COUNT(*) AS count FROM steps').get()?.count, 0);
 });

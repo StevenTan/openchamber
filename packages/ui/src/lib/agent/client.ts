@@ -65,4 +65,7 @@ export interface ConversationClient {
   replyToPermission(sessionID: string, requestID: string, reply: 'once' | 'always' | 'reject', options?: { message?: string; directory?: string | null }): Promise<boolean>;
   replyToForm(sessionID: string, formID: string, answer: Record<string, FormValue>, directory?: string | null): Promise<boolean>;
   cancelForm(sessionID: string, formID: string, directory?: string | null, message?: string): Promise<boolean>;
+  stageRevert(id: string, messageID: string, options?: { directory?: string | null }): Promise<NonNullable<Session['revert']>>;
+  clearRevert(id: string, directory?: string | null): Promise<void>;
+  commitRevert(id: string, directory?: string | null): Promise<void>;
 }

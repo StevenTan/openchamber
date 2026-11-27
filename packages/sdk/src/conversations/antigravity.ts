@@ -11,7 +11,8 @@ export function acpSession(session: AcpConversation): Session {
   return { id: session.id, backendID: 'antigravity', projectID: session.directory, directory: session.directory,
     title: session.title, agent: 'antigravity', cost: 0, tokens: session.tokens ?? emptyUsage(), metadata: session.metadata ? z.record(z.string(), z.json()).parse(session.metadata) : undefined,
     ...model?.type === 'select' && { model: { id: model.currentValue, providerID: 'antigravity', ...thought?.type === 'select' && { variant: thought.currentValue } } },
-    time: { created: session.created, updated: session.updated, ...session.archived != null && { archived: session.archived } } };
+    time: { created: session.created, updated: session.updated, ...session.archived != null && { archived: session.archived } },
+    ...session.revert && { revert: session.revert } };
 }
 
 export function acpCatalog(session: AcpConversation): ProviderCatalog {

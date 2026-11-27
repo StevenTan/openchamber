@@ -21,7 +21,7 @@ const root = '/api/conversations'
 const catalogRoot = '/api/conversation-catalog'
 const runtimeRoot = '/api/conversation-runtime'
 type RuntimeClient = Pick<AgentRuntime, 'listPendingForms' | 'listPendingPermissions' | 'getLocation' | 'getConfiguration' | 'listProjects' | 'getVcs' | 'getActiveSessionStatuses'>
-type ConversationBody = CreateConversation | ModelSelection | ConversationContext | ConversationPrompt | { title: string } | { agent: string } | { names: readonly string[] } | { decision: 'once' | 'always' | 'reject'; message?: string } | { answer: Record<string, FormValue> } | { message?: string }
+type ConversationBody = CreateConversation | ModelSelection | ConversationContext | ConversationPrompt | { title: string } | { agent: string } | { names: readonly string[] } | { decision: 'once' | 'always' | 'reject'; message?: string } | { answer: Record<string, FormValue> } | { message?: string } | { messageID: string }
 
 export function createConversationHttpClient(backendID: string, runtime: AgentRuntime): ConversationClient & RuntimeClient {
   const catalogs = new Map<string, Promise<ProviderCatalog>>()
@@ -118,6 +118,9 @@ export function createConversationHttpClient(backendID: string, runtime: AgentRu
       prompt: async prompt => { await request<{ id: string }>(sessionPath(input.id, '/prompt'), directoryOf(input.directory), 'POST', prompt) },
     }),
     abortSession: (id, directory) => request(sessionPath(id, '/interrupt'), directoryOf(directory), 'POST'),
+    stageRevert: (id, messageID, options) => request(sessionPath(id, '/revert/stage'), directoryOf(options?.directory), 'POST', { messageID }),
+    clearRevert: async (id, directory) => { await request(sessionPath(id, '/revert/clear'), directoryOf(directory), 'POST') },
+    commitRevert: async (id, directory) => { await request(sessionPath(id, '/revert/commit'), directoryOf(directory), 'POST') },
     async getProvidersForConfig(directory, options) {
       const folder = directoryOf(directory)
       const key = JSON.stringify([getRuntimeKey(), folder, options?.sessionID])

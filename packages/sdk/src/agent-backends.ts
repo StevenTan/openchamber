@@ -55,6 +55,7 @@ export interface AcpConversation {
   tokens?: AcpTokenUsage;
   archived?: number | null;
   metadata?: Record<string, z.infer<ReturnType<typeof z.json>> | undefined> | undefined;
+  revert?: { messageID: string };
 }
 
 export type AcpConversationEvent =
@@ -62,7 +63,8 @@ export type AcpConversationEvent =
   | { type: 'deleted'; sessionID: string; directory: string }
   | { type: 'turn'; sessionID: string; directory: string; turn: AcpTurn; session: AcpConversation }
   | { type: 'update'; sessionID: string; directory: string; turnID: string; update: SessionNotification['update']; turn: AcpTurn; session: AcpConversation }
-  | { type: 'control'; payload: unknown; directory: string };
+  | { type: 'control'; payload: unknown; directory: string }
+  | { type: 'reverted'; session: AcpConversation; messageID: string };
 
 export interface AcpSend {
   text: string;

@@ -47,4 +47,7 @@ export const conversationClient: ConversationClient = {
   replyToPermission: (id, requestID, reply, options) => getSessionBackend(id).client.replyToPermission(id, requestID, reply, options),
   replyToForm: (id, formID, answer, directory) => getSessionBackend(id).client.replyToForm(id, formID, answer, directory),
   cancelForm: (id, formID, directory, message) => getSessionBackend(id).client.cancelForm(id, formID, directory, message),
+  stageRevert: (id, messageID, options) => getSessionBackend(id).client.stageRevert(id, messageID, options),
+  clearRevert: (id, directory) => getSessionBackend(id).client.clearRevert(id, directory),
+  commitRevert: (id, directory) => getSessionBackend(id).client.commitRevert(id, directory),
 }

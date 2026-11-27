@@ -89,5 +89,8 @@ export function createAntigravityConversations(backend: ReturnType<typeof create
     projects: async () => [...new Set((await backend.list()).map(session => session.directory))].map(folder => ({ id: folder, worktree: folder, time: { created: 0, updated: 0 }, sandboxes: [] })),
     vcs: async () => ({}),
     statuses: async () => backend.statuses(),
+    stageRevert: (id, messageID) => backend.stageRevert(id, messageID),
+    clearRevert: id => backend.clearRevert(id),
+    commitRevert: id => backend.commitRevert(id),
   };
 }
